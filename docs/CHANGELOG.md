@@ -41,6 +41,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Replace the single cloud-like Agent Brain surface and external aura with a recognizable bilateral brain silhouette, central fissure, restrained lower structures, internal status-colored network, and a subdued stage background
 - Replace the network-cloud Agent Brain as the primary visual with a stable semi-solid organic brain volume, layered additive glow, and internal status-driven neural activity; remove continuous whole-brain rotation
 
 ### Fixed

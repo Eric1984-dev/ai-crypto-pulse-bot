@@ -402,17 +402,18 @@ test("Agent Brain uses layered status-driven glow without rotating the brain vol
     documentRef: harness.documentRef,
     initialStatus: "IDLE"
   });
-  const shellMaterial = harness.calls.meshes[1].material;
-  const auraMaterial = harness.calls.meshes[0].material;
+  const shellMaterial = harness.calls.meshes[0].material;
+  const innerGlowMaterial = harness.calls.meshes[1].material;
   const brainGroup = harness.calls.brainGroups[0];
 
   brain.setStatus("ACTIVE");
   const activeIntensity = shellMaterial.emissiveIntensity;
   const activeOpacity = shellMaterial.opacity;
+  const activeInnerGlow = innerGlowMaterial.opacity;
   brain.setStatus("ANALYZING");
   assert.ok(shellMaterial.emissiveIntensity > activeIntensity);
   assert.ok(shellMaterial.opacity > activeOpacity);
-  assert.ok(auraMaterial.opacity > 0.1);
+  assert.ok(innerGlowMaterial.opacity > activeInnerGlow);
 
   brain.setStatus("IDLE");
   assert.ok(shellMaterial.opacity < activeOpacity);
@@ -452,34 +453,42 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.equal(brain.isAvailable(), true);
   assert.equal(harness.calls.rendererOptions.antialias, true);
   assert.equal(harness.calls.rendererOptions.powerPreference, "low-power");
-  assert.deepEqual(harness.calls.sphereGeometryArgs, [[1, 64, 48]]);
-  assert.equal(harness.calls.surfaceGeometries.length, 1);
-  assert.equal(harness.calls.computedNormals, 1);
-  assert.equal(harness.calls.meshes.length, 3);
-  assert.ok(harness.calls.meshes.every((mesh) =>
-    mesh.geometry === harness.calls.surfaceGeometries[0]
-  ));
-  const auraMaterial = harness.calls.meshes[0].material;
-  const shellMaterial = harness.calls.meshes[1].material;
-  const innerGlowMaterial = harness.calls.meshes[2].material;
-  assert.equal(auraMaterial.blending, harness.THREE.AdditiveBlending);
+  assert.deepEqual(harness.calls.sphereGeometryArgs, [
+    [1, 40, 32],
+    [1, 40, 32],
+    [1, 28, 20],
+    [1, 20, 16]
+  ]);
+  assert.equal(harness.calls.surfaceGeometries.length, 4);
+  assert.equal(harness.calls.computedNormals, 4);
+  assert.equal(harness.calls.meshes.length, 6);
+  assert.equal(harness.calls.meshes[0].geometry, harness.calls.surfaceGeometries[0]);
+  assert.equal(harness.calls.meshes[2].geometry, harness.calls.surfaceGeometries[1]);
+  assert.equal(harness.calls.meshes[0].position.x, -0.255);
+  assert.equal(harness.calls.meshes[2].position.x, 0.255);
+  assert.equal(harness.calls.meshes[0].material, harness.calls.meshes[2].material);
+  const shellMaterial = harness.calls.meshes[0].material;
+  const innerGlowMaterial = harness.calls.meshes[1].material;
   assert.equal(innerGlowMaterial.blending, harness.THREE.AdditiveBlending);
-  assert.equal(shellMaterial.shininess, 54);
-  const surface = harness.calls.surfaceGeometries[0].getAttribute("position");
+  assert.equal(shellMaterial.shininess, 66);
+  const leftSurface = harness.calls.surfaceGeometries[0].getAttribute("position");
+  const rightSurface = harness.calls.surfaceGeometries[1].getAttribute("position");
   let minSurfaceX = Infinity;
   let maxSurfaceX = -Infinity;
   let minSurfaceY = Infinity;
   let maxSurfaceY = -Infinity;
-  for (let index = 0; index < surface.count; index += 1) {
-    minSurfaceX = Math.min(minSurfaceX, surface.getX(index));
-    maxSurfaceX = Math.max(maxSurfaceX, surface.getX(index));
-    minSurfaceY = Math.min(minSurfaceY, surface.getY(index));
-    maxSurfaceY = Math.max(maxSurfaceY, surface.getY(index));
+  for (const [surface, offsetX] of [[leftSurface, -0.255], [rightSurface, 0.255]]) {
+    for (let index = 0; index < surface.count; index += 1) {
+      minSurfaceX = Math.min(minSurfaceX, surface.getX(index) + offsetX);
+      maxSurfaceX = Math.max(maxSurfaceX, surface.getX(index) + offsetX);
+      minSurfaceY = Math.min(minSurfaceY, surface.getY(index));
+      maxSurfaceY = Math.max(maxSurfaceY, surface.getY(index));
+    }
   }
   const surfaceWidth = maxSurfaceX - minSurfaceX;
   const surfaceHeight = maxSurfaceY - minSurfaceY;
-  assert.ok(surfaceWidth > surfaceHeight * 1.4);
-  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.021);
+  assert.ok(surfaceWidth > surfaceHeight * 1.15);
+  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.014);
   assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
   const networkPositions = neuralNodes.geometry.getAttribute("position");
   let networkMaxX = 0;
@@ -489,6 +498,9 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.ok(networkMaxX < Math.max(Math.abs(minSurfaceX), Math.abs(maxSurfaceX)));
   const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
   assert.ok(connectionPosition.count > 1000);
+  assert.ok(harness.calls.lineSegmentGeometries.every((geometry) =>
+    geometry === harness.calls.lineSegmentGeometries[0]
+  ));
   assert.ok(harness.calls.lineSegmentGeometries[0].getAttribute("position").count
     <= agentBrain.performanceLimits.maxConnections * 2);
   let leftHemisphereConnections = 0;
@@ -521,7 +533,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.equal(harness.calls.frameCallbacks.size, 1);
   brain.setStatus("STOPPED");
   assert.equal(harness.stateElement.dataset.state, "stopped");
-  const stoppedColor = harness.calls.points.find(({ material }) => material.size === 0.021)
+  const stoppedColor = harness.calls.points.find(({ material }) => material.size === 0.014)
     .material.color.value;
   const stoppedChannels = [
     (stoppedColor >> 16) & 0xff,

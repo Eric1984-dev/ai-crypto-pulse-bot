@@ -159,49 +159,60 @@
 
       const brain = new THREE.Group();
       scene.add(brain);
-      const brainGeometry = trackGeometry(geometries, createBrainSurfaceGeometry(THREE));
-      const auraMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
-        color: config.color,
-        transparent: true,
-        opacity: 0.12,
-        blending: THREE.AdditiveBlending,
-        side: THREE.BackSide,
-        depthWrite: false,
-        depthTest: false
-      }));
-      const aura = new THREE.Mesh(brainGeometry, auraMaterial);
-      aura.scale.set(1.1, 1.1, 1.1);
-      aura.renderOrder = 4;
-      brain.add(aura);
-
+      const leftHemisphereGeometry = trackGeometry(
+        geometries,
+        createHemisphereGeometry(THREE, -1)
+      );
+      const rightHemisphereGeometry = trackGeometry(
+        geometries,
+        createHemisphereGeometry(THREE, 1)
+      );
+      const cerebellumGeometry = trackGeometry(geometries, createCerebellumGeometry(THREE));
+      const brainstemGeometry = trackGeometry(geometries, createBrainstemGeometry(THREE));
       const shellMaterial = trackMaterial(materials, new THREE.MeshPhongMaterial({
-        color: scaleColor(config.color, 0.28),
+        color: scaleColor(config.color, 0.46),
         emissive: config.color,
-        emissiveIntensity: config.emissiveIntensity * 0.22,
+        emissiveIntensity: config.emissiveIntensity * 0.24,
         specular: 0xb9f7ff,
-        shininess: 54,
+        shininess: 66,
         transparent: true,
-        opacity: 0.36,
+        opacity: 0.52,
         side: THREE.DoubleSide,
         depthWrite: false
       }));
-      const shell = new THREE.Mesh(brainGeometry, shellMaterial);
-      shell.renderOrder = 3;
-      brain.add(shell);
-
       const innerGlowMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
         color: config.color,
         transparent: true,
-        opacity: 0.1,
+        opacity: 0.025,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
         depthWrite: false,
         depthTest: false
       }));
-      const innerGlow = new THREE.Mesh(brainGeometry, innerGlowMaterial);
-      innerGlow.scale.set(0.82, 0.82, 0.82);
-      innerGlow.renderOrder = 2;
-      brain.add(innerGlow);
+      for (const [geometry, side] of [
+        [leftHemisphereGeometry, -1],
+        [rightHemisphereGeometry, 1]
+      ]) {
+        const hemisphere = new THREE.Mesh(geometry, shellMaterial);
+        hemisphere.position.x = side * 0.255;
+        hemisphere.renderOrder = 3;
+        brain.add(hemisphere);
+
+        const innerLayer = new THREE.Mesh(geometry, innerGlowMaterial);
+        innerLayer.position.x = side * 0.255;
+        innerLayer.scale.set(0.96, 0.96, 0.96);
+        innerLayer.renderOrder = 2;
+        brain.add(innerLayer);
+      }
+
+      const cerebellum = new THREE.Mesh(cerebellumGeometry, shellMaterial);
+      cerebellum.position.set(0, -0.43, -0.06);
+      cerebellum.renderOrder = 3;
+      brain.add(cerebellum);
+      const brainstem = new THREE.Mesh(brainstemGeometry, shellMaterial);
+      brainstem.position.set(0, -0.63, -0.03);
+      brainstem.renderOrder = 3;
+      brain.add(brainstem);
 
       const nodePositions = createNodePositions(THREE);
       const connectionPairs = createConnectionPairs(nodePositions);
@@ -218,7 +229,7 @@
         vertexColors: true,
         transparent: true,
         opacity: 0.56,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       const connectionGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
@@ -226,7 +237,7 @@
         vertexColors: true,
         transparent: true,
         opacity: 0.16,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       brain.add(new THREE.LineSegments(connectionsGeometry, connectionGlowMaterial));
@@ -238,21 +249,21 @@
       const animatedNodePositions = new Float32Array(nodePositions.length * 3);
       const nodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.045,
+        size: 0.036,
         sizeAttenuation: true,
         transparent: true,
         opacity: 0.16,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       brain.add(new THREE.Points(nodeGeometry, nodeGlowMaterial));
       const nodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.021,
+        size: 0.014,
         sizeAttenuation: true,
         transparent: true,
         opacity: 0.95,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       brain.add(new THREE.Points(nodeGeometry, nodeMaterial));
@@ -266,7 +277,7 @@
         sizeAttenuation: true,
         transparent: true,
         opacity: 0.98,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       const activityGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
@@ -275,7 +286,7 @@
         sizeAttenuation: true,
         transparent: true,
         opacity: 0.32,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false
       }));
       brain.add(new THREE.Points(activityGeometry, activityGlowMaterial));
@@ -300,22 +311,21 @@
         const warningDim = config.mode === "warning" && rawIntensity < 0.3;
         const visibleStrength = warningDim ? 0.08 : strength;
         const shellBase = {
-          ACTIVE: 0.22,
-          ANALYZING: 0.25,
-          IDLE: 0.17,
-          STOPPED: 0.15,
-          ERROR: 0.21,
-          UNKNOWN: 0.14
+          ACTIVE: 0.35,
+          ANALYZING: 0.42,
+          IDLE: 0.24,
+          STOPPED: 0.12,
+          ERROR: 0.34,
+          UNKNOWN: 0.19
         }[config.status];
 
-        shellMaterial.emissiveIntensity = rawIntensity * 0.22;
-        shellMaterial.opacity = shellBase + visibleStrength * 0.1 + idleBreath * 0.04;
-        auraMaterial.opacity = 0.015 + visibleStrength * 0.12 + idleBreath * 0.035;
-        innerGlowMaterial.opacity = 0.012 + visibleStrength * 0.065;
-        connectionMaterial.opacity = 0.08 + visibleStrength * 0.32;
-        connectionGlowMaterial.opacity = 0.025 + visibleStrength * 0.12;
-        nodeMaterial.opacity = 0.55 + visibleStrength * 0.44;
-        nodeGlowMaterial.opacity = 0.03 + visibleStrength * 0.16;
+        shellMaterial.emissiveIntensity = rawIntensity * 0.2;
+        shellMaterial.opacity = shellBase + visibleStrength * 0.1 + idleBreath * 0.025;
+        innerGlowMaterial.opacity = 0.008 + visibleStrength * 0.05;
+        connectionMaterial.opacity = 0.015 + visibleStrength * 0.38;
+        connectionGlowMaterial.opacity = 0.008 + visibleStrength * 0.14;
+        nodeMaterial.opacity = 0.07 + visibleStrength * 0.45;
+        nodeGlowMaterial.opacity = 0.008 + visibleStrength * 0.12;
         activityMaterial.opacity = 0.75 + visibleStrength * 0.25;
         activityGlowMaterial.opacity = 0.08 + visibleStrength * 0.42;
       }
@@ -412,8 +422,7 @@
         if (typeof container.setAttribute === "function") {
           container.setAttribute("aria-label", `3D Agent Brain; status ${config.status}`);
         }
-        setMaterialColor(auraMaterial, config.color);
-        setColor(shellMaterial.color, scaleColor(config.color, 0.28));
+        setColor(shellMaterial.color, scaleColor(config.color, 0.46));
         setColor(shellMaterial.emissive, config.color);
         setMaterialColor(innerGlowMaterial, config.color);
         setMaterialColor(connectionMaterial, config.color);
@@ -571,14 +580,15 @@
     }
   }
 
-  function createBrainSurfaceGeometry(THREE) {
-    const geometry = new THREE.SphereGeometry(1, 64, 48);
+  function createHemisphereGeometry(THREE, side) {
+    const geometry = new THREE.SphereGeometry(1, 40, 32);
     const positions = geometry.getAttribute("position");
     for (let index = 0; index < positions.count; index += 1) {
-      const point = deformBrainVertex(
+      const point = deformHemisphereVertex(
         positions.getX(index),
         positions.getY(index),
-        positions.getZ(index)
+        positions.getZ(index),
+        side
       );
       positions.setXYZ(index, point.x, point.y, point.z);
     }
@@ -587,37 +597,66 @@
     return geometry;
   }
 
-  function deformBrainVertex(x, y, z) {
-    const midline = Math.exp(-x * x * 105) * (0.32 + Math.abs(y) * 0.68)
-      * Math.max(0, z);
-    const corticalFold = Math.sin(y * 17 + Math.sin(z * 9) * 0.8)
-      * Math.cos(x * 14 - z * 6);
-    const secondaryFold = Math.sin(y * 8 + x * 5) * Math.sin(z * 12 - x * 4);
-    const cerebellarBulge = Math.exp(-((y + 0.62) ** 2) * 34)
-      * Math.exp(-((z + 0.18) ** 2) * 16);
-    const contour = 1 + corticalFold * 0.045 + secondaryFold * 0.018
-      + cerebellarBulge * 0.055;
-    const centralCompression = 1 - midline * 0.075;
-
+  function deformHemisphereVertex(x, y, z, side) {
+    const outwardX = x * side;
+    const medialFlattening = outwardX < 0 ? 0.76 : 1;
+    const frontalTaper = 1 - 0.16 * Math.max(0, x) * Math.max(0, y);
+    const lowerTemporalBulge = 1 + 0.11 * Math.exp(-((y + 0.35) ** 2) * 14)
+      * Math.exp(-((x - side * 0.35) ** 2) * 8);
+    const longitude = Math.atan2(z, x);
+    const broadGyri = Math.sin(y * 18 + longitude * 3.2
+      + Math.sin(longitude * 8) * 0.45);
+    const secondaryGyri = Math.sin(y * 31 - longitude * 5.4)
+      * Math.cos(x * 7 + y * 2);
+    const fold = 1 + broadGyri * 0.064 + secondaryGyri * 0.03;
+    const radial = fold * lowerTemporalBulge;
     return {
-      x: x * 0.96 * contour * centralCompression,
-      y: y * 0.56 * contour,
-      z: z * 0.37 * contour - midline * 0.14
+      x: x * 0.34 * medialFlattening * frontalTaper * radial,
+      y: y * 0.48 * radial,
+      z: z * 0.29 * frontalTaper * radial
     };
+  }
+
+  function createCerebellumGeometry(THREE) {
+    const geometry = new THREE.SphereGeometry(1, 28, 20);
+    const positions = geometry.getAttribute("position");
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const y = positions.getY(index);
+      const z = positions.getZ(index);
+      const folds = 1 + Math.sin(x * 11 + y * 17) * 0.035;
+      positions.setXYZ(index, x * 0.25 * folds, y * 0.16 * folds, z * 0.2 * folds);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  function createBrainstemGeometry(THREE) {
+    const geometry = new THREE.SphereGeometry(1, 20, 16);
+    const positions = geometry.getAttribute("position");
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const y = positions.getY(index);
+      const z = positions.getZ(index);
+      const taper = 0.72 + (y + 1) * 0.16;
+      positions.setXYZ(index, x * 0.105 * taper, y * 0.27, z * 0.1 * taper);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    return geometry;
   }
 
   function createMidlineFissure(THREE) {
     const points = [];
-    for (let index = 0; index <= 36; index += 1) {
-      const progress = index / 36;
-      const y = 0.49 - progress * 0.96;
-      const normalizedY = y / 0.56;
-      const z = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY)) * 0.37
-        - 0.14 * Math.max(0.32 + Math.abs(normalizedY) * 0.68, 0);
+    for (let index = 0; index <= 32; index += 1) {
+      const progress = index / 32;
+      const y = 0.48 - progress * 0.91;
+      const z = 0.29 * Math.sqrt(Math.max(0, 1 - (y / 0.48) ** 2)) + 0.008;
       points.push(new THREE.Vector3(
-        Math.sin(progress * Math.PI * 2) * 0.008,
+        Math.sin(progress * Math.PI * 2) * 0.004,
         y,
-        z + 0.006
+        z
       ));
     }
     return points;
@@ -631,21 +670,20 @@
 
     for (const side of [-1, 1]) {
       for (let index = 0; index < pointsPerHemisphere; index += 1) {
-        const lateral = (index + 0.5) / pointsPerHemisphere;
-        const angle = index * goldenAngle + (side > 0 ? 0.23 : 0);
-        const ringRadius = Math.sqrt(1 - lateral * lateral);
-        const vertical = ringRadius * Math.cos(angle);
-        const depth = ringRadius * Math.sin(angle);
-        const folds = Math.sin(angle * 5.2 + lateral * 13 + side * 0.4) * 0.075
-          + Math.cos(angle * 8 - lateral * 9) * 0.035
-          + Math.sin(angle * 3.1 + side * 0.9) * 0.035;
-        const contour = 1 + folds;
-        const radial = 0.56 + ((index * 0.61803398875 + (side > 0 ? 0.31 : 0)) % 1) * 0.39;
-
+        const u = (index + 0.5) / pointsPerHemisphere;
+        const polar = Math.acos(1 - 2 * u);
+        const azimuth = index * goldenAngle + (side > 0 ? 0.24 : 0);
+        const radius = 0.28 + ((index * 0.61803398875 + (side > 0 ? 0.31 : 0)) % 1) * 0.65;
+        const local = deformHemisphereVertex(
+          Math.sin(polar) * Math.cos(azimuth) * radius,
+          Math.cos(polar) * radius,
+          Math.sin(polar) * Math.sin(azimuth) * radius,
+          side
+        );
         positions.push(new THREE.Vector3(
-          side * (0.035 + lateral * 0.82 * contour * radial),
-          vertical * 0.49 * contour * radial,
-          depth * 0.32 * contour * radial * (1 + Math.max(0, depth) * 0.035)
+          side * 0.255 + local.x,
+          local.y,
+          local.z
         ));
       }
     }
@@ -655,9 +693,9 @@
       const radius = 0.078 * (1 - progress) + 0.014;
       const angle = index * goldenAngle;
       positions.push(new THREE.Vector3(
-        Math.cos(angle) * radius,
-        -0.4 - progress * 0.17,
-        Math.sin(angle) * radius * 0.62
+        Math.cos(angle) * radius * 0.65,
+        -0.57 - progress * 0.21,
+        Math.sin(angle) * radius
       ));
     }
 
