@@ -12,9 +12,14 @@
     [...protectedPaths]
   );
   const message = document.querySelector("[data-auth-message]");
-  const isRecoveryLink = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const recoveryAccessToken = hashParams.get("access_token") || searchParams.get("access_token");
+  const isRecoveryLink = hashParams.get("type") === "recovery"
+    || searchParams.get("type") === "recovery";
   const sdkUrl = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
   let clearCookieRequest;
+  let recoverySessionDetected = false;
 
   function showMessage(text, isError = false) {
     if (!message) {
@@ -73,6 +78,31 @@
     return typeof session?.access_token === "string" && session.access_token.length > 0;
   }
 
+  function hasRecoverySession(session) {
+    if (!hasAccessToken(session)) {
+      return false;
+    }
+    if (recoverySessionDetected) {
+      return true;
+    }
+    return isRecoveryLink && session.access_token === recoveryAccessToken;
+  }
+
+  function setRecoveryFormVisibility(isRecoverySession) {
+    const requestForm = document.querySelector("#reset-request-form");
+    const passwordForm = document.querySelector("#reset-password-form");
+
+    if (requestForm) {
+      requestForm.hidden = isRecoverySession;
+    }
+    if (passwordForm) {
+      passwordForm.hidden = !isRecoverySession;
+    }
+    if (isRecoverySession) {
+      showMessage("Choose a new password for your account.");
+    }
+  }
+
   async function initialize() {
     const response = await fetch("/api/auth-config", { cache: "no-store" });
     if (!response.ok) {
@@ -86,6 +116,10 @@
     const auth = window.CryptoPulseAuth.createAuthService(client);
 
     auth.onAuthStateChange((event, session) => {
+      if (pageType === "reset" && event === "PASSWORD_RECOVERY" && hasAccessToken(session)) {
+        recoverySessionDetected = true;
+        setRecoveryFormVisibility(true);
+      }
       if (event === "TOKEN_REFRESHED" && hasAccessToken(session)) {
         requestSessionCookie(session).catch((error) => showMessage(error.message, true));
       }
@@ -124,6 +158,10 @@
       await requestSessionCookie(session);
       window.location.replace(nextPath);
       return;
+    }
+
+    if (pageType === "reset") {
+      setRecoveryFormVisibility(hasRecoverySession(session) || recoverySessionDetected);
     }
 
     document.documentElement.classList.remove("auth-pending");
@@ -179,10 +217,15 @@
         if (password !== form.elements.confirmPassword.value) {
           throw new Error("The passwords do not match.");
         }
-        await auth.updatePassword(password);
         const session = await auth.getSession();
-        if (hasAccessToken(session)) {
-          await requestSessionCookie(session);
+        if (!hasRecoverySession(session)) {
+          setRecoveryFormVisibility(false);
+          throw new Error("Open a valid password recovery link before changing your password.");
+        }
+        await auth.updatePassword(password);
+        const updatedSession = await auth.getSession();
+        if (hasAccessToken(updatedSession)) {
+          await requestSessionCookie(updatedSession);
           window.location.replace("/dashboard.html");
           return;
         }
@@ -190,12 +233,6 @@
         window.location.replace("/login.html");
       });
     });
-
-    if (pageType === "reset" && isRecoveryLink) {
-      document.querySelector("#reset-request-form")?.setAttribute("hidden", "");
-      document.querySelector("#reset-password-form")?.removeAttribute("hidden");
-      showMessage("Choose a new password for your account.");
-    }
 
     if (pageType === "login" && new URLSearchParams(window.location.search).has("verified")) {
       showMessage("Email confirmed. You can now sign in.");

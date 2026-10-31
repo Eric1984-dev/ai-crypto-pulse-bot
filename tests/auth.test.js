@@ -53,6 +53,155 @@ function createFakeClient(session = { access_token: testAccessToken }) {
   return { client: { auth }, calls, data };
 }
 
+async function loadResetPage({ search = "", hash = "", session = null, recoveryEvent = false } = {}) {
+  const authConfig = await authConfigModule;
+  const authSession = await authSessionModule;
+  const configHandler = authConfig.createHandler({ env: authEnv });
+  const sessionHandler = authSession.createHandler({
+    env: { ...authEnv, NODE_ENV: "production" },
+    verify: async (token) => token === testAccessToken
+  });
+  const requests = [];
+  const authCalls = [];
+  const redirects = [];
+  let resolvePageReady;
+  let authStateListener;
+  const pageReady = new Promise((resolve) => {
+    resolvePageReady = resolve;
+  });
+
+  function createForm(elements = {}, hidden = false) {
+    let submitListener;
+    const submitButton = { disabled: false };
+    return {
+      elements,
+      hidden,
+      addEventListener(eventName, listener) {
+        if (eventName === "submit") {
+          submitListener = listener;
+        }
+      },
+      querySelector() {
+        return submitButton;
+      },
+      removeAttribute(attribute) {
+        if (attribute === "hidden") {
+          this.hidden = false;
+        }
+      },
+      reset() {},
+      setAttribute(attribute) {
+        if (attribute === "hidden") {
+          this.hidden = true;
+        }
+      },
+      async submit() {
+        await submitListener({
+          preventDefault() {},
+          currentTarget: this
+        });
+      }
+    };
+  }
+
+  const requestForm = createForm({ email: { value: "trader@example.test" } });
+  const passwordForm = createForm({
+    password: { value: "" },
+    confirmPassword: { value: "" }
+  }, true);
+  const forms = {
+    "#reset-request-form": requestForm,
+    "#reset-password-form": passwordForm
+  };
+  const message = { textContent: "", dataset: {} };
+  const document = {
+    body: { dataset: { authPage: "reset" } },
+    documentElement: { classList: { remove: resolvePageReady } },
+    querySelector(selector) {
+      return selector === "[data-auth-message]" ? message : forms[selector] || null;
+    },
+    querySelectorAll() {
+      return [];
+    }
+  };
+  const sessionClient = {
+    auth: {
+      getSession: async () => ({ data: { session }, error: null }),
+      onAuthStateChange(callback) {
+        authStateListener = callback;
+        if (recoveryEvent && session) {
+          callback("PASSWORD_RECOVERY", session);
+        }
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      async updateUser(args) {
+        authCalls.push(["updateUser", args]);
+        return { data: { user: session?.user || null }, error: null };
+      }
+    }
+  };
+  const window = {
+    CryptoPulseAuth: require("../js/auth-service.js"),
+    location: {
+      origin: "https://app.test",
+      search,
+      hash,
+      pathname: "/reset-password.html",
+      replace(destination) {
+        redirects.push(destination);
+      }
+    }
+  };
+  const fetch = async (url, options = {}) => {
+    const method = options.method || "GET";
+    requests.push({ url, method });
+    const res = createResponse();
+
+    if (url === "/api/auth-config") {
+      configHandler({ method }, res);
+      return { ok: res.statusCode === 200, json: async () => JSON.parse(res.body) };
+    }
+
+    if (url === "/api/auth-session") {
+      await sessionHandler({
+        method,
+        headers: {},
+        body: method === "POST" ? JSON.parse(options.body) : undefined
+      }, res);
+      return { ok: res.statusCode >= 200 && res.statusCode < 300 };
+    }
+
+    throw new Error(`Unexpected request: ${method} ${url}`);
+  };
+  const source = fs.readFileSync(path.join(rootDirectory, "js/auth.js"), "utf8");
+  const sdkImport = "const sdk = await import(sdkUrl);";
+  assert.ok(source.includes(sdkImport));
+  const browserCode = source.replace(sdkImport, "const sdk = { createClient: () => sessionClient };");
+
+  vm.runInNewContext(browserCode, {
+    document,
+    window,
+    fetch,
+    sessionClient,
+    URL,
+    URLSearchParams
+  });
+
+  let timeout;
+  try {
+    await Promise.race([
+      pageReady,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("Reset page auth did not finish initializing.")), 2000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  return { authCalls, forms, message, redirects, requests, authStateListener };
+}
+
 test("registration calls Supabase Auth with confirmation redirect", async () => {
   const { client, calls, data } = createFakeClient();
   const auth = createAuthService(client);
@@ -97,6 +246,75 @@ test("password reset and password update use Supabase Auth", async () => {
     { redirectTo: "https://app.test/reset-password.html" }
   ]);
   assert.deepEqual(calls[1], ["updateUser", { password: "New-strong-password-2" }]);
+});
+
+test("anonymous password reset page exposes only the email form", async () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "reset-password.html"), "utf8");
+  const styles = fs.readFileSync(path.join(rootDirectory, "css/styles.css"), "utf8");
+  const passwordFormMarkup = html.match(/<form[^>]*id="reset-password-form"[^>]*>/);
+  assert.ok(passwordFormMarkup);
+  assert.match(passwordFormMarkup[0], /\shidden(?:\s|>)/);
+  assert.match(styles, /\.auth-card form\[hidden\]\s*\{\s*display:\s*none\s*;\s*\}/);
+
+  const page = await loadResetPage();
+  assert.equal(page.forms["#reset-request-form"].hidden, false);
+  assert.equal(page.forms["#reset-password-form"].hidden, true);
+  assert.equal(page.requests.some((request) => request.url === "/api/auth-session"), false);
+
+  const invalidRecoveryLink = await loadResetPage({
+    hash: "#type=recovery",
+    session: { access_token: testAccessToken, user: { email: "trader@example.test" } }
+  });
+  assert.equal(invalidRecoveryLink.forms["#reset-request-form"].hidden, false);
+  assert.equal(invalidRecoveryLink.forms["#reset-password-form"].hidden, true);
+});
+
+test("valid recovery link sessions reveal the password change form", async () => {
+  const session = {
+    access_token: testAccessToken,
+    expires_in: 3600,
+    user: { email: "trader@example.test" }
+  };
+  const hashFlow = await loadResetPage({
+    hash: `#access_token=${testAccessToken}&type=recovery`,
+    session
+  });
+  assert.equal(hashFlow.forms["#reset-request-form"].hidden, true);
+  assert.equal(hashFlow.forms["#reset-password-form"].hidden, false);
+  assert.match(hashFlow.message.textContent, /Choose a new password/);
+
+  const eventFlow = await loadResetPage({
+    search: "?code=recovery-code",
+    session,
+    recoveryEvent: true
+  });
+  assert.equal(eventFlow.forms["#reset-request-form"].hidden, true);
+  assert.equal(eventFlow.forms["#reset-password-form"].hidden, false);
+
+  const codeFlow = await loadResetPage({ search: "?code=recovery-code", session });
+  assert.equal(codeFlow.forms["#reset-request-form"].hidden, false);
+  assert.equal(codeFlow.forms["#reset-password-form"].hidden, true);
+});
+
+test("password update requires a recovery session and completes through Supabase Auth", async () => {
+  const session = {
+    access_token: testAccessToken,
+    expires_in: 3600,
+    user: { email: "trader@example.test" }
+  };
+  const page = await loadResetPage({
+    hash: `#access_token=${testAccessToken}&type=recovery`,
+    session
+  });
+  const form = page.forms["#reset-password-form"];
+  form.elements.password.value = "New-strong-password-2";
+  form.elements.confirmPassword.value = "New-strong-password-2";
+
+  await form.submit();
+
+  assert.deepEqual(page.authCalls, [["updateUser", { password: "New-strong-password-2" }]]);
+  assert.ok(page.requests.some((request) => request.url === "/api/auth-session" && request.method === "POST"));
+  assert.ok(page.redirects.includes("/dashboard.html"));
 });
 
 test("Supabase client persists sessions and handles auth redirect URLs", () => {

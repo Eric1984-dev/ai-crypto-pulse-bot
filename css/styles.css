@@ -230,6 +230,10 @@ h2 {
   gap: 12px;
 }
 
+.auth-card form[hidden] {
+  display: none;
+}
+
 .auth-card label {
   margin-top: 5px;
   color: #dcebe1;
