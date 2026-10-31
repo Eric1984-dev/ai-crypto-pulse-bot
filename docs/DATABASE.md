@@ -65,6 +65,11 @@ created_at TIMESTAMP
 
 updated_at TIMESTAMP
 
+Relationship:
+
+id references auth.users.id
+
+One Profile exists for each authenticated Supabase user.
 ---
 
 # AI_Crypto_Bot_Portfolios
@@ -89,6 +94,9 @@ created_at TIMESTAMP
 
 updated_at TIMESTAMP
 
+Foreign Keys:
+
+user_id -> AI_Crypto_Bot_Profiles.id
 ---
 
 # AI_Crypto_Bot_Positions
@@ -124,6 +132,10 @@ Ondersteunde statussen:
 OPEN
 
 CLOSED
+
+Foreign Keys:
+
+portfolio_id -> AI_Crypto_Bot_Portfolios.id
 
 ---
 
@@ -161,6 +173,9 @@ BUY
 
 SELL
 
+Foreign Keys:
+
+portfolio_id -> AI_Crypto_Bot_Portfolios.id
 ---
 
 # AI_Crypto_Bot_AI_Decisions
@@ -196,6 +211,18 @@ SELL
 HOLD
 
 WAIT
+
+Classification:
+
+Server Managed
+
+Access:
+
+Read:
+Authenticated Users
+
+Write:
+Server Only
 
 ---
 
@@ -233,9 +260,6 @@ STOPPED
 
 ERROR
 
-PAUSED
-
-EMERGENCY_STOP
 
 ---
 
@@ -377,6 +401,9 @@ reason TEXT
 
 created_at TIMESTAMP
 
+Foreign Keys:
+
+strategy_id -> AI_Crypto_Bot_Strategies.id
 ---
 
 # AI_Crypto_Bot_Strategy_Performance
@@ -405,6 +432,9 @@ score NUMERIC
 
 created_at TIMESTAMP
 
+Foreign Keys:
+
+strategy_id -> AI_Crypto_Bot_Strategies.id
 ---
 
 # AI_Crypto_Bot_Backtests
@@ -429,6 +459,10 @@ drawdown NUMERIC
 
 created_at TIMESTAMP
 
+Foreign Keys:
+
+strategy_id -> AI_Crypto_Bot_Strategies.id
+
 ---
 
 # AI_Crypto_Bot_Portfolio_Snapshots
@@ -451,6 +485,9 @@ open_positions INTEGER
 
 captured_at TIMESTAMP
 
+Foreign Keys:
+
+portfolio_id -> AI_Crypto_Bot_Portfolios.id
 ---
 
 # AI_Crypto_Bot_Scanner_Events
@@ -473,6 +510,17 @@ confidence NUMERIC
 
 created_at TIMESTAMP
 
+Classification:
+
+Server Managed
+
+Access:
+
+Read:
+Authenticated Users
+
+Write:
+Server Only
 ---
 
 # AI_Crypto_Bot_Emergency_State
@@ -493,7 +541,7 @@ created_at TIMESTAMP
 
 Ondersteunde statussen:
 
-ACTIVE
+NORMAL
 
 PAUSED
 
@@ -531,11 +579,58 @@ AI_Crypto_Bot_Backtests
 
 # Row Level Security
 
-Alle tabellen moeten Row Level Security ondersteunen.
+All tables must support Row Level Security.
 
-Gebruikers mogen enkel hun eigen gegevens bekijken.
+User Owned Tables
 
-Admin-functionaliteit moet gescheiden blijven van gebruikersfunctionaliteit.
+- AI_Crypto_Bot_Profiles
+- AI_Crypto_Bot_Portfolios
+- AI_Crypto_Bot_Positions
+- AI_Crypto_Bot_Trades
+- AI_Crypto_Bot_Portfolio_Snapshots
+- AI_Crypto_Bot_AI_Decisions
+- AI_Crypto_Bot_Scanner_Events
+
+DeOwnership Policies are defined per table.
+
+AI_Crypto_Bot_Profiles
+
+auth.uid() = id
+
+AI_Crypto_Bot_Portfolios
+
+auth.uid() = user_id
+
+AI_Crypto_Bot_Positions
+
+Ownership is inherited through portfolio_id.
+
+AI_Crypto_Bot_Trades
+
+Ownership is inherited through portfolio_id.
+
+AI_Crypto_Bot_Portfolio_Snapshots
+
+Ownership is inherited through portfolio_id.
+
+Global Read Tables
+
+- AI_Crypto_Bot_Watched_Markets
+- AI_Crypto_Bot_Market_Data
+- AI_Crypto_Bot_Candles
+
+Server Managed Tables
+
+- AI_Crypto_Bot_Status
+- AI_Crypto_Bot_Emergency_State
+- AI_Crypto_Bot_Strategies
+- AI_Crypto_Bot_Strategy_Changes
+- AI_Crypto_Bot_Strategy_Performance
+- AI_Crypto_Bot_Backtests
+- AI_Crypto_Bot_AI_Decisions
+- AI_Crypto_Bot_Scanner_Events
+
+Administrative functionality must remain separated from user functionality.
 
 ---
 
@@ -552,6 +647,43 @@ Nooit rechtstreeks productie-tabellen wijzigen zonder migratie.
 
 ---
 
+# Migration Procedure
+
+All database changes must be implemented through Supabase migrations.
+
+Migration Order:
+
+1. Create Tables
+2. Create Constraints
+3. Create Indexes
+4. Create RLS Policies
+5. Seed Required Data
+6. Validate Schema
+
+Migration files must be stored in:
+
+supabase/migrations/
+
+No direct schema modifications are allowed.
+
+---
+
+# Seed Data
+
+Initial seed data includes:
+
+AI_Crypto_Bot_Watched_Markets
+
+Source:
+
+config/markets.js
+
+Required default markets are seeded during initial deployment.
+
+No user data may be seeded.
+
+---
+
 # Future Extensions
 
 De database moet voorbereid zijn op:
@@ -564,3 +696,25 @@ De database moet voorbereid zijn op:
 - Live Trading Support
 
 zonder bestaande data te breken.
+
+# PostgreSQL Naming
+
+Documentation uses:
+
+AI_Crypto_Bot_Profiles
+
+for readability.
+
+Actual PostgreSQL table names should use lowercase identifiers:
+
+ai_crypto_bot_profiles
+
+ai_crypto_bot_portfolios
+
+ai_crypto_bot_positions
+
+ai_crypto_bot_trades
+
+Applications should use lowercase PostgreSQL identifiers.
+
+Documentation may continue to use the readable project format.
