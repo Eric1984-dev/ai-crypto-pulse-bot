@@ -9,6 +9,7 @@ The bilateral brain silhouette, dashboard position, Supabase status integration,
 ## Changes
 
 - Kept the existing 720 neuron positions and connected the network to the full 2160-edge limit using evenly distributed, short-range links. No node positions or contour paths were changed.
+- Slightly increased the rendered brain's vertical scale by 6%, anchoring its lower edge to preserve the existing dashboard placement.
 - Added independent, deterministic per-neuron pulse phases. All 720 nodes render with per-vertex intensity; active neurons temporarily brighten and selected active neurons receive localized glow.
 - Added up to 48 deterministic routes that traverse adjacent network edges. Signal particles move from neuron to neuron, activating their current endpoints and brightening the current pathway with a short trailing signal.
 - Reduced pathway and glow-layer opacity. Inactive connections remain dim rather than contributing a uniform network glow.

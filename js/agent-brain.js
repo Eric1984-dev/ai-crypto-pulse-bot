@@ -363,7 +363,8 @@
         const height = Math.max(1, container.clientHeight || 200);
         camera.aspect = width / height;
         const responsiveScale = Math.min(1.18, 1 + Math.max(0, (camera.aspect - 1.5) * 0.08));
-        brain.scale.set(responsiveScale * 1.08, responsiveScale, responsiveScale);
+        brain.scale.set(responsiveScale * 1.08, responsiveScale * 1.06, responsiveScale);
+        brain.position.y = responsiveScale * 0.55 * 0.06;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
         renderStatic();
