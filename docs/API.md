@@ -100,7 +100,7 @@ The market endpoints require a valid `cp_access_token` session and preserve the 
 
 ### GET /api/market-summary
 
-Returns the active watched-market count, the count with stored market data, available stored snapshots, the latest capture time, and refresh state. A scheduled Vercel Cron invocation synchronizes valid configured EUR markets and refreshes stale ticker snapshots. Existing watched-market rows are never overwritten or removed by synchronization.
+Returns the active watched-market count, the count with stored market data, available stored snapshots, the latest capture time, and refresh state. Vercel Cron where available, or an external scheduler, can invoke the refresh endpoint to synchronize valid configured EUR markets and refresh stale ticker snapshots. Existing watched-market rows are never overwritten or removed by synchronization.
 
 Success response:
 
@@ -138,7 +138,7 @@ Provider errors, empty responses, and timeouts preserve and return the most rece
 
 ### GET /api/market-refresh
 
-Vercel Cron-only endpoint, scheduled every five minutes. It requires `Authorization: Bearer <CRON_SECRET>` and a server-only `SUPABASE_SERVICE_ROLE_KEY`. It validates configured symbols against the live public market catalog, adds only missing valid markets, and refreshes stale ticker snapshots. It does not expose either secret.
+Scheduled-refresh endpoint callable by an external scheduler such as cron-job.org, or by Vercel Cron on plans that support the desired schedule. It requires `Authorization: Bearer <CRON_SECRET>` and a server-only `SUPABASE_SERVICE_ROLE_KEY`. Configure the scheduler to issue a `GET` request to the deployed `/api/market-refresh` URL and send the authorization header; do not put the secret in the URL or query string. The endpoint validates configured symbols against the live public market catalog, adds only missing valid markets, and refreshes stale ticker snapshots. It does not expose either secret.
 
 Market endpoint responses use `Cache-Control: no-store`; Bitvavo data and market catalog entries are cached in memory for 60 seconds. Serverless instances have independent in-memory caches, so the persisted `captured_at` timestamp also determines database freshness.
 

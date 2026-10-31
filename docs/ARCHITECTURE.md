@@ -272,7 +272,7 @@ without modifying application code.
 
 # Phase 06 Market Data Flow
 
-Vercel Cron / authenticated market request
+External scheduler / Vercel Cron where available / authenticated market request
 ↓
 Market Data Service
 ↓
@@ -476,7 +476,8 @@ Scheduled Jobs:
 
 Execution Platform:
 
-- Vercel Cron Jobs
+- External scheduler such as cron-job.org
+- Vercel Cron where the deployment plan supports the required schedule
 - Scheduled Functions
 
 Requirements:

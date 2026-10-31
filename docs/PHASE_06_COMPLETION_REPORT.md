@@ -7,7 +7,7 @@
 ## Implementation summary
 
 - Expanded `config/markets.js` to 102 EUR markets validated against Bitvavo's public market catalog. `SWEAT-EUR` was excluded because it was not available as a trading EUR market during validation.
-- Added authenticated market and market-summary APIs, plus a five-minute Vercel Cron endpoint for server-side market refresh.
+- Added authenticated market and market-summary APIs, plus a server-side market refresh endpoint callable by an external scheduler.
 - Validated configured markets before synchronization. Only missing valid markets are inserted; existing watched-market settings are preserved, and invalid configured markets are logged rather than inserted.
 - Added 60-second in-memory caching for Bitvavo market catalog, tickers, and requested candle intervals.
 - Added safe fallback to stored market snapshots and candles when the public provider is empty, rate-limited, timed out, or unavailable.
@@ -36,13 +36,13 @@ No `Agent_*` tables or database migrations were added. Authenticated reads prese
 
 ## Caching and refresh behavior
 
-Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary refreshes. The Vercel Cron route refreshes ticker snapshots every five minutes; candle data is fetched and upserted when an authenticated market request asks for a symbol and interval. Independent serverless instances have separate in-memory caches.
+Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary refreshes. An external scheduler can invoke the refresh endpoint at its configured interval to update ticker snapshots; candle data is fetched and upserted when an authenticated market request asks for a symbol and interval. Independent serverless instances have separate in-memory caches.
 
 ## Endpoints created
 
 - `GET /api/market` — authenticated stored market snapshot and requested candles; validates symbol, interval, and limit.
 - `GET /api/market-summary` — authenticated active-market counts, markets-with-data count, snapshots, and refresh status.
-- `GET /api/market-refresh` — Vercel Cron endpoint protected by `CRON_SECRET`; uses server-side Supabase credentials.
+- `GET /api/market-refresh` — scheduler-independent endpoint protected by `CRON_SECRET`; uses server-side Supabase credentials.
 
 ## Files changed
 
@@ -65,7 +65,7 @@ Provider responses are cached in memory for 60 seconds. Persisted snapshot times
 
 - In-memory caches are per serverless instance; database `captured_at` freshness provides cross-instance protection for ticker snapshots.
 - Scheduled refresh updates ticker snapshots; historical candle updates are request-driven rather than periodically backfilled.
-- Supabase Cron operation requires `SUPABASE_SERVICE_ROLE_KEY` and a strong `CRON_SECRET` in server-side Vercel environment configuration.
+- Scheduled refresh requires `SUPABASE_SERVICE_ROLE_KEY` and a strong `CRON_SECRET` in server-side Vercel environment configuration, plus a configured external scheduler or supported Vercel Cron plan.
 - No signal generation, scanning decisions, AI, trading, backtesting, or live trading is included.
 
 ## Phase 07 readiness

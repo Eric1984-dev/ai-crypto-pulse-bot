@@ -36,7 +36,18 @@ ENABLE_LIVE_TRADING=false
 
 For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` and serves `/api/*` routes. Opening the HTML files through a static-only server does not run the protected-page functions.
 
-The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization and writes; `CRON_SECRET` protects `/api/market-refresh`. Keep both secrets out of browser configuration and logs. Vercel invokes the market refresh every five minutes, and Bitvavo access uses public endpoints without an API key.
+The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization and writes; `CRON_SECRET` protects `/api/market-refresh`. Keep both secrets out of browser configuration and logs. Bitvavo access uses public endpoints without an API key.
+
+### External scheduled market refresh
+
+The market refresh function remains available at `/api/market-refresh`, but `vercel.json` does not declare a Vercel Cron schedule. This keeps deployment compatible with Vercel Hobby. Configure an external scheduler such as cron-job.org:
+
+1. Set the task URL to `https://<your-deployment-host>/api/market-refresh`.
+2. Select `GET` and a schedule supported by the scheduler.
+3. Add the HTTP header `Authorization: Bearer <CRON_SECRET>`, using the same secret configured as a server-side Vercel environment variable.
+4. Do not include the secret in the URL, query string, or task name. Confirm successful runs return HTTP `200`.
+
+Vercel Cron can still be used on plans that support the chosen schedule; it is not required by project validation.
 
 In Supabase Authentication settings, configure the site URL and allow the exact deployed `/login.html` and `/reset-password.html` redirect URLs for email confirmation and password recovery. Supabase can fall back to the configured site URL when a requested redirect does not match the allowlist, which may send recovery links to the site root. Do not configure production Auth redirects to untrusted origins.
 

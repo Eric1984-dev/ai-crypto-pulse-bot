@@ -77,7 +77,7 @@ Status: Completed (2026-10-31)
 - [x] Persist validated 24-hour market snapshots and OHLCV candles in existing tables
 - [x] Log invalid markets, missing data, provider failures, and refresh failures in `AI_Crypto_Bot_Scanner_Events`
 - [x] Add authenticated market and market-summary APIs with dashboard integration
-- [x] Schedule five-minute market snapshot refresh with a server-secret-protected Vercel Cron route
+- [x] Expose server-secret-protected market refresh endpoint for external schedulers and Vercel Cron where supported
 - [x] Add market-data, endpoint, caching, failure-mode, and dashboard integration tests
 - [x] Update Phase 06 documentation and completion report
 

@@ -37,7 +37,7 @@ Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`
 - Node.js 18 of hoger voor tests en validatie.
 - De database-integratietests voeren de Supabase migrations uit in PGlite; er zijn geen Supabase-credentials nodig.
 - Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
-- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` en `CRON_SECRET` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. De service-role sleutel en cron secret zijn uitsluitend server-side.
+- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` en `CRON_SECRET` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. De service-role sleutel en cron secret zijn uitsluitend server-side; geef `CRON_SECRET` aan een externe scheduler mee als `Authorization: Bearer <CRON_SECRET>`.
 - Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
 - Supabase JS, Chart.js en Three.js worden via vastgepinde CDN-modules geladen; Three.js wordt alleen voor de Agent Brain geladen. PGlite is alleen een development dependency voor database tests.
 
@@ -46,13 +46,13 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth- en marktdata-endpoints, beschermde rewrites, Vercel Cron-configuratie, database-table/RLS-contract en behoud van de initiële marktseeds; het maakt geen build-output aan. `npm.cmd test` bevat ook dashboard-, marktdata-, API-, foutafhandelings-, database- en authenticatietests.
+`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth- en marktdata-endpoints, beschermde rewrites, database-table/RLS-contract en behoud van de initiële marktseeds; het vereist geen schedulerconfiguratie in Vercel. `npm.cmd test` bevat ook dashboard-, marktdata-, API-, foutafhandelings-, database- en authenticatietests.
 
 Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
 
 ## Deployen
 
-Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en cron-variabelen. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
+Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `/api/market-refresh` aanroepen. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
 
 ## Documentatie
 
@@ -73,3 +73,4 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 05 Final Redesign Report](./docs/PHASE_05_FINAL_REDESIGN_REPORT.md)
 - [Phase 05 Neural Activity Refinement Report](./docs/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md)
 - [Phase 06 completion report](./docs/PHASE_06_COMPLETION_REPORT.md)
+- [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)

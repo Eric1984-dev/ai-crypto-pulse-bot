@@ -8,8 +8,9 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 06 deployment fix: allow external schedulers for market refresh on Vercel Hobby without a Vercel Cron declaration
 - Phase 06 public Bitvavo market catalog, ticker, and candle service backed by existing market tables
-- Authenticated market and market-summary APIs, non-destructive watched-market sync, scanner-event logging, and five-minute Vercel refresh
+- Authenticated market and market-summary APIs, non-destructive watched-market sync, scanner-event logging, and scheduled refresh endpoint
 - Dashboard market-data count and watched-market price / 24-hour change details
 - Bitvavo provider, database persistence, cache, failure-fallback, API, and dashboard regression tests
 - Phase 06 Bitvavo market-data completion report

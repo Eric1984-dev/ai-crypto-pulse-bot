@@ -64,7 +64,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm run build` additionally validates the market endpoints, shared market-data service, five-minute Vercel Cron route, and server-only environment template. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
+`npm run build` additionally validates the market endpoints, shared market-data service, and server-only environment template without requiring a Vercel Cron configuration. Project tests verify that `/api/market-refresh` remains available when Vercel Cron is absent. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
 
 ---
 

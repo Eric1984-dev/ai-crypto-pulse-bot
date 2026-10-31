@@ -111,11 +111,6 @@ function validateProject() {
   if (!fs.existsSync(path.join(rootDirectory, "lib", "market-data.mjs"))) {
     errors.push("Missing shared market-data service: lib/market-data.mjs");
   }
-  if (!vercelConfig?.crons?.some((cron) =>
-    cron.path === "/api/market-refresh" && cron.schedule === "*/5 * * * *"
-  )) {
-    errors.push("A five-minute Vercel Cron route is required for public market refresh.");
-  }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];
   for (const page of protectedPages) {
