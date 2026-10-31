@@ -9,7 +9,7 @@ Implemented within Phase 05. Phase 06 was not started. The dashboard layout, Age
 Replaced the diffuse neural-cloud layout with a front-facing bilateral brain drawing guided by the supplied reference:
 
 - Two explicit cortical contours form broad, irregular hemispheres with a bright center fissure.
-- Both hemispheres are stretched upward slightly (6%) while the lower edge stays anchored.
+- Both hemispheres are stretched upward by approximately 16% while the lower edge stays anchored.
 - Curved gyri, branching neural paths, lower cerebellar arcs, and a short brainstem define the brain itself.
 - The renderer uses 720 individually pulsing neural points, 2160 thin internal connections, 136 selected neuron hotspots, and up to 48 routed energy signals.
 - Each signal advances across adjacent neurons. Only the current path segment and a short trail brighten; inactive connections stay subdued so neurons remain the visual focus.

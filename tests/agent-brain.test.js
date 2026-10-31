@@ -698,9 +698,9 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
   const brainGroup = harness.calls.brainGroups[0];
   const initialScale = { ...brainGroup.scale };
   const initialPositionY = brainGroup.position.y;
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x > 0.97);
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x < 0.99);
-  assert.ok(initialPositionY > 0.02 && initialPositionY < 0.05);
+  assert.ok(brainGroup.scale.y / brainGroup.scale.x > 1.06);
+  assert.ok(brainGroup.scale.y / brainGroup.scale.x < 1.08);
+  assert.ok(initialPositionY > 0.08 && initialPositionY < 0.1);
 
   const [frameId, firstFrame] = harness.calls.frameCallbacks.entries().next().value;
   harness.calls.frameCallbacks.delete(frameId);

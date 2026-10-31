@@ -47,6 +47,7 @@ All notable project changes should be documented here.
 - Remove every brain surface mesh, translucent shell, inner volume, and separate fissure line; define the bilateral silhouette solely with status-colored nodes, local connections, bright hotspots, and traveling energy particles
 - Refine Agent Brain activity so 720 neurons pulse independently, up to 48 signals travel across the connected network, and inactive connections stay subtle until a signal passes
 - Slightly increase both Agent Brain hemispheres' vertical proportions while keeping the lower edge anchored
+- Increase the Agent Brain's vertical proportions by a further 10 percentage points (approximately 16% total) and preserve its lower-edge alignment
 - Replace the single cloud-like Agent Brain surface and external aura with a recognizable bilateral brain silhouette, central fissure, restrained lower structures, internal status-colored network, and a subdued stage background
 - Historical visual iteration: temporarily used a semi-solid brain volume and layered additive glow; superseded by the current shell-free, contour-led network
 
