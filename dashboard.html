@@ -3,12 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CryptoPulse dashboard placeholder.">
+    <meta name="description" content="CryptoPulse paper portfolio and agent status dashboard.">
     <title>Dashboard · CryptoPulse</title>
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="/js/agent-brain.js" defer></script>
+    <script src="/js/dashboard.js" defer></script>
   </head>
   <body data-auth-page="protected">
     <header class="site-header">
@@ -25,15 +28,149 @@
         </nav>
       </div>
     </header>
-    <main class="page-shell">
+    <main class="page-shell dashboard-shell">
       <p data-auth-message role="status" aria-live="polite"></p>
-      <p class="eyebrow">Overzicht</p>
-      <h1>Dashboard</h1>
-      <p class="page-description">De dashboardmodules worden in latere fases opgebouwd. Er worden hier nog geen portfolio- of marktgegevens geladen.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alleen simulatie; paper trading is nog niet geïmplementeerd.</span></div>
-      <section class="placeholder-card" aria-labelledby="dashboard-placeholder">
-        <h2 id="dashboard-placeholder">Dashboard placeholder</h2>
-        <p class="card-description">KPI's, agentstatus en grafieken zijn nog niet beschikbaar in Phase 01. Geen live gegevens of handelsbeslissingen worden getoond.</p>
+      <div class="dashboard-heading">
+        <div>
+          <p class="eyebrow">Paper portfolio</p>
+          <h1>Dashboard</h1>
+          <p class="page-description">Je agent, portefeuille en recente activiteit uit Supabase.</p>
+        </div>
+        <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite">Databasegegevens laden…</span>
+      </div>
+      <div class="mode-banner">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <strong>PAPER ACTIVE</strong>
+        <span>Alle bedragen zijn gesimuleerd. Dit dashboard plaatst geen orders.</span>
+      </div>
+      <div class="dashboard-error" data-dashboard-error role="alert" hidden></div>
+      <button class="dashboard-retry" data-dashboard-retry type="button" hidden>Opnieuw proberen</button>
+
+      <section class="dashboard-section" aria-labelledby="summary-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Overzicht</p>
+            <h2 id="summary-heading">Portfolio summary</h2>
+          </div>
+          <span class="dashboard-muted"><span data-dashboard-value="portfolioCount">—</span> portfolios</span>
+        </div>
+        <dl class="dashboard-metrics">
+          <div class="metric-card metric-card-primary">
+            <dt>Portfolio Value</dt>
+            <dd data-dashboard-value="portfolioValue">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Total P&amp;L</dt>
+            <dd data-dashboard-value="totalPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Daily P&amp;L <span class="metric-detail">(realized, UTC)</span></dt>
+            <dd data-dashboard-value="dailyPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Win Rate <span class="metric-detail">(sell trades)</span></dt>
+            <dd data-dashboard-value="winRate">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Open Positions</dt>
+            <dd data-dashboard-value="openPositions">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Available Balance</dt>
+            <dd data-dashboard-value="availableBalance">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>AI Decisions</dt>
+            <dd data-dashboard-value="aiDecisions">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Paper Trades</dt>
+            <dd data-dashboard-value="paperTrades">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Tracked Markets</dt>
+            <dd data-dashboard-value="trackedMarkets">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid-status" aria-label="Agent status">
+        <article class="dashboard-panel status-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Backend status</p>
+              <h2>Agent Status</h2>
+            </div>
+            <span class="status-pill" data-dashboard-status="agent" data-state="unknown">UNKNOWN</span>
+          </div>
+          <p class="card-description">Status wordt gelezen uit AI_Crypto_Bot_Status.</p>
+          <div class="agent-brain" data-agent-brain data-state="unknown">
+            <div class="agent-brain-stage" data-agent-brain-stage role="img" aria-label="3D Agent Brain; status UNKNOWN"></div>
+            <p class="agent-brain-fallback" data-agent-brain-fallback role="status" hidden>
+              3D visualization unavailable. Agent status remains available above.
+            </p>
+          </div>
+          <p class="agent-brain-caption">Visualisatie van de actuele status uit AI_Crypto_Bot_Status.</p>
+        </article>
+        <article class="dashboard-panel emergency-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Risk control</p>
+              <h2>Emergency State</h2>
+            </div>
+            <span class="status-pill" data-dashboard-status="emergency" data-state="unknown">UNKNOWN</span>
+          </div>
+          <p class="card-description">Emergency State is afzonderlijk opgeslagen en verandert Agent Status niet.</p>
+        </article>
+      </section>
+
+      <section class="dashboard-panel chart-panel" aria-labelledby="portfolio-chart-heading">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Database history</p>
+            <h2 id="portfolio-chart-heading">Portfolio history</h2>
+          </div>
+          <span class="dashboard-muted">Supabase snapshots</span>
+        </div>
+        <div class="chart-frame">
+          <canvas data-portfolio-chart aria-label="Portfolio value history chart" role="img" hidden></canvas>
+          <p class="dashboard-empty" data-dashboard-chart-empty>Portfolio history will appear after the first database snapshot.</p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid-lists" aria-label="Database summaries">
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Portfolio</p><h2>Open Positions</h2></div>
+            <span class="count-pill" data-dashboard-value="openPositions">0</span>
+          </div>
+          <ul class="dashboard-list" data-dashboard-list="positions" hidden></ul>
+          <p class="dashboard-empty" data-dashboard-empty="positions">No open positions.</p>
+        </article>
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Activity</p><h2>Recent Trades</h2></div>
+            <span class="count-pill" data-dashboard-value="paperTrades">0</span>
+          </div>
+          <ul class="dashboard-list" data-dashboard-list="trades" hidden></ul>
+          <p class="dashboard-empty" data-dashboard-empty="trades">No paper trades recorded.</p>
+        </article>
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Market universe</p><h2>Watched Markets</h2></div>
+            <span class="count-pill" data-dashboard-value="trackedMarkets">0</span>
+          </div>
+          <ul class="dashboard-list" data-dashboard-list="markets" hidden></ul>
+          <p class="dashboard-empty" data-dashboard-empty="markets">No enabled markets found.</p>
+        </article>
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Agent log</p><h2>Recent AI Decisions</h2></div>
+            <span class="count-pill" data-dashboard-value="aiDecisions">0</span>
+          </div>
+          <ul class="dashboard-list" data-dashboard-list="decisions" hidden></ul>
+          <p class="dashboard-empty" data-dashboard-empty="decisions">No AI decisions recorded.</p>
+        </article>
       </section>
     </main>
     <footer class="site-footer">

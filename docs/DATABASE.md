@@ -72,7 +72,7 @@ The server-side caller must reuse the same idempotency UUID when retrying a trad
 
 The migration backfills profiles for existing Auth users and installs prefixed triggers to create profiles at signup and synchronize email changes. Profile identity always comes from `auth.users.id`; the browser cannot create or change profile identity records directly. Email is nullable to remain compatible with Supabase identities that do not have an email address.
 
-Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. They do not provide database access. Any future database API must authenticate the caller, preserve the caller's JWT when relying on user-scoped RLS, and keep `service_role` credentials server-only.
+Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. The Phase 04 dashboard API and Phase 05 Agent Status API separately verify the access token and preserve the caller's JWT when querying through PostgREST, allowing RLS to remain authoritative. Both APIs are read-only; future database APIs must follow the same rule and keep `service_role` credentials server-only.
 
 ## Row Level Security and grants
 

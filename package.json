@@ -2,7 +2,7 @@
   "name": "crypto-pulse-ai-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "Phase 01 static project foundation for CryptoPulse AI Agent",
+  "description": "CryptoPulse AI Agent static application with Supabase Auth and dashboard",
   "scripts": {
     "build": "node scripts/validate-project.js && node scripts/validate-database.js",
     "test": "node --test"

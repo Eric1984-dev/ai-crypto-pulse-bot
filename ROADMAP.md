@@ -42,18 +42,28 @@ Runtime database APIs, market-data ingestion, and trading behavior remain out of
 
 ## Phase 04 - Dashboard
 
-- KPI Cards
-- Portfolio Charts
-- Mobile Layout
-- Responsive Design
+- [x] Database-backed dashboard summaries for agent status, emergency state, portfolio, positions, trades, watched markets, and AI decisions
+- [x] KPI cards and portfolio history chart from actual database snapshots
+- [x] Mobile-first responsive layout and empty/error states
+- [x] Authenticated read-only API, tests, and documentation
+
+Status: Completed
+
+Phase 04 does not implement market scanning, AI execution, or trading. The Agent Brain visualization is delivered in Phase 05.
 
 ---
 
 ## Phase 05 - Agent Brain
 
-- Three.js Brain
-- Agent Status Integratie
-- Status Visualisatie
+- [x] Three.js Agent Brain formed by an organic neural-network silhouette in the existing Agent Status panel
+- [x] Live status refresh from `AI_Crypto_Bot_Status` through an authenticated read-only API
+- [x] ACTIVE, ANALYZING, IDLE, STOPPED, ERROR, and neutral UNKNOWN visualization states
+- [x] 720-node network, up to 2160 dynamically pulsing connections, and up to 48 status-driven energy particles
+- [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
+- [x] Responsive rendering, visibility pause, disposal, and performance safeguards
+- [x] Tests and documentation
+
+Status: Completed (2026-10-31)
 
 ---
 

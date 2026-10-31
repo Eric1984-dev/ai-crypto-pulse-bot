@@ -85,10 +85,20 @@ function validateProject() {
     }
   }
 
-  for (const endpoint of ["api/auth-config.mjs", "api/auth-session.mjs", "api/protected-page.mjs"]) {
+  for (const endpoint of [
+    "api/auth-config.mjs",
+    "api/auth-session.mjs",
+    "api/protected-page.mjs",
+    "api/dashboard-data.mjs",
+    "api/agent-status.mjs"
+  ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
-      errors.push(`Missing authentication endpoint: ${endpoint}`);
+      errors.push(`Missing required API endpoint: ${endpoint}`);
     }
+  }
+
+  if (!fs.existsSync(path.join(rootDirectory, "js/agent-brain.js"))) {
+    errors.push("Missing Three.js Agent Brain module: js/agent-brain.js");
   }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];

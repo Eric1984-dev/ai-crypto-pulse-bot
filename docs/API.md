@@ -33,101 +33,69 @@ Vercel rewrites `dashboard.html`, `portfolio.html`, `scanner.html`, `history.htm
 
 Registration, login, logout, password-reset email, and password updates use the Supabase JS Auth SDK directly. No application database, market, trading, or scanner API is implemented in Phase 02.
 
-## Planned application endpoints
+## Phase 04 dashboard endpoint
 
-The following non-authentication endpoints remain future contracts; they are not implemented.
+### GET /api/dashboard-data
 
-Alle endpoints draaien in Vercel Functions.
+Authentication is required. The endpoint reads the `cp_access_token` HttpOnly cookie, verifies it with Supabase Auth, and sends the verified user's JWT together with the public anon key on read-only PostgREST requests. Supabase RLS scopes user-owned rows. It does not use a service-role key and does not write data.
 
----
+The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, and up to 100 persisted portfolio snapshots. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
 
-GET /api/status
+Summary semantics:
 
-Geeft Agent Status terug.
+- `totalPnl`: sum of visible portfolio values minus their starting balances.
+- `dailyPnl`: realized P&L from SELL trades since 00:00 UTC. If the bounded query cannot include all matching trades, it is `null`.
+- `winRate`: profitable SELL trades divided by all visible SELL trades.
+- Count fields represent all visible matching rows; list fields contain a bounded recent subset.
 
-Response:
-
-{
-  "status":"ACTIVE"
-}
-
----
-
-GET /api/market
-
-Marktdata ophalen.
-
-Response:
-
-{
-  "btc":100000,
-  "eth":3500
-}
-
----
-
-GET /api/portfolio
-
-Portfolio data.
-
----
-
-GET /api/trades
-
-Trade history.
-
----
-
-GET /api/ai-decisions
-
-AI beslissingen.
-
----
-
-POST /api/paper-buy
-
-Voert paper buy uit.
-
----
-
-POST /api/paper-sell
-
-Voert paper sell uit.
-
----
-
-POST /api/scan
-
-Marktscan uitvoeren.
-
----
-
-POST /api/analyze
-
-AI analyse uitvoeren.
-
----
-
-Geen endpoint mag ooit echte orders plaatsen.
-
-# Standard Error Response
+Success response:
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "MARKET_DATA_UNAVAILABLE",
-    "message": "Market data unavailable"
+  "data": {
+    "agentStatus": { "status": "IDLE" },
+    "emergencyState": { "status": "NORMAL" },
+    "portfolio": {
+      "count": 0,
+      "portfolioValue": null,
+      "totalPnl": null,
+      "availableBalance": null,
+      "dailyPnl": 0,
+      "dailyPnlTradeCount": 0,
+      "winRate": null,
+      "winRateTradeCount": 0
+    },
+    "openPositions": { "count": 0, "items": [] },
+    "recentTrades": { "count": 0, "items": [] },
+    "watchedMarkets": { "count": 0, "items": [] },
+    "aiDecisions": { "count": 0, "items": [] },
+    "portfolioSnapshots": []
   }
 }
 ```
 
----
+Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configuration, unavailable Supabase, or invalid database responses: `503`. The endpoint sets `Cache-Control: no-store`; it returns no provider credentials or raw database errors.
 
-Every endpoint must document:
+## Phase 05 Agent Status endpoint
 
-- Authentication Required
-- Rate Limited
-- Request Format
-- Response Format
-- Error Responses
+### GET /api/agent-status
+
+Authentication is required. The endpoint verifies the `cp_access_token` HttpOnly cookie with Supabase Auth, then selects the current `status` from `AI_Crypto_Bot_Status` using the anon key and the user's access token. RLS remains in force. It is read-only and returns no service-role credentials.
+
+Success response:
+
+```json
+{
+  "data": {
+    "status": "ANALYZING"
+  }
+}
+```
+
+When there is no valid status row, success returns `{"data":{"status":null}}`; the dashboard displays `UNKNOWN` and a neutral visualization. The dashboard polls this endpoint every 15 seconds while visible. An expired session returns `401`; missing configuration or provider/database failure returns `503`; unsupported methods return `405`. Responses use `Cache-Control: no-store`.
+
+## Planned application endpoints
+
+Market data ingestion, trading, scanner, AI, and realtime endpoints are not implemented.
+
+No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

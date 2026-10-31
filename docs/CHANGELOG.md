@@ -8,6 +8,14 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 04 authenticated read-only dashboard endpoint and database-backed summaries for agent status, emergency state, portfolio, positions, trades, watched markets, and AI decisions
+- Responsive dashboard KPI cards, actual-snapshot Chart.js history, and safe empty/error states
+- Dashboard API and rendering tests plus Phase 04 completion report
+- Three.js Agent Brain visualization mapped to the live `AI_Crypto_Bot_Status.status` value
+- Authenticated status polling endpoint with UNKNOWN fallback, hidden-tab pause, bounded rendering, and explicit GPU-resource disposal
+- Agent Brain status-mapping, API, dashboard integration, fallback, rendering, and performance tests plus Phase 05 completion report
+- Network-first Agent Brain silhouette with 720 nodes, up to 2160 dynamically pulsing links, flowing energy particles, and WebGL-context-aware fallback behavior
+- Phase 05 brain improvement report and geometry, signal-flow, and fallback-recovery regression tests
 - Phase 03 Supabase migrations for all 16 prefixed application tables, relationships, indexes, Auth profile synchronization, RLS, duplicate-safe trade/strategy-change keys, and initial seeds
 - Central default market list in `config/markets.js` with automated migration-seed parity validation
 - PGlite database integration tests for migration execution, Auth profile provisioning, RLS ownership, role grants, seed idempotency, and constraints
@@ -33,6 +41,7 @@ All notable project changes should be documented here.
 
 ### Fixed
 
+- Keep the Agent Brain fallback hidden whenever its renderer is available, clear stale failed initialization state, and retry after transient renderer failures
 - Prevent anonymous auth pages from sending an empty session to `/api/auth-session` by unwrapping Supabase `getSession()` results and checking for an access token before cookie synchronization
 - Bind logout controls during auth initialization on protected pages so logout signs out, clears the server cookie, and redirects to login
 - Keep password-change fields hidden until a recovery session is detected; preserve the hidden state against auth-card form styling

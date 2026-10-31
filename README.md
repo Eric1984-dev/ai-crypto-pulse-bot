@@ -1,25 +1,27 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication; **Phase 03 voegt de gemigreerde PostgreSQL-database, seed data en Row Level Security toe** aan de statische HTML/CSS/JavaScript-basis.
+CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, en Phase 05 de Three.js Agent Brain visualisatie.
 
 ## Huidige status
 
 - Accountacties worden afgehandeld door Supabase Authentication; sessies blijven bestaan via de Supabase JS client.
 - Dashboard, portfolio, scanner, trade history en instellingen zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
-- De pagina's blijven placeholders en er is nog geen runtime database/API-integratie, marktdata-ingestie, Bitvavo, AI, paper trading, scannerlogica of realtime-functionaliteit.
+- Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API.
+- De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. De hersensilhouet wordt gevormd door 720 neurale nodes, maximaal 2160 dynamische verbindingen en statusgestuurde energiedeeltjes; er wordt geen solide lobbenmesh gebruikt.
+- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. Marktdata-ingestie, Bitvavo, AI Engine, autonomous trading, paper-trade uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard.
-- Phase 03 (Database) is voltooid; Phase 04 is niet gestart.
+- Phase 05 (Agent Brain) is voltooid; Phase 06 is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie en beschermde Vercel route
+api/        Supabase-config, sessiecookie, beschermde routes en dashboard/status APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
-js/         Browsercode en Supabase Auth-service
+js/         Browsercode, Supabase Auth-service, dashboard rendering en Three.js Agent Brain
 lib/        Server-side sessievalidatie
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
@@ -36,14 +38,14 @@ Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`
 - Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
 - Configureer `SUPABASE_URL` en `SUPABASE_ANON_KEY` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables.
 - Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
-- De Supabase JS SDK is via een vastgepinde CDN-module geladen; PGlite is alleen een development dependency voor database tests.
+- Supabase JS, Chart.js en Three.js worden via vastgepinde CDN-modules geladen; Three.js wordt alleen voor de Agent Brain geladen. PGlite is alleen een development dependency voor database tests.
 
 ```powershell
 npm.cmd test
 npm.cmd run build
 ```
 
-`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-endpoints, beschermde rewrites, Vercel-configuratie, database-table/RLS-contract en gelijkheid tussen de seed migration en `config/markets.js`; het maakt geen build-output aan.
+`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-endpoints, beschermde rewrites, Vercel-configuratie, database-table/RLS-contract en gelijkheid tussen de seed migration en `config/markets.js`; het maakt geen build-output aan. `npm.cmd test` bevat ook dashboard API-, weergave-, lege-status-, foutafhandelings- en authenticatietests.
 
 Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
 
@@ -60,3 +62,7 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Teststrategie](./docs/TESTING.MD)
 - [Phase 02 completion report](./docs/PHASE_02_COMPLETION_REPORT.md)
 - [Phase 03 completion report](./docs/PHASE_03_COMPLETION_REPORT.md)
+- [Phase 04 completion report](./docs/PHASE_04_COMPLETION_REPORT.md)
+- [Phase 05 completion report](./docs/PHASE_05_COMPLETION_REPORT.md)
+- [Phase 05 Brain Improvement Report](./docs/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md)
+- [Phase 05 Final Fix Report](./docs/PHASE_05_FINAL_FIX_REPORT.md)

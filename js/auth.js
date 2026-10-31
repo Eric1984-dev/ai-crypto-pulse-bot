@@ -271,5 +271,5 @@
     }
   }
 
-  initialize().catch(showBootFailure);
+  window.CryptoPulseAuthReady = initialize().catch(showBootFailure);
 })();

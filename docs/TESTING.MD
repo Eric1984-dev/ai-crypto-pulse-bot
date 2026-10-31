@@ -28,6 +28,32 @@ npm.cmd run build
 
 The build check validates migration filenames, table/policy/index prefixes, per-table RLS coverage, and market seed parity. PGlite tests do not connect to Supabase or validate a linked project's existing schema. Supabase CLI and Docker are not configured in this environment, so `supabase db reset`, `supabase db push`, and live-provider integration checks must be run separately where those tools and project access are available. Inspect the target database and back it up before applying migrations.
 
+## Phase 04 dashboard validation
+
+Dashboard tests use the Node.js built-in test runner with mocked Supabase PostgREST responses; they do not depend on credentials or create simulated trading records in the database. They cover verified-session requirements, forwarding the caller JWT and anon key, RLS-compatible data requests, summary calculations, error responses, rendering, text-safe list content, empty values, persisted-snapshot chart data, authentication readiness, retry behavior, and expired-session redirects.
+
+```powershell
+node --test tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+The API reads real rows at runtime. Empty collections render as empty states and absent financial aggregates as unavailable; no positions, trades, decisions, or chart snapshots are synthesized. Mobile layout is implemented with mobile-first CSS. Automated tests validate dashboard behavior, but physical iOS/Android device testing and live Supabase smoke tests require a configured deployment and were not performed by the test suite.
+
+## Phase 05 Agent Brain validation
+
+Agent Brain and status API tests use the Node.js test runner and deterministic fake Three.js/browser interfaces. They cover supported and unknown-state mapping, authenticated database status reads with the caller JWT, dashboard application of initial and polled status, fallback recovery after transient renderer initialization failure, fallback suppression while a renderer remains available, neutral fallback when WebGL/Three.js is unavailable, an organic silhouette formed by 720 network nodes without solid lobe meshes, more than a thousand dynamically updated connections, per-link signal brightness, flowing energy particles, renderer setup, pixel-ratio and 30 FPS caps, hidden-tab pause/resume, and renderer/geometry/material/listener disposal.
+
+The browser smoke check loads the actual dashboard markup and pinned Three.js renderer with local API responses. The protected Vercel route still requires an authenticated session; an unauthenticated browser is redirected to login, so this smoke check does not claim a live Supabase session.
+
+```powershell
+node --test tests/agent-brain.test.js tests/agent-status.test.js tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+Rendering uses a pinned Three.js ES module loaded on demand. Rendering is capped at 30 frames per second, device pixel ratio is capped at 1.5 (1.25 on mobile), the network is capped at 720 nodes and 2160 connections, active energy particles are capped at 48, and polling is limited to one status request every 15 seconds while the page is visible. The fallback remains hidden while the WebGL context is usable. If WebGL or Three.js initialization fails, the real status label remains visible and the visualization falls back to a safe unavailable state; later status updates may retry initialization. Browser/device GPU performance varies; physical-device profiling is a separate deployment check.
+
 ---
 
 # Testing Types

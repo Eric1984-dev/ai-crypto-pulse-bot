@@ -1,6 +1,6 @@
 # Architecture
 
-## Current Implementation: Phase 03
+## Current Implementation: Phase 05
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies.
 
@@ -21,12 +21,14 @@ Implemented components:
 - RLS policies and role grants for user-owned, global, and server-managed data
 - Central default market configuration and initial database seeds
 - Embedded PostgreSQL migration and RLS integration tests
+- Authenticated read-only dashboard API that forwards the caller's JWT to Supabase so RLS remains authoritative
+- Database-backed dashboard summaries, recent activity, and snapshot chart with safe empty/error states
+- Three.js Agent Brain visualization driven by the live database status, with bounded rendering, hidden-tab pause, and explicit resource disposal
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.
 
 The following capabilities are not implemented:
 
-- Runtime application database access or database-backed API endpoints
 - Realtime functionality
 - Bitvavo integration
 - AI Engine
@@ -426,6 +428,10 @@ The Agent Brain must reflect actual backend state.
 
 Opening a dashboard page must never activate the Agent Brain.
 
+The neural network itself defines the Agent Brain silhouette: 720 spatially distributed nodes, up to 2160 local connections, and a narrow node-and-link brainstem. There is no solid lobe mesh. Node positions and per-connection brightness animate continuously, while up to 48 glowing particles travel along graph edges. The database status maps to blue activity (ACTIVE), brighter/faster blue activity (ANALYZING), slow breathing blue (IDLE), static grey (STOPPED), and intermittent red warning glow (ERROR). Missing or invalid status is `UNKNOWN` with a neutral, static visualization. The fallback is hidden while a WebGL context is available and appears only when WebGL is unavailable or Three.js initialization fails; transient failures can be retried on later status updates. It does not activate or control the agent.
+
+Rendering is capped at 30 FPS and device pixel ratio is capped at 1.5 (1.25 on mobile). The network is capped at 720 nodes, 2160 connections, and 48 traveling energy particles. The loop pauses while the document is hidden. Renderer, geometry, material, observer, and event-listener resources are disposed when the page is left.
+
 ---
 
 # Emergency State Model
@@ -490,7 +496,9 @@ docs/SCHEDULING.md
 
 Phase 02 uses Supabase Authentication for registration, password login, logout, recovery email, and password updates. The Supabase JS client persists and refreshes the browser session. An authenticated access token is verified by `/api/auth-session` and stored only in a short-lived HttpOnly cookie for protected-page requests.
 
-Protected Vercel rewrites validate that cookie with Supabase Auth before returning page HTML; invalid or missing sessions are redirected to login. The anon key is public by design. Phase 03 creates the schema and RLS, but does not add runtime database access. The protected-page cookie is not a database authorization token; future APIs must validate the user session and preserve the user's JWT when relying on user-scoped policies.
+Protected Vercel rewrites validate that cookie with Supabase Auth before returning page HTML; invalid or missing sessions are redirected to login. The anon key is public by design. Phase 04's `/api/dashboard-data` endpoint reads the cookie, validates its access token with Supabase Auth, then makes read-only PostgREST requests using the anon key and the same user JWT. Supabase RLS remains authoritative for user-owned rows. The HttpOnly cookie itself is not a database authorization token.
+
+Phase 05's `/api/agent-status` endpoint independently verifies the same cookie and reads only `AI_Crypto_Bot_Status.status` with the user's JWT. The dashboard polls this endpoint every 15 seconds while visible; it pauses polling when hidden and renders no frontend-selected status. Missing or invalid status becomes `UNKNOWN`.
 
 Database data access controls include:
 
@@ -499,18 +507,19 @@ Database data access controls include:
 - Server-only writes for balances, trades, positions, agent state, and market data
 - Explicit ownership validation in future privileged server APIs
 
-The service-role key bypasses RLS and must never be exposed to the presentation layer. Runtime database/API access remains out of scope until a later phase.
+The service-role key bypasses RLS and must never be exposed to the presentation layer. Dashboard data is fetched from the API only; browser code must not access Supabase tables directly.
 
 ---
 
 # API Architecture
 
-Future API endpoints are implemented through:
+Application API endpoints are implemented through:
 
 Vercel Functions
 
 Examples:
 
+- /api/dashboard-data
 - /api/status
 - /api/market
 - /api/portfolio
@@ -518,7 +527,13 @@ Examples:
 - /api/scan
 - /api/analyze
 
-API Contracts:
+`GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, and up to 100 real portfolio snapshots. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC, and win rate is the share of profitable SELL trades across visible trade history.
+
+`GET /api/agent-status` is an authenticated read-only endpoint for the Agent Brain. It reads a single status row and returns a supported status or `null` when no valid row exists. It uses the public anon key plus the verified user's JWT and never writes to the database.
+
+The dashboard API uses only the Supabase anon key and the request user's verified access token. It never uses the service-role key and cannot write to the database. User-visible empty values are represented as `null` or empty collections; read failures return explicit errors rather than mock values.
+
+Future API contracts must document:
 
 - Authentication Rules
 - Validation Rules
