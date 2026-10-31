@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="nl" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Sign in to CryptoPulse AI Agent.">
+    <title>Inloggen · CryptoPulse</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+  </head>
+  <body data-auth-page="login">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <nav class="primary-nav" aria-label="Account navigation">
+          <a data-nav-link href="/login.html">Inloggen</a>
+          <a data-nav-link href="/register.html">Account aanmaken</a>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell">
+      <p class="eyebrow">Account</p>
+      <h1>Welkom terug.</h1>
+      <p class="page-description">Log in om verder te gaan naar je beveiligde CryptoPulse-pagina.</p>
+      <section class="auth-card" aria-labelledby="login-heading">
+        <h2 id="login-heading">Inloggen</h2>
+        <form id="login-form" method="post">
+          <label for="login-email">E-mailadres</label>
+          <input id="login-email" name="email" type="email" autocomplete="email" required>
+          <label for="login-password">Wachtwoord</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+          <button class="button-link" type="submit">Inloggen</button>
+        </form>
+        <p data-auth-message role="status" aria-live="polite"></p>
+        <div class="auth-links">
+          <a href="/reset-password.html">Wachtwoord vergeten?</a>
+          <a href="/register.html">Nog geen account? Registreren</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>PAPER ACTIVE · geen echte orders.</p></div>
+    </footer>
+  </body>
+</html>

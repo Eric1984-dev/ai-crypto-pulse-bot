@@ -1,0 +1,10 @@
+{
+  "name": "crypto-pulse-ai-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 01 static project foundation for CryptoPulse AI Agent",
+  "scripts": {
+    "build": "node scripts/validate-project.js",
+    "test": "node --test"
+  }
+}

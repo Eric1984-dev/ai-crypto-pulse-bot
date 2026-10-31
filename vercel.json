@@ -1,0 +1,22 @@
+{
+  "cleanUrls": true,
+  "outputDirectory": ".",
+  "routes": [
+    { "src": "^/dashboard$", "dest": "/api/protected-page?page=dashboard" },
+    { "src": "^/dashboard\\.html$", "dest": "/api/protected-page?page=dashboard" },
+    { "src": "^/portfolio$", "dest": "/api/protected-page?page=portfolio" },
+    { "src": "^/portfolio\\.html$", "dest": "/api/protected-page?page=portfolio" },
+    { "src": "^/scanner$", "dest": "/api/protected-page?page=scanner" },
+    { "src": "^/scanner\\.html$", "dest": "/api/protected-page?page=scanner" },
+    { "src": "^/history$", "dest": "/api/protected-page?page=history" },
+    { "src": "^/history\\.html$", "dest": "/api/protected-page?page=history" },
+    { "src": "^/settings$", "dest": "/api/protected-page?page=settings" },
+    { "src": "^/settings\\.html$", "dest": "/api/protected-page?page=settings" },
+    { "handle": "filesystem" }
+  ],
+  "functions": {
+    "api/protected-page.mjs": {
+      "includeFiles": "*.html"
+    }
+  }
+}

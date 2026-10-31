@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="nl" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CryptoPulse dashboard placeholder.">
+    <title>Dashboard · CryptoPulse</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+  </head>
+  <body data-auth-page="protected">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <nav class="primary-nav" aria-label="Hoofdnavigatie">
+          <a data-nav-link href="/dashboard.html">Dashboard</a>
+          <a data-nav-link href="/portfolio.html">Portfolio</a>
+          <a data-nav-link href="/scanner.html">Scanner</a>
+          <a data-nav-link href="/history.html">Trade history</a>
+          <a data-nav-link href="/settings.html">Instellingen</a>
+          <span class="account-email" data-user-email></span>
+          <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell">
+      <p data-auth-message role="status" aria-live="polite"></p>
+      <p class="eyebrow">Overzicht</p>
+      <h1>Dashboard</h1>
+      <p class="page-description">De dashboardmodules worden in latere fases opgebouwd. Er worden hier nog geen portfolio- of marktgegevens geladen.</p>
+      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alleen simulatie; paper trading is nog niet geïmplementeerd.</span></div>
+      <section class="placeholder-card" aria-labelledby="dashboard-placeholder">
+        <h2 id="dashboard-placeholder">Dashboard placeholder</h2>
+        <p class="card-description">KPI's, agentstatus en grafieken zijn nog niet beschikbaar in Phase 01. Geen live gegevens of handelsbeslissingen worden getoond.</p>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>Geen echte orders.</p></div>
+    </footer>
+  </body>
+</html>
