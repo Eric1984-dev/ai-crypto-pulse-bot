@@ -203,8 +203,7 @@
     document.querySelector("#reset-request-form")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       await submitForm(event.currentTarget, async (form) => {
-        const redirectTo = new URL("/reset-password.html", window.location.origin).toString();
-        await auth.requestPasswordReset(form.elements.email.value.trim(), redirectTo);
+        await auth.requestPasswordReset(form.elements.email.value.trim(), window.location.origin);
         showMessage("If an account exists for that address, a password reset email has been sent.");
         form.reset();
       });

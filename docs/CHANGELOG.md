@@ -32,6 +32,7 @@ All notable project changes should be documented here.
 - Prevent anonymous auth pages from sending an empty session to `/api/auth-session` by unwrapping Supabase `getSession()` results and checking for an access token before cookie synchronization
 - Bind logout controls during auth initialization on protected pages so logout signs out, clears the server cookie, and redirects to login
 - Keep password-change fields hidden until a recovery session is detected; preserve the hidden state against auth-card form styling
+- Always pass `/reset-password.html` as the password reset email redirect target
 
 ---
 

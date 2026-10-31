@@ -38,7 +38,8 @@
       logout() {
         return resolve(client.auth.signOut());
       },
-      requestPasswordReset(email, redirectTo) {
+      requestPasswordReset(email, origin) {
+        const redirectTo = new URL("/reset-password.html", origin).toString();
         return resolve(client.auth.resetPasswordForEmail(email, { redirectTo }));
       },
       updatePassword(password) {

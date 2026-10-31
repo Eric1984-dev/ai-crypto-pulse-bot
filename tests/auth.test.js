@@ -127,6 +127,10 @@ async function loadResetPage({ search = "", hash = "", session = null, recoveryE
   const sessionClient = {
     auth: {
       getSession: async () => ({ data: { session }, error: null }),
+      async resetPasswordForEmail(email, options) {
+        authCalls.push(["resetPasswordForEmail", email, options]);
+        return { data: {}, error: null };
+      },
       onAuthStateChange(callback) {
         authStateListener = callback;
         if (recoveryEvent && session) {
@@ -237,15 +241,27 @@ test("password reset and password update use Supabase Auth", async () => {
   const { client, calls } = createFakeClient();
   const auth = createAuthService(client);
 
-  await auth.requestPasswordReset("trader@example.test", "https://app.test/reset-password.html");
+  await auth.requestPasswordReset("trader@example.test", "https://my-vercel-domain");
   await auth.updatePassword("New-strong-password-2");
 
   assert.deepEqual(calls[0], [
     "resetPasswordForEmail",
     "trader@example.test",
-    { redirectTo: "https://app.test/reset-password.html" }
+    { redirectTo: "https://my-vercel-domain/reset-password.html" }
   ]);
   assert.deepEqual(calls[1], ["updateUser", { password: "New-strong-password-2" }]);
+});
+
+test("reset email submission always requests the reset-password page", async () => {
+  const page = await loadResetPage();
+
+  await page.forms["#reset-request-form"].submit();
+
+  assert.deepEqual(page.authCalls, [
+    ["resetPasswordForEmail", "trader@example.test", {
+      redirectTo: "https://app.test/reset-password.html"
+    }]
+  ]);
 });
 
 test("anonymous password reset page exposes only the email form", async () => {

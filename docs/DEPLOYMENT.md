@@ -36,6 +36,6 @@ For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` 
 
 The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. Never use or expose a Supabase service-role key. Keep all other secrets in server-side environment variables.
 
-In Supabase Authentication settings, configure the site URL and allow the deployed `/login.html` and `/reset-password.html` redirect URLs for email confirmation and password recovery. Do not configure production Auth redirects to untrusted origins.
+In Supabase Authentication settings, configure the site URL and allow the exact deployed `/login.html` and `/reset-password.html` redirect URLs for email confirmation and password recovery. Supabase can fall back to the configured site URL when a requested redirect does not match the allowlist, which may send recovery links to the site root. Do not configure production Auth redirects to untrusted origins.
 
 `ENABLE_LIVE_TRADING=false` remains the required safe default. Live trading is not implemented or available.
