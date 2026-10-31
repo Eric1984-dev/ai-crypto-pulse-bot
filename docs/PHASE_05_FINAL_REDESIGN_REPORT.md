@@ -10,11 +10,12 @@ Replaced the diffuse neural-cloud layout with a front-facing bilateral brain dra
 
 - Two explicit cortical contours form broad, irregular hemispheres with a bright center fissure.
 - Curved gyri, branching neural paths, lower cerebellar arcs, and a short brainstem define the brain itself.
-- The renderer uses 720 neural points, 735 connected path segments, 136 selected neuron hotspots, and up to 48 moving energy particles. The existing limit remains 2160 connections.
-- Selected neurons use localized radial shader halos and additive pathway glow. No decorative lines extend beyond the brain contour.
+- The renderer uses 720 individually pulsing neural points, 2160 thin internal connections, 136 selected neuron hotspots, and up to 48 routed energy signals.
+- Each signal advances across adjacent neurons. Only the current path segment and a short trail brighten; inactive connections stay subdued so neurons remain the visual focus.
+- Selected neurons use localized radial shader halos. No decorative lines extend beyond the brain contour.
 - No brain surface mesh, translucent shell, fog, volume layer, or post-processing bloom pass is used.
 - Both hemispheres use the same status color. Status changes activity and glow intensity; ERROR uses red and STOPPED uses grey.
-- The structure remains stationary. Neural brightness, linked pulses, and traveling energy provide the motion.
+- The structure remains stationary. Independent neuron activations, routed signal pulses, and traveling energy provide the motion.
 
 ## Preserved behavior
 

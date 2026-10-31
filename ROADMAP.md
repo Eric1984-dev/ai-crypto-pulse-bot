@@ -58,7 +58,7 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 - [x] Reference-inspired, front-facing bilateral brain silhouette with an explicit center fissure, organic cortical contour, curved neural pathways, bright hotspots, and traveling energy particles in the existing Agent Status panel
 - [x] Live status refresh from `AI_Crypto_Bot_Status` through an authenticated read-only API
 - [x] ACTIVE, ANALYZING, IDLE, STOPPED, ERROR, and neutral UNKNOWN visualization states
-- [x] 720 neural nodes, up to 2160 dynamically pulsing connections, up to 48 status-driven energy particles, and neuron-local glow
+- [x] 720 independently pulsing neural nodes, 2160 subtly rendered connections, and up to 48 status-driven signals that travel neuron-to-neuron and brighten only the pathways they traverse
 - [x] Stable brain silhouette with animated neural activity and no continuous whole-brain rotation
 - [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards

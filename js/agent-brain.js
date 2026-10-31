@@ -14,6 +14,11 @@
       emissiveIntensity: 0.95,
       pulseSpeed: 1.7,
       pulseAmount: 0.035,
+      activationThreshold: 0.82,
+      neuronBaseline: 0.055,
+      neuronGain: 0.95,
+      signalSpeed: 0.72,
+      connectionPulseGain: 0.78,
       activityPoints: 28,
       animated: true,
       mode: "continuous"
@@ -24,6 +29,11 @@
       emissiveIntensity: 2.4,
       pulseSpeed: 4.2,
       pulseAmount: 0.07,
+      activationThreshold: 0.62,
+      neuronBaseline: 0.07,
+      neuronGain: 0.98,
+      signalSpeed: 0.82,
+      connectionPulseGain: 1,
       activityPoints: 48,
       animated: true,
       mode: "continuous"
@@ -34,6 +44,11 @@
       emissiveIntensity: 0.35,
       pulseSpeed: 0.48,
       pulseAmount: 0.018,
+      activationThreshold: 0.975,
+      neuronBaseline: 0.025,
+      neuronGain: 0.78,
+      signalSpeed: 0.48,
+      connectionPulseGain: 0.58,
       activityPoints: 4,
       animated: true,
       mode: "breathing"
@@ -44,6 +59,11 @@
       emissiveIntensity: 0.08,
       pulseSpeed: 0,
       pulseAmount: 0,
+      activationThreshold: 1.1,
+      neuronBaseline: 0.018,
+      neuronGain: 0,
+      signalSpeed: 0,
+      connectionPulseGain: 0,
       activityPoints: 0,
       animated: false,
       mode: "static"
@@ -54,6 +74,11 @@
       emissiveIntensity: 1.7,
       pulseSpeed: 2.6,
       pulseAmount: 0.055,
+      activationThreshold: 0.78,
+      neuronBaseline: 0.045,
+      neuronGain: 0.95,
+      signalSpeed: 0.72,
+      connectionPulseGain: 0.9,
       activityPoints: 20,
       animated: true,
       mode: "warning"
@@ -64,6 +89,11 @@
       emissiveIntensity: 0.12,
       pulseSpeed: 0,
       pulseAmount: 0,
+      activationThreshold: 1.1,
+      neuronBaseline: 0.025,
+      neuronGain: 0,
+      signalSpeed: 0,
+      connectionPulseGain: 0,
       activityPoints: 0,
       animated: false,
       mode: "neutral"
@@ -159,6 +189,10 @@
       const connectionPairs = neuralLayout.connectionPairs;
       const connectionWeights = neuralLayout.connectionWeights;
       const hotspotIndices = neuralLayout.hotspotIndices;
+      const signalRoutes = createSignalRoutes(connectionPairs, nodePositions.length);
+      const neuronActivity = new Float32Array(nodePositions.length);
+      const connectionActivity = new Float32Array(connectionPairs.length);
+      const connectionSignalProgress = new Float32Array(connectionPairs.length);
       const connectionsGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       connectionsGeometry.setFromPoints(createConnectionLinePoints(nodePositions, connectionPairs));
       const connectionPositionAttribute = connectionsGeometry.getAttribute("position");
@@ -171,7 +205,7 @@
         color: 0xffffff,
         vertexColors: true,
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.4,
         depthTest: false,
         depthWrite: false
       }));
@@ -179,7 +213,7 @@
         color: 0xffffff,
         vertexColors: true,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.12,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
@@ -190,13 +224,19 @@
       const nodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       nodeGeometry.setFromPoints(nodePositions);
       const nodePositionAttribute = nodeGeometry.getAttribute("position");
+      const nodeColorAttribute = new THREE.BufferAttribute(
+        new Float32Array(nodePositions.length * 3),
+        3
+      );
+      nodeGeometry.setAttribute("color", nodeColorAttribute);
       const animatedNodePositions = new Float32Array(nodePositions.length * 3);
       const nodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.16,
+        size: 0.1,
         sizeAttenuation: true,
+        vertexColors: true,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.14,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
@@ -204,8 +244,9 @@
       brain.add(new THREE.Points(nodeGeometry, nodeGlowMaterial));
       const nodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.032,
+        size: 0.045,
         sizeAttenuation: true,
+        vertexColors: true,
         transparent: true,
         opacity: 0.95,
         depthTest: false,
@@ -216,10 +257,16 @@
       const hotspotGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       hotspotGeometry.setFromPoints(hotspotIndices.map((index) => nodePositions[index]));
       const hotspotPositionAttribute = hotspotGeometry.getAttribute("position");
+      const hotspotColorAttribute = new THREE.BufferAttribute(
+        new Float32Array(hotspotIndices.length * 3),
+        3
+      );
+      hotspotGeometry.setAttribute("color", hotspotColorAttribute);
       const hotspotMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
         size: 0.085,
         sizeAttenuation: true,
+        vertexColors: true,
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
@@ -233,23 +280,28 @@
           uSize: { value: 16 * pixelRatio }
         },
         vertexShader: `
+          attribute vec3 color;
+          varying vec3 vIntensity;
           uniform float uSize;
           void main() {
+            vIntensity = color;
             vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
             gl_Position = projectionMatrix * viewPosition;
             gl_PointSize = uSize;
           }
         `,
         fragmentShader: `
+          varying vec3 vIntensity;
           uniform vec3 uColor;
           uniform float uOpacity;
           void main() {
             float radius = length(gl_PointCoord - vec2(0.5));
             float core = 1.0 - smoothstep(0.04, 0.2, radius);
             float halo = 1.0 - smoothstep(0.08, 0.5, radius);
-            float alpha = (core * 0.8 + halo * 0.38) * uOpacity;
+            float intensity = max(max(vIntensity.r, vIntensity.g), vIntensity.b);
+            float alpha = (core * 0.8 + halo * 0.38) * uOpacity * intensity;
             if (alpha < 0.01) discard;
-            gl_FragColor = vec4(uColor, alpha);
+            gl_FragColor = vec4(uColor * vIntensity, alpha);
             #include <colorspace_fragment>
           }
         `,
@@ -276,10 +328,10 @@
       }));
       const activityGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.17,
+        size: 0.11,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.16,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
@@ -293,24 +345,14 @@
         const idleBreath = config.mode === "breathing" ? (breath + 1) * 0.5 : 0;
         const warningDim = config.mode === "warning" && rawIntensity < 0.3;
         const visibleStrength = warningDim ? 0.08 : strength;
-        const statusBase = {
-          ACTIVE: 0.68,
-          ANALYZING: 0.82,
-          IDLE: 0.2,
-          STOPPED: 0.06,
-          ERROR: 0.3,
-          UNKNOWN: 0.08
-        }[config.status];
-        const signalGain = config.status === "ERROR" ? 0.38 : 0.24;
-        const glowGain = config.status === "ANALYZING" ? 0.62 : 0.42;
-        connectionMaterial.opacity = Math.min(1, statusBase + visibleStrength * signalGain);
-        connectionGlowMaterial.opacity = 0.05 + visibleStrength * glowGain;
-        nodeMaterial.opacity = Math.min(1, statusBase + visibleStrength * signalGain);
-        nodeGlowMaterial.opacity = 0.06 + visibleStrength * glowGain + idleBreath * 0.04;
-        hotspotMaterial.opacity = Math.min(1, statusBase + visibleStrength * 0.62);
-        hotspotGlowMaterial.uniforms.uOpacity.value = 0.1 + visibleStrength * glowGain * 0.84;
-        activityMaterial.opacity = 0.76 + visibleStrength * 0.24;
-        activityGlowMaterial.opacity = 0.08 + visibleStrength * 0.52;
+        connectionMaterial.opacity = 0.3;
+        connectionGlowMaterial.opacity = 0.035 + visibleStrength * 0.05;
+        nodeMaterial.opacity = 0.96;
+        nodeGlowMaterial.opacity = 0.1 + visibleStrength * 0.12 + idleBreath * 0.02;
+        hotspotMaterial.opacity = 0.92;
+        hotspotGlowMaterial.uniforms.uOpacity.value = 0.12 + visibleStrength * 0.34;
+        activityMaterial.opacity = 0.92;
+        activityGlowMaterial.opacity = 0.07 + visibleStrength * 0.14;
       }
 
       function resize() {
@@ -369,26 +411,34 @@
           const breath = Math.sin(elapsed);
           updateNeuralNetwork(
             nodePositionAttribute,
-            connectionPositionAttribute,
-            connectionColorAttribute,
-            nodePositions,
-            connectionPairs,
-            connectionWeights,
-            animatedNodePositions,
-            config,
-            elapsed
+          nodeColorAttribute,
+          connectionPositionAttribute,
+          connectionColorAttribute,
+          nodePositions,
+          connectionPairs,
+          connectionWeights,
+          animatedNodePositions,
+          neuronActivity,
+          connectionActivity,
+          connectionSignalProgress,
+          signalRoutes,
+          config,
+          elapsed
           );
-            updateHotspotPositions(
-              hotspotPositionAttribute,
-              animatedNodePositions,
-              hotspotIndices
-            );
-            updateEnergyParticles(
-            activityGeometry,
-            connectionPairs,
-            animatedNodePositions,
-            config.activityPoints,
-            elapsed
+          updateHotspotPositions(
+          hotspotPositionAttribute,
+          animatedNodePositions,
+          hotspotIndices
+          );
+          updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
+          updateEnergyParticles(
+          activityGeometry,
+          connectionPairs,
+          signalRoutes,
+          animatedNodePositions,
+          config.activityPoints,
+          elapsed,
+          config
           );
           updateVisualIntensity(elapsed, breath);
           renderer.render(scene, camera);
@@ -424,12 +474,17 @@
         activityGeometry.setDrawRange(0, config.activityPoints);
         updateNeuralNetwork(
           nodePositionAttribute,
+          nodeColorAttribute,
           connectionPositionAttribute,
           connectionColorAttribute,
           nodePositions,
           connectionPairs,
           connectionWeights,
           animatedNodePositions,
+          neuronActivity,
+          connectionActivity,
+          connectionSignalProgress,
+          signalRoutes,
           config,
           0
         );
@@ -438,12 +493,15 @@
           animatedNodePositions,
           hotspotIndices
         );
+        updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
         updateEnergyParticles(
           activityGeometry,
           connectionPairs,
+          signalRoutes,
           animatedNodePositions,
           config.activityPoints,
-          0
+          0,
+          config
         );
         updateVisualIntensity(0, 0);
         brain.rotation.set(0, 0, 0);
@@ -679,6 +737,7 @@
 
     const hemispherePaths = [];
     for (const side of [-1, 1]) {
+      const start = nodePositions.length;
       const contour = addPath(createOuterContour(side), 1.65, true);
       for (let index = 0; index < contour.length; index += 2) {
         hotspotIndices.push(contour[index]);
@@ -705,7 +764,7 @@
         addConnection(branchPath[branchPath.length - 1], target[branch.targetIndex], 0.94);
         hotspotIndices.push(branchPath[Math.floor(branchPath.length / 2)]);
       }
-      hemispherePaths.push({ side, contour, gyri });
+      hemispherePaths.push({ side, contour, gyri, start, end: nodePositions.length });
     }
 
     const cerebellarPaths = [];
@@ -747,6 +806,73 @@
     addConnection(cerebellarPaths[0][0], brainstemPath[0], 0.85);
     addConnection(cerebellarPaths[2][0], brainstemPath[1], 0.85);
 
+    function addLocalConnections(start, end, targetCount) {
+      const existing = new Set(connectionPairs.map(([left, right]) =>
+        left < right ? `${left}:${right}` : `${right}:${left}`
+      ));
+      const maxDistanceSquared = 0.32 ** 2;
+      const candidatesBySource = [];
+      for (let source = start; source < end; source += 1) {
+        const candidates = [];
+        const sourcePosition = nodePositions[source];
+        for (let target = start; target < end; target += 1) {
+          if (source === target) {
+            continue;
+          }
+          const targetPosition = nodePositions[target];
+          const dx = sourcePosition.x - targetPosition.x;
+          const dy = sourcePosition.y - targetPosition.y;
+          const dz = sourcePosition.z - targetPosition.z;
+          const distanceSquared = dx * dx + dy * dy + dz * dz;
+          if (distanceSquared <= maxDistanceSquared) {
+            candidates.push({ target, distanceSquared });
+          }
+        }
+        candidates.sort((left, right) => left.distanceSquared - right.distanceSquared);
+        candidatesBySource.push(candidates);
+      }
+
+      let added = 0;
+      const longestCandidateList = Math.max(...candidatesBySource.map((items) => items.length));
+      for (
+        let candidateRank = 0;
+        candidateRank < longestCandidateList && added < targetCount;
+        candidateRank += 1
+      ) {
+        for (let sourceOffset = 0; sourceOffset < candidatesBySource.length; sourceOffset += 1) {
+          const candidate = candidatesBySource[sourceOffset][candidateRank];
+          if (!candidate) {
+            continue;
+          }
+          const source = start + sourceOffset;
+          const left = Math.min(source, candidate.target);
+          const right = Math.max(source, candidate.target);
+          const key = `${left}:${right}`;
+          if (existing.has(key)) {
+            continue;
+          }
+          const distance = Math.sqrt(candidate.distanceSquared);
+          const weight = 0.18 + (1 - distance / 0.32) * 0.17;
+          addConnection(source, candidate.target, weight);
+          existing.add(key);
+          added += 1;
+          if (added >= targetCount) {
+            break;
+          }
+        }
+      }
+      return added;
+    }
+
+    let remainingConnectionBudget = performanceLimits.maxConnections - connectionPairs.length;
+    for (let index = 0; index < hemispherePaths.length; index += 1) {
+      const hemispheresRemaining = hemispherePaths.length - index;
+      const targetCount = Math.ceil(remainingConnectionBudget / hemispheresRemaining);
+      const hemisphere = hemispherePaths[index];
+      const added = addLocalConnections(hemisphere.start, hemisphere.end, targetCount);
+      remainingConnectionBudget -= added;
+    }
+
     if (
       nodePositions.length !== performanceLimits.maxNeuralNodes
       || connectionPairs.length > performanceLimits.maxConnections
@@ -783,14 +909,60 @@
     return points;
   }
 
+  function createSignalRoutes(connectionPairs, nodeCount) {
+    const adjacency = Array.from({ length: nodeCount }, () => []);
+    connectionPairs.forEach(([start, end], edgeIndex) => {
+      adjacency[start].push({ node: end, edgeIndex });
+      adjacency[end].push({ node: start, edgeIndex });
+    });
+
+    const routes = [];
+    for (let routeIndex = 0; routeIndex < performanceLimits.maxActivityPoints; routeIndex += 1) {
+      let currentNode = (routeIndex * 137 + 23) % nodeCount;
+      let previousNode = -1;
+      const nodeIndices = [currentNode];
+      const edgeIndices = [];
+      const usedEdges = new Set();
+      for (let step = 0; step < 8; step += 1) {
+        const neighbors = adjacency[currentNode];
+        const candidates = neighbors.filter(({ node, edgeIndex }) =>
+          node !== previousNode && !usedEdges.has(edgeIndex)
+        );
+        const available = candidates.length ? candidates : neighbors;
+        if (!available.length) {
+          break;
+        }
+        const choice = available[(routeIndex * 11 + step * 7) % available.length];
+        edgeIndices.push(choice.edgeIndex);
+        usedEdges.add(choice.edgeIndex);
+        previousNode = currentNode;
+        currentNode = choice.node;
+        nodeIndices.push(currentNode);
+      }
+      if (edgeIndices.length) {
+        routes.push({
+          edgeIndices,
+          nodeIndices,
+          phase: routeIndex * 0.43
+        });
+      }
+    }
+    return routes;
+  }
+
   function updateNeuralNetwork(
     nodeAttribute,
+    nodeColorAttribute,
     connectionAttribute,
     colorAttribute,
     nodePositions,
     connectionPairs,
     connectionWeights,
     animatedPositions,
+    neuronActivity,
+    connectionActivity,
+    connectionSignalProgress,
+    signalRoutes,
     config,
     elapsed
   ) {
@@ -806,8 +978,66 @@
       animatedPositions[offset + 1] = y;
       animatedPositions[offset + 2] = z;
       nodeAttribute.setXYZ(index, x, y, z);
+
+      const activationPhase = index * 2.399963229728653 + (index % 13) * 0.17;
+      const oscillator = (Math.sin(elapsed * (0.72 + (index % 9) * 0.045)
+        + activationPhase) + 1) * 0.5;
+      const activationRange = Math.max(0.001, 1 - config.activationThreshold);
+      const activation = config.animated
+        ? Math.pow(Math.max(0, (oscillator - config.activationThreshold) / activationRange), 1.45)
+          * config.neuronGain
+        : 0;
+      neuronActivity[index] = Math.min(1, config.neuronBaseline + activation);
+      nodeColorAttribute.setXYZ(
+        index,
+        neuronActivity[index],
+        neuronActivity[index],
+        neuronActivity[index]
+      );
     }
     nodeAttribute.needsUpdate = true;
+    nodeColorAttribute.needsUpdate = true;
+
+    connectionActivity.fill(0);
+    connectionSignalProgress.fill(0);
+    const routeCount = Math.min(config.activityPoints, signalRoutes.length);
+    for (let routeIndex = 0; routeIndex < routeCount; routeIndex += 1) {
+      const route = signalRoutes[routeIndex];
+      const routePosition = (
+        elapsed * config.signalSpeed + route.phase
+      ) % route.edgeIndices.length;
+      const edgeStep = Math.floor(routePosition);
+      const progress = routePosition - edgeStep;
+      const pulse = 0.64 + Math.sin(progress * Math.PI) * 0.36;
+      const edgeIndex = route.edgeIndices[edgeStep];
+      connectionActivity[edgeIndex] = Math.max(connectionActivity[edgeIndex], pulse);
+      connectionSignalProgress[edgeIndex] = progress;
+
+      if (edgeStep > 0) {
+        const trailingEdge = route.edgeIndices[edgeStep - 1];
+        const trailingPulse = (1 - progress) * 0.32;
+        if (trailingPulse > connectionActivity[trailingEdge]) {
+          connectionActivity[trailingEdge] = trailingPulse;
+          connectionSignalProgress[trailingEdge] = 1;
+        }
+      }
+
+      const startNode = route.nodeIndices[edgeStep];
+      const endNode = route.nodeIndices[edgeStep + 1];
+      neuronActivity[startNode] = Math.max(
+        neuronActivity[startNode],
+        0.48 + pulse * 0.46 * (1 - progress)
+      );
+      neuronActivity[endNode] = Math.max(
+        neuronActivity[endNode],
+        0.38 + pulse * 0.56 * progress
+      );
+    }
+    for (let index = 0; index < nodePositions.length; index += 1) {
+      const intensity = neuronActivity[index];
+      nodeColorAttribute.setXYZ(index, intensity, intensity, intensity);
+    }
+    nodeColorAttribute.needsUpdate = true;
 
     const channels = [
       ((config.color >> 16) & 0xff) / 255,
@@ -832,14 +1062,15 @@
         animatedPositions[endOffset + 2]
       );
 
-      const phase = elapsed * 2.6 + index * 0.17;
       const weight = connectionWeights[index] || 1;
-      const startBrightness = (config.animated
-        ? 0.12 + (Math.sin(phase) * 0.5 + 0.5) * 0.88
-        : 0.48) * weight;
-      const endBrightness = (config.animated
-        ? 0.12 + (Math.sin(phase + 1.1) * 0.5 + 0.5) * 0.88
-        : 0.48) * weight;
+      const pulseBrightness = connectionActivity[index] * config.connectionPulseGain;
+      const weightFactor = 0.35 + Math.min(1, weight) * 0.65;
+      const inactiveBrightness = 0.008 + Math.min(1, weight) * 0.018;
+      const progress = connectionSignalProgress[index];
+      const startBrightness = inactiveBrightness
+        + pulseBrightness * weightFactor * (0.3 + 0.7 * (1 - progress));
+      const endBrightness = inactiveBrightness
+        + pulseBrightness * weightFactor * (0.3 + 0.7 * progress);
       colorAttribute.setXYZ(
         vertexOffset,
         channels[0] * startBrightness,
@@ -857,7 +1088,15 @@
     colorAttribute.needsUpdate = true;
   }
 
-  function updateEnergyParticles(geometry, connectionPairs, animatedPositions, count, elapsed) {
+  function updateEnergyParticles(
+    geometry,
+    connectionPairs,
+    signalRoutes,
+    animatedPositions,
+    count,
+    elapsed,
+    config
+  ) {
     if (!connectionPairs.length || typeof geometry.getAttribute !== "function") {
       return;
     }
@@ -866,19 +1105,26 @@
       return;
     }
     for (let index = 0; index < count; index += 1) {
-      const pair = connectionPairs[(index * 37) % connectionPairs.length];
-      const progress = (elapsed * 0.34 + index / count) % 1;
-      const direction = index % 2 === 0 ? progress : 1 - progress;
+      const route = signalRoutes[index];
+      if (!route) {
+        continue;
+      }
+      const routePosition = (
+        elapsed * config.signalSpeed + route.phase
+      ) % route.edgeIndices.length;
+      const edgeStep = Math.floor(routePosition);
+      const progress = routePosition - edgeStep;
+      const pair = connectionPairs[route.edgeIndices[edgeStep]];
       const fromOffset = pair[0] * 3;
       const toOffset = pair[1] * 3;
       positions.setXYZ(
         index,
         animatedPositions[fromOffset]
-          + (animatedPositions[toOffset] - animatedPositions[fromOffset]) * direction,
+          + (animatedPositions[toOffset] - animatedPositions[fromOffset]) * progress,
         animatedPositions[fromOffset + 1]
-          + (animatedPositions[toOffset + 1] - animatedPositions[fromOffset + 1]) * direction,
+          + (animatedPositions[toOffset + 1] - animatedPositions[fromOffset + 1]) * progress,
         animatedPositions[fromOffset + 2]
-          + (animatedPositions[toOffset + 2] - animatedPositions[fromOffset + 2]) * direction
+          + (animatedPositions[toOffset + 2] - animatedPositions[fromOffset + 2]) * progress
       );
     }
     positions.needsUpdate = true;
@@ -895,6 +1141,14 @@
       );
     }
     positionAttribute.needsUpdate = true;
+  }
+
+  function updateHotspotColors(colorAttribute, neuronActivity, hotspotIndices) {
+    for (let index = 0; index < hotspotIndices.length; index += 1) {
+      const intensity = Math.max(0, (neuronActivity[hotspotIndices[index]] - 0.035) * 1.35);
+      colorAttribute.setXYZ(index, intensity, intensity, intensity);
+    }
+    colorAttribute.needsUpdate = true;
   }
 
   function pulseIntensity(config, elapsed, breath) {

@@ -404,7 +404,7 @@ test("Agent Brain caps renderer pixel ratio for desktop and mobile performance",
   assert.equal(agentBrain.performanceLimits.maxConnections, 2160);
 });
 
-test("Agent Brain drives neural network glow by status without rotating the graph", () => {
+test("Agent Brain drives independent neuron and traveling signal activity without rotating", () => {
   const harness = createBrainHarness();
   const brain = agentBrain.createAgentBrain({
     THREE: harness.THREE,
@@ -414,18 +414,56 @@ test("Agent Brain drives neural network glow by status without rotating the grap
     initialStatus: "IDLE"
   });
   const lineMaterial = harness.calls.materialInstances.find((material) => material.vertexColors);
-  const nodeMaterial = harness.calls.points.find(({ material }) => material.size === 0.032).material;
+  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
+  const nodeMaterial = neuralNodes.material;
   const hotspotMaterial = harness.calls.points.find(({ material }) => material.size === 0.085).material;
+  const nodeColors = neuralNodes.geometry.getAttribute("color");
+  const hotspotColors = harness.calls.points.find(({ material }) => material.size === 0.085)
+    .geometry.getAttribute("color");
   const brainGroup = harness.calls.brainGroups[0];
 
   brain.setStatus("ACTIVE");
   assert.equal(nodeMaterial.color.value, hotspotMaterial.color.value);
-  const activeLineGlow = lineMaterial.opacity;
-  const activeNeuronGlow = hotspotMaterial.opacity;
+  const activeNodeValues = [...nodeColors.array];
+  const activeHotspotValues = [...hotspotColors.array];
+  const activeConnectionValues = [...harness.calls.lineSegmentGeometries[0]
+    .getAttribute("color").array];
+  assert.ok(new Set(activeNodeValues).size > 10);
   brain.setStatus("ANALYZING");
-  assert.ok(lineMaterial.opacity > activeLineGlow);
-  assert.ok(nodeMaterial.opacity > activeLineGlow);
-  assert.ok(hotspotMaterial.opacity > activeNeuronGlow);
+  assert.equal(lineMaterial.opacity, 0.3);
+  const analyzingNodeValues = [...nodeColors.array];
+  const analyzingHotspotValues = [...hotspotColors.array];
+  const analyzingConnectionValues = [...harness.calls.lineSegmentGeometries[0]
+    .getAttribute("color").array];
+  let activeConnectionCount = 0;
+  for (let index = 0; index < analyzingConnectionValues.length; index += 6) {
+    if (Math.max(
+      analyzingConnectionValues[index],
+      analyzingConnectionValues[index + 1],
+      analyzingConnectionValues[index + 2],
+      analyzingConnectionValues[index + 3],
+      analyzingConnectionValues[index + 4],
+      analyzingConnectionValues[index + 5]
+    ) > 0.12) {
+      activeConnectionCount += 1;
+    }
+  }
+  assert.ok(activeConnectionCount > 0);
+  assert.ok(activeConnectionCount < analyzingConnectionValues.length / 24);
+  const countBrightNodes = (values, threshold) => {
+    let count = 0;
+    for (let index = 0; index < values.length; index += 3) {
+      if (values[index] > threshold) {
+        count += 1;
+      }
+    }
+    return count;
+  };
+  assert.ok(countBrightNodes(analyzingNodeValues, 0.6)
+    > countBrightNodes(activeNodeValues, 0.6));
+  assert.ok(countBrightNodes(analyzingHotspotValues, 0.35)
+    > countBrightNodes(activeHotspotValues, 0.35));
+  assert.notDeepEqual(analyzingConnectionValues, activeConnectionValues);
   const connectionGeometry = harness.calls.lineSegmentGeometries[0];
   const connectionPositions = connectionGeometry.getAttribute("position");
   const connectionColors = connectionGeometry.getAttribute("color");
@@ -450,10 +488,13 @@ test("Agent Brain drives neural network glow by status without rotating the grap
   assert.ok(Math.abs(leftColor[1] / leftColor[2] - rightColor[1] / rightColor[2]) < 0.00001);
 
   brain.setStatus("IDLE");
-  assert.ok(lineMaterial.opacity < activeLineGlow);
+  assert.ok(countBrightNodes([...nodeColors.array], 0.6)
+    < countBrightNodes(activeNodeValues, 0.6));
   brain.setStatus("STOPPED");
   assert.equal(harness.calls.frameCallbacks.size, 0);
-  assert.ok(lineMaterial.opacity < activeLineGlow);
+  assert.ok(Math.max(...nodeColors.array) < Math.max(...activeNodeValues));
+  const stoppedConnectionValues = [...connectionColors.array];
+  assert.ok(Math.max(...stoppedConnectionValues) < Math.max(...analyzingConnectionValues));
   assert.equal(harness.calls.points.find(({ material }) => material.size === 0.075)
     .geometry.drawRange.count, 0);
   brain.setStatus("ERROR");
@@ -468,9 +509,9 @@ test("Agent Brain drives neural network glow by status without rotating the grap
     callback(timestamp);
   };
   runFrame(200);
-  const warningGlow = lineMaterial.opacity;
+  const warningSignals = [...connectionColors.array];
   runFrame(1600);
-  assert.ok(lineMaterial.opacity < warningGlow);
+  assert.notDeepEqual([...connectionColors.array], warningSignals);
   assert.equal(brainGroup.rotation.x, 0);
   assert.equal(brainGroup.rotation.y, 0);
 
@@ -496,7 +537,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.equal(harness.calls.surfaceGeometries.length, 0);
   assert.equal(harness.calls.computedNormals, 0);
   assert.equal(harness.calls.meshes.length, 0);
-  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.032);
+  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
   assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
   const networkPositions = neuralNodes.geometry.getAttribute("position");
   let minimumNetworkX = Infinity;
@@ -534,7 +575,10 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.ok(networkMaxX > 0.5);
   const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
   assert.ok(connectionPosition.count > 1000);
-  assert.equal(connectionPosition.count, 1470);
+  assert.equal(
+    connectionPosition.count,
+    agentBrain.performanceLimits.maxConnections * 2
+  );
   let leftContourInnerEdge = -Infinity;
   let leftContourOuterEdge = Infinity;
   let leftContourTop = -Infinity;
@@ -601,7 +645,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.equal(harness.calls.frameCallbacks.size, 1);
   brain.setStatus("STOPPED");
   assert.equal(harness.stateElement.dataset.state, "stopped");
-  const stoppedColor = harness.calls.points.find(({ material }) => material.size === 0.032)
+  const stoppedColor = harness.calls.points.find(({ material }) => material.size === 0.045)
     .material.color.value;
   const stoppedChannels = [
     (stoppedColor >> 16) & 0xff,
@@ -662,6 +706,9 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
   const energyGeometry = harness.calls.points.find(({ material }) => material.size === 0.075).geometry;
   const energyPositions = energyGeometry.getAttribute("position");
   const initialEnergyPositions = [...energyPositions.array];
+  const nodeColors = harness.calls.points.find(({ material }) => material.size === 0.045)
+    .geometry.getAttribute("color");
+  const initialNodeColors = [...nodeColors.array];
   const hotspotGeometry = harness.calls.points.find(({ material }) => material.size === 0.085).geometry;
   const hotspotPositions = hotspotGeometry.getAttribute("position");
   const initialHotspotPositions = [...hotspotPositions.array];
@@ -674,6 +721,7 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
   assert.equal(harness.calls.renders, initialRenderCount + 1);
   assert.equal(energyPositions.needsUpdate, true);
   assert.notDeepEqual([...energyPositions.array], initialEnergyPositions);
+  assert.notDeepEqual([...nodeColors.array], initialNodeColors);
   assert.equal(hotspotPositions.needsUpdate, true);
   assert.notDeepEqual([...hotspotPositions.array], initialHotspotPositions);
   assert.equal(linePositions.needsUpdate, true);
