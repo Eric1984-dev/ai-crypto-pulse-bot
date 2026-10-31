@@ -6,6 +6,8 @@
 
 The Agent Brain replaces the placeholder in the existing Agent Status panel. The dashboard layout is otherwise unchanged: the Brain remains below Backend status / Agent Status and before Risk control / Emergency State, and it was not moved above the dashboard summaries.
 
+The network-only appearance documented in this original completion report was subsequently replaced by the semi-solid visual redesign in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md). That report describes the current renderer and its updated validation.
+
 ## Implementation
 
 - Added `GET /api/agent-status`, an authenticated read-only endpoint that verifies the existing HttpOnly session cookie and selects `AI_Crypto_Bot_Status.status` using the anon key and the user's JWT. RLS remains authoritative.

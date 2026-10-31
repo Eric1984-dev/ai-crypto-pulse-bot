@@ -39,6 +39,10 @@ All notable project changes should be documented here.
 - Deployment documentation
 - Testing documentation
 
+### Changed
+
+- Replace the network-cloud Agent Brain as the primary visual with a stable semi-solid organic brain volume, layered additive glow, and internal status-driven neural activity; remove continuous whole-brain rotation
+
 ### Fixed
 
 - Keep the Agent Brain fallback hidden whenever its renderer is available, clear stale failed initialization state, and retry after transient renderer failures

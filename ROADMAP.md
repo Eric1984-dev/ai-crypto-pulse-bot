@@ -55,10 +55,11 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 
 ## Phase 05 - Agent Brain
 
-- [x] Three.js Agent Brain formed by an organic neural-network silhouette in the existing Agent Status panel
+- [x] Premium Three.js Agent Brain with a stable semi-solid organic volume and visible internal neural network in the existing Agent Status panel
 - [x] Live status refresh from `AI_Crypto_Bot_Status` through an authenticated read-only API
 - [x] ACTIVE, ANALYZING, IDLE, STOPPED, ERROR, and neutral UNKNOWN visualization states
-- [x] 720-node network, up to 2160 dynamically pulsing connections, and up to 48 status-driven energy particles
+- [x] 720 internal nodes, up to 2160 dynamically pulsing connections, up to 48 status-driven energy particles, and layered status-driven glow
+- [x] Stable brain silhouette with animated neural activity and no continuous whole-brain rotation
 - [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards
 - [x] Tests and documentation

@@ -12,9 +12,11 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
     contextLost: false,
     geometryDisposed: 0,
     materialDisposed: 0,
+    computedNormals: 0,
     sphereGeometryArgs: [],
-    cortexGeometries: [],
+    surfaceGeometries: [],
     meshes: [],
+    brainGroups: [],
     materialInstances: [],
     lineSegmentGeometries: [],
     points: [],
@@ -65,7 +67,16 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
   class FakeObject3D {
     constructor() {
       this.children = [];
-      this.position = { x: 0, y: 0, z: 0 };
+      this.position = {
+        x: 0,
+        y: 0,
+        z: 0,
+        set(x, y, z) {
+          this.x = x;
+          this.y = y;
+          this.z = z;
+        }
+      };
       this.rotation = {
         x: 0,
         y: 0,
@@ -138,7 +149,7 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
         }
       }
       this.attributes.position = createAttribute(points);
-      calls.cortexGeometries.push(this);
+      calls.surfaceGeometries.push(this);
     }
   }
 
@@ -227,16 +238,31 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
     PerspectiveCamera: class extends FakeObject3D {
       updateProjectionMatrix() {}
     },
-    Group: FakeObject3D,
+    Group: class extends FakeObject3D {
+      constructor() {
+        super();
+        calls.brainGroups.push(this);
+      }
+    },
     SphereGeometry: FakeSphereGeometry,
     BufferGeometry: FakeGeometry,
     BufferAttribute: FakeBufferAttribute,
-    MeshStandardMaterial: FakeMaterial,
+    MeshPhongMaterial: FakeMaterial,
     MeshBasicMaterial: FakeMaterial,
     LineBasicMaterial: FakeMaterial,
     PointsMaterial: FakeMaterial,
     AmbientLight: FakeObject3D,
-    PointLight: FakeObject3D,
+    PointLight: class extends FakeObject3D {
+      constructor(color) {
+        super();
+        this.color = {
+          value: color,
+          setHex(value) {
+            this.value = value;
+          }
+        };
+      }
+    },
     Mesh: class extends FakeObject3D {
       constructor(geometry, material) {
         super();
@@ -269,7 +295,10 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
       }
     },
     Vector3: FakeVector3,
-    WebGLRenderer: FakeRenderer
+    WebGLRenderer: FakeRenderer,
+    AdditiveBlending: 2,
+    BackSide: 1,
+    DoubleSide: 2
   };
 
   const container = {
@@ -364,6 +393,50 @@ test("Agent Brain caps renderer pixel ratio for desktop and mobile performance",
   assert.equal(agentBrain.performanceLimits.maxConnections, 2160);
 });
 
+test("Agent Brain uses layered status-driven glow without rotating the brain volume", () => {
+  const harness = createBrainHarness();
+  const brain = agentBrain.createAgentBrain({
+    THREE: harness.THREE,
+    container: harness.container,
+    windowRef: harness.windowRef,
+    documentRef: harness.documentRef,
+    initialStatus: "IDLE"
+  });
+  const shellMaterial = harness.calls.meshes[1].material;
+  const auraMaterial = harness.calls.meshes[0].material;
+  const brainGroup = harness.calls.brainGroups[0];
+
+  brain.setStatus("ACTIVE");
+  const activeIntensity = shellMaterial.emissiveIntensity;
+  const activeOpacity = shellMaterial.opacity;
+  brain.setStatus("ANALYZING");
+  assert.ok(shellMaterial.emissiveIntensity > activeIntensity);
+  assert.ok(shellMaterial.opacity > activeOpacity);
+  assert.ok(auraMaterial.opacity > 0.1);
+
+  brain.setStatus("IDLE");
+  assert.ok(shellMaterial.opacity < activeOpacity);
+  brain.setStatus("STOPPED");
+  assert.equal(harness.calls.frameCallbacks.size, 0);
+  assert.ok(shellMaterial.emissiveIntensity < activeIntensity);
+  brain.setStatus("ERROR");
+  assert.equal(shellMaterial.emissive.value, 0xff4655);
+
+  const runFrame = (timestamp) => {
+    const [frameId, callback] = harness.calls.frameCallbacks.entries().next().value;
+    harness.calls.frameCallbacks.delete(frameId);
+    callback(timestamp);
+  };
+  runFrame(200);
+  const warningGlow = shellMaterial.emissiveIntensity;
+  runFrame(1600);
+  assert.ok(shellMaterial.emissiveIntensity < warningGlow);
+  assert.equal(brainGroup.rotation.x, 0);
+  assert.equal(brainGroup.rotation.y, 0);
+
+  brain.dispose();
+});
+
 test("Agent Brain initializes a low-power renderer and pauses/resumes animation with page visibility", () => {
   const harness = createBrainHarness();
   const brain = agentBrain.createAgentBrain({
@@ -377,21 +450,43 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
 
   assert.equal(brain.available, true);
   assert.equal(brain.isAvailable(), true);
-  assert.equal(harness.calls.rendererOptions.antialias, false);
+  assert.equal(harness.calls.rendererOptions.antialias, true);
   assert.equal(harness.calls.rendererOptions.powerPreference, "low-power");
-  assert.deepEqual(harness.calls.sphereGeometryArgs, []);
-  assert.equal(harness.calls.cortexGeometries.length, 0);
-  assert.equal(harness.calls.meshes.length, 0);
+  assert.deepEqual(harness.calls.sphereGeometryArgs, [[1, 64, 48]]);
+  assert.equal(harness.calls.surfaceGeometries.length, 1);
+  assert.equal(harness.calls.computedNormals, 1);
+  assert.equal(harness.calls.meshes.length, 3);
+  assert.ok(harness.calls.meshes.every((mesh) =>
+    mesh.geometry === harness.calls.surfaceGeometries[0]
+  ));
+  const auraMaterial = harness.calls.meshes[0].material;
+  const shellMaterial = harness.calls.meshes[1].material;
+  const innerGlowMaterial = harness.calls.meshes[2].material;
+  assert.equal(auraMaterial.blending, harness.THREE.AdditiveBlending);
+  assert.equal(innerGlowMaterial.blending, harness.THREE.AdditiveBlending);
+  assert.equal(shellMaterial.shininess, 54);
+  const surface = harness.calls.surfaceGeometries[0].getAttribute("position");
+  let minSurfaceX = Infinity;
+  let maxSurfaceX = -Infinity;
+  let minSurfaceY = Infinity;
+  let maxSurfaceY = -Infinity;
+  for (let index = 0; index < surface.count; index += 1) {
+    minSurfaceX = Math.min(minSurfaceX, surface.getX(index));
+    maxSurfaceX = Math.max(maxSurfaceX, surface.getX(index));
+    minSurfaceY = Math.min(minSurfaceY, surface.getY(index));
+    maxSurfaceY = Math.max(maxSurfaceY, surface.getY(index));
+  }
+  const surfaceWidth = maxSurfaceX - minSurfaceX;
+  const surfaceHeight = maxSurfaceY - minSurfaceY;
+  assert.ok(surfaceWidth > surfaceHeight * 1.4);
   const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.021);
   assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
   const networkPositions = neuralNodes.geometry.getAttribute("position");
-  const xValues = Array.from({ length: networkPositions.count }, (_, index) => networkPositions.getX(index));
-  const yValues = Array.from({ length: networkPositions.count }, (_, index) => networkPositions.getY(index));
-  const horizontalSpan = Math.max(...xValues) - Math.min(...xValues);
-  const verticalSpan = Math.max(...yValues) - Math.min(...yValues);
-  assert.ok(horizontalSpan > 1.7);
-  assert.ok(verticalSpan > 0.9);
-  assert.ok(horizontalSpan / verticalSpan > 1.4);
+  let networkMaxX = 0;
+  for (let index = 0; index < networkPositions.count; index += 1) {
+    networkMaxX = Math.max(networkMaxX, Math.abs(networkPositions.getX(index)));
+  }
+  assert.ok(networkMaxX < Math.max(Math.abs(minSurfaceX), Math.abs(maxSurfaceX)));
   const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
   assert.ok(connectionPosition.count > 1000);
   assert.ok(harness.calls.lineSegmentGeometries[0].getAttribute("position").count
@@ -473,8 +568,11 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
     documentRef: harness.documentRef,
     initialStatus: "ANALYZING"
   });
+  assert.equal(harness.calls.rendererOptions.antialias, false);
   assert.deepEqual(harness.calls.setPixelRatio, [1.25]);
   const initialRenderCount = harness.calls.renders;
+  const brainGroup = harness.calls.brainGroups[0];
+  const initialScale = { ...brainGroup.scale };
 
   const [frameId, firstFrame] = harness.calls.frameCallbacks.entries().next().value;
   harness.calls.frameCallbacks.delete(frameId);
@@ -497,6 +595,9 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
   assert.notDeepEqual([...linePositions.array], initialLinePositions);
   assert.equal(connectionColors.needsUpdate, true);
   assert.notDeepEqual([...connectionColors.array], initialConnectionColors);
+  assert.equal(brainGroup.rotation.x, 0);
+  assert.equal(brainGroup.rotation.y, 0);
+  assert.deepEqual(brainGroup.scale, initialScale);
 
   brain.dispose();
   assert.equal(harness.calls.frameCallbacks.size, 0);

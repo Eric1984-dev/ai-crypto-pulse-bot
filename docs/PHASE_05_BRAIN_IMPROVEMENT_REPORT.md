@@ -1,5 +1,7 @@
 # Phase 05 Brain Improvement Report
 
+> Historical iteration report. Its network-only visual was later superseded by the semi-solid brain redesign in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md).
+
 ## Status
 
 The Agent Brain fallback and visualization improvements are implemented. The dashboard placement, database-backed status source, and Phase 05 scope are unchanged. Phase 06 was not started.

@@ -11,18 +11,18 @@
     ACTIVE: Object.freeze({
       status: "ACTIVE",
       color: 0x389cff,
-      emissiveIntensity: 0.8,
+      emissiveIntensity: 0.95,
       pulseSpeed: 1.7,
       pulseAmount: 0.035,
-      activityPoints: 24,
+      activityPoints: 28,
       animated: true,
       mode: "continuous"
     }),
     ANALYZING: Object.freeze({
       status: "ANALYZING",
       color: 0x36b8ff,
-      emissiveIntensity: 1.45,
-      pulseSpeed: 3.2,
+      emissiveIntensity: 2.4,
+      pulseSpeed: 4.2,
       pulseAmount: 0.07,
       activityPoints: 48,
       animated: true,
@@ -31,10 +31,10 @@
     IDLE: Object.freeze({
       status: "IDLE",
       color: 0x76aee2,
-      emissiveIntensity: 0.38,
+      emissiveIntensity: 0.35,
       pulseSpeed: 0.48,
       pulseAmount: 0.018,
-      activityPoints: 6,
+      activityPoints: 4,
       animated: true,
       mode: "breathing"
     }),
@@ -51,10 +51,10 @@
     ERROR: Object.freeze({
       status: "ERROR",
       color: 0xff4655,
-      emissiveIntensity: 1.15,
-      pulseSpeed: 2.4,
+      emissiveIntensity: 1.7,
+      pulseSpeed: 2.6,
       pulseAmount: 0.055,
-      activityPoints: 18,
+      activityPoints: 20,
       animated: true,
       mode: "warning"
     }),
@@ -132,15 +132,22 @@
     try {
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 20);
-      camera.position.z = 2.75;
+      camera.position.z = 2.45;
+      const ambientLight = new THREE.AmbientLight(0x7193b8, 0.38);
+      const keyLight = new THREE.PointLight(config.color, 1.25, 5);
+      keyLight.position.set(-1.1, 1.2, 2.4);
+      const rimLight = new THREE.PointLight(0xd7fbff, 0.8, 4);
+      rimLight.position.set(1.4, 0.2, -1.2);
+      scene.add(ambientLight, keyLight, rimLight);
+      const mobileViewport = isMobileViewport(windowRef, container);
       renderer = new THREE.WebGLRenderer({
         alpha: true,
-        antialias: false,
+        antialias: !mobileViewport,
         powerPreference: "low-power"
       });
       renderer.setPixelRatio(getPixelRatio(
         windowRef.devicePixelRatio,
-        isMobileViewport(windowRef, container)
+        mobileViewport
       ));
       renderer.setSize(1, 1, false);
       renderer.domElement.className = "agent-brain-canvas";
@@ -152,6 +159,50 @@
 
       const brain = new THREE.Group();
       scene.add(brain);
+      const brainGeometry = trackGeometry(geometries, createBrainSurfaceGeometry(THREE));
+      const auraMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
+        color: config.color,
+        transparent: true,
+        opacity: 0.12,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false
+      }));
+      const aura = new THREE.Mesh(brainGeometry, auraMaterial);
+      aura.scale.set(1.1, 1.1, 1.1);
+      aura.renderOrder = 4;
+      brain.add(aura);
+
+      const shellMaterial = trackMaterial(materials, new THREE.MeshPhongMaterial({
+        color: scaleColor(config.color, 0.28),
+        emissive: config.color,
+        emissiveIntensity: config.emissiveIntensity * 0.22,
+        specular: 0xb9f7ff,
+        shininess: 54,
+        transparent: true,
+        opacity: 0.36,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      }));
+      const shell = new THREE.Mesh(brainGeometry, shellMaterial);
+      shell.renderOrder = 3;
+      brain.add(shell);
+
+      const innerGlowMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
+        color: config.color,
+        transparent: true,
+        opacity: 0.1,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false
+      }));
+      const innerGlow = new THREE.Mesh(brainGeometry, innerGlowMaterial);
+      innerGlow.scale.set(0.82, 0.82, 0.82);
+      innerGlow.renderOrder = 2;
+      brain.add(innerGlow);
+
       const nodePositions = createNodePositions(THREE);
       const connectionPairs = createConnectionPairs(nodePositions);
       const connectionsGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
@@ -187,10 +238,10 @@
       const animatedNodePositions = new Float32Array(nodePositions.length * 3);
       const nodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.066,
+        size: 0.045,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.28,
+        opacity: 0.16,
         depthTest: false,
         depthWrite: false
       }));
@@ -229,6 +280,45 @@
       }));
       brain.add(new THREE.Points(activityGeometry, activityGlowMaterial));
       brain.add(new THREE.Points(activityGeometry, activityMaterial));
+      const fissureGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      fissureGeometry.setFromPoints(createMidlineFissure(THREE));
+      const fissureMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
+        color: 0x071525,
+        transparent: true,
+        opacity: 0.62,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const fissure = new THREE.Line(fissureGeometry, fissureMaterial);
+      fissure.renderOrder = 5;
+      brain.add(fissure);
+
+      function updateVisualIntensity(elapsed, breath) {
+        const rawIntensity = pulseIntensity(config, elapsed, breath);
+        const strength = Math.max(0, Math.min(1, rawIntensity / 2.4));
+        const idleBreath = config.mode === "breathing" ? (breath + 1) * 0.5 : 0;
+        const warningDim = config.mode === "warning" && rawIntensity < 0.3;
+        const visibleStrength = warningDim ? 0.08 : strength;
+        const shellBase = {
+          ACTIVE: 0.22,
+          ANALYZING: 0.25,
+          IDLE: 0.17,
+          STOPPED: 0.15,
+          ERROR: 0.21,
+          UNKNOWN: 0.14
+        }[config.status];
+
+        shellMaterial.emissiveIntensity = rawIntensity * 0.22;
+        shellMaterial.opacity = shellBase + visibleStrength * 0.1 + idleBreath * 0.04;
+        auraMaterial.opacity = 0.015 + visibleStrength * 0.12 + idleBreath * 0.035;
+        innerGlowMaterial.opacity = 0.012 + visibleStrength * 0.065;
+        connectionMaterial.opacity = 0.08 + visibleStrength * 0.32;
+        connectionGlowMaterial.opacity = 0.025 + visibleStrength * 0.12;
+        nodeMaterial.opacity = 0.55 + visibleStrength * 0.44;
+        nodeGlowMaterial.opacity = 0.03 + visibleStrength * 0.16;
+        activityMaterial.opacity = 0.75 + visibleStrength * 0.25;
+        activityGlowMaterial.opacity = 0.08 + visibleStrength * 0.42;
+      }
 
       function resize() {
         if (disposed) {
@@ -237,6 +327,8 @@
         const width = Math.max(1, container.clientWidth || 320);
         const height = Math.max(1, container.clientHeight || 200);
         camera.aspect = width / height;
+        const responsiveScale = Math.min(1.18, 1 + Math.max(0, (camera.aspect - 1.5) * 0.08));
+        brain.scale.set(responsiveScale, responsiveScale, responsiveScale);
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
         renderStatic();
@@ -282,11 +374,6 @@
         if (timestamp - lastRenderAt >= minimumFrameInterval) {
           const elapsed = timestamp * 0.001 * config.pulseSpeed;
           const breath = Math.sin(elapsed);
-          brain.rotation.y = Math.sin(elapsed * 0.35) * 0.12
-            + (config.mode === "continuous" ? elapsed * 0.045 : 0);
-          brain.rotation.x = Math.sin(elapsed * 0.42) * 0.045;
-          const scale = 1 + breath * config.pulseAmount;
-          brain.scale.set(scale, scale, scale);
           updateNeuralNetwork(
             nodePositionAttribute,
             connectionPositionAttribute,
@@ -304,11 +391,7 @@
             config.activityPoints,
             elapsed
           );
-          const intensity = pulseIntensity(config, elapsed, breath);
-          connectionMaterial.opacity = 0.22 + Math.max(0, intensity) * 0.34;
-          connectionGlowMaterial.opacity = 0.08 + Math.max(0, intensity) * 0.16;
-          nodeMaterial.opacity = 0.62 + Math.max(0, intensity) * 0.34;
-          nodeGlowMaterial.opacity = 0.12 + Math.max(0, intensity) * 0.18;
+          updateVisualIntensity(elapsed, breath);
           renderer.render(scene, camera);
           lastRenderAt = timestamp;
         }
@@ -329,12 +412,17 @@
         if (typeof container.setAttribute === "function") {
           container.setAttribute("aria-label", `3D Agent Brain; status ${config.status}`);
         }
+        setMaterialColor(auraMaterial, config.color);
+        setColor(shellMaterial.color, scaleColor(config.color, 0.28));
+        setColor(shellMaterial.emissive, config.color);
+        setMaterialColor(innerGlowMaterial, config.color);
         setMaterialColor(connectionMaterial, config.color);
         setMaterialColor(connectionGlowMaterial, config.color);
         setMaterialColor(nodeMaterial, config.color);
         setMaterialColor(nodeGlowMaterial, config.color);
         setMaterialColor(activityMaterial, config.color);
         setMaterialColor(activityGlowMaterial, config.color);
+        setMaterialColor(keyLight, config.color);
         connectionMaterial.color.setHex(0xffffff);
         connectionGlowMaterial.color.setHex(0xffffff);
         activityGeometry.setDrawRange(0, config.activityPoints);
@@ -355,12 +443,7 @@
           config.activityPoints,
           0
         );
-        const intensity = pulseIntensity(config, 0, 0);
-        connectionMaterial.opacity = 0.22 + Math.max(0, intensity) * 0.34;
-        connectionGlowMaterial.opacity = 0.08 + Math.max(0, intensity) * 0.16;
-        nodeMaterial.opacity = 0.62 + Math.max(0, intensity) * 0.34;
-        nodeGlowMaterial.opacity = 0.12 + Math.max(0, intensity) * 0.18;
-        brain.scale.set(1, 1, 1);
+        updateVisualIntensity(0, 0);
         brain.rotation.set(0, 0, 0);
         lastRenderAt = 0;
         stopAnimation();
@@ -488,6 +571,58 @@
     }
   }
 
+  function createBrainSurfaceGeometry(THREE) {
+    const geometry = new THREE.SphereGeometry(1, 64, 48);
+    const positions = geometry.getAttribute("position");
+    for (let index = 0; index < positions.count; index += 1) {
+      const point = deformBrainVertex(
+        positions.getX(index),
+        positions.getY(index),
+        positions.getZ(index)
+      );
+      positions.setXYZ(index, point.x, point.y, point.z);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  function deformBrainVertex(x, y, z) {
+    const midline = Math.exp(-x * x * 105) * (0.32 + Math.abs(y) * 0.68)
+      * Math.max(0, z);
+    const corticalFold = Math.sin(y * 17 + Math.sin(z * 9) * 0.8)
+      * Math.cos(x * 14 - z * 6);
+    const secondaryFold = Math.sin(y * 8 + x * 5) * Math.sin(z * 12 - x * 4);
+    const cerebellarBulge = Math.exp(-((y + 0.62) ** 2) * 34)
+      * Math.exp(-((z + 0.18) ** 2) * 16);
+    const contour = 1 + corticalFold * 0.045 + secondaryFold * 0.018
+      + cerebellarBulge * 0.055;
+    const centralCompression = 1 - midline * 0.075;
+
+    return {
+      x: x * 0.96 * contour * centralCompression,
+      y: y * 0.56 * contour,
+      z: z * 0.37 * contour - midline * 0.14
+    };
+  }
+
+  function createMidlineFissure(THREE) {
+    const points = [];
+    for (let index = 0; index <= 36; index += 1) {
+      const progress = index / 36;
+      const y = 0.49 - progress * 0.96;
+      const normalizedY = y / 0.56;
+      const z = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY)) * 0.37
+        - 0.14 * Math.max(0.32 + Math.abs(normalizedY) * 0.68, 0);
+      points.push(new THREE.Vector3(
+        Math.sin(progress * Math.PI * 2) * 0.008,
+        y,
+        z + 0.006
+      ));
+    }
+    return points;
+  }
+
   function createNodePositions(THREE) {
     const positions = [];
     const brainStemCount = Math.round(performanceLimits.maxNeuralNodes * 0.055);
@@ -505,11 +640,12 @@
           + Math.cos(angle * 8 - lateral * 9) * 0.035
           + Math.sin(angle * 3.1 + side * 0.9) * 0.035;
         const contour = 1 + folds;
+        const radial = 0.56 + ((index * 0.61803398875 + (side > 0 ? 0.31 : 0)) % 1) * 0.39;
 
         positions.push(new THREE.Vector3(
-          side * (0.055 + lateral * 0.88 * contour),
-          vertical * 0.49 * contour,
-          depth * 0.32 * contour * (1 + Math.max(0, depth) * 0.035)
+          side * (0.035 + lateral * 0.82 * contour * radial),
+          vertical * 0.49 * contour * radial,
+          depth * 0.32 * contour * radial * (1 + Math.max(0, depth) * 0.035)
         ));
       }
     }
@@ -718,6 +854,13 @@
     if (colorObject && typeof colorObject.setHex === "function") {
       colorObject.setHex(color);
     }
+  }
+
+  function scaleColor(color, factor) {
+    const red = Math.round(((color >> 16) & 0xff) * factor);
+    const green = Math.round(((color >> 8) & 0xff) * factor);
+    const blue = Math.round((color & 0xff) * factor);
+    return (red << 16) | (green << 8) | blue;
   }
 
   function trackGeometry(geometries, geometry) {

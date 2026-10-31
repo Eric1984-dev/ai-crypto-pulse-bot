@@ -563,19 +563,32 @@ a:focus-visible {
   height: clamp(190px, 52vw, 240px);
   overflow: hidden;
   background:
+    radial-gradient(ellipse at 50% 52%, rgb(44 160 255 / 15%), rgb(20 78 132 / 8%) 38%, transparent 72%),
     radial-gradient(ellipse at center, rgb(28 91 151 / 12%), transparent 68%),
     #05090f;
 }
 
 .agent-brain[data-state="analyzing"] .agent-brain-stage {
   background:
-    radial-gradient(ellipse at center, rgb(35 153 255 / 16%), transparent 68%),
+    radial-gradient(ellipse at 50% 52%, rgb(72 206 255 / 20%), rgb(35 153 255 / 10%) 42%, transparent 72%),
     #04080e;
+}
+
+.agent-brain[data-state="idle"] .agent-brain-stage {
+  background:
+    radial-gradient(ellipse at 50% 52%, rgb(74 131 194 / 10%), transparent 70%),
+    #05090f;
+}
+
+.agent-brain[data-state="stopped"] .agent-brain-stage {
+  background:
+    radial-gradient(ellipse at 50% 52%, rgb(118 132 148 / 8%), transparent 70%),
+    #06090d;
 }
 
 .agent-brain[data-state="error"] .agent-brain-stage {
   background:
-    radial-gradient(ellipse at center, rgb(220 62 76 / 12%), transparent 68%),
+    radial-gradient(ellipse at 50% 52%, rgb(255 70 85 / 15%), rgb(220 62 76 / 7%) 38%, transparent 72%),
     #0b080c;
 }
 

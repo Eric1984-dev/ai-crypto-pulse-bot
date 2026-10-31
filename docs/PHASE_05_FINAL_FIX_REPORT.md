@@ -1,5 +1,7 @@
 # Phase 05 Final Fix Report
 
+> Historical iteration report. The current appearance is documented in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md), which supersedes this report's network-first visual description.
+
 ## Summary
 
 Fixed Agent Brain fallback handling so a usable Three.js renderer keeps the fallback message hidden, including when a later status update fails. A failed initialization, unavailable WebGL context, or lost WebGL context still triggers the safe fallback and allows initialization retries.

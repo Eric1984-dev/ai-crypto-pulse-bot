@@ -42,7 +42,7 @@ The API reads real rows at runtime. Empty collections render as empty states and
 
 ## Phase 05 Agent Brain validation
 
-Agent Brain and status API tests use the Node.js test runner and deterministic fake Three.js/browser interfaces. They cover supported and unknown-state mapping, authenticated database status reads with the caller JWT, dashboard application of initial and polled status, fallback recovery after transient renderer initialization failure, fallback suppression while a renderer remains available, neutral fallback when WebGL/Three.js is unavailable, an organic silhouette formed by 720 network nodes without solid lobe meshes, more than a thousand dynamically updated connections, per-link signal brightness, flowing energy particles, renderer setup, pixel-ratio and 30 FPS caps, hidden-tab pause/resume, and renderer/geometry/material/listener disposal.
+Agent Brain and status API tests use the Node.js test runner and deterministic fake Three.js/browser interfaces. They cover supported and unknown-state mapping, authenticated database status reads with the caller JWT, dashboard application of initial and polled status, fallback recovery after transient renderer initialization failure, fallback suppression while a renderer remains available, neutral fallback when WebGL/Three.js is unavailable, the deformed semi-solid brain surface and layered glow meshes, 720 internal network nodes, more than a thousand dynamically updated connections, status-specific glow intensity, stable orientation, per-link signal brightness, flowing energy particles, renderer setup, pixel-ratio and 30 FPS caps, hidden-tab pause/resume, and renderer/geometry/material/listener disposal.
 
 The browser smoke check loads the actual dashboard markup and pinned Three.js renderer with local API responses. The protected Vercel route still requires an authenticated session; an unauthenticated browser is redirected to login, so this smoke check does not claim a live Supabase session.
 
@@ -52,7 +52,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-Rendering uses a pinned Three.js ES module loaded on demand. Rendering is capped at 30 frames per second, device pixel ratio is capped at 1.5 (1.25 on mobile), the network is capped at 720 nodes and 2160 connections, active energy particles are capped at 48, and polling is limited to one status request every 15 seconds while the page is visible. The fallback remains hidden while the WebGL context is usable. If WebGL or Three.js initialization fails, the real status label remains visible and the visualization falls back to a safe unavailable state; later status updates may retry initialization. Browser/device GPU performance varies; physical-device profiling is a separate deployment check.
+Rendering uses a pinned Three.js ES module loaded on demand. Rendering is capped at 30 frames per second, device pixel ratio is capped at 1.5 (1.25 on mobile), the network is capped at 720 nodes and 2160 connections, active energy particles are capped at 48, and polling is limited to one status request every 15 seconds while the page is visible. The fallback remains hidden while the WebGL context is usable. If WebGL or Three.js initialization fails, the real status label remains visible and the visualization falls back to a safe unavailable state; later status updates may retry initialization. Automated tests validate limits and stable-orientation behavior; no device-specific GPU frame-time benchmark is implied. Browser/device GPU performance varies; physical-device profiling is a separate deployment check.
 
 ---
 
