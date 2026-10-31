@@ -187,18 +187,6 @@
       brain.add(new THREE.LineSegments(connectionsGeometry, connectionGlowMaterial));
       brain.add(new THREE.LineSegments(connectionsGeometry, connectionMaterial));
 
-      const circuitGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      circuitGeometry.setFromPoints(createCircuitTracePoints(THREE, nodePositions));
-      const circuitMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: config.color,
-        transparent: true,
-        opacity: 0.12,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      brain.add(new THREE.LineSegments(circuitGeometry, circuitMaterial));
-
       const nodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       nodeGeometry.setFromPoints(nodePositions);
       const nodePositionAttribute = nodeGeometry.getAttribute("position");
@@ -315,18 +303,8 @@
         }[config.status];
         const signalGain = config.status === "ERROR" ? 0.38 : 0.24;
         const glowGain = config.status === "ANALYZING" ? 0.62 : 0.42;
-        const circuitOpacity = {
-          ACTIVE: 0.28,
-          ANALYZING: 0.38,
-          IDLE: 0.1,
-          STOPPED: 0.035,
-          ERROR: 0.25,
-          UNKNOWN: 0.04
-        }[config.status];
-
         connectionMaterial.opacity = Math.min(1, statusBase + visibleStrength * signalGain);
         connectionGlowMaterial.opacity = 0.05 + visibleStrength * glowGain;
-        circuitMaterial.opacity = circuitOpacity;
         nodeMaterial.opacity = Math.min(1, statusBase + visibleStrength * signalGain);
         nodeGlowMaterial.opacity = 0.06 + visibleStrength * glowGain + idleBreath * 0.04;
         hotspotMaterial.opacity = Math.min(1, statusBase + visibleStrength * 0.62);
@@ -435,7 +413,6 @@
         }
         setMaterialColor(connectionMaterial, config.color);
         setMaterialColor(connectionGlowMaterial, config.color);
-        setMaterialColor(circuitMaterial, config.color);
         setMaterialColor(nodeMaterial, config.color);
         setMaterialColor(nodeGlowMaterial, config.color);
         setMaterialColor(hotspotMaterial, config.color);
@@ -802,30 +779,6 @@
     const points = [];
     for (const [start, end] of connectionPairs) {
       points.push(nodePositions[start], nodePositions[end]);
-    }
-    return points;
-  }
-
-  function createCircuitTracePoints(THREE, nodePositions) {
-    const points = [];
-    const outerContourIndices = [8, 17, 24, 33, 40, 49];
-    const offsets = [0.18, 0.1, -0.045, 0.045, -0.1, -0.18];
-    for (const hemisphereStart of [0, 328]) {
-      const side = hemisphereStart === 0 ? -1 : 1;
-      for (let index = 0; index < outerContourIndices.length; index += 1) {
-        const anchor = nodePositions[hemisphereStart + outerContourIndices[index]];
-        const bendX = side * (Math.abs(anchor.x) + 0.12);
-        const endX = side * 1.08;
-        const endY = anchor.y + offsets[index];
-        points.push(
-          anchor,
-          new THREE.Vector3(bendX, anchor.y, anchor.z * 0.7),
-          new THREE.Vector3(bendX, anchor.y, anchor.z * 0.7),
-          new THREE.Vector3(bendX, endY, anchor.z * 0.7),
-          new THREE.Vector3(bendX, endY, anchor.z * 0.7),
-          new THREE.Vector3(endX, endY, anchor.z * 0.7)
-        );
-      }
     }
     return points;
   }

@@ -63,7 +63,7 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 - [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards
 - [x] Tests and documentation
-- [x] Final shell-free contour redesign with same-color hemispheres, radial neuron glow, and restrained circuit traces connected to the brain outline
+- [x] Final shell-free contour redesign with same-color hemispheres and radial neuron glow, without external circuit traces
 
 Status: Completed (2026-10-31)
 

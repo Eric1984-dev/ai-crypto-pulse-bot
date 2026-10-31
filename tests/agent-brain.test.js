@@ -558,17 +558,10 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.ok(leftContourTop > 0.46);
   assert.ok(leftContourBottom < -0.4);
   const uniqueLineGeometries = [...new Set(harness.calls.lineSegmentGeometries)];
-  assert.equal(uniqueLineGeometries.length, 2);
-  const circuitGeometry = uniqueLineGeometries.find((geometry) =>
-    geometry !== harness.calls.lineSegmentGeometries[0]
-  );
-  assert.ok(circuitGeometry.getAttribute("position").count >= 72);
-  let circuitMaximumX = 0;
-  const circuitPositions = circuitGeometry.getAttribute("position");
-  for (let index = 0; index < circuitPositions.count; index += 1) {
-    circuitMaximumX = Math.max(circuitMaximumX, Math.abs(circuitPositions.getX(index)));
-  }
-  assert.ok(circuitMaximumX > 1);
+  assert.equal(uniqueLineGeometries.length, 1);
+  assert.ok(harness.calls.lineSegmentGeometries.every((geometry) =>
+    geometry === harness.calls.lineSegmentGeometries[0]
+  ));
   assert.ok(harness.calls.lineSegmentGeometries[0].getAttribute("position").count
     <= agentBrain.performanceLimits.maxConnections * 2);
   let leftHemisphereConnections = 0;
