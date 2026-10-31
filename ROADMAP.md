@@ -27,12 +27,16 @@ Status: Completed (2026-10-31)
 
 ## Phase 03 - Database
 
-- Migrations
-- Tabellen
-- RLS Policies
-- Ownership Rules
+- [x] Timestamped Supabase migrations for all 16 prefixed Agent tables
+- [x] Foreign keys, validation constraints, indexes, duplicate-safe trade/change keys, and Auth profile synchronization
+- [x] Row Level Security policies and server-only write grants
+- [x] Initial market, agent-status, and emergency-state seed data
+- [x] Embedded PostgreSQL migration, RLS, ownership, seed, and constraint tests
+- [x] Database, architecture, testing, README, and changelog documentation
 
-Status: Not started
+Status: Completed (2026-10-31)
+
+Runtime database APIs, market-data ingestion, and trading behavior remain out of scope.
 
 ---
 

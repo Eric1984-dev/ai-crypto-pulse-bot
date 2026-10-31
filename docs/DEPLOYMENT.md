@@ -2,7 +2,7 @@
 
 ## Phase 02 status
 
-Phase 02 uses Supabase Auth and Vercel Functions for public Auth configuration, session-cookie validation, and protected-page delivery. No database schema, market, trading, or service-role credentials are required.
+Phase 02 uses Supabase Auth and Vercel Functions for public Auth configuration, session-cookie validation, and protected-page delivery. Phase 03 adds PostgreSQL tables and RLS through Supabase migrations, but the schema is not automatically applied by a Vercel deployment. Apply reviewed database migrations separately with the Supabase CLI; no service-role credential is required by the static deployment.
 
 ## Hosting
 

@@ -1,720 +1,125 @@
 # Database Design
 
-## Phase 02 status
+## Phase 03 status
 
-This document records the intended future application database design. Phase 02 uses only Supabase's managed Auth service; it creates no application tables, schema, migrations, or policies.
+Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. It does not add database access to the browser or implement trading, market-data ingestion, the AI engine, or scanner behavior.
 
-CryptoPulse AI Agent gebruikt Supabase PostgreSQL.
+The application is installed in an existing Supabase database. The migrations create only the prefixed CryptoPulse objects and reference Supabase's managed `auth.users` table. They deliberately do not use `IF NOT EXISTS`: a conflicting object must stop the migration for review instead of hiding a schema mismatch.
 
-De applicatie wordt toegevoegd aan een bestaande database.
+## Naming
 
-Om conflicten met bestaande tabellen te vermijden moeten alle CryptoPulse-tabellen verplicht beginnen met de prefix:
+All application tables, functions, triggers, policies, and explicitly named indexes use the required `AI_Crypto_Bot_` prefix. Table and object identifiers preserve the required mixed-case spelling and therefore must be double-quoted in PostgreSQL SQL and PostgREST table names. Unquoted PostgreSQL identifiers fold to lowercase.
 
-AI_Crypto_Bot_
+The objects live in the `public` schema. Supabase-managed objects such as `auth.users` are not renamed or altered beyond the profile synchronization trigger.
 
-Geen enkele tabel mag zonder deze prefix worden aangemaakt.
+## Tables
 
-Hetzelfde principe geldt voor:
+| Table | Ownership and purpose |
+|---|---|
+| `AI_Crypto_Bot_Profiles` | User-owned profile; `id` is the Supabase Auth user ID. |
+| `AI_Crypto_Bot_Portfolios` | User-owned paper portfolio and balances. |
+| `AI_Crypto_Bot_Positions` | User-owned positions, scoped through their portfolio. |
+| `AI_Crypto_Bot_Trades` | User-owned paper trade history, scoped through its portfolio. |
+| `AI_Crypto_Bot_AI_Decisions` | Server-managed decision history; authenticated users may read it. |
+| `AI_Crypto_Bot_Status` | Server-managed singleton containing the current agent status. |
+| `AI_Crypto_Bot_Watched_Markets` | Global market universe; authenticated users may read it. |
+| `AI_Crypto_Bot_Market_Data` | Latest market-data snapshot per watched symbol. |
+| `AI_Crypto_Bot_Candles` | Historical OHLCV data for the supported intervals. |
+| `AI_Crypto_Bot_Strategies` | Server-managed, versioned strategy catalog. |
+| `AI_Crypto_Bot_Strategy_Changes` | Append-only history of strategy changes. |
+| `AI_Crypto_Bot_Strategy_Performance` | Historical strategy metrics and ranking inputs. |
+| `AI_Crypto_Bot_Backtests` | Backtest results, kept separate from paper-trading records. |
+| `AI_Crypto_Bot_Portfolio_Snapshots` | User-owned portfolio history, scoped through its portfolio. |
+| `AI_Crypto_Bot_Scanner_Events` | Server-managed scanner history; authenticated users may read it. |
+| `AI_Crypto_Bot_Emergency_State` | Server-managed emergency-state event history. |
 
-- tabellen
-- views
-- functies
-- stored procedures
-- indexes
-- policies
+### User, portfolio, and trading tables
 
-waar dit praktisch mogelijk is.
+- `AI_Crypto_Bot_Profiles`: `id uuid` primary key and foreign key to `auth.users.id`; nullable unique `email`; `created_at` and `updated_at` timestamps.
+- `AI_Crypto_Bot_Portfolios`: UUID ID, `user_id`, starting/available balances, portfolio value, and timestamps. Balances use exact numeric types and cannot be negative.
+- `AI_Crypto_Bot_Positions`: portfolio and watched-market references, positive amount/prices, unrealized P&L, and `OPEN`/`CLOSED` status.
+- `AI_Crypto_Bot_Trades`: portfolio and watched-market references, required unique idempotency key, `BUY`/`SELL` side, positive price/quantity, nonnegative fees/slippage, realized P&L, and creation time.
+- `AI_Crypto_Bot_Portfolio_Snapshots`: portfolio reference, portfolio value, available balance, nonnegative open-position count, and capture time.
 
----
+### Agent, market, and strategy tables
 
-# Naming Convention
+- `AI_Crypto_Bot_AI_Decisions`: watched symbol, `BUY`/`SELL`/`HOLD`/`WAIT` decision, confidence from 0 to 100, JSON object of indicators, reason, optional strategy name/version snapshot, and creation time. Strategy text is an immutable historical snapshot, not a foreign key.
+- `AI_Crypto_Bot_Status`: one row enforced by a singleton key; status is `ACTIVE`, `ANALYZING`, `IDLE`, `STOPPED`, or `ERROR`. Boolean status flags are constrained to agree with the status value.
+- `AI_Crypto_Bot_Watched_Markets`: unique market symbol, enabled flag, positive priority, and timestamps. This table is the runtime market-universe source of truth.
+- `AI_Crypto_Bot_Market_Data`: one latest row per watched symbol, with price, volume, daily change, 24-hour high/low, and capture time.
+- `AI_Crypto_Bot_Candles`: watched symbol, interval (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`), OHLCV values, and timestamp. OHLC consistency is checked and `(symbol, interval, timestamp)` is unique.
+- `AI_Crypto_Bot_Strategies`: unique name/version, enabled flag, score, description, and timestamps.
+- `AI_Crypto_Bot_Strategy_Changes`: strategy reference, required unique idempotency key, change type, old/new values, reason, and creation time. The key prevents duplicate scheduled changes/optimization events.
+- `AI_Crypto_Bot_Strategy_Performance`: strategy reference, win rate, profit factor, average profit/loss, drawdown, score, trade count, net profit, risk-adjusted return, average trade duration, and creation time.
+- `AI_Crypto_Bot_Backtests`: strategy reference, P&L and performance metrics, fees, slippage, spread, optional data range, reproducibility configuration, and creation time.
+- `AI_Crypto_Bot_Scanner_Events`: watched symbol, event type, reason, optional confidence, and creation time.
+- `AI_Crypto_Bot_Emergency_State`: append-only state events with `NORMAL`, `PAUSED`, or `EMERGENCY_STOP`, optional reason, and creation time. The newest event represents the current emergency state; this is independent of Agent Status.
 
-Verplicht:
+## Relationships and deletion behavior
 
-AI_Crypto_Bot_
+- `AI_Crypto_Bot_Profiles.id` references `auth.users.id`; deleting an Auth user cascades to its profile.
+- `AI_Crypto_Bot_Portfolios.user_id` references `AI_Crypto_Bot_Profiles.id`; deleting a profile cascades through its portfolios and their positions, trades, and snapshots.
+- Positions, trades, and portfolio snapshots reference their portfolio and cascade with it.
+- Market data, candles, positions, trades, AI decisions, and scanner events reference `AI_Crypto_Bot_Watched_Markets.symbol`. Market deletion is restricted while dependent history exists; disable a market instead of deleting it.
+- Strategy changes, performance records, and backtests reference a strategy. Strategy deletion is restricted to preserve history.
+- AI decision strategy name/version values are snapshots so old decisions remain interpretable if a strategy catalog entry changes.
 
-Voorbeelden:
+All timestamps use `timestamptz`. UUIDs are generated by PostgreSQL except profile IDs, which come from Supabase Auth. Numeric financial and price values use `numeric`, not floating-point types. Checks reject invalid status, interval, confidence, range, and nonnegative-value inputs.
 
-AI_Crypto_Bot_Profiles
+The server-side caller must reuse the same idempotency UUID when retrying a trade or strategy-change operation. A new key for each retry would represent a new operation and cannot prevent duplicates.
 
-AI_Crypto_Bot_Portfolios
+## Supabase Auth integration
 
-AI_Crypto_Bot_Positions
+The migration backfills profiles for existing Auth users and installs prefixed triggers to create profiles at signup and synchronize email changes. Profile identity always comes from `auth.users.id`; the browser cannot create or change profile identity records directly. Email is nullable to remain compatible with Supabase identities that do not have an email address.
 
-AI_Crypto_Bot_Trades
+Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. They do not provide database access. Any future database API must authenticate the caller, preserve the caller's JWT when relying on user-scoped RLS, and keep `service_role` credentials server-only.
 
-AI_Crypto_Bot_AI_Decisions
+## Row Level Security and grants
 
-AI_Crypto_Bot_Status
+RLS is enabled on all 16 application tables. `anon` and `PUBLIC` receive no table privileges. Authenticated users receive read-only `SELECT`; all direct user writes are denied so clients cannot edit balances, trades, positions, agent state, or risk controls.
 
----
+| Table group | Authenticated read policy | Writes |
+|---|---|---|
+| Profiles | `auth.uid() = id` | Server only; signup/email trigger maintains the row. |
+| Portfolios | `auth.uid() = user_id` | Server only. |
+| Positions, trades, snapshots | Portfolio belongs to `auth.uid()` | Server only. |
+| Watched markets, market data, candles | All authenticated users | Server only. |
+| AI decisions, status, strategies, strategy changes, performance, backtests, scanner events, emergency state | All authenticated users | Server only. |
 
-# AI_Crypto_Bot_Profiles
+The scoped child-table policies resolve ownership through `portfolio_id`. They do not assume the child tables contain a `user_id` column. Tables with no matching read policy deny access under RLS. No client-side `INSERT`, `UPDATE`, or `DELETE` policy is created.
 
-Beschrijving:
+`service_role` is granted server-side CRUD access and bypasses RLS by Supabase design. It must never be exposed to the browser. Future server endpoints using it must derive the user identity from a verified Supabase session and perform explicit ownership and risk checks; possession of the service role alone is not user authorization.
 
-Profielinformatie van gebruikers.
+## Indexes
 
-Kolommen:
+Primary-key and unique constraints provide indexes for row IDs, profile email, watched-market symbol, market-data symbol, candle identity, strategy name/version, and the status singleton. Additional prefixed indexes support:
 
-id UUID PRIMARY KEY
+- Portfolio ownership lookups.
+- Enabled-market priority ordering.
+- Portfolio position/status and trade-history queries.
+- Market-data freshness.
+- Strategy change, performance, and backtest history.
+- AI decision and scanner-event history by symbol and time.
+- Portfolio snapshot history.
+- Emergency-state history.
 
-email TEXT UNIQUE NOT NULL
+The candle uniqueness index is also the lookup index for symbol/interval/time-range reads; no duplicate index is added.
 
-created_at TIMESTAMP
+## Market seeds
 
-updated_at TIMESTAMP
+`config/markets.js` is the centralized default list used to create the initial watched-market rows. The seed migration is checked against that list by the build and test commands. It inserts `BTC-EUR`, `ETH-EUR`, `SOL-EUR`, `XRP-EUR`, and `ADA-EUR`; conflicts use `DO NOTHING` so a later reset or seed run does not overwrite runtime enabled/priority settings.
 
-Relationship:
+The seed migration also creates the initial `IDLE` agent status and `NORMAL` emergency-state event. It does not seed user portfolios or activate trading strategies.
 
-id references auth.users.id
+## Migrations and operations
 
-One Profile exists for each authenticated Supabase user.
----
+Migration files are stored in `supabase/migrations/` and run in timestamp order:
 
-# AI_Crypto_Bot_Portfolios
+1. `20261031190000_create_agent_tables.sql` creates the prefixed schema, constraints, indexes, Auth synchronization triggers, RLS policies, and grants.
+2. `20261031190100_seed_initial_data.sql` inserts default markets and initial agent/emergency states.
 
-Beschrijving:
+For local Supabase development, install the Supabase CLI and Docker, then run `supabase start` and `supabase db reset`. A linked project can apply reviewed pending migrations with `supabase db push`. Do not run remote migrations until the target database has been inspected for existing objects using this prefix and a backup/restore plan is available. The migrations fail on naming collisions rather than silently accepting an unknown schema.
 
-Portfolio van gebruiker.
+Migrations are append-only. Corrective schema changes must use a new reviewed migration; do not edit an already-applied migration or modify production tables outside the migration history. Restoring a prior database state requires the approved backup/restore procedure.
 
-Kolommen:
-
-id UUID PRIMARY KEY
-
-user_id UUID
-
-starting_balance NUMERIC
-
-available_balance NUMERIC
-
-portfolio_value NUMERIC
-
-created_at TIMESTAMP
-
-updated_at TIMESTAMP
-
-Foreign Keys:
-
-user_id -> AI_Crypto_Bot_Profiles.id
----
-
-# AI_Crypto_Bot_Positions
-
-Beschrijving:
-
-Open paper trading posities.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-portfolio_id UUID
-
-symbol TEXT
-
-amount NUMERIC
-
-entry_price NUMERIC
-
-current_price NUMERIC
-
-unrealized_pnl NUMERIC
-
-status TEXT
-
-created_at TIMESTAMP
-
-updated_at TIMESTAMP
-
-Ondersteunde statussen:
-
-OPEN
-
-CLOSED
-
-Foreign Keys:
-
-portfolio_id -> AI_Crypto_Bot_Portfolios.id
-
----
-
-# AI_Crypto_Bot_Trades
-
-Beschrijving:
-
-Historiek van paper trades.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-portfolio_id UUID
-
-symbol TEXT
-
-side TEXT
-
-price NUMERIC
-
-quantity NUMERIC
-
-fees NUMERIC
-
-slippage NUMERIC
-
-realized_pnl NUMERIC
-
-created_at TIMESTAMP
-
-Ondersteunde waarden:
-
-BUY
-
-SELL
-
-Foreign Keys:
-
-portfolio_id -> AI_Crypto_Bot_Portfolios.id
----
-
-# AI_Crypto_Bot_AI_Decisions
-
-Beschrijving:
-
-Opslag van alle AI beslissingen.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-symbol TEXT
-
-decision TEXT
-
-confidence NUMERIC
-
-reason TEXT
-
-strategy_name TEXT
-
-strategy_version TEXT
-
-created_at TIMESTAMP
-
-Ondersteunde waarden:
-
-BUY
-
-SELL
-
-HOLD
-
-WAIT
-
-Classification:
-
-Server Managed
-
-Access:
-
-Read:
-Authenticated Users
-
-Write:
-Server Only
-
----
-
-# AI_Crypto_Bot_Status
-
-Beschrijving:
-
-Actuele toestand van de agent.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-is_active BOOLEAN
-
-is_analyzing BOOLEAN
-
-status TEXT
-
-last_run TIMESTAMP
-
-error_message TEXT
-
-updated_at TIMESTAMP
-
-Ondersteunde statussen:
-
-ACTIVE
-
-ANALYZING
-
-IDLE
-
-STOPPED
-
-ERROR
-
-
----
-
-# AI_Crypto_Bot_Watched_Markets
-
-Beschrijving:
-
-Beheert alle markten die door de agent gevolgd worden.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-symbol TEXT UNIQUE
-
-enabled BOOLEAN DEFAULT TRUE
-
-priority INTEGER DEFAULT 1
-
-created_at TIMESTAMP
-
-updated_at TIMESTAMP
-
----
-
-# AI_Crypto_Bot_Market_Data
-
-Beschrijving:
-
-Laatste opgehaalde marktgegevens.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-symbol TEXT
-
-price NUMERIC
-
-volume NUMERIC
-
-daily_change NUMERIC
-
-high_24h NUMERIC
-
-low_24h NUMERIC
-
-captured_at TIMESTAMP
-
----
-
-# AI_Crypto_Bot_Candles
-
-Beschrijving:
-
-Historische OHLCV data voor analyses en backtesting.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-symbol TEXT
-
-interval TEXT
-
-open NUMERIC
-
-high NUMERIC
-
-low NUMERIC
-
-close NUMERIC
-
-volume NUMERIC
-
-timestamp TIMESTAMP
-
-Ondersteunde intervallen:
-
-1m
-
-5m
-
-15m
-
-1h
-
-4h
-
-1d
-
----
-
-# AI_Crypto_Bot_Strategies
-
-Beschrijving:
-
-Beschikbare tradingstrategieën.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-name TEXT
-
-version TEXT
-
-enabled BOOLEAN
-
-score NUMERIC
-
-description TEXT
-
-created_at TIMESTAMP
-
-updated_at TIMESTAMP
-
----
-
-# AI_Crypto_Bot_Strategy_Changes
-
-Beschrijving:
-
-Historiek van strategie-aanpassingen.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-strategy_id UUID
-
-change_type TEXT
-
-old_value TEXT
-
-new_value TEXT
-
-reason TEXT
-
-created_at TIMESTAMP
-
-Foreign Keys:
-
-strategy_id -> AI_Crypto_Bot_Strategies.id
----
-
-# AI_Crypto_Bot_Strategy_Performance
-
-Beschrijving:
-
-Prestatiegegevens van strategieën.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-strategy_id UUID
-
-win_rate NUMERIC
-
-profit_factor NUMERIC
-
-average_profit NUMERIC
-
-average_loss NUMERIC
-
-drawdown NUMERIC
-
-score NUMERIC
-
-created_at TIMESTAMP
-
-Foreign Keys:
-
-strategy_id -> AI_Crypto_Bot_Strategies.id
----
-
-# AI_Crypto_Bot_Backtests
-
-Beschrijving:
-
-Historische backtestresultaten.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-strategy_id UUID
-
-profit_loss NUMERIC
-
-win_rate NUMERIC
-
-profit_factor NUMERIC
-
-drawdown NUMERIC
-
-created_at TIMESTAMP
-
-Foreign Keys:
-
-strategy_id -> AI_Crypto_Bot_Strategies.id
-
----
-
-# AI_Crypto_Bot_Portfolio_Snapshots
-
-Beschrijving:
-
-Historische portfolio snapshots.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-portfolio_id UUID
-
-portfolio_value NUMERIC
-
-available_balance NUMERIC
-
-open_positions INTEGER
-
-captured_at TIMESTAMP
-
-Foreign Keys:
-
-portfolio_id -> AI_Crypto_Bot_Portfolios.id
----
-
-# AI_Crypto_Bot_Scanner_Events
-
-Beschrijving:
-
-Gevonden market scanner opportunities.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-symbol TEXT
-
-event_type TEXT
-
-reason TEXT
-
-confidence NUMERIC
-
-created_at TIMESTAMP
-
-Classification:
-
-Server Managed
-
-Access:
-
-Read:
-Authenticated Users
-
-Write:
-Server Only
----
-
-# AI_Crypto_Bot_Emergency_State
-
-Beschrijving:
-
-Emergency-control logging.
-
-Kolommen:
-
-id UUID PRIMARY KEY
-
-status TEXT
-
-reason TEXT
-
-created_at TIMESTAMP
-
-Ondersteunde statussen:
-
-NORMAL
-
-PAUSED
-
-EMERGENCY_STOP
-
----
-
-# Relationships
-
-AI_Crypto_Bot_Profiles
-↓
-AI_Crypto_Bot_Portfolios
-
-AI_Crypto_Bot_Portfolios
-↓
-AI_Crypto_Bot_Positions
-
-AI_Crypto_Bot_Portfolios
-↓
-AI_Crypto_Bot_Trades
-
-AI_Crypto_Bot_Strategies
-↓
-AI_Crypto_Bot_Strategy_Performance
-
-AI_Crypto_Bot_Strategies
-↓
-AI_Crypto_Bot_Strategy_Changes
-
-AI_Crypto_Bot_Strategies
-↓
-AI_Crypto_Bot_Backtests
-
----
-
-# Row Level Security
-
-All tables must support Row Level Security.
-
-User Owned Tables
-
-- AI_Crypto_Bot_Profiles
-- AI_Crypto_Bot_Portfolios
-- AI_Crypto_Bot_Positions
-- AI_Crypto_Bot_Trades
-- AI_Crypto_Bot_Portfolio_Snapshots
-- AI_Crypto_Bot_AI_Decisions
-- AI_Crypto_Bot_Scanner_Events
-
-DeOwnership Policies are defined per table.
-
-AI_Crypto_Bot_Profiles
-
-auth.uid() = id
-
-AI_Crypto_Bot_Portfolios
-
-auth.uid() = user_id
-
-AI_Crypto_Bot_Positions
-
-Ownership is inherited through portfolio_id.
-
-AI_Crypto_Bot_Trades
-
-Ownership is inherited through portfolio_id.
-
-AI_Crypto_Bot_Portfolio_Snapshots
-
-Ownership is inherited through portfolio_id.
-
-Global Read Tables
-
-- AI_Crypto_Bot_Watched_Markets
-- AI_Crypto_Bot_Market_Data
-- AI_Crypto_Bot_Candles
-
-Server Managed Tables
-
-- AI_Crypto_Bot_Status
-- AI_Crypto_Bot_Emergency_State
-- AI_Crypto_Bot_Strategies
-- AI_Crypto_Bot_Strategy_Changes
-- AI_Crypto_Bot_Strategy_Performance
-- AI_Crypto_Bot_Backtests
-- AI_Crypto_Bot_AI_Decisions
-- AI_Crypto_Bot_Scanner_Events
-
-Administrative functionality must remain separated from user functionality.
-
----
-
-# Migration Rules
-
-Elke schemawijziging vereist:
-
-- Migration File
-- Documentatie Update
-- Validatie
-- Testing
-
-Nooit rechtstreeks productie-tabellen wijzigen zonder migratie.
-
----
-
-# Migration Procedure
-
-All database changes must be implemented through Supabase migrations.
-
-Migration Order:
-
-1. Create Tables
-2. Create Constraints
-3. Create Indexes
-4. Create RLS Policies
-5. Seed Required Data
-6. Validate Schema
-
-Migration files must be stored in:
-
-supabase/migrations/
-
-No direct schema modifications are allowed.
-
----
-
-# Seed Data
-
-Initial seed data includes:
-
-AI_Crypto_Bot_Watched_Markets
-
-Source:
-
-config/markets.js
-
-Required default markets are seeded during initial deployment.
-
-No user data may be seeded.
-
----
-
-# Future Extensions
-
-De database moet voorbereid zijn op:
-
-- Multi Strategy Support
-- Multi Exchange Support
-- Backtesting
-- Strategy Optimization
-- Autonomous Agent Learning
-- Live Trading Support
-
-zonder bestaande data te breken.
-
-# PostgreSQL Naming
-
-Documentation uses:
-
-AI_Crypto_Bot_Profiles
-
-for readability.
-
-Actual PostgreSQL table names should use lowercase identifiers:
-
-ai_crypto_bot_profiles
-
-ai_crypto_bot_portfolios
-
-ai_crypto_bot_positions
-
-ai_crypto_bot_trades
-
-Applications should use lowercase PostgreSQL identifiers.
-
-Documentation may continue to use the readable project format.
+The automated database suite executes both SQL migrations and exercises them in an embedded PostgreSQL engine. It covers RLS ownership, role grants, Auth profile provisioning, seed idempotency, and representative constraints. It does not connect to a Supabase project. Local Supabase CLI reset/push and remote provider checks must be run separately where the CLI, Docker, and project access are available.

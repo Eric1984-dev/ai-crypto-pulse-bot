@@ -1,8 +1,8 @@
 # Architecture
 
-## Current Implementation: Phase 02
+## Current Implementation: Phase 03
 
-The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery.
+The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies.
 
 Implemented components:
 
@@ -15,13 +15,18 @@ Implemented components:
 - Persistent Supabase client sessions
 - HttpOnly session cookie for Vercel protected-page rewrites
 - Authentication tests
+- Timestamped Supabase migrations for all 16 prefixed application tables
+- Foreign keys, validation constraints, and query indexes
+- Auth profile provisioning and email synchronization
+- RLS policies and role grants for user-owned, global, and server-managed data
+- Central default market configuration and initial database seeds
+- Embedded PostgreSQL migration and RLS integration tests
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.
 
 The following capabilities are not implemented:
 
-- Database access
-- Custom database schema or RLS policies
+- Runtime application database access or database-backed API endpoints
 - Realtime functionality
 - Bitvavo integration
 - AI Engine
@@ -186,6 +191,7 @@ Supabase PostgreSQL
 Responsibilities:
 
 - Authentication Storage
+- User Profile Storage
 - Portfolio Storage
 - Trade Storage
 - Strategy Storage
@@ -217,6 +223,8 @@ All tables must use the:
 AI_Crypto_Bot_
 
 prefix.
+
+The schema is managed only by timestamped files in `supabase/migrations/`. All application tables enable RLS. Authenticated users have read-only access filtered by ownership where applicable; server-side services perform writes. Supabase `service_role` credentials must remain server-only.
 
 ---
 
@@ -482,13 +490,16 @@ docs/SCHEDULING.md
 
 Phase 02 uses Supabase Authentication for registration, password login, logout, recovery email, and password updates. The Supabase JS client persists and refreshes the browser session. An authenticated access token is verified by `/api/auth-session` and stored only in a short-lived HttpOnly cookie for protected-page requests.
 
-Protected Vercel rewrites validate that cookie with Supabase Auth before returning page HTML; invalid or missing sessions are redirected to login. The anon key is public by design. No service-role key, custom database access, schema, or RLS policy is used in this phase.
+Protected Vercel rewrites validate that cookie with Supabase Auth before returning page HTML; invalid or missing sessions are redirected to login. The anon key is public by design. Phase 03 creates the schema and RLS, but does not add runtime database access. The protected-page cookie is not a database authorization token; future APIs must validate the user session and preserve the user's JWT when relying on user-scoped policies.
 
-Database ownership and data access controls remain required when Phase 03 introduces application tables:
+Database data access controls include:
 
 - Row Level Security
-- Access Policies
-- User Ownership Validation
+- Per-table read policies and ownership checks
+- Server-only writes for balances, trades, positions, agent state, and market data
+- Explicit ownership validation in future privileged server APIs
+
+The service-role key bypasses RLS and must never be exposed to the presentation layer. Runtime database/API access remains out of scope until a later phase.
 
 ---
 

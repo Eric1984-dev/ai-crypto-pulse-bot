@@ -8,6 +8,10 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 03 Supabase migrations for all 16 prefixed application tables, relationships, indexes, Auth profile synchronization, RLS, duplicate-safe trade/strategy-change keys, and initial seeds
+- Central default market list in `config/markets.js` with automated migration-seed parity validation
+- PGlite database integration tests for migration execution, Auth profile provisioning, RLS ownership, role grants, seed idempotency, and constraints
+- Phase 03 database completion report
 - Phase 01 static project structure and six placeholder pages
 - Shared responsive CSS and small browser navigation script
 - Node.js built-in test setup and static project validation command

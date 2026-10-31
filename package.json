@@ -4,7 +4,10 @@
   "private": true,
   "description": "Phase 01 static project foundation for CryptoPulse AI Agent",
   "scripts": {
-    "build": "node scripts/validate-project.js",
+    "build": "node scripts/validate-project.js && node scripts/validate-database.js",
     "test": "node --test"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14"
   }
 }

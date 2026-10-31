@@ -1,0 +1,4 @@
+project_id = "crypto-pulse-ai-agent"
+
+[db.seed]
+enabled = false

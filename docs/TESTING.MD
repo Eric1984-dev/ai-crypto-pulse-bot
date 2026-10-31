@@ -17,6 +17,17 @@ The tests cover registration, login, logout, password reset and update, persiste
 
 No Supabase project credentials are present in the repository, so live-provider integration tests were not run. Configure `.env` and use the Vercel development runtime for a real Supabase smoke test. Database, market data, AI, risk, and paper-trading tests remain outside Phase 02.
 
+## Phase 03 database validation
+
+Phase 03 database tests execute the timestamped SQL migrations in PGlite, an embedded PostgreSQL engine used only for development tests. They verify the 16 prefixed tables, RLS activation, migration seed parity with `config/markets.js`, Auth profile backfill and signup/email synchronization, Auth-delete cascades, user portfolio isolation, authenticated read access, anonymous denial, server-only writes, seed repeatability, unique trade/change idempotency keys, foreign keys, and representative data constraints.
+
+```powershell
+npm.cmd test
+npm.cmd run build
+```
+
+The build check validates migration filenames, table/policy/index prefixes, per-table RLS coverage, and market seed parity. PGlite tests do not connect to Supabase or validate a linked project's existing schema. Supabase CLI and Docker are not configured in this environment, so `supabase db reset`, `supabase db push`, and live-provider integration checks must be run separately where those tools and project access are available. Inspect the target database and back it up before applying migrations.
+
 ---
 
 # Testing Types
