@@ -316,6 +316,7 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"aiDecisions\"]",
     "[data-dashboard-value=\"paperTrades\"]",
     "[data-dashboard-value=\"trackedMarkets\"]",
+    "[data-dashboard-value=\"marketsWithData\"]",
     "[data-dashboard-value=\"portfolioCount\"]",
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
@@ -397,6 +398,11 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     },
     recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 100000, created_at: generatedAt }] },
     watchedMarkets: { count: 1, items: [{ symbol: "BTC-EUR", priority: 1 }] },
+    marketSummary: {
+      activeMarkets: 1,
+      marketsWithData: 1,
+      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }]
+    },
     aiDecisions: { count: 1, items: [{ decision: "HOLD", symbol: "BTC-EUR", confidence: 80, reason: "No action." }] },
     portfolioSnapshots: [
       { portfolio_id: "portfolio-1", portfolio_value: "1100", captured_at: "2026-03-20T11:00:00.000Z" },
@@ -410,10 +416,15 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
+  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0,01 units");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
+  assert.match(
+    elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
+    /Priority 1.*100\.000,00.*2,5% \(24h\)/
+  );
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
 });
@@ -442,6 +453,7 @@ test("dashboard renders safe empty states without inventing portfolio history", 
 
   assert.equal(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "Unavailable");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "UNKNOWN");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, true);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, false);
@@ -493,6 +505,18 @@ test("dashboard requests same-origin API data and validates error responses", as
   assert.equal(statusRequest.options.credentials, "same-origin");
   assert.equal(statusRequest.options.cache, "no-store");
 
+  let marketSummaryRequest;
+  const expectedMarketSummary = {
+    data: { activeMarkets: 12, marketsWithData: 10, items: [{ symbol: "BTC-EUR" }] }
+  };
+  assert.deepEqual(await dashboard.requestMarketSummary(async (url, options) => {
+    marketSummaryRequest = { url, options };
+    return { ok: true, status: 200, json: async () => expectedMarketSummary };
+  }), expectedMarketSummary.data);
+  assert.equal(marketSummaryRequest.url, "/api/market-summary");
+  assert.equal(marketSummaryRequest.options.credentials, "same-origin");
+  assert.equal(marketSummaryRequest.options.cache, "no-store");
+
   await assert.rejects(
     () => dashboard.requestDashboardData(async () => ({ ok: false, status: 401 })),
     (error) => error.status === 401
@@ -504,6 +528,10 @@ test("dashboard requests same-origin API data and validates error responses", as
   await assert.rejects(
     () => dashboard.requestAgentStatus(async () => ({ ok: false, status: 503 })),
     /status is unavailable/
+  );
+  await assert.rejects(
+    () => dashboard.requestMarketSummary(async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
+    /response is invalid/
   );
 });
 
@@ -532,6 +560,63 @@ test("dashboard waits for authentication and offers retry after a load error", a
   assert.equal(fetchCalls, 1);
   assert.equal(elements.get("[data-dashboard-error]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
+});
+
+test("dashboard loads active-market counts and prices from the authenticated market summary API", async () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const dashboardData = dashboard.emptyDashboardData();
+  dashboardData.watchedMarkets = {
+    count: 1,
+    items: [{ symbol: "BTC-EUR", priority: 1 }]
+  };
+  const windowRef = {
+    CryptoPulseAuthReady: Promise.resolve(),
+    CryptoPulseAgentBrain: {
+      createAgentBrain: () => ({ available: true, setStatus() {}, dispose() {} })
+    },
+    location: { replace() {} },
+    setInterval: () => 1,
+    clearInterval() {},
+    fetch: async (url) => {
+      if (url === "/api/dashboard-data") {
+        return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
+      }
+      if (url === "/api/market-summary") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              activeMarkets: 7,
+              marketsWithData: 6,
+              items: [{ symbol: "BTC-EUR", price: 50000, daily_change: 1.25 }]
+            }
+          })
+        };
+      }
+      if (url === "/api/agent-status") {
+        return { ok: true, status: 200, json: async () => ({ data: { status: null } }) };
+      }
+      throw new Error(`Unexpected dashboard request: ${url}`);
+    }
+  };
+
+  const controller = dashboard.startDashboard({
+    windowRef,
+    documentRef: dashboardDocument,
+    ChartConstructor: null,
+    loadThree: async () => ({ scene: true })
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "7");
+  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "6");
+  assert.match(
+    elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
+    /Priority 1.*50\.000,00.*1,25% \(24h\)/
+  );
+  controller.dispose();
 });
 
 test("dashboard redirects to login when the data API reports an expired session", async () => {

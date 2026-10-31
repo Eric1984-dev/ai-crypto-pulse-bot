@@ -94,8 +94,56 @@ Success response:
 
 When there is no valid status row, success returns `{"data":{"status":null}}`; the dashboard displays `UNKNOWN` and a neutral visualization. The dashboard polls this endpoint every 15 seconds while visible. An expired session returns `401`; missing configuration or provider/database failure returns `503`; unsupported methods return `405`. Responses use `Cache-Control: no-store`.
 
+## Phase 06 public Bitvavo market data
+
+The market endpoints require a valid `cp_access_token` session and preserve the caller's JWT for RLS-protected reads. They use only Bitvavo's public `GET /v2/markets`, `GET /v2/ticker/24h`, and `GET /v2/{market}/candles` endpoints. No Bitvavo key, private endpoint, account, balance, portfolio, or order access is used.
+
+### GET /api/market-summary
+
+Returns the active watched-market count, the count with stored market data, available stored snapshots, the latest capture time, and refresh state. A scheduled Vercel Cron invocation synchronizes valid configured EUR markets and refreshes stale ticker snapshots. Existing watched-market rows are never overwritten or removed by synchronization.
+
+Success response:
+
+```json
+{
+  "data": {
+    "activeMarkets": 102,
+    "marketsWithData": 102,
+    "items": [{
+      "symbol": "BTC-EUR",
+      "price": 65000,
+      "volume": 123.4,
+      "daily_change": 1.2,
+      "high_24h": 66000,
+      "low_24h": 64000,
+      "captured_at": "2026-03-20T12:00:00.000Z"
+    }],
+    "refreshedAt": "2026-03-20T12:00:00.000Z",
+    "refreshStatus": "refreshed"
+  }
+}
+```
+
+### GET /api/market
+
+Returns the stored snapshot and candles for an enabled, tracked market. When configured with the server-only service role, a candle request refreshes the selected interval from Bitvavo and upserts validated OHLCV rows before returning stored results.
+
+Query parameters:
+
+- `symbol`: required uppercase EUR market symbol, such as `BTC-EUR`.
+- `interval`: optional `1m`, `5m`, `15m`, `1h`, `4h`, or `1d` (default `1m`).
+- `limit`: optional integer from 1 to 500 (default 200).
+
+Provider errors, empty responses, and timeouts preserve and return the most recent stored data when available; the refresh state and scanner-event log identify failures.
+
+### GET /api/market-refresh
+
+Vercel Cron-only endpoint, scheduled every five minutes. It requires `Authorization: Bearer <CRON_SECRET>` and a server-only `SUPABASE_SERVICE_ROLE_KEY`. It validates configured symbols against the live public market catalog, adds only missing valid markets, and refreshes stale ticker snapshots. It does not expose either secret.
+
+Market endpoint responses use `Cache-Control: no-store`; Bitvavo data and market catalog entries are cached in memory for 60 seconds. Serverless instances have independent in-memory caches, so the persisted `captured_at` timestamp also determines database freshness.
+
+Errors: unauthenticated/expired session `401`; invalid market query `400`; untracked/disabled market `404`; unsupported method `405`; Supabase storage failure `503`; other request failure `500`. Bitvavo outages are represented as safe fallback data and a non-success `refreshStatus` when persisted data is readable.
+
 ## Planned application endpoints
 
-Market data ingestion, trading, scanner, AI, and realtime endpoints are not implemented.
-
-No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.
+AI, trading, paper-trading execution, strategy optimization, backtesting, and realtime endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

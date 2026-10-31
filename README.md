@@ -1,6 +1,6 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, en Phase 05 de Three.js Agent Brain visualisatie.
+CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie en Phase 06 publieke Bitvavo-marktdata.
 
 ## Huidige status
 
@@ -8,21 +8,22 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard, portfolio, scanner, trade history en instellingen zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API.
+- Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie, haalt publieke Bitvavo-tickers en candles op, slaat gegevens op in de bestaande markt-, candle- en scanner-eventtabellen en toont actieve markten en markten met data op het dashboard.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met iets hogere hersenhelften (circa 16%), een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. Alle 720 neuronen pulseren onafhankelijk; maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Inactieve verbindingen blijven gedimd en lichten alleen op wanneer een signaal passeert. De visualisatie heeft geen volume, shell, fog, mesh of externe circuitsporen. Beide hersenhelften delen dezelfde statuskleur.
-- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. Marktdata-ingestie, Bitvavo, AI Engine, autonomous trading, paper-trade uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd.
+- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; AI Engine, autonome trading, paper-trade-uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
-- `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard.
-- Phase 05 (Agent Brain) is voltooid; Phase 06 is niet gestart.
+- `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard; Phase 06 gebruikt geen private Bitvavo-endpoints, accountgegevens of orders.
+- Phase 06 (publieke Bitvavo-marktdata) is voltooid; Phase 07 is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes en dashboard/status APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard- en marktdata-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
 js/         Browsercode, Supabase Auth-service, dashboard rendering en Three.js Agent Brain
-lib/        Server-side sessievalidatie
+lib/        Server-side sessie- en marktdata-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
@@ -36,7 +37,7 @@ Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`
 - Node.js 18 of hoger voor tests en validatie.
 - De database-integratietests voeren de Supabase migrations uit in PGlite; er zijn geen Supabase-credentials nodig.
 - Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
-- Configureer `SUPABASE_URL` en `SUPABASE_ANON_KEY` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables.
+- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` en `CRON_SECRET` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. De service-role sleutel en cron secret zijn uitsluitend server-side.
 - Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
 - Supabase JS, Chart.js en Three.js worden via vastgepinde CDN-modules geladen; Three.js wordt alleen voor de Agent Brain geladen. PGlite is alleen een development dependency voor database tests.
 
@@ -45,13 +46,13 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-endpoints, beschermde rewrites, Vercel-configuratie, database-table/RLS-contract en gelijkheid tussen de seed migration en `config/markets.js`; het maakt geen build-output aan. `npm.cmd test` bevat ook dashboard API-, weergave-, lege-status-, foutafhandelings- en authenticatietests.
+`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth- en marktdata-endpoints, beschermde rewrites, Vercel Cron-configuratie, database-table/RLS-contract en behoud van de initiële marktseeds; het maakt geen build-output aan. `npm.cmd test` bevat ook dashboard-, marktdata-, API-, foutafhandelings-, database- en authenticatietests.
 
 Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
 
 ## Deployen
 
-Importeer de repository in Vercel met de projectroot als root directory en configureer de twee Supabase-variabelen. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
+Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en cron-variabelen. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
 
 ## Documentatie
 
@@ -71,3 +72,4 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 05 Final Visual Refinement Report](./docs/PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md)
 - [Phase 05 Final Redesign Report](./docs/PHASE_05_FINAL_REDESIGN_REPORT.md)
 - [Phase 05 Neural Activity Refinement Report](./docs/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md)
+- [Phase 06 completion report](./docs/PHASE_06_COMPLETION_REPORT.md)

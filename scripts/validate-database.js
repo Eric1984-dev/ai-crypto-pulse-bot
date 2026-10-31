@@ -116,8 +116,14 @@ function validateDatabase() {
           priority: Number(match[3])
         }))
       : [];
-    if (JSON.stringify(seededMarkets) !== JSON.stringify(markets)) {
-      errors.push("Watched-market migration seed does not match config/markets.js.");
+    const configuredMarketsBySymbol = new Map(markets.map((market) => [market.symbol, market]));
+    for (const seededMarket of seededMarkets) {
+      if (JSON.stringify(configuredMarketsBySymbol.get(seededMarket.symbol)) !== JSON.stringify(seededMarket)) {
+        errors.push(`Initial watched-market seed does not match config/markets.js: ${seededMarket.symbol}.`);
+      }
+    }
+    if (!seededMarkets.length) {
+      errors.push("Initial watched-market seed contains no markets.");
     }
   }
 
@@ -130,7 +136,7 @@ if (require.main === module) {
     console.error(`Database migration validation failed:\n- ${errors.join("\n- ")}`);
     process.exitCode = 1;
   } else {
-    console.log("Database migration validation passed (16 prefixed tables, RLS coverage, seed parity).");
+    console.log("Database migration validation passed (16 prefixed tables, RLS coverage, initial seed consistency).");
   }
 }
 

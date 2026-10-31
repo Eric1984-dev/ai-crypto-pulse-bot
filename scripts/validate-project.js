@@ -83,6 +83,11 @@ function validateProject() {
         errors.push(`The environment template must declare ${variable}.`);
       }
     }
+    for (const variable of ["SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET"]) {
+      if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
+        errors.push(`The environment template must declare ${variable}.`);
+      }
+    }
   }
 
   for (const endpoint of [
@@ -90,7 +95,10 @@ function validateProject() {
     "api/auth-session.mjs",
     "api/protected-page.mjs",
     "api/dashboard-data.mjs",
-    "api/agent-status.mjs"
+    "api/agent-status.mjs",
+    "api/market.mjs",
+    "api/market-summary.mjs",
+    "api/market-refresh.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
       errors.push(`Missing required API endpoint: ${endpoint}`);
@@ -99,6 +107,14 @@ function validateProject() {
 
   if (!fs.existsSync(path.join(rootDirectory, "js/agent-brain.js"))) {
     errors.push("Missing Three.js Agent Brain module: js/agent-brain.js");
+  }
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "market-data.mjs"))) {
+    errors.push("Missing shared market-data service: lib/market-data.mjs");
+  }
+  if (!vercelConfig?.crons?.some((cron) =>
+    cron.path === "/api/market-refresh" && cron.schedule === "*/5 * * * *"
+  )) {
+    errors.push("A five-minute Vercel Cron route is required for public market refresh.");
   }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];

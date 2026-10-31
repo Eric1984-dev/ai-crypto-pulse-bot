@@ -33,6 +33,7 @@
       openPositions: { count: 0, items: [] },
       recentTrades: { count: 0, items: [] },
       watchedMarkets: { count: 0, items: [] },
+      marketSummary: null,
       aiDecisions: { count: 0, items: [] },
       portfolioSnapshots: []
     };
@@ -64,6 +65,36 @@
       throw new Error("Dashboard data response is invalid.");
     }
     return result.data;
+  }
+
+  async function requestMarketSummary(fetchImpl) {
+    const response = await fetchImpl("/api/market-summary", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) {
+      const error = new Error("Authentication is required.");
+      error.status = 401;
+      throw error;
+    }
+    if (!response.ok) {
+      throw new Error("Market summary is unavailable.");
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("Market summary response is invalid.");
+    }
+    const summary = result && result.data;
+    if (!summary || !Number.isInteger(summary.activeMarkets)
+      || !Number.isInteger(summary.marketsWithData) || !Array.isArray(summary.items)) {
+      throw new Error("Market summary response is invalid.");
+    }
+    return summary;
   }
 
   async function requestAgentStatus(fetchImpl) {
@@ -100,7 +131,13 @@
     const openPositions = view.openPositions || { count: 0, items: [] };
     const recentTrades = view.recentTrades || { count: 0, items: [] };
     const watchedMarkets = view.watchedMarkets || { count: 0, items: [] };
+    const marketSummary = view.marketSummary;
     const aiDecisions = view.aiDecisions || { count: 0, items: [] };
+    const marketDataBySymbol = new Map(
+      marketSummary && Array.isArray(marketSummary.items)
+        ? marketSummary.items.map((item) => [item.symbol, item])
+        : []
+    );
 
     setText(documentRef, "portfolioValue", formatCurrency(portfolio.portfolioValue));
     setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl));
@@ -110,7 +147,16 @@
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
     setText(documentRef, "aiDecisions", formatCount(aiDecisions.count));
     setText(documentRef, "paperTrades", formatCount(recentTrades.count));
-    setText(documentRef, "trackedMarkets", formatCount(watchedMarkets.count));
+    setText(
+      documentRef,
+      "trackedMarkets",
+      marketSummary ? formatCount(marketSummary.activeMarkets) : formatCount(watchedMarkets.count)
+    );
+    setText(
+      documentRef,
+      "marketsWithData",
+      marketSummary ? formatCount(marketSummary.marketsWithData) : "Unavailable"
+    );
 
     setStatus(documentRef, "agent", view.agentStatus && view.agentStatus.status);
     setStatus(documentRef, "emergency", view.emergencyState && view.emergencyState.status);
@@ -126,7 +172,7 @@
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
-      `Priority ${formatCount(item.priority)}`
+      formatMarketDetails(item, marketDataBySymbol.get(item.symbol))
     ]);
     renderCollection(documentRef, "decisions", aiDecisions.items, (item) => [
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
@@ -313,6 +359,15 @@
       : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 8 }).format(number);
   }
 
+  function formatMarketDetails(market, snapshot) {
+    const details = [`Priority ${formatCount(market.priority)}`];
+    if (snapshot) {
+      details.push(formatCurrency(snapshot.price));
+      details.push(`${formatPercent(snapshot.daily_change)} (24h)`);
+    }
+    return details.join(" · ");
+  }
+
   function formatDate(value) {
     const date = new Date(value);
     return Number.isFinite(date.getTime())
@@ -374,6 +429,17 @@
 
       try {
         const data = await requestDashboardData(fetchImpl);
+        try {
+          data.marketSummary = await requestMarketSummary(fetchImpl);
+        } catch (error) {
+          if (error && error.status === 401) {
+            throw error;
+          }
+          if (windowRef.console && typeof windowRef.console.warn === "function") {
+            windowRef.console.warn("Dashboard market summary is unavailable.", error);
+          }
+          data.marketSummary = null;
+        }
         if (disposed) {
           return;
         }
@@ -652,6 +718,7 @@
     createPortfolioChartConfig,
     emptyDashboardData,
     requestAgentStatus,
+    requestMarketSummary,
     renderDashboard,
     requestDashboardData,
     startDashboard

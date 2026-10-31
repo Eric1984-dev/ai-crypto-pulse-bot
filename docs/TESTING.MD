@@ -19,14 +19,14 @@ No Supabase project credentials are present in the repository, so live-provider 
 
 ## Phase 03 database validation
 
-Phase 03 database tests execute the timestamped SQL migrations in PGlite, an embedded PostgreSQL engine used only for development tests. They verify the 16 prefixed tables, RLS activation, migration seed parity with `config/markets.js`, Auth profile backfill and signup/email synchronization, Auth-delete cascades, user portfolio isolation, authenticated read access, anonymous denial, server-only writes, seed repeatability, unique trade/change idempotency keys, foreign keys, and representative data constraints.
+Phase 03 database tests execute the timestamped SQL migrations in PGlite, an embedded PostgreSQL engine used only for development tests. They verify the 16 prefixed tables, RLS activation, consistency of the immutable initial five-market seed with `config/markets.js`, Auth profile backfill and signup/email synchronization, Auth-delete cascades, user portfolio isolation, authenticated read access, anonymous denial, server-only writes, seed repeatability, unique trade/change idempotency keys, foreign keys, and representative data constraints.
 
 ```powershell
 npm.cmd test
 npm.cmd run build
 ```
 
-The build check validates migration filenames, table/policy/index prefixes, per-table RLS coverage, and market seed parity. PGlite tests do not connect to Supabase or validate a linked project's existing schema. Supabase CLI and Docker are not configured in this environment, so `supabase db reset`, `supabase db push`, and live-provider integration checks must be run separately where those tools and project access are available. Inspect the target database and back it up before applying migrations.
+The build check validates migration filenames, table/policy/index prefixes, per-table RLS coverage, and consistency of the immutable initial market seeds. PGlite tests do not connect to Supabase or validate a linked project's existing schema. Supabase CLI and Docker are not configured in this environment, so `supabase db reset`, `supabase db push`, and live-provider integration checks must be run separately where those tools and project access are available. Inspect the target database and back it up before applying migrations.
 
 ## Phase 04 dashboard validation
 
@@ -53,6 +53,18 @@ npm.cmd run build
 ```
 
 Rendering uses a pinned Three.js ES module loaded on demand. Each neuron has an independent per-vertex intensity; at most 48 deterministic routes advance signals through adjacent connections. Only the current signal segments and their short trail brighten, while inactive links retain low intensity. Radial shader halos are localized to selected neuron points. Rendering is capped at 30 frames per second, device pixel ratio is capped at 1.5 (1.25 on mobile), the network is capped at 720 nodes and 2160 connections, active energy particles are capped at 48, and polling is limited to one status request every 15 seconds while the page is visible. The fallback remains hidden while the WebGL context is usable. If WebGL or Three.js initialization fails, the real status label remains visible and the visualization falls back to a safe unavailable state; later status updates may retry initialization. Automated tests validate limits and stable-orientation behavior; no device-specific GPU frame-time benchmark is implied. Browser/device GPU performance varies; physical-device profiling is a separate deployment check.
+
+## Phase 06 Bitvavo market-data validation
+
+Market-data tests use mocked public Bitvavo responses and mocked PostgREST calls. They verify ticker and candle parsing/persistence, invalid configured market logging and non-insertion, empty provider responses, timeouts, rate limits, offline fallbacks, storage failures, scanner-event writes, 60-second catalog/ticker/candle caching, authenticated market/summary endpoints, query validation, the cron-secret guard, and dashboard integration with stored snapshots and market counts. No private Bitvavo endpoint or API key is used.
+
+```powershell
+node --test tests/market-data.test.mjs tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+`npm run build` additionally validates the market endpoints, shared market-data service, five-minute Vercel Cron route, and server-only environment template. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
 
 ---
 

@@ -1,6 +1,6 @@
 # Architecture
 
-## Current Implementation: Phase 05
+## Current Implementation: Phase 06
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies.
 
@@ -24,15 +24,18 @@ Implemented components:
 - Authenticated read-only dashboard API that forwards the caller's JWT to Supabase so RLS remains authoritative
 - Database-backed dashboard summaries, recent activity, and snapshot chart with safe empty/error states
 - Three.js Agent Brain visualization driven by the live database status, with bounded rendering, hidden-tab pause, and explicit resource disposal
+- Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
+- Non-destructive watched-market validation/synchronization and 60-second in-memory provider caching
+- Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
+- Five-minute scheduled market refresh and dashboard counts for active markets and markets with stored data
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.
 
 The following capabilities are not implemented:
 
 - Realtime functionality
-- Bitvavo integration
 - AI Engine
-- Market Scanner
+- Signal-generating Market Scanner
 - Paper Trading
 - Backtesting
 - Strategy Optimization
@@ -267,19 +270,21 @@ without modifying application code.
 
 ---
 
-# Market Data Flow
+# Phase 06 Market Data Flow
 
-Bitvavo
+Vercel Cron / authenticated market request
 ↓
 Market Data Service
 ↓
-AI_Crypto_Bot_Candles
+Public Bitvavo markets, tickers, or candles
 ↓
-AI_Crypto_Bot_Watched_Markets
+Validation and 60-second cache
 ↓
-Market Scanner
+Existing watched-market, market-data, candle, and scanner-event tables
 ↓
-AI Engine
+Authenticated dashboard summary / market response
+
+The service validates markets before adding missing watched-market rows and never overwrites existing user-configured enabled/priority values. Caller JWTs are used for authenticated reads; scheduled refresh and persistence use the server-only Supabase service role. Bitvavo access is public only. Signal generation, scanner decisions, AI, and trading are not part of this phase.
 
 Historical market data is shared across:
 

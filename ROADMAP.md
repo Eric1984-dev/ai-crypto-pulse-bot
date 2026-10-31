@@ -71,9 +71,17 @@ Status: Completed (2026-10-31)
 
 ## Phase 06 - Bitvavo Integration
 
-- Marktdata
-- Market Storage
-- Market Summary
+- [x] Expand and validate the centralized EUR market universe against Bitvavo's public market catalog
+- [x] Non-destructively synchronize valid missing markets into `AI_Crypto_Bot_Watched_Markets`
+- [x] Cache public Bitvavo market/ticker/candle responses for 60 seconds and preserve stored-data fallbacks
+- [x] Persist validated 24-hour market snapshots and OHLCV candles in existing tables
+- [x] Log invalid markets, missing data, provider failures, and refresh failures in `AI_Crypto_Bot_Scanner_Events`
+- [x] Add authenticated market and market-summary APIs with dashboard integration
+- [x] Schedule five-minute market snapshot refresh with a server-secret-protected Vercel Cron route
+- [x] Add market-data, endpoint, caching, failure-mode, and dashboard integration tests
+- [x] Update Phase 06 documentation and completion report
+
+Status: Completed
 
 ---
 

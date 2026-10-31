@@ -18,5 +18,8 @@
     "api/protected-page.mjs": {
       "includeFiles": "*.html"
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/market-refresh", "schedule": "*/5 * * * *" }
+  ]
 }

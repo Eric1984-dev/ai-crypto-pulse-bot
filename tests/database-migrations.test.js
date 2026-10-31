@@ -58,13 +58,14 @@ async function withRole(database, role, callback) {
 test("database migration contract covers all prefixed tables, RLS policies, and seed configuration", () => {
   assert.deepEqual(validateDatabase(), []);
   assert.equal(requiredTables.length, 16);
-  assert.deepEqual(markets.map(({ symbol }) => symbol), [
+  assert.deepEqual(markets.slice(0, 5).map(({ symbol }) => symbol), [
     "BTC-EUR",
     "ETH-EUR",
     "SOL-EUR",
     "XRP-EUR",
     "ADA-EUR"
   ]);
+  assert.equal(new Set(markets.map(({ symbol }) => symbol)).size, markets.length);
 });
 
 test("migrations apply, backfill auth profiles, and seed repeatably", async () => {
@@ -106,7 +107,7 @@ test("migrations apply, backfill auth profiles, and seed repeatably", async () =
     const emergencyCount = await database.query(
       `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Emergency_State"`
     );
-    assert.equal(marketsCount.rows[0].count, markets.length);
+    assert.equal(marketsCount.rows[0].count, 5);
     assert.equal(statusCount.rows[0].count, 1);
     assert.equal(emergencyCount.rows[0].count, 1);
   } finally {
@@ -266,7 +267,7 @@ test("authenticated reads are scoped to portfolio ownership while shared data is
     assert.deepEqual(visibleRows.profiles.rows.map(({ id }) => id), [ownerId]);
     assert.deepEqual(visibleRows.portfolios.rows.map(({ id }) => id), [ownerPortfolioId]);
     assert.deepEqual(visibleRows.positions.rows.map(({ symbol }) => symbol), ["BTC-EUR"]);
-    assert.equal(visibleRows.marketRows.rows.length, markets.length);
+    assert.equal(visibleRows.marketRows.rows.length, 5);
     assert.equal(visibleRows.decisions.rows.length, 1);
   } finally {
     await database.close();

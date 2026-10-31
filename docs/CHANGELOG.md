@@ -8,6 +8,11 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 06 public Bitvavo market catalog, ticker, and candle service backed by existing market tables
+- Authenticated market and market-summary APIs, non-destructive watched-market sync, scanner-event logging, and five-minute Vercel refresh
+- Dashboard market-data count and watched-market price / 24-hour change details
+- Bitvavo provider, database persistence, cache, failure-fallback, API, and dashboard regression tests
+- Phase 06 Bitvavo market-data completion report
 - Phase 04 authenticated read-only dashboard endpoint and database-backed summaries for agent status, emergency state, portfolio, positions, trades, watched markets, and AI decisions
 - Responsive dashboard KPI cards, actual-snapshot Chart.js history, and safe empty/error states
 - Dashboard API and rendering tests plus Phase 04 completion report

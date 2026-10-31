@@ -2,7 +2,7 @@
 
 ## Phase 02 status
 
-Phase 02 uses Supabase Auth and Vercel Functions for public Auth configuration, session-cookie validation, and protected-page delivery. Phase 03 adds PostgreSQL tables and RLS through Supabase migrations, but the schema is not automatically applied by a Vercel deployment. Apply reviewed database migrations separately with the Supabase CLI; no service-role credential is required by the static deployment.
+Phases 02-06 use Supabase Auth and Vercel Functions for protected pages, dashboard data, and public Bitvavo market data. Phase 03 adds PostgreSQL tables and RLS through Supabase migrations; Phase 06 uses those existing tables and adds no schema migration. Apply reviewed database migrations separately with the Supabase CLI.
 
 ## Hosting
 
@@ -29,12 +29,14 @@ Set these variables in a local ignored `.env` file and in Vercel Project Setting
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_SERVICE_ROLE_KEY=server-only-service-role-key
+CRON_SECRET=long-random-cron-secret
 ENABLE_LIVE_TRADING=false
 ```
 
 For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` and serves `/api/*` routes. Opening the HTML files through a static-only server does not run the protected-page functions.
 
-The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. Never use or expose a Supabase service-role key. Keep all other secrets in server-side environment variables.
+The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization and writes; `CRON_SECRET` protects `/api/market-refresh`. Keep both secrets out of browser configuration and logs. Vercel invokes the market refresh every five minutes, and Bitvavo access uses public endpoints without an API key.
 
 In Supabase Authentication settings, configure the site URL and allow the exact deployed `/login.html` and `/reset-password.html` redirect URLs for email confirmation and password recovery. Supabase can fall back to the configured site URL when a requested redirect does not match the allowlist, which may send recovery links to the site root. Do not configure production Auth redirects to untrusted origins.
 
