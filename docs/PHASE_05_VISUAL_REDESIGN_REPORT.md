@@ -1,5 +1,7 @@
 # Phase 05 Visual Redesign Report
 
+> Superseded by [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md), which removes the shell and defines the brain silhouette entirely with neurons, connections, hotspots, and traveling signals.
+
 ## Status
 
 The Agent Brain visual refresh is implemented within Phase 05. Phase 06 was not started. Dashboard placement, authenticated status polling, and the `AI_Crypto_Bot_Status.status` data source remain unchanged.

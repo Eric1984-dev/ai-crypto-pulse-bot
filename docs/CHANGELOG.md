@@ -16,6 +16,7 @@ All notable project changes should be documented here.
 - Agent Brain status-mapping, API, dashboard integration, fallback, rendering, and performance tests plus Phase 05 completion report
 - Network-first Agent Brain silhouette with 720 nodes, up to 2160 dynamically pulsing links, flowing energy particles, and WebGL-context-aware fallback behavior
 - Phase 05 brain improvement report and geometry, signal-flow, and fallback-recovery regression tests
+- Final Phase 05 visual redesign report documenting the contour-led brain and browser validation
 - Phase 03 Supabase migrations for all 16 prefixed application tables, relationships, indexes, Auth profile synchronization, RLS, duplicate-safe trade/strategy-change keys, and initial seeds
 - Central default market list in `config/markets.js` with automated migration-seed parity validation
 - PGlite database integration tests for migration execution, Auth profile provisioning, RLS ownership, role grants, seed idempotency, and constraints
@@ -41,8 +42,10 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Replace the diffuse node-cloud layout with a front-facing bilateral cortical contour, pronounced center fissure, curved gyri, branching neural paths, radial neuron halos, and subdued connected circuit traces; both hemispheres share one status color
+- Remove every brain surface mesh, translucent shell, inner volume, and separate fissure line; define the bilateral silhouette solely with status-colored nodes, local connections, bright hotspots, and traveling energy particles
 - Replace the single cloud-like Agent Brain surface and external aura with a recognizable bilateral brain silhouette, central fissure, restrained lower structures, internal status-colored network, and a subdued stage background
-- Replace the network-cloud Agent Brain as the primary visual with a stable semi-solid organic brain volume, layered additive glow, and internal status-driven neural activity; remove continuous whole-brain rotation
+- Historical visual iteration: temporarily used a semi-solid brain volume and layered additive glow; superseded by the current shell-free, contour-led network
 
 ### Fixed
 

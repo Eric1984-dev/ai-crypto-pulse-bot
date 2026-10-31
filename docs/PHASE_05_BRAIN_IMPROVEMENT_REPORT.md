@@ -1,6 +1,6 @@
 # Phase 05 Brain Improvement Report
 
-> Historical iteration report. Its network-only visual was later superseded by the semi-solid brain redesign in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md).
+> Historical iteration report. Its initial network-only visual and later semi-solid redesign were superseded by the shell-free renderer in [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md).
 
 ## Status
 

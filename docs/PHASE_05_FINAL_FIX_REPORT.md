@@ -1,6 +1,6 @@
 # Phase 05 Final Fix Report
 
-> Historical iteration report. The current appearance is documented in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md), which supersedes this report's network-first visual description.
+> Historical iteration report. Its network-first visual was later given a translucent shell; the current shell-free renderer is documented in [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md).
 
 ## Summary
 

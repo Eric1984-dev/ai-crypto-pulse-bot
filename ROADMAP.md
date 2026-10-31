@@ -55,15 +55,15 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 
 ## Phase 05 - Agent Brain
 
-- [x] Premium Three.js Agent Brain with distinct bilateral hemispheres, a visible midline fissure, and internal neural activity in the existing Agent Status panel
+- [x] Reference-inspired, front-facing bilateral brain silhouette with an explicit center fissure, organic cortical contour, curved neural pathways, bright hotspots, and traveling energy particles in the existing Agent Status panel
 - [x] Live status refresh from `AI_Crypto_Bot_Status` through an authenticated read-only API
 - [x] ACTIVE, ANALYZING, IDLE, STOPPED, ERROR, and neutral UNKNOWN visualization states
-- [x] 720 internal nodes, up to 2160 dynamically pulsing connections, up to 48 status-driven energy particles, and layered status-driven glow
+- [x] 720 neural nodes, up to 2160 dynamically pulsing connections, up to 48 status-driven energy particles, and neuron-local glow
 - [x] Stable brain silhouette with animated neural activity and no continuous whole-brain rotation
 - [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards
 - [x] Tests and documentation
-- [x] Final bilateral silhouette refresh with reduced external glow and a unified state-driven color family
+- [x] Final shell-free contour redesign with same-color hemispheres, radial neuron glow, and restrained circuit traces connected to the brain outline
 
 Status: Completed (2026-10-31)
 

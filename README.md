@@ -8,7 +8,7 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard, portfolio, scanner, trade history en instellingen zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API.
-- De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Twee herkenbare hersenhelften, een middenspleet en subtiele cerebellum-/hersenstamvormen maken het silhouet; 720 interne neurale nodes, maximaal 2160 dynamische verbindingen en energiedeeltjes visualiseren de activiteit zonder een dominante externe wolk.
+- De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. De visualisatie heeft geen volume, shell, fog of mesh; subtiele circuitsporen sluiten aan op de buitencontour. Beide hersenhelften delen dezelfde statuskleur.
 - Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. Marktdata-ingestie, Bitvavo, AI Engine, autonomous trading, paper-trade uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard.
@@ -68,3 +68,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 05 Final Fix Report](./docs/PHASE_05_FINAL_FIX_REPORT.md)
 - [Phase 05 Visual Redesign Report](./docs/PHASE_05_VISUAL_REDESIGN_REPORT.md)
 - [Phase 05 Final Visual Redesign Report](./docs/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md)
+- [Phase 05 Final Visual Refinement Report](./docs/PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md)
+- [Phase 05 Final Redesign Report](./docs/PHASE_05_FINAL_REDESIGN_REPORT.md)

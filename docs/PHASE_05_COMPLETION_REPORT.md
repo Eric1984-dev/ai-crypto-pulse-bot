@@ -6,13 +6,13 @@
 
 The Agent Brain replaces the placeholder in the existing Agent Status panel. The dashboard layout is otherwise unchanged: the Brain remains below Backend status / Agent Status and before Risk control / Emergency State, and it was not moved above the dashboard summaries.
 
-The network-only appearance documented in this original completion report was subsequently replaced by the semi-solid visual redesign in [PHASE_05_VISUAL_REDESIGN_REPORT.md](./PHASE_05_VISUAL_REDESIGN_REPORT.md). That report describes the current renderer and its updated validation.
+This completion report records the original Phase 05 delivery. Its visual implementation was refined afterward; the current shell-free, node-defined renderer and latest validation are documented in [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md).
 
 ## Implementation
 
 - Added `GET /api/agent-status`, an authenticated read-only endpoint that verifies the existing HttpOnly session cookie and selects `AI_Crypto_Bot_Status.status` using the anon key and the user's JWT. RLS remains authoritative.
 - The dashboard initializes from the status returned by its existing dashboard-data API, then polls the status-only endpoint every 15 seconds while visible. Polling pauses while hidden and resumes with an immediate refresh when visible.
-- Added a pinned, on-demand Three.js ES-module import and a network-defined organic brain silhouette with 720 nodes, up to 2160 dynamic links, and a node-and-link brainstem. No solid lobe mesh is used.
+- Added a pinned, on-demand Three.js ES-module import and a network-defined organic brain silhouette with 720 nodes, up to 2160 dynamic links, and a node-and-link brainstem. The later final refinement removes all surface meshes and translucent volume layers.
 - Added database-status mappings:
   - `ACTIVE`: moderate blue pulse and continuous movement.
   - `ANALYZING`: brighter/faster blue pulse and increased activity points.

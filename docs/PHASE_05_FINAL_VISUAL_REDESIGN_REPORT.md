@@ -1,5 +1,7 @@
 # Phase 05 Final Visual Redesign Report
 
+> Superseded by [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md); the current renderer contains no surface mesh or translucent brain volume.
+
 ## Status
 
 The final Agent Brain silhouette refresh is implemented within Phase 05. Phase 06 was not started. Supabase integration, authenticated status polling, dashboard placement, and rendering safeguards were not changed.
