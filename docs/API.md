@@ -41,6 +41,8 @@ Authentication is required. The endpoint reads the `cp_access_token` HttpOnly co
 
 The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, and up to 100 persisted portfolio snapshots. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
 
+Timestamp fields are returned as UTC values and remain unchanged by the API. Browser clients use the shared formatter to display those instants in `Europe/Brussels`; date filters and daily P&L boundaries remain UTC.
+
 Summary semantics:
 
 - `totalPnl`: sum of visible portfolio values minus their starting balances.

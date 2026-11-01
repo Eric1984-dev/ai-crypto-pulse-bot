@@ -428,7 +428,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
         amount: 0.01,
         entry_price: 0.00453954,
         current_price: 0.05671234,
-        unrealized_pnl: 100
+        unrealized_pnl: 100,
+        created_at: "2026-03-20T10:00:00.000Z"
       }]
     },
     recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 0.98123456, created_at: generatedAt }] },
@@ -445,13 +446,23 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
               symbol: "BTC-EUR",
               decision: "BUY",
               confidence: 90,
-              reason: "Momentum is positive."
+              reason: "Momentum is positive.",
+              created_at: generatedAt.toISOString()
             }]
           }
         }
       }
     },
-    aiDecisions: { count: 1, items: [{ decision: "HOLD", symbol: "BTC-EUR", confidence: 80, reason: "No action." }] },
+    aiDecisions: {
+      count: 1,
+      items: [{
+        decision: "HOLD",
+        symbol: "BTC-EUR",
+        confidence: 80,
+        reason: "No action.",
+        created_at: generatedAt.toISOString()
+      }]
+    },
     portfolioSnapshots: [
       { portfolio_id: "portfolio-1", portfolio_value: "1100", captured_at: "2026-03-20T11:00:00.000Z" },
       { portfolio_id: "portfolio-1", portfolio_value: "1050", captured_at: "2026-03-20T10:00:00.000Z" }
@@ -469,11 +480,15 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0,01 units");
   assert.match(
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
-    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?100,00/
+    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?100,00 · Opened .*11:00/
   );
   assert.match(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].textContent,
-    /€\s?0,98123/
+    /€\s?0,98123.*13:00/
+  );
+  assert.match(
+    elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,
+    /Recorded .*13:00 · No action/
   );
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
@@ -487,10 +502,11 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   );
   assert.match(
     elements.get("[data-dashboard-list=\"scanner-opportunities\"]")[0].children[0].children[1].textContent,
-    /Momentum is positive/
+    /Recorded .*13:00 · Momentum is positive/
   );
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
+  assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
 });
 
 test("Agent Brain replaces the placeholder in the existing Agent Status panel", () => {

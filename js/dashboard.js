@@ -246,11 +246,11 @@
 
     renderCollection(documentRef, "positions", openPositions.items, (item) => [
       `${item.symbol || "—"} · ${formatQuantity(item.amount)} units`,
-      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
+      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
     ]);
     renderCollection(documentRef, "trades", recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatQuantity(item.quantity)} units`,
-      `${formatters.formatPrice(item.price)} · ${formatDate(item.created_at)}`
+      `${formatters.formatPrice(item.price)} · ${formatters.formatTimestamp(item.created_at)}`
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
@@ -258,7 +258,7 @@
     ]);
     renderCollection(documentRef, "decisions", aiDecisions.items, (item) => [
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
-      item.reason || "No decision reason recorded."
+      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
     ]);
     const scanner24h = marketSummary && marketSummary.scanner
       && marketSummary.scanner.timeframes && marketSummary.scanner.timeframes["24h"];
@@ -268,7 +268,7 @@
     ]);
     renderCollection(documentRef, "scanner-opportunities", scanner24h && scanner24h.aiOpportunities, (item) => [
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
-      item.reason || "No decision reason recorded."
+      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
     ]);
 
     const chart = renderPortfolioChart(
@@ -340,7 +340,7 @@
       .filter((timestamp) => Number.isFinite(Date.parse(timestamp)))
       .sort((left, right) => Date.parse(left) - Date.parse(right));
     const portfolioIds = [...new Set(snapshots.map((snapshot) => snapshot.portfolio_id))];
-    const labels = timestamps.map((timestamp) => formatDate(timestamp));
+    const labels = timestamps.map((timestamp) => formatters.formatTimestamp(timestamp));
     const datasets = portfolioIds.map((portfolioId, index) => {
       const snapshotsByTime = new Map(
         snapshots
@@ -458,13 +458,6 @@
       details.push(`${formatPercent(snapshot.daily_change)} (24h)`);
     }
     return details.join(" · ");
-  }
-
-  function formatDate(value) {
-    const date = new Date(value);
-    return Number.isFinite(date.getTime())
-      ? new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(date)
-      : "—";
   }
 
   function numericValue(value) {

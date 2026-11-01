@@ -222,6 +222,16 @@ npm.cmd run build
 
 The API tests mock PostgREST and the database integration runs in PGlite. These checks do not prove that the migration was applied to the configured remote Supabase project or validate a production deployment.
 
+## Shared timestamp timezone coverage
+
+The shared browser formatter pins timestamps to `Europe/Brussels` and relies on the runtime's IANA timezone data for daylight-saving changes. Tests cover winter and summer offsets, the spring DST transition, date rollover, invalid inputs, dashboard chart/trade/position/AI-decision timestamps, portfolio positions and trades, scanner snapshots and AI opportunities, and the trade-history date column. The API and database remain UTC; no timestamp writes or calculations are converted.
+
+```powershell
+node --test tests/price-formatting.test.js tests/dashboard.test.js tests/portfolio.test.js tests/market-scanner-ui.test.js tests/trade-history.test.js
+npm.cmd test
+npm.cmd run build
+```
+
 ---
 
 ## Regression Testing

@@ -27,7 +27,8 @@ function createSummary() {
         symbol: "BTC-EUR",
         decision: "BUY",
         confidence: 90,
-        reason: "Momentum is positive."
+        reason: "Momentum is positive.",
+        created_at: "2026-03-20T12:00:00.000Z"
       }]
     }
   ]));
@@ -147,10 +148,15 @@ test("scanner deduplicates requests and safely renders selected timeframe rankin
     selectors.get('[data-scanner-list="topGainers"]').children[0].children[0].textContent,
     "BTC-EUR · 2%"
   );
-  assert.equal(
-    selectors.get('[data-scanner-list="aiOpportunities"]').children[0].children[1].textContent,
-    "Momentum is positive."
+  assert.match(
+    selectors.get('[data-scanner-list="topGainers"]').children[0].children[1].textContent,
+    /Captured 13:00/
   );
+  assert.match(
+    selectors.get('[data-scanner-list="aiOpportunities"]').children[0].children[1].textContent,
+    /^Recorded .*13:00 · Momentum is positive\.$/
+  );
+  assert.match(selectors.get("[data-scanner-status]").textContent, /Updated 13:00/);
 
   timeframeButtons[1].listeners.click();
   assert.equal(timeframeButtons[1].attributes["aria-pressed"], "true");

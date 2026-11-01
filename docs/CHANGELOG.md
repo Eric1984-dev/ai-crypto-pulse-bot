@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Shared `Europe/Brussels` timestamp formatting across dashboard, AI decision and agent logs, paper-trading and portfolio activity, scanner, and trade history; UTC storage and API values remain unchanged
 - Accessible, keyboard-operable explanations for all 12 dashboard portfolio KPIs, with responsive popovers and outside-click dismissal
 - Phase 10 trade history with authenticated server-side search, action/time filters, allowlisted sorting, stable 25-row pagination, and actual stored-trade statistics
 - SECURITY INVOKER trade-history aggregate RPC, RLS/grant coverage, responsive history page, dashboard link, regression tests, and Phase 10 completion report

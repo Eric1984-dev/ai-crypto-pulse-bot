@@ -18,11 +18,6 @@
     maximumFractionDigits: 2
   });
   const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 8 });
-  const dateFormat = new Intl.DateTimeFormat("nl-NL", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  });
-
   function buildTradeHistoryUrl({
     page = 1,
     search = "",
@@ -134,7 +129,7 @@
   function createTradeRow(documentRef, trade) {
     const row = documentRef.createElement("tr");
     const values = [
-      formatDate(trade.created_at),
+      formatters.formatTimestamp(trade.created_at, "medium"),
       trade.symbol,
       trade.side,
       formatters.formatPrice(trade.price),
@@ -332,11 +327,6 @@
 
   function formatCount(value) {
     return Number.isInteger(value) ? numberFormat.format(value) : "—";
-  }
-
-  function formatDate(value) {
-    const date = new Date(value);
-    return Number.isFinite(date.getTime()) ? dateFormat.format(date) : "—";
   }
 
   function numericValue(value) {

@@ -19,6 +19,23 @@
     minimumFractionDigits: 2,
     maximumFractionDigits: 5
   });
+  const timestampFormats = {
+    short: new Intl.DateTimeFormat("nl-NL", {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "Europe/Brussels"
+    }),
+    medium: new Intl.DateTimeFormat("nl-NL", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Europe/Brussels"
+    }),
+    time: new Intl.DateTimeFormat("nl-NL", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Brussels"
+    })
+  };
 
   function formatPrice(value) {
     if (value === null || value === undefined || value === "") {
@@ -33,5 +50,20 @@
       : standardPriceFormat.format(price);
   }
 
-  return { formatPrice };
+  function formatTimestamp(value, style = "short") {
+    if (!Object.prototype.hasOwnProperty.call(timestampFormats, style)) {
+      throw new RangeError("Unsupported timestamp format.");
+    }
+    const formatter = timestampFormats[style];
+    if (value === null || value === undefined || value === "") {
+      return "—";
+    }
+    if (!(value instanceof Date) && typeof value !== "string" && typeof value !== "number") {
+      return "—";
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isFinite(date.getTime()) ? formatter.format(date) : "—";
+  }
+
+  return { formatPrice, formatTimestamp };
 });

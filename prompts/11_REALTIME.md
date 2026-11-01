@@ -35,3 +35,12 @@ Reconnect
 Multiple tabs
 
 Offline scenario
+
+Do not create new API endpoints.
+
+Use Supabase Realtime subscriptions.
+
+Maximum:
+12 Vercel Functions.
+
+Function count may not increase.

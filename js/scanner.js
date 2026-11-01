@@ -1,12 +1,15 @@
 (function attachMarketScanner(root, createApi) {
-  const api = createApi();
+  const formatters = typeof module !== "undefined" && module.exports
+    ? require("./formatters.js")
+    : root.CryptoPulseFormatters;
+  const api = createApi(formatters);
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     api.startMarketScanner({ windowRef: window, documentRef: document });
   }
-})(globalThis, function createMarketScannerApi() {
+})(globalThis, function createMarketScannerApi(formatters) {
   const timeframes = ["24h", "7d", "30d"];
   const rankings = ["topGainers", "topLosers", "highestVolume", "strongestMomentum", "aiOpportunities"];
   const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 2 });
@@ -89,7 +92,7 @@
     if (ranking === "aiOpportunities") {
       return [
         `${item.decision || "—"} · ${symbol} · ${formatPercent(item.confidence)}`,
-        item.reason || "No decision reason recorded."
+        `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
       ];
     }
     const metric = ranking === "highestVolume"
@@ -115,10 +118,7 @@
   }
 
   function formatTime(value) {
-    const timestamp = Date.parse(value || "");
-    return Number.isFinite(timestamp)
-      ? new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" }).format(timestamp)
-      : "—";
+    return formatters.formatTimestamp(value, "time");
   }
 
   function startMarketScanner({

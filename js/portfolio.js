@@ -62,11 +62,11 @@
 
     renderCollection(documentRef, "positions", data.openPositions.items, (item) => [
       `${item.symbol || "—"} · ${formatNumber(item.amount)} units`,
-      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
+      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
     ]);
     renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatNumber(item.quantity)} units`,
-      `${formatters.formatPrice(item.price)} · Fee ${formatCurrency(item.fees)} · P&L ${formatCurrency(item.realized_pnl)}`
+      `${formatters.formatPrice(item.price)} · Fee ${formatCurrency(item.fees)} · P&L ${formatCurrency(item.realized_pnl)} · Executed ${formatters.formatTimestamp(item.created_at)}`
     ]);
   }
 

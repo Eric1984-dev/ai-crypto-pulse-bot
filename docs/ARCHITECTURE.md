@@ -569,6 +569,8 @@ Examples:
 
 `GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard and portfolio view. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, and up to 100 real portfolio snapshots. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC; realized/unrealized totals are `null` when their bounded source queries are incomplete. Win rate is the share of profitable SELL trades across visible trade history.
 
+Database timestamp instants and API values remain UTC. Browser views use the shared `formatTimestamp` utility to display timestamps in `Europe/Brussels`; the IANA timezone rules apply daylight-saving changes automatically. Formatting is presentation-only and does not alter requests, database values, or UTC-based calculations.
+
 `GET /api/agent-status` is an authenticated read-only endpoint for the Agent Brain. It reads a single status row and returns a supported status or `null` when no valid row exists. It uses the public anon key plus the verified user's JWT and never writes to the database.
 
 The dashboard API uses only the Supabase anon key and the request user's verified access token. It never uses the service-role key and cannot write to the database. User-visible empty values are represented as `null` or empty collections; read failures return explicit errors rather than mock values.
