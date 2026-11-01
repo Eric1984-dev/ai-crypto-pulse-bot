@@ -8,6 +8,10 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 08 transactional paper-trading engine using persisted AI decisions and stored market data only, with service-role-only database execution, unique decision-linked trade records, portfolio valuation, and scheduler metrics
+- Per-profile €10,000 simulated starting portfolios, paper positions/trades/snapshots, 0.25% fees, 0.10% adverse slippage, and database-enforced position, confidence, cooldown, funds, drawdown, and emergency-stop rules
+- Authenticated portfolio summary page and dashboard realized/unrealized P&L values sourced from bounded, RLS-protected database reads
+- Phase 08 database migration, PGlite risk/execution regression tests, scheduler/API tests, portfolio UI tests, documentation, and completion report
 - Phase 07 AI candle retrieval now queries each supported interval independently with a bounded per-interval limit, preventing PostgREST's global response cap from starving later intervals
 - Phase 06 separate market-snapshot and candle-refresh jobs; authenticated candle batches process one interval and up to five markets with incremental reads, metrics, and existing-schema upserts
 - Phase 06 incremental candle refresh using latest stored timestamps, due-interval scheduling, bounded range requests, batch latest-candle reads, and market/candle runtime metrics

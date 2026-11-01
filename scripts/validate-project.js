@@ -100,7 +100,8 @@ function validateProject() {
     "api/market-summary.mjs",
     "api/market-refresh.mjs",
     "api/candle-refresh.mjs",
-    "api/ai-analysis.mjs"
+    "api/ai-analysis.mjs",
+    "api/paper-trading.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
       errors.push(`Missing required API endpoint: ${endpoint}`);
@@ -118,6 +119,9 @@ function validateProject() {
   }
   if (!fs.existsSync(path.join(rootDirectory, "lib", "cron-auth.js"))) {
     errors.push("Missing shared scheduler authorization helper: lib/cron-auth.js");
+  }
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "paper-trading.mjs"))) {
+    errors.push("Missing server-side paper-trading service: lib/paper-trading.mjs");
   }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];

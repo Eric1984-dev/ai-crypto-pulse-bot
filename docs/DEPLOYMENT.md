@@ -1,8 +1,8 @@
 # Deployment Guide
 
-## Phase 02 status
+## Current status
 
-Phases 02-06 use Supabase Auth and Vercel Functions for protected pages, dashboard data, and public Bitvavo market data. Phase 03 adds PostgreSQL tables and RLS through Supabase migrations; Phase 06 uses those existing tables and adds no schema migration. Apply reviewed database migrations separately with the Supabase CLI.
+Phases 02-08 use Supabase Auth and Vercel Functions for protected pages, dashboard data, public Bitvavo market data, AI analysis, and paper trading. Apply reviewed PostgreSQL migrations separately with the Supabase CLI before enabling the scheduled paper-trading endpoint.
 
 ## Hosting
 
@@ -60,4 +60,10 @@ Phase 07 exposes `POST /api/ai-analysis` for an external scheduler. Configure th
 
 In Supabase Authentication settings, configure the site URL and allow the exact deployed `/login.html` and `/reset-password.html` redirect URLs for email confirmation and password recovery. Supabase can fall back to the configured site URL when a requested redirect does not match the allowlist, which may send recovery links to the site root. Do not configure production Auth redirects to untrusted origins.
 
-`ENABLE_LIVE_TRADING=false` remains the required safe default. Live trading is not implemented or available.
+### External paper-trading execution
+
+After `/api/ai-analysis` completes successfully, configure an external scheduler to call `POST https://<your-deployment-host>/api/paper-trading` with the same protected cron authorization header. Use the same cadence as analysis and do not run the jobs concurrently. Verify that migration `20261101154600_phase08_paper_trading.sql` has been reviewed and applied first. Check the returned status and execution metrics after setup. This endpoint uses stored AI decisions and market snapshots only and never sends an exchange order.
+
+The endpoint requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, server-only `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and `ENABLE_LIVE_TRADING=false`. It returns `503` if the live-trading flag is configured to anything other than `false`.
+
+`ENABLE_LIVE_TRADING=false` remains the required safe default. Live trading is not implemented or available; do not change this value.

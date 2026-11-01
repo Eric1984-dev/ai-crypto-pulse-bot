@@ -184,6 +184,30 @@ An existing `STOPPED` or `ANALYZING` status returns a successful skipped result 
 
 Errors: unsupported method `405`; missing cron secret `503` (`CRON_NOT_CONFIGURED`); invalid scheduler authorization `401` (`CRON_AUTH_REQUIRED`); missing Supabase/service-role configuration `503` (`AI_ENGINE_NOT_CONFIGURED`); database/analysis failures `503` (`AI_ANALYSIS_UNAVAILABLE`). Responses use `Cache-Control: no-store`.
 
+## Phase 08 paper trading
+
+### POST /api/paper-trading
+
+This server-to-server endpoint invokes the service-role-only `AI_Crypto_Bot_Run_Paper_Trading` database function. It uses only the newest stored AI decision per enabled market and the corresponding stored market snapshot; the database rejects stale decisions and snapshots. It does not call Bitvavo or any exchange endpoint.
+
+Required headers and environment:
+
+- `Authorization: Bearer <CRON_SECRET>`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `ENABLE_LIVE_TRADING=false`
+
+The request has no body. Schedule it after `/api/ai-analysis` completes. Runs are serialized with a database advisory lock, and the unique trade idempotency key is deterministically derived from the portfolio and AI-decision IDs. Repeating a request cannot create a duplicate trade for the same decision.
+
+BUY decisions open a position only with confidence at least 70, a fresh market snapshot, no active emergency/pause, fewer than five open positions, no same-market trade within 15 minutes, and remaining daily/portfolio drawdown capacity. Entry notional is capped at 10% of current portfolio value and available funds. SELL decisions close all open positions for that market when a fresh snapshot is available; HOLD and WAIT never trade. SELL can reduce risk without the entry confidence/cooldown gates. Trading fees are 0.25%; simulated slippage is 0.10%.
+
+Daily drawdown of 5% and maximum portfolio drawdown of 15% prevent new entries. A 20% peak drawdown writes an `EMERGENCY_STOP` event and sets Agent Status to `STOPPED`. Existing positions remain visible; only a valid SELL can close them. A stale/invalid input fails closed and never creates a trade.
+
+Success response includes `data.status` (`COMPLETED` or `SKIPPED`), portfolio/decision/trade/duplicate/skip counts, and `metrics.paperTradingDurationMs`. Successful metrics are logged without credentials. Unsupported method: `405`; missing cron configuration or Supabase configuration: `503`; invalid authorization: `401`; missing or non-false live-trading flag: `503`; database failure or invalid RPC response: `503`. Responses use `Cache-Control: no-store`.
+
+The authenticated `GET /api/dashboard-data` response includes real realized and unrealized P&L summaries when the corresponding bounded history/position reads are complete. If a query exceeds its supported page size, the affected aggregate is `null`, not an incomplete sum.
+
 ## Planned application endpoints
 
-Risk-managed trading, paper-trading execution, strategy optimization, backtesting, and realtime endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.
+Market Scanner, strategy optimization, backtesting, realtime, and live-trading endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

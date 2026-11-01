@@ -10,9 +10,9 @@ No known blocking implementation issues.
 
 ## Scope Limitations
 
-Only the dashboard is database-backed. Portfolio, scanner, history, and settings remain placeholders; market-data ingestion, Bitvavo, AI execution, paper-trade execution, scanner logic, realtime functionality, and live trading are not implemented.
+The dashboard and portfolio are database-backed. Scanner, history, and settings remain placeholders. Signal-generating scanner logic, strategy optimization, backtesting, realtime functionality, and live trading are not implemented. Paper-trading requires the Phase 08 migration and an external scheduler configured to invoke AI analysis before paper execution.
 
-The dashboard requires the Supabase environment variables and the Phase 03 schema to be available in the target environment. Live provider/database smoke testing and physical mobile-device testing must be performed separately. Chart.js and Three.js are loaded from pinned CDNs. If either library is unavailable, its visualization falls back to a visible unavailable state while database status and other dashboard data remain available.
+Dashboard and portfolio requests require valid Supabase configuration and applied migrations. Realized/unrealized P&L summaries are shown as unavailable when their bounded source queries exceed supported limits rather than returning partial sums. Live Supabase, deployed Vercel, external scheduler, and physical mobile-device smoke testing must be performed separately. Chart.js and Three.js are loaded from pinned CDNs. If either library is unavailable, its visualization falls back to a visible unavailable state while database status and other data remain available.
 
 ---
 

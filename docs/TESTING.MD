@@ -182,6 +182,22 @@ Validate:
 
 ---
 
+## Phase 08 automated coverage
+
+The Phase 08 PGlite suite executes the schema, seed, and paper-trading migrations and verifies profile-triggered €10,000 portfolio provisioning, service-role-only RPC access, decision-to-trade links, a real stored-decision BUY/SELL cycle, fee/slippage arithmetic, the 10% entry cap, insufficient funds, five-position limits, minimum entry confidence, HOLD/WAIT behavior, unique retry protection, per-market cooldown, live portfolio valuation, daily and maximum drawdown gates, and emergency-stop state changes.
+
+The scheduler/API tests verify POST-only handling, timing-safe cron authorization, mandatory `ENABLE_LIVE_TRADING=false`, server-only service-role use, no-store RPC requests, malformed/provider failure handling, metrics, and that paper execution calls only Supabase rather than an exchange endpoint. Portfolio UI tests verify real summary/position/trade rendering, safe text insertion, response validation, and authenticated no-store reads.
+
+```powershell
+node --test tests/database-migrations.test.js tests/paper-trading.test.mjs tests/portfolio.test.js tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+These are local embedded-database and mocked HTTP tests. They do not prove a remote Supabase migration was applied, a Vercel deployment succeeded, or cron-job.org has been configured.
+
+---
+
 ## Regression Testing
 
 Every completed phase must be followed by regression testing.

@@ -1,6 +1,6 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie, Phase 06 publieke Bitvavo-marktdata en Phase 07 de deterministische AI Engine.
+CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie, Phase 06 publieke Bitvavo-marktdata, Phase 07 de deterministische AI Engine en Phase 08 de risk-managed paper-trading-engine.
 
 ## Huidige status
 
@@ -10,21 +10,23 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API. De volledige dashboarddata wordt na authenticatie en daarna iedere 30 seconden ververst; bij terugkeer naar de voorgrond volgt direct een refresh. Verzoeken blijven `no-store`.
 - Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie en haalt publieke Bitvavo-tickers en candles op. `/api/market-refresh` vernieuwt alleen marktsnapshots; `/api/candle-refresh` verwerkt candles afzonderlijk, incrementeel, per interval en in batches van maximaal vijf markten. Beide processen schrijven uitsluitend naar bestaande tabellen en rapporteren runtimeduur en verwerkte records.
 - Phase 07 analyseert echte markt snapshots en candledata met EMA, RSI, MACD, momentum, volume en volatiliteit. De AI Engine leest elk candle-interval afzonderlijk zodat een globale PostgREST-responslimiet geen intervallen uitsluit. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; ontbrekende of verouderde input levert veilige `WAIT`- of lagere-confidence `HOLD`-beslissingen op.
+- Phase 08 voert uitsluitend de nieuwste, opgeslagen AI-beslissingen uit tegen verse, opgeslagen marktprijzen. Een server-only Supabase RPC serialiseert runs en voert risicocontroles, paper buys/sells, kosten, positiewaardering, portfolio-snapshots en trade-idempotency transactioneel uit. Een nieuw profiel krijgt een gesimuleerd startportfolio van €10.000; er worden geen trades verzonnen of echte orders geplaatst.
+- Dashboard en portfolio lezen echte, door RLS afgeschermde databasegegevens. De portfolio toont beschikbaar saldo, totale/gerealiseerde/ongerealiseerde/dagelijkse P&L, win rate, posities en recente trades; waarden blijven onbeschikbaar als een begrensde query geen volledige berekening ondersteunt.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met ongeveer 13% extra hoogte ten opzichte van de breedteschaal, een iets lager doorlopende onderkant, een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. Alle 720 neuronen pulseren onafhankelijk; actieve neuronen krijgen een sterkere lokale glow en maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Inactieve verbindingen blijven gedimd en lichten alleen op wanneer een signaal passeert. De visualisatie heeft geen volume, shell, fog, mesh of externe circuitsporen. Beide hersenhelften delen dezelfde statuskleur.
-- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; paper-trade-uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd. De AI Engine genereert uitsluitend analysebeslissingen en voert geen trades uit.
+- De scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; scannerlogica, strategieoptimalisatie, backtesting, realtime-functionaliteit en live trading zijn niet geïmplementeerd. De AI Engine blijft analysis-only; paper-trades worden uitsluitend door de afzonderlijke Phase 08 risk-managed executor aangemaakt.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
-- `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard; Phase 06 gebruikt geen private Bitvavo-endpoints, accountgegevens of orders.
-- Phase 07 (deterministische AI Engine) is voltooid; Phase 08 is niet gestart.
+- `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard. De paper-tradingcode gebruikt geen private Bitvavo-endpoints, exchange-accountgegevens of echte orders.
+- Phase 08 (paper trading) is voltooid; Phase 09 (Market Scanner) is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, marktdata- en AI-analyse-APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, marktdata-, AI-analyse- en paper-trading-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
 js/         Browsercode, Supabase Auth-service, dashboard rendering en Three.js Agent Brain
-lib/        Server-side sessie-, marktdata- en AI Engine-services
+lib/        Server-side sessie-, marktdata-, AI Engine- en paper-trading-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
@@ -47,13 +49,13 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-, marktdata- en AI-endpoints, beschermde rewrites, database-table/RLS-contract en behoud van de initiële marktseeds; het vereist geen schedulerconfiguratie in Vercel. `npm.cmd test` bevat ook indicator-, confidence-, besluitlogica-, AI API-, dashboard-, marktdata-, database- en authenticatietests.
+`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-, marktdata-, AI- en paper-trading-endpoints, beschermde rewrites, database-table/RLS-contract en behoud van de initiële marktseeds; het vereist geen schedulerconfiguratie in Vercel. `npm.cmd test` bevat ook indicator-, confidence-, besluitlogica-, AI API-, dashboard-, marktdata-, database- en authenticatietests, plus PGlite-risico- en paper-tradingintegratietests.
 
 Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
 
 ## Deployen
 
-Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `GET /api/market-refresh`, `GET /api/candle-refresh?interval=1m&batch=0` en `POST /api/ai-analysis` aanroepen met de `CRON_SECRET`-autorisatieheader. Plan alle candle-intervallen en batches afzonderlijk; zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) en [docs/SCHEDULING.md](./docs/SCHEDULING.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
+Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `GET /api/market-refresh`, de afzonderlijke candle-batches, `POST /api/ai-analysis` en daarna `POST /api/paper-trading` aanroepen met de `CRON_SECRET`-autorisatieheader. Plan paper trading na AI analysis; zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) en [docs/SCHEDULING.md](./docs/SCHEDULING.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
 
 ## Documentatie
 
@@ -79,4 +81,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 06 candle batching report](./docs/PHASE_06_CANDLE_BATCHING_REPORT.md)
 - [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
 - [Phase 07 completion report](./docs/PHASE_07_COMPLETION_REPORT.md)
+- [Phase 08 completion report](./docs/PHASE_08_COMPLETION_REPORT.md)
 - [Phase 07 candle query fix report](./docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)

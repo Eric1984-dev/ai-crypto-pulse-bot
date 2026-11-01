@@ -16,6 +16,9 @@ const migrationSql = migrationFiles
   .map((file) => fs.readFileSync(path.join(migrationsDirectory, file), "utf8"));
 const schemaMigration = migrationSql.find((sql) => sql.includes('CREATE TABLE public."AI_Crypto_Bot_Profiles"'));
 const seedMigration = migrationSql.find((sql) => sql.includes('INSERT INTO public."AI_Crypto_Bot_Watched_Markets"'));
+const paperTradingMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Run_Paper_Trading"')
+);
 
 async function createDatabase() {
   const { PGlite } = await import("@electric-sql/pglite");
@@ -43,6 +46,7 @@ async function createDatabase() {
   );
   await database.exec(schemaMigration);
   await database.exec(seedMigration);
+  await database.exec(paperTradingMigration);
   return database;
 }
 
@@ -53,6 +57,46 @@ async function withRole(database, role, callback) {
   } finally {
     await database.exec("RESET ROLE");
   }
+}
+
+async function getInitialPortfolio(database) {
+  const portfolio = await database.query(
+    `SELECT id FROM public."AI_Crypto_Bot_Portfolios"
+     WHERE user_id = $1 ORDER BY created_at LIMIT 1`,
+    ["10000000-0000-4000-8000-000000000001"]
+  );
+  return portfolio.rows[0].id;
+}
+
+async function setMarketPrice(database, symbol, price) {
+  await database.query(
+    `INSERT INTO public."AI_Crypto_Bot_Market_Data"
+      (symbol, price, high_24h, low_24h, captured_at)
+     VALUES ($1, $2, $2, $2, now())
+     ON CONFLICT (symbol) DO UPDATE
+       SET price = EXCLUDED.price,
+           high_24h = EXCLUDED.high_24h,
+           low_24h = EXCLUDED.low_24h,
+           captured_at = EXCLUDED.captured_at`,
+    [symbol, price]
+  );
+}
+
+async function addDecision(database, symbol, decision, confidence = 80) {
+  return database.query(
+    `INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+      (symbol, decision, confidence, reason, created_at)
+     VALUES ($1, $2, $3, 'Paper trading integration fixture', now())
+     RETURNING id`,
+    [symbol, decision, confidence]
+  );
+}
+
+async function runPaperTrading(database) {
+  const result = await database.query(
+    `SELECT public."AI_Crypto_Bot_Run_Paper_Trading"() AS result`
+  );
+  return result.rows[0].result;
 }
 
 test("database migration contract covers all prefixed tables, RLS policies, and seed configuration", () => {
@@ -96,6 +140,20 @@ test("migrations apply, backfill auth profiles, and seed repeatably", async () =
       ["10000000-0000-4000-8000-000000000001"]
     );
     assert.equal(backfilledProfile.rows[0].email, "existing@example.test");
+    const initialPortfolio = await database.query(
+      `SELECT starting_balance, available_balance, portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolios"
+       WHERE user_id = $1`,
+      ["10000000-0000-4000-8000-000000000001"]
+    );
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(initialPortfolio.rows[0]).map(([key, value]) => [key, Number(value)])),
+      {
+        starting_balance: 10000,
+        available_balance: 10000,
+        portfolio_value: 10000
+      }
+    );
 
     await database.exec(seedMigration);
     const marketsCount = await database.query(
@@ -107,9 +165,14 @@ test("migrations apply, backfill auth profiles, and seed repeatably", async () =
     const emergencyCount = await database.query(
       `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Emergency_State"`
     );
+    const initialPortfolioCount = await database.query(
+      `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Portfolios" WHERE user_id = $1`,
+      ["10000000-0000-4000-8000-000000000001"]
+    );
     assert.equal(marketsCount.rows[0].count, 5);
     assert.equal(statusCount.rows[0].count, 1);
     assert.equal(emergencyCount.rows[0].count, 1);
+    assert.equal(initialPortfolioCount.rows[0].count, 1);
   } finally {
     await database.close();
   }
@@ -183,6 +246,11 @@ test("Supabase Auth inserts provision profiles and synchronize email changes", a
       [userId]
     );
     assert.equal(profile.rows[0].email, "updated@example.test");
+    const portfolio = await database.query(
+      `SELECT starting_balance FROM public."AI_Crypto_Bot_Portfolios" WHERE user_id = $1`,
+      [userId]
+    );
+    assert.equal(Number(portfolio.rows[0].starting_balance), 10000);
   } finally {
     await database.close();
   }
@@ -236,6 +304,10 @@ test("authenticated reads are scoped to portfolio ownership while shared data is
     const ownerPortfolioId = "30000000-0000-4000-8000-000000000003";
     const otherPortfolioId = "40000000-0000-4000-8000-000000000004";
     await database.query("INSERT INTO auth.users (id, email) VALUES ($1, $2)", [otherId, "other@example.test"]);
+    await database.query(
+      `DELETE FROM public."AI_Crypto_Bot_Portfolios" WHERE user_id IN ($1, $2)`,
+      [ownerId, otherId]
+    );
     await database.query(
       `INSERT INTO public."AI_Crypto_Bot_Portfolios"
         (id, user_id, starting_balance, available_balance, portfolio_value)
@@ -388,6 +460,358 @@ test("database constraints reject invalid trade, candle, and decision records", 
       database.query(strategyChange, [strategyId, changeKey]),
       { code: "23505" }
     );
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper-trading RPC is service-role-only and internal execution functions stay private", async () => {
+  const database = await createDatabase();
+  try {
+    await assert.rejects(
+      withRole(database, "authenticated", () =>
+        database.query(`SELECT public."AI_Crypto_Bot_Run_Paper_Trading"()`)
+      ),
+      { code: "42501" }
+    );
+    await withRole(database, "service_role", () =>
+      database.query(`SELECT public."AI_Crypto_Bot_Run_Paper_Trading"()`)
+    );
+    await assert.rejects(
+      withRole(database, "service_role", () =>
+        database.query(
+          `SELECT public."AI_Crypto_Bot_Apply_Paper_Decision"(
+            gen_random_uuid(),
+            gen_random_uuid()
+          )`
+        )
+      ),
+      { code: "42501" }
+    );
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading buys from a stored confident AI decision with bounded fees and slippage", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    const decision = await addDecision(database, "BTC-EUR", "BUY", 80);
+
+    const result = await runPaperTrading(database);
+    const trade = await database.query(
+      `SELECT side, ai_decision_id, price, quantity, fees, slippage
+       FROM public."AI_Crypto_Bot_Trades"
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    const position = await database.query(
+      `SELECT status, amount, entry_price, current_price, unrealized_pnl
+       FROM public."AI_Crypto_Bot_Positions"
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    const portfolio = await database.query(
+      `SELECT available_balance, portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolios"
+       WHERE id = $1`,
+      [portfolioId]
+    );
+
+    assert.equal(result.tradesExecuted, 1);
+    assert.equal(trade.rows.length, 1);
+    assert.equal(trade.rows[0].side, "BUY");
+    assert.equal(trade.rows[0].ai_decision_id, decision.rows[0].id);
+    assert.ok(Number(trade.rows[0].price) > 100);
+    assert.ok(Math.abs(Number(trade.rows[0].fees) - 2.5) < 0.000001);
+    assert.ok(Math.abs(Number(trade.rows[0].slippage) - 0.999001) < 0.000001);
+    assert.equal(position.rows[0].status, "OPEN");
+    assert.ok(Number(position.rows[0].amount) > 0);
+    assert.ok(Number(position.rows[0].amount) * Number(trade.rows[0].price) <= 1000.000001);
+    assert.ok(Number(position.rows[0].entry_price) > Number(trade.rows[0].price));
+    assert.ok(Number(position.rows[0].unrealized_pnl) < 0);
+    assert.ok(
+      Math.abs(
+        Number(portfolio.rows[0].portfolio_value)
+          - (Number(portfolio.rows[0].available_balance)
+            + Number(position.rows[0].amount) * Number(position.rows[0].current_price))
+      ) < 0.000001
+    );
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading retries are idempotent and HOLD or WAIT decisions never trade", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await setMarketPrice(database, "ETH-EUR", 50);
+    await setMarketPrice(database, "SOL-EUR", 20);
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+
+    const firstRun = await runPaperTrading(database);
+    const duplicateRun = await runPaperTrading(database);
+    assert.equal(firstRun.tradesExecuted, 1);
+    assert.equal(duplicateRun.tradesExecuted, 0);
+    assert.equal(duplicateRun.duplicates, 1);
+
+    await addDecision(database, "BTC-EUR", "WAIT", 95);
+    await addDecision(database, "ETH-EUR", "HOLD", 95);
+    await addDecision(database, "SOL-EUR", "BUY", 69);
+    const noTradeRun = await runPaperTrading(database);
+    const trades = await database.query(
+      `SELECT count(*)::integer AS count
+       FROM public."AI_Crypto_Bot_Trades"
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    assert.equal(noTradeRun.tradesExecuted, 0);
+    assert.equal(trades.rows[0].count, 1);
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper SELL closes positions and records realized P&L, fees, and slippage", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+    await runPaperTrading(database);
+
+    await setMarketPrice(database, "BTC-EUR", 110);
+    await addDecision(database, "BTC-EUR", "SELL", 80);
+    const result = await runPaperTrading(database);
+    const position = await database.query(
+      `SELECT status, unrealized_pnl
+       FROM public."AI_Crypto_Bot_Positions"
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    const sellTrade = await database.query(
+      `SELECT side, price, fees, slippage, realized_pnl
+       FROM public."AI_Crypto_Bot_Trades"
+       WHERE portfolio_id = $1 AND side = 'SELL'`,
+      [portfolioId]
+    );
+    const portfolio = await database.query(
+      `SELECT available_balance, portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolios"
+       WHERE id = $1`,
+      [portfolioId]
+    );
+
+    assert.equal(result.tradesExecuted, 1);
+    assert.equal(position.rows[0].status, "CLOSED");
+    assert.equal(Number(position.rows[0].unrealized_pnl), 0);
+    assert.equal(sellTrade.rows[0].side, "SELL");
+    assert.ok(Number(sellTrade.rows[0].price) < 110);
+    assert.ok(Number(sellTrade.rows[0].fees) > 0);
+    assert.ok(Number(sellTrade.rows[0].slippage) > 0);
+    assert.ok(Number(sellTrade.rows[0].realized_pnl) > 0);
+    assert.ok(Number(portfolio.rows[0].available_balance) > 10000);
+    assert.equal(portfolio.rows[0].portfolio_value, portfolio.rows[0].available_balance);
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading blocks entries with insufficient funds and enforces the open-position limit", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Portfolios"
+       SET available_balance = 0.000000000001
+       WHERE id = $1`,
+      [portfolioId]
+    );
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Positions"
+        (portfolio_id, symbol, amount, entry_price, current_price)
+       VALUES ($1, 'ETH-EUR', 99.999999, 100, 100)`,
+      [portfolioId]
+    );
+    await setMarketPrice(database, "ETH-EUR", 100);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+
+    const insufficientFunds = await runPaperTrading(database);
+    assert.equal(insufficientFunds.tradesExecuted, 0);
+    let trades = await database.query(
+      `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Trades" WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    assert.equal(trades.rows[0].count, 0);
+
+    const symbols = ["ETH-EUR", "SOL-EUR", "XRP-EUR", "ADA-EUR", "DOGE-EUR"];
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Watched_Markets" (symbol, enabled, priority)
+       VALUES ('DOGE-EUR', true, 6)`
+    );
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Portfolios"
+       SET available_balance = 10000, portfolio_value = 10000
+       WHERE id = $1`,
+      [portfolioId]
+    );
+    for (const symbol of symbols) {
+      await setMarketPrice(database, symbol, 100);
+    }
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Positions"
+        (portfolio_id, symbol, amount, entry_price, current_price)
+       VALUES
+        ($1, 'SOL-EUR', 1, 100, 100),
+        ($1, 'XRP-EUR', 1, 100, 100),
+        ($1, 'ADA-EUR', 1, 100, 100),
+        ($1, 'DOGE-EUR', 1, 100, 100)`,
+      [portfolioId]
+    );
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+    const maxPositions = await runPaperTrading(database);
+    trades = await database.query(
+      `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Trades" WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    assert.equal(maxPositions.tradesExecuted, 0);
+    assert.equal(trades.rows[0].count, 0);
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading enforces the per-market cooldown and refreshes portfolio valuation", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+    await runPaperTrading(database);
+
+    await setMarketPrice(database, "BTC-EUR", 105);
+    await addDecision(database, "BTC-EUR", "SELL", 80);
+    await runPaperTrading(database);
+    await addDecision(database, "BTC-EUR", "BUY", 90);
+    const cooldown = await runPaperTrading(database);
+    const openPositions = await database.query(
+      `SELECT count(*)::integer AS count
+       FROM public."AI_Crypto_Bot_Positions"
+       WHERE portfolio_id = $1 AND status = 'OPEN'`,
+      [portfolioId]
+    );
+    const portfolio = await database.query(
+      `SELECT portfolio_value, available_balance
+       FROM public."AI_Crypto_Bot_Portfolios"
+       WHERE id = $1`,
+      [portfolioId]
+    );
+    const latestSnapshot = await database.query(
+      `SELECT portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+       WHERE portfolio_id = $1
+       ORDER BY captured_at DESC, id DESC
+       LIMIT 1`,
+      [portfolioId]
+    );
+
+    assert.equal(cooldown.tradesExecuted, 0);
+    assert.equal(openPositions.rows[0].count, 0);
+    assert.ok(Number(portfolio.rows[0].available_balance) > 10000);
+    assert.equal(portfolio.rows[0].portfolio_value, latestSnapshot.rows[0].portfolio_value);
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading enforces daily and maximum drawdown limits and activates the emergency stop", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Portfolio_Snapshots"
+       SET captured_at = now() - INTERVAL '1 day'
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Portfolios"
+       SET available_balance = 0
+       WHERE id = $1`,
+      [portfolioId]
+    );
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Positions"
+        (portfolio_id, symbol, amount, entry_price, current_price)
+       VALUES ($1, 'ETH-EUR', 100, 100, 100)`,
+      [portfolioId]
+    );
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await setMarketPrice(database, "ETH-EUR", 94);
+    const decision = await addDecision(database, "BTC-EUR", "BUY", 90);
+
+    await database.query(
+      `SELECT public."AI_Crypto_Bot_Refresh_Paper_Portfolio"($1)`,
+      [portfolioId]
+    );
+    let result = await database.query(
+      `SELECT public."AI_Crypto_Bot_Apply_Paper_Decision"($1, $2) AS result`,
+      [portfolioId, decision.rows[0].id]
+    );
+    assert.equal(result.rows[0].result.status, "DAILY_DRAWDOWN_LIMIT");
+
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Portfolio_Snapshots"
+       SET portfolio_value = 8800
+       WHERE id = (
+         SELECT id
+         FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+         WHERE portfolio_id = $1
+         ORDER BY captured_at, id
+         LIMIT 1
+       )`,
+      [portfolioId]
+    );
+    await setMarketPrice(database, "ETH-EUR", 84);
+    await database.query(
+      `SELECT public."AI_Crypto_Bot_Refresh_Paper_Portfolio"($1)`,
+      [portfolioId]
+    );
+    result = await database.query(
+      `SELECT public."AI_Crypto_Bot_Apply_Paper_Decision"($1, $2) AS result`,
+      [portfolioId, decision.rows[0].id]
+    );
+    assert.equal(result.rows[0].result.status, "MAX_DRAWDOWN_LIMIT");
+
+    await setMarketPrice(database, "ETH-EUR", 79);
+    await database.query(
+      `SELECT public."AI_Crypto_Bot_Refresh_Paper_Portfolio"($1)`,
+      [portfolioId]
+    );
+    result = await database.query(
+      `SELECT public."AI_Crypto_Bot_Apply_Paper_Decision"($1, $2) AS result`,
+      [portfolioId, decision.rows[0].id]
+    );
+    const emergency = await database.query(
+      `SELECT status FROM public."AI_Crypto_Bot_Emergency_State"
+       ORDER BY created_at DESC, id DESC LIMIT 1`
+    );
+    const agentStatus = await database.query(
+      `SELECT status, is_active, is_analyzing
+       FROM public."AI_Crypto_Bot_Status" WHERE singleton`
+    );
+    assert.equal(result.rows[0].result.status, "TRADING_PAUSED");
+    assert.equal(emergency.rows[0].status, "EMERGENCY_STOP");
+    assert.deepEqual(agentStatus.rows[0], {
+      status: "STOPPED",
+      is_active: false,
+      is_analyzing: false
+    });
   } finally {
     await database.close();
   }

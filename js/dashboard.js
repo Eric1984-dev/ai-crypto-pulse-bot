@@ -27,6 +27,8 @@
         count: 0,
         portfolioValue: null,
         totalPnl: null,
+        realizedPnl: null,
+        unrealizedPnl: null,
         dailyPnl: null,
         availableBalance: null,
         winRate: null
@@ -142,6 +144,8 @@
 
     setText(documentRef, "portfolioValue", formatCurrency(portfolio.portfolioValue));
     setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl));
+    setText(documentRef, "realizedPnl", formatCurrency(portfolio.realizedPnl));
+    setText(documentRef, "unrealizedPnl", formatCurrency(portfolio.unrealizedPnl));
     setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl));
     setText(documentRef, "winRate", formatPercent(portfolio.winRate));
     setText(documentRef, "openPositions", formatCount(openPositions.count));

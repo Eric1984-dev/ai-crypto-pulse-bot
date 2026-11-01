@@ -36,6 +36,21 @@ It requires `Authorization: Bearer <CRON_SECRET>` and the Supabase server enviro
 
 The endpoint skips runs when the existing agent status is `STOPPED` or `ANALYZING`, and stores decisions only in the existing AI decision table. It does not execute trades or modify portfolios. Scheduler cadence is an operator choice; monitor HTTP responses and `AI_Crypto_Bot_Status` after configuring it.
 
+## Phase 08 paper-trading execution
+
+After `/api/ai-analysis` has returned success, invoke:
+
+```text
+POST /api/paper-trading
+Authorization: Bearer <CRON_SECRET>
+```
+
+Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and `ENABLE_LIVE_TRADING=false` in Vercel's server environment. The endpoint accepts no body. Keep the cron secret in protected scheduler-header settings, never in the URL or task name. No Vercel Cron configuration is required, so this also works on Vercel Hobby.
+
+Schedule the paper-trading request only after the AI-analysis request completes; do not run them concurrently. Use the same cadence as AI analysis (five minutes is a suitable example when analysis runs every five minutes). The database processes only the newest stored decision per enabled market, serializes overlapping paper jobs, and makes repeated requests idempotent. Running more often does not create repeat trades for the same decision.
+
+Inspect the JSON status and the `paperTradingDurationMs`, `portfoliosProcessed`, `decisionsProcessed`, `tradesExecuted`, `duplicates`, and `skipped` metrics. A skipped run may indicate that analysis is still in progress or another paper-trading invocation holds the database lock. The 15-minute freshness check, confidence/risk checks, and per-market cooldown are enforced in the database. No private Bitvavo endpoint, account credential, or real order is used.
+
 ## Future scheduled work
 
-Market scanning, portfolio refresh, strategy evaluation, and market ranking remain unimplemented. Future scheduled jobs must be idempotent, retry-safe, and duplicate-safe. Duplicate executions may never create duplicate trades or strategy changes. Vercel Cron Jobs, external schedulers, and scheduled functions are possible execution providers; the application endpoint should remain scheduler-independent.
+Market scanning, portfolio strategy evaluation, market ranking, backtesting, and live trading remain unimplemented. Future scheduled jobs must be idempotent, retry-safe, and duplicate-safe. Duplicate executions may never create duplicate trades or strategy changes. Vercel Cron Jobs, external schedulers, and scheduled functions are possible execution providers; the application endpoint should remain scheduler-independent.

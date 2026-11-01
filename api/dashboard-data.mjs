@@ -14,7 +14,8 @@ const limits = Object.freeze({
   markets: 8,
   decisions: 5,
   snapshots: 100,
-  dailyTrades: 1000
+  dailyTrades: 1000,
+  realizedTrades: 1000
 });
 
 export function createHandler({
@@ -108,7 +109,7 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     aiDecisions,
     portfolioSnapshots,
     dailySellTrades,
-    sellTradeCount,
+    realizedSellTrades,
     winningSellTradeCount
   ] = await Promise.all([
     fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Status", {
@@ -159,7 +160,12 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
       order: "created_at.asc",
       limit: String(limits.dailyTrades)
     }, true),
-    fetchCount(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", { side: "eq.SELL" }),
+    fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
+      select: "realized_pnl",
+      side: "eq.SELL",
+      order: "created_at.desc",
+      limit: String(limits.realizedTrades)
+    }, true),
     fetchCount(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
       side: "eq.SELL",
       realized_pnl: "gt.0"
@@ -172,8 +178,9 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
 
   const portfolioSummary = createPortfolioSummary(
     portfolios.rows,
+    openPositions,
     dailySellTrades,
-    sellTradeCount,
+    realizedSellTrades,
     winningSellTradeCount
   );
 
@@ -202,19 +209,37 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
   };
 }
 
-function createPortfolioSummary(portfolios, dailySellTrades, sellTradeCount, winningSellTradeCount) {
+function createPortfolioSummary(
+  portfolios,
+  openPositions,
+  dailySellTrades,
+  realizedSellTrades,
+  winningSellTradeCount
+) {
+  const realizedPnl = realizedSellTrades.count > realizedSellTrades.rows.length
+    ? null
+    : sumNumericRows(realizedSellTrades.rows, "realized_pnl");
+  const unrealizedPnl = openPositions.count > openPositions.rows.length
+    ? null
+    : sumNumericRows(openPositions.rows, "unrealized_pnl");
+
   if (!portfolios.length) {
     return {
       count: 0,
       portfolioValue: null,
       totalPnl: null,
       availableBalance: null,
+      realizedPnl,
+      realizedPnlTradeCount: realizedSellTrades.count,
+      unrealizedPnl,
       dailyPnl: dailySellTrades.count > dailySellTrades.rows.length
         ? null
         : sumNumericRows(dailySellTrades.rows, "realized_pnl"),
       dailyPnlTradeCount: dailySellTrades.count,
-      winRate: sellTradeCount > 0 ? winningSellTradeCount / sellTradeCount * 100 : null,
-      winRateTradeCount: sellTradeCount
+      winRate: realizedSellTrades.count > 0
+        ? winningSellTradeCount / realizedSellTrades.count * 100
+        : null,
+      winRateTradeCount: realizedSellTrades.count
     };
   }
 
@@ -225,12 +250,17 @@ function createPortfolioSummary(portfolios, dailySellTrades, sellTradeCount, win
     portfolioValue,
     totalPnl: portfolioValue - startingBalance,
     availableBalance: sumNumericRows(portfolios, "available_balance"),
+    realizedPnl,
+    realizedPnlTradeCount: realizedSellTrades.count,
+    unrealizedPnl,
     dailyPnl: dailySellTrades.count > dailySellTrades.rows.length
       ? null
       : sumNumericRows(dailySellTrades.rows, "realized_pnl"),
     dailyPnlTradeCount: dailySellTrades.count,
-    winRate: sellTradeCount > 0 ? winningSellTradeCount / sellTradeCount * 100 : null,
-    winRateTradeCount: sellTradeCount
+    winRate: realizedSellTrades.count > 0
+      ? winningSellTradeCount / realizedSellTrades.count * 100
+      : null,
+    winRateTradeCount: realizedSellTrades.count
   };
 }
 

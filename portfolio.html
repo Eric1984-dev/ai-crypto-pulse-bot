@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CryptoPulse portfolio placeholder.">
+    <meta name="description" content="CryptoPulse simulated portfolio, positions and paper-trade history.">
     <title>Portfolio · CryptoPulse</title>
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/portfolio.js" defer></script>
   </head>
   <body data-auth-page="protected">
     <header class="site-header">
@@ -25,15 +26,77 @@
         </nav>
       </div>
     </header>
-    <main class="page-shell">
+    <main class="page-shell" data-portfolio-page>
       <p data-auth-message role="status" aria-live="polite"></p>
-      <p class="eyebrow">Simulatie</p>
-      <h1>Portfolio</h1>
-      <p class="page-description">Deze pagina is een placeholder voor de toekomstige gesimuleerde portfolio- en positieweergave.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alleen simulatie; portfoliofunctionaliteit is nog niet geïmplementeerd.</span></div>
-      <section class="placeholder-card" aria-labelledby="portfolio-placeholder">
-        <h2 id="portfolio-placeholder">Portfolio placeholder</h2>
-        <p class="card-description">Er is nog geen saldo, positie- of winst/verliesberekening beschikbaar in Phase 01.</p>
+      <div class="mode-banner">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <strong>PAPER ACTIVE</strong>
+        <span>Alle bedragen zijn gesimuleerd. Dit systeem plaatst geen echte orders.</span>
+      </div>
+      <p class="eyebrow">Portfolio</p>
+      <h1>Paper portfolio</h1>
+      <p class="page-description">Waarden, posities en trades zijn gebaseerd op opgeslagen AI-beslissingen en marktgegevens.</p>
+      <p data-portfolio-loading role="status" aria-live="polite">Portfolio laden…</p>
+      <div class="dashboard-error" data-portfolio-error role="alert" hidden></div>
+      <button class="dashboard-retry" data-portfolio-retry type="button" hidden>Opnieuw proberen</button>
+
+      <section class="dashboard-section" aria-labelledby="portfolio-summary-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Gesimuleerd saldo</p>
+            <h2 id="portfolio-summary-heading">Portfolio summary</h2>
+          </div>
+          <span class="dashboard-muted"><span data-portfolio-value="count">—</span> portfolios</span>
+        </div>
+        <dl class="dashboard-metrics">
+          <div class="metric-card metric-card-primary">
+            <dt>Portfolio Value</dt>
+            <dd data-portfolio-value="portfolioValue">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Available Balance</dt>
+            <dd data-portfolio-value="availableBalance">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Total P&amp;L</dt>
+            <dd data-portfolio-value="totalPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Realized P&amp;L</dt>
+            <dd data-portfolio-value="realizedPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Unrealized P&amp;L</dt>
+            <dd data-portfolio-value="unrealizedPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Daily P&amp;L <span class="metric-detail">(realized, UTC)</span></dt>
+            <dd data-portfolio-value="dailyPnl">—</dd>
+          </div>
+          <div class="metric-card">
+            <dt>Win Rate <span class="metric-detail">(closed paper trades)</span></dt>
+            <dd data-portfolio-value="winRate">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid-lists" aria-label="Paper portfolio activity">
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Actief</p><h2>Open Positions</h2></div>
+            <span class="count-pill" data-portfolio-value="openPositions">0</span>
+          </div>
+          <ul class="dashboard-list" data-portfolio-list="positions" hidden></ul>
+          <p class="dashboard-empty" data-portfolio-empty="positions">No open positions.</p>
+        </article>
+        <article class="dashboard-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Uitvoering</p><h2>Recent Paper Trades</h2></div>
+            <span class="count-pill" data-portfolio-value="paperTrades">0</span>
+          </div>
+          <ul class="dashboard-list" data-portfolio-list="trades" hidden></ul>
+          <p class="dashboard-empty" data-portfolio-empty="trades">No paper trades recorded.</p>
+        </article>
       </section>
     </main>
     <footer class="site-footer">

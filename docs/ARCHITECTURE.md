@@ -1,6 +1,6 @@
 # Architecture
 
-## Current Implementation: Phase 07
+## Current Implementation: Phase 08
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies. Phase 07 adds a server-side deterministic analysis engine using the existing Phase 06 market data.
 
@@ -32,6 +32,11 @@ Implemented components:
 - Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
 - Independent bounded PostgREST candle reads for every supported interval, preventing global row caps from excluding later timeframes
 - Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
+- Scheduler-protected Phase 08 paper-trading endpoint backed by service-role-only PostgreSQL functions
+- Stored-decision trade audit links, deterministic idempotency, transaction/advisory locks, and real portfolio snapshots
+- €10,000 simulated portfolio provisioning for existing/new profiles without existing portfolios
+- Database-enforced position sizing, confidence, cooldown, funds, drawdown, and emergency-stop controls
+- Dashboard realized/unrealized P&L summaries and an authenticated portfolio view sourced from persisted rows
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.
 
@@ -39,7 +44,6 @@ The following capabilities are not implemented:
 
 - Realtime functionality
 - Signal-generating Market Scanner
-- Paper-trade execution
 - Backtesting
 - Strategy Optimization
 - Live Trading
@@ -47,6 +51,8 @@ The following capabilities are not implemented:
 Current platform status:
 
 PAPER ACTIVE
+
+Phase 08 is complete; Phase 09 has not started. The AI Engine remains analysis-only; the separate paper executor applies the Risk Manager to its stored decisions.
 
 ---
 
@@ -326,7 +332,27 @@ Stored data:
 - Reason
 - Decision
 
-Phase 07 ends at decision persistence and dashboard display. Risk management and paper-trade execution remain future functionality; this engine never writes portfolio, position, or trade records.
+Phase 07 ends at decision persistence and dashboard display. The AI Engine never writes portfolio, position, or trade records; Phase 08 consumes its stored decisions through a separate risk-managed executor.
+
+---
+
+# Phase 08 Paper Trading Flow
+
+Stored AI Decisions + Stored Market Snapshots
+↓
+Scheduler-authenticated `/api/paper-trading`
+↓
+Database advisory lock and per-portfolio row lock
+↓
+Freshness, confidence, position, cooldown, balance, drawdown, and emergency checks
+↓
+Simulated BUY/SELL with stored fees, slippage, and source decision ID
+↓
+Position, trade, portfolio balance/value, and snapshot writes in one transaction
+
+BUY opens long positions only; SELL closes existing positions; HOLD and WAIT do not trade. The executor does not contact Bitvavo or any exchange and cannot place a real order. The service role is used only server-side. The database migration grants the scheduler RPC to `service_role` and revokes execution of its internal helpers from browser roles.
+
+Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than five open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
 
 ---
 
@@ -537,8 +563,9 @@ Examples:
 - /api/trades
 - /api/scan
 - /api/analyze
+- /api/paper-trading
 
-`GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, and up to 100 real portfolio snapshots. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC, and win rate is the share of profitable SELL trades across visible trade history.
+`GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard and portfolio view. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, and up to 100 real portfolio snapshots. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC; realized/unrealized totals are `null` when their bounded source queries are incomplete. Win rate is the share of profitable SELL trades across visible trade history.
 
 `GET /api/agent-status` is an authenticated read-only endpoint for the Agent Brain. It reads a single status row and returns a supported status or `null` when no valid row exists. It uses the public anon key plus the verified user's JWT and never writes to the database.
 

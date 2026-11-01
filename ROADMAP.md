@@ -100,15 +100,23 @@ Status: Completed
 
 Status: Completed
 
-The AI Engine is analysis-only. It does not create trades, mutate portfolios, or start Phase 08 paper trading.
+The AI Engine is analysis-only. It does not create trades or mutate portfolios; Phase 08 consumes its stored decisions through a separate risk-managed executor.
 
 ---
 
 ## Phase 08 - Paper Trading
 
-- Paper Buy
-- Paper Sell
-- Position Management
+- [x] Gesimuleerd startportfolio van €10.000 per profiel en portfolio-snapshots
+- [x] Paper Buy en Paper Sell op basis van opgeslagen AI-beslissingen en verse marktdata
+- [x] Transactionele risk manager met positie-, confidence-, cooldown- en drawdownlimieten
+- [x] Fee-, slippage-, P&L-, waarderings- en win-rateberekeningen
+- [x] Idempotente scheduler-API en auditlink tussen trade en AI-beslissing
+- [x] Dashboard- en portfoliopagina gekoppeld aan echte RLS-afgeschermde gegevens
+- [x] Database-, API-, UI-, risicoregressietests en documentatie
+
+Status: Completed
+
+Phase 08 gebruikt uitsluitend paper trading; Phase 09 is niet gestart. De code gebruikt geen private exchange-endpoints, exchange-accounts of echte orders.
 
 ---
 

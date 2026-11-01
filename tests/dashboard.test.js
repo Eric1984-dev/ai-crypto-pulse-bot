@@ -128,6 +128,9 @@ function createSupabaseFetch({ rows = buildDashboardRows(), failTable = null, ca
     const isDailySellQuery = table === "AI_Crypto_Bot_Trades"
       && select === "realized_pnl"
       && query.has("created_at");
+    const isRealizedSellQuery = table === "AI_Crypto_Bot_Trades"
+      && select === "realized_pnl"
+      && !query.has("created_at");
     const isWinningSellCount = table === "AI_Crypto_Bot_Trades"
       && select === "id"
       && query.get("realized_pnl") === "gt.0";
@@ -143,6 +146,9 @@ function createSupabaseFetch({ rows = buildDashboardRows(), failTable = null, ca
         { realized_pnl: "25" },
         { realized_pnl: "-5" }
       ];
+      exactCount = responseRows.length;
+    } else if (isRealizedSellQuery) {
+      responseRows = tableRows.map(({ realized_pnl }) => ({ realized_pnl }));
       exactCount = responseRows.length;
     } else if (isWinningSellCount) {
       responseRows = [];
@@ -205,6 +211,9 @@ test("authenticated dashboard API returns real table data and computed summaries
     count: 1,
     portfolioValue: 1100,
     totalPnl: 100,
+    realizedPnl: 20,
+    realizedPnlTradeCount: 2,
+    unrealizedPnl: 100,
     availableBalance: 800,
     dailyPnl: 20,
     dailyPnlTradeCount: 2,
@@ -309,6 +318,8 @@ function createDashboardDocument() {
   const selectors = [
     "[data-dashboard-value=\"portfolioValue\"]",
     "[data-dashboard-value=\"totalPnl\"]",
+    "[data-dashboard-value=\"realizedPnl\"]",
+    "[data-dashboard-value=\"unrealizedPnl\"]",
     "[data-dashboard-value=\"dailyPnl\"]",
     "[data-dashboard-value=\"winRate\"]",
     "[data-dashboard-value=\"openPositions\"]",
@@ -382,6 +393,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
       count: 1,
       portfolioValue: 1100,
       totalPnl: 100,
+      realizedPnl: 20,
+      unrealizedPnl: 100,
       dailyPnl: 20,
       availableBalance: 800,
       winRate: 50
