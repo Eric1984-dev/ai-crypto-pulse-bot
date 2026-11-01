@@ -42,6 +42,7 @@ function createHarness({
   tickers = [validTicker],
   candleRows = [],
   providerError = null,
+  failRead = null,
   failMarketDataWrite = false,
   failCandleInterval = null,
   failCandleIntervalStatus = 503,
@@ -133,6 +134,12 @@ function createHarness({
         }
       }
       return jsonResponse({}, 201);
+    }
+    if (typeof failRead === "function") {
+      const failure = failRead({ table, url, options });
+      if (failure) {
+        return failure.response || jsonResponse(failure.body || {}, failure.status || 500);
+      }
     }
     const symbolFilter = url.searchParams.get("symbol");
     let rows = database[table];
@@ -436,6 +443,113 @@ test("market summary endpoint returns active and data-bearing market counts", as
     marketsWithData: 3,
     items: [],
     scanner: { timeframes: { "24h": { aiOpportunities: [] } } }
+  });
+});
+
+test("scanner read diagnostics identify permission failures, schema failures, and malformed responses", async () => {
+  const cases = [
+    {
+      name: "RLS/permission rejection",
+      query: "AI_Crypto_Bot_Candles",
+      matches: ({ url }) => url.searchParams.get("interval") === "eq.1d",
+      failure: { status: 403, body: { code: "42501" } },
+      expected: { queryName: "scanner.daily-candles", failureKind: "RLS_OR_PERMISSION", httpStatus: 403 }
+    },
+    {
+      name: "schema mismatch",
+      query: "AI_Crypto_Bot_AI_Decisions",
+      matches: () => true,
+      failure: { status: 404, body: { code: "PGRST205" } },
+      expected: { queryName: "scanner.ai-decisions", failureKind: "SCHEMA_MISMATCH", httpStatus: 404 }
+    },
+    {
+      name: "malformed successful response",
+      query: "AI_Crypto_Bot_Candles",
+      matches: ({ url }) => url.searchParams.get("interval") === "eq.1h",
+      failure: {
+        response: {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: [] })
+        }
+      },
+      expected: { queryName: "scanner.hourly-candles", failureKind: "MALFORMED_RESPONSE", httpStatus: 200 }
+    }
+  ];
+
+  for (const entry of cases) {
+    const { service } = createHarness({
+      failRead({ table, url }) {
+        if (table === entry.query && entry.matches({ url })) {
+          return entry.failure;
+        }
+        return null;
+      }
+    });
+    await assert.rejects(
+      service.getMarketScannerSummary({
+        config,
+        accessToken: "user-jwt",
+        serviceRoleKey,
+        activeMarkets: [watchedMarket],
+        marketData: []
+      }),
+      (error) => {
+        assert.equal(error.code, "STORAGE_UNAVAILABLE", entry.name);
+        assert.deepEqual({
+          queryName: error.queryName,
+          failureKind: error.failureKind,
+          httpStatus: error.httpStatus
+        }, entry.expected, entry.name);
+        return true;
+      }
+    );
+  }
+});
+
+test("summary endpoint includes diagnostics only in development responses", async () => {
+  const storageError = Object.assign(new Error("internal database details"), {
+    code: "STORAGE_UNAVAILABLE",
+    queryName: "scanner.daily-candles",
+    failureKind: "RLS_OR_PERMISSION",
+    httpStatus: 403,
+    databaseCode: "42501"
+  });
+  const service = {
+    async getMarketSummary() {
+      throw storageError;
+    }
+  };
+  const options = {
+    SUPABASE_URL: config.supabaseUrl,
+    SUPABASE_ANON_KEY: config.supabaseAnonKey
+  };
+  const createHandler = (nodeEnv) => createMarketSummaryHandler({
+    env: { ...options, NODE_ENV: nodeEnv },
+    verify: async () => true,
+    service,
+    logger: { error() {} }
+  });
+  const development = responseCapture();
+  await createHandler("development")(authenticatedRequest("/api/market-summary"), development);
+  const developmentBody = JSON.parse(development.body);
+  assert.equal(development.statusCode, 503);
+  assert.deepEqual(developmentBody.error.diagnostics, {
+    queryName: "scanner.daily-candles",
+    failureKind: "RLS_OR_PERMISSION",
+    httpStatus: 403,
+    databaseCode: "42501"
+  });
+  assert.doesNotMatch(development.body, /internal database details/);
+
+  const production = responseCapture();
+  await createHandler("production")(authenticatedRequest("/api/market-summary"), production);
+  assert.equal(production.statusCode, 503);
+  assert.deepEqual(JSON.parse(production.body), {
+    error: {
+      code: "MARKET_DATA_UNAVAILABLE",
+      message: "Stored market data is temporarily unavailable."
+    }
   });
 });
 

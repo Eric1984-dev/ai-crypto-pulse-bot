@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Temporary development-only market-summary read diagnostics identify the failed query and classify RLS/permission, schema, malformed-response, network, and database failures; production error responses remain generic
 - Phase 09 market scanner rankings for gainers, losers, estimated quote volume, momentum, and recent stored AI opportunities across 24h, 7d, and 30d
 - Scanner ranking and API pagination regression tests for empty and large datasets, plus responsive scanner UI and dashboard preview using the existing market-summary endpoint
 - Phase 09 completion report documenting ranking methodology, data sources, function-count verification, and limitations
