@@ -161,7 +161,7 @@ Invalid interval/batch input: `400`; missing cron authorization: `401`; missing 
 
 ### POST /api/ai-analysis
 
-Runs deterministic analysis over enabled rows in `AI_Crypto_Bot_Watched_Markets`, using only persisted `AI_Crypto_Bot_Market_Data` snapshots and `AI_Crypto_Bot_Candles`. It stores one decision per analyzed market in `AI_Crypto_Bot_AI_Decisions` and updates the existing singleton `AI_Crypto_Bot_Status`. It uses EMA, RSI, MACD, momentum, volume, and volatility indicators. The existing dashboard reads and renders the stored decisions.
+Runs deterministic analysis over enabled rows in `AI_Crypto_Bot_Watched_Markets`, using only persisted `AI_Crypto_Bot_Market_Data` snapshots and `AI_Crypto_Bot_Candles`. Candle rows are queried separately for each supported interval, with a per-interval limit, so a global PostgREST response cap cannot starve later intervals. It stores one decision per analyzed market in `AI_Crypto_Bot_AI_Decisions` and updates the existing singleton `AI_Crypto_Bot_Status`. It uses EMA, RSI, MACD, momentum, volume, and volatility indicators. The existing dashboard reads and renders the stored decisions.
 
 This server-to-server endpoint requires `Authorization: Bearer <CRON_SECRET>` and `POST`; the request has no body. A configured `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY` are also required. No service-role key or raw database error is returned. An external scheduler may invoke the endpoint; no Vercel Cron schedule is required.
 

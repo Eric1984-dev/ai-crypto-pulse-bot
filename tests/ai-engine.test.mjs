@@ -63,6 +63,7 @@ function createEngineHarness({
   markets = [activeMarket],
   marketData = [createSnapshot()],
   candles = buildCandles(),
+  postgrestMaxRows = 1000,
   failReadTable = null,
   logger = { info() {}, error() {} }
 } = {}) {
@@ -91,7 +92,31 @@ function createEngineHarness({
       if (table === "AI_Crypto_Bot_Candles") {
         const symbolFilter = url.searchParams.get("symbol");
         const symbol = symbolFilter?.startsWith("eq.") ? symbolFilter.slice(3) : null;
-        return jsonResponse(candles.filter((candle) => !symbol || candle.symbol === symbol));
+        const intervalFilter = url.searchParams.get("interval");
+        const intervals = intervalFilter?.startsWith("eq.")
+          ? [intervalFilter.slice(3)]
+          : intervalFilter?.startsWith("in.(")
+            ? intervalFilter.slice(4, -1).split(",")
+            : null;
+        let rows = candles.filter((candle) =>
+          (!symbol || candle.symbol === symbol)
+          && (!intervals || intervals.includes(candle.interval))
+        );
+        const order = url.searchParams.get("order");
+        if (order === "interval.asc,timestamp.desc") {
+          rows.sort((left, right) => left.interval < right.interval
+            ? -1
+            : left.interval > right.interval
+              ? 1
+              : Date.parse(right.timestamp) - Date.parse(left.timestamp));
+        } else if (order === "timestamp.desc") {
+          rows.sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
+        }
+        const requestLimit = Number(url.searchParams.get("limit"));
+        if (Number.isSafeInteger(requestLimit) && requestLimit >= 0) {
+          rows = rows.slice(0, Math.min(requestLimit, postgrestMaxRows));
+        }
+        return jsonResponse(rows);
       }
       throw new Error(`Unexpected read table: ${table}`);
     }
@@ -268,6 +293,43 @@ test("stale snapshots and invalid candle records cannot produce directional sign
   });
   assert.equal(missingSnapshotResult.decision, "WAIT");
   assert.equal(invalidResult.indicators.dataQuality.invalidCandlesIgnored, 1);
+});
+
+test("analysis retrieves each candle interval independently under a 1000-row PostgREST cap", async () => {
+  const candleCounts = {
+    "1m": 549,
+    "5m": 510,
+    "15m": 518,
+    "1h": 501,
+    "4h": 500,
+    "1d": 500
+  };
+  const candles = Object.entries(candleCounts).flatMap(([interval, count]) =>
+    createCandles("BTC-EUR", interval, count)
+  );
+  const harness = createEngineHarness({ candles, postgrestMaxRows: 1000 });
+  await harness.service.runAnalysis({ config, serviceRoleKey });
+
+  const decision = harness.writes.find(({ table }) => table === "AI_Crypto_Bot_AI_Decisions").body[0];
+  const candleRequests = harness.requests
+    .filter(({ table }) => table === "AI_Crypto_Bot_Candles")
+    .map(({ url }) => new URL(url));
+
+  assert.deepEqual(decision.indicators.dataQuality.candleIntervalsAvailable, [
+    "1m", "5m", "15m", "1h", "4h", "1d"
+  ]);
+  for (const [interval, count] of Object.entries(candleCounts)) {
+    assert.equal(decision.indicators.timeframes[interval].candleCount, count);
+  }
+  assert.equal(candleRequests.length, 6);
+  assert.deepEqual(
+    candleRequests.map((url) => url.searchParams.get("interval")).sort(),
+    Object.keys(candleCounts).map((interval) => `eq.${interval}`).sort()
+  );
+  assert.ok(candleRequests.every((url) =>
+    url.searchParams.get("limit") === "1000"
+      && url.searchParams.get("order") === "timestamp.desc"
+  ));
 });
 
 test("analysis persists real decisions and updates status with PATCH", async () => {

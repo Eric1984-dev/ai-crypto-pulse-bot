@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 07 AI candle retrieval now queries each supported interval independently with a bounded per-interval limit, preventing PostgREST's global response cap from starving later intervals
 - Phase 06 separate market-snapshot and candle-refresh jobs; authenticated candle batches process one interval and up to five markets with incremental reads, metrics, and existing-schema upserts
 - Phase 06 incremental candle refresh using latest stored timestamps, due-interval scheduling, bounded range requests, batch latest-candle reads, and market/candle runtime metrics
 - Phase 06 bounded scheduled candle refresh across all six supported intervals for enabled, Bitvavo-valid watched markets, with bounded concurrency, limit-aware cached upserts, provider/storage circuit breakers, explicit partial results, and regression coverage

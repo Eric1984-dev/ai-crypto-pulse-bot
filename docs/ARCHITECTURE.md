@@ -29,6 +29,7 @@ Implemented components:
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
 - Separate scheduler-protected market-snapshot and bounded candle-refresh endpoints, plus AI analysis; candle work handles one interval and at most five markets per invocation, with external schedulers supported without a Vercel Cron route
 - Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
+- Independent bounded PostgREST candle reads for every supported interval, preventing global row caps from excluding later timeframes
 - Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.

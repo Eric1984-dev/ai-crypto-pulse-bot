@@ -20,7 +20,7 @@ External scheduler
   -> existing authenticated dashboard
 ```
 
-The endpoint uses the server-only service role for database reads and writes. The service uses bounded candle-query concurrency and per-request timeouts. It logs analysis start, each analyzed market and generated decision/confidence, completion, and failures without logging credentials or raw provider errors.
+The endpoint uses the server-only service role for database reads and writes. The service uses bounded candle-query concurrency and per-request timeouts. It reads each market/interval combination separately, with a 1,000-row limit per interval, so a global PostgREST response cap cannot starve the later intervals. It logs analysis start, each analyzed market and generated decision/confidence, completion, and failures without logging credentials or raw provider errors.
 
 ## Decision logic and confidence model
 
@@ -63,6 +63,7 @@ Added:
 - `lib/cron-auth.js`
 - `tests/ai-engine.test.mjs`
 - `docs/PHASE_07_COMPLETION_REPORT.md`
+- `docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md`
 
 Modified:
 
@@ -80,7 +81,7 @@ Modified:
 
 ## Tests and validation
 
-Added AI engine and API tests covering indicator outputs, bullish/bearish/neutral decisions, confidence bounds and partial-data reduction, missing/stale/invalid inputs, decision persistence, status PATCH behavior, STOPPED/empty-market behavior, database failures, scheduler authorization/configuration, and generic failure responses. Existing dashboard tests cover the authenticated AI decision response and recent-decision rendering.
+Added AI engine and API tests covering indicator outputs, bullish/bearish/neutral decisions, confidence bounds and partial-data reduction, missing/stale/invalid inputs, decision persistence, status PATCH behavior, STOPPED/empty-market behavior, database failures, scheduler authorization/configuration, and generic failure responses. The candle query regression simulates the PostgREST 1,000-row cap and verifies all six intervals reach the persisted decision. Existing dashboard tests cover the authenticated AI decision response and recent-decision rendering.
 
 | Command | Result |
 |---|---|
@@ -101,3 +102,7 @@ Tests use deterministic fixtures and mocked PostgREST responses; they do not rep
 ## Phase 08 readiness
 
 Phase 07 is complete and the existing dashboard can display the persisted decisions. The project is ready to begin Phase 08 implementation, but this phase does not implement or authorize trading. Phase 08 must add its own risk-manager validation and paper-trading execution safeguards before any decision can mutate a simulated portfolio. Phase 08 has not been started.
+
+## Follow-up: interval-aware candle retrieval
+
+The original multi-interval query applied one row limit to all intervals combined. With intervals sorted alphabetically and rows ordered newest-first within each interval, the 1,000-row PostgREST response cap could fill with `15m` and `1d` rows before the other intervals were returned. The engine now requests each supported interval independently, retaining the existing analysis, confidence model, tables, and schema. Regression coverage verifies that all six intervals are represented when the stored counts exceed the former combined-query cap. See [the candle query fix report](./PHASE_07_CANDLE_QUERY_FIX_REPORT.md) for the follow-up validation results.

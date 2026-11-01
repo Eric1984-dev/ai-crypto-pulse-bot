@@ -74,7 +74,7 @@ The migration backfills profiles for existing Auth users and installs prefixed t
 
 Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. The Phase 04 dashboard API and Phase 05 Agent Status API separately verify the access token and preserve the caller's JWT when querying through PostgREST, allowing RLS to remain authoritative. Phase 06 market APIs likewise verify the session and use the caller JWT for RLS reads. The scheduled refresh and server-side writes use `SUPABASE_SERVICE_ROLE_KEY`, which must remain server-only.
 
-Phase 07's scheduler-protected AI analysis service reads enabled watched markets, stored market snapshots, candles, and the current agent status using the server-side service role. It inserts only generated rows into `AI_Crypto_Bot_AI_Decisions` and updates the singleton `AI_Crypto_Bot_Status` row, including `updated_at`. It does not write market data, candles, portfolios, positions, trades, or other tables. No migration or RLS policy change was required.
+Phase 07's scheduler-protected AI analysis service reads enabled watched markets, stored market snapshots, candles, and the current agent status using the server-side service role. Candle reads are scoped to one market and one interval per request, with a bounded per-interval limit, so a PostgREST response cap cannot exclude other intervals. It inserts only generated rows into `AI_Crypto_Bot_AI_Decisions` and updates the singleton `AI_Crypto_Bot_Status` row, including `updated_at`. It does not write market data, candles, portfolios, positions, trades, or other tables. No migration or RLS policy change was required.
 
 ## Row Level Security and grants
 

@@ -76,6 +76,8 @@ npm.cmd test
 npm.cmd run build
 ```
 
+The AI Engine regression suite simulates the PostgREST 1,000-row response cap and verifies that all six supported intervals remain available when each interval has hundreds of stored candles. It also verifies the interval-aware result is persisted in the decision indicators.
+
 The AI engine reads only persisted market snapshots/candles and writes only AI decisions and agent status. The tests do not call live Supabase, Bitvavo, or an external scheduler. No trading, order execution, portfolio mutation, or paper-trading behavior is implemented or tested in this phase.
 
 ---

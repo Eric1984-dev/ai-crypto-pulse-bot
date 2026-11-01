@@ -90,6 +90,7 @@ Status: Completed
 ## Phase 07 - AI Engine
 
 - [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
+- [x] Retrieve each supported candle interval independently so PostgREST row caps cannot exclude later intervals
 - [x] Confidence-weighted BUY, SELL, HOLD, and WAIT decisions from real watched-market snapshots and candles
 - [x] Persist decisions and status transitions through existing `AI_Crypto_Bot_*` tables only
 - [x] Graceful handling for missing, stale, partial, and invalid market data
