@@ -19,6 +19,9 @@ const seedMigration = migrationSql.find((sql) => sql.includes('INSERT INTO publi
 const paperTradingMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Run_Paper_Trading"')
 );
+const tradeHistoryMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Trade_History_Stats"')
+);
 
 async function createDatabase() {
   const { PGlite } = await import("@electric-sql/pglite");
@@ -47,6 +50,7 @@ async function createDatabase() {
   await database.exec(schemaMigration);
   await database.exec(seedMigration);
   await database.exec(paperTradingMigration);
+  await database.exec(tradeHistoryMigration);
   return database;
 }
 
@@ -64,6 +68,15 @@ async function getInitialPortfolio(database) {
     `SELECT id FROM public."AI_Crypto_Bot_Portfolios"
      WHERE user_id = $1 ORDER BY created_at LIMIT 1`,
     ["10000000-0000-4000-8000-000000000001"]
+  );
+  return portfolio.rows[0].id;
+}
+
+async function getInitialPortfolioForUser(database, userId) {
+  const portfolio = await database.query(
+    `SELECT id FROM public."AI_Crypto_Bot_Portfolios"
+     WHERE user_id = $1 ORDER BY created_at LIMIT 1`,
+    [userId]
   );
   return portfolio.rows[0].id;
 }
@@ -110,6 +123,78 @@ test("database migration contract covers all prefixed tables, RLS policies, and 
     "ADA-EUR"
   ]);
   assert.equal(new Set(markets.map(({ symbol }) => symbol)).size, markets.length);
+});
+
+test("trade-history statistics aggregate stored SELL trades and remain scoped by RLS", async () => {
+  const database = await createDatabase();
+  try {
+    const ownerId = "10000000-0000-4000-8000-000000000001";
+    const ownerPortfolioId = await getInitialPortfolio(database);
+    const emptyStats = await withRole(database, "authenticated", async () => {
+      await database.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [ownerId]);
+      return database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Trade_History_Stats"()`
+      );
+    });
+    assert.equal(Number(emptyStats.rows[0].closed_trade_count), 0);
+    assert.equal(emptyStats.rows[0].average_profit, null);
+    assert.equal(emptyStats.rows[0].worst_trade, null);
+
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Trades"
+        (portfolio_id, idempotency_key, symbol, side, price, quantity, realized_pnl)
+       VALUES
+        ($1, '50000000-0000-4000-8000-000000000011', 'BTC-EUR', 'SELL', 100, 1, 12),
+        ($1, '50000000-0000-4000-8000-000000000012', 'ETH-EUR', 'SELL', 100, 1, -4),
+        ($1, '50000000-0000-4000-8000-000000000013', 'SOL-EUR', 'SELL', 100, 1, 0),
+        ($1, '50000000-0000-4000-8000-000000000014', 'XRP-EUR', 'BUY', 100, 1, 999)`,
+      [ownerPortfolioId]
+    );
+
+    const otherId = "20000000-0000-4000-8000-000000000002";
+    await database.query(
+      "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+      [otherId, "other@example.test"]
+    );
+    const otherPortfolioId = await getInitialPortfolioForUser(database, otherId);
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Trades"
+        (portfolio_id, idempotency_key, symbol, side, price, quantity, realized_pnl)
+       VALUES ($1, '50000000-0000-4000-8000-000000000015', 'BTC-EUR', 'SELL', 100, 1, 1000)`,
+      [otherPortfolioId]
+    );
+
+    const stats = await withRole(database, "authenticated", async () => {
+      await database.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [ownerId]);
+      return database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Trade_History_Stats"()`
+      );
+    });
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(stats.rows[0]).map(([key, value]) => [
+        key,
+        value === null ? null : Number(value)
+      ])),
+      {
+        closed_trade_count: 3,
+        winning_trade_count: 1,
+        losing_trade_count: 1,
+        average_profit: 12,
+        average_loss: -4,
+        best_trade: 12,
+        worst_trade: -4
+      }
+    );
+
+    await assert.rejects(
+      withRole(database, "anon", () =>
+        database.query(`SELECT * FROM public."AI_Crypto_Bot_Trade_History_Stats"()`)
+      ),
+      { code: "42501" }
+    );
+  } finally {
+    await database.close();
+  }
 });
 
 test("migrations apply, backfill auth profiles, and seed repeatably", async () => {

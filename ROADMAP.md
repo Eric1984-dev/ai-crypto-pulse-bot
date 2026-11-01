@@ -140,9 +140,14 @@ Ranking is read-only and uses stored market data and AI decisions. It does not g
 
 ## Phase 10 - Trade History
 
-- Trade Overzicht
-- Filters
-- Statistieken
+- [x] Paginated paper-trade history sourced from stored `AI_Crypto_Bot_Trades`
+- [x] Server-side market search, action and time filters, allowlisted sorting, and exact counts
+- [x] Winning/losing counts, average profit/loss, and best/worst realized SELL P&L from an RLS-scoped database aggregate
+- [x] Responsive trade table, empty/error states, and dashboard link to complete history
+- [x] Search, filtering, sorting, pagination, empty/large dataset, rendering, aggregate, and RLS regression tests
+- [x] API, database, README, changelog, roadmap, and completion-report documentation
+
+Status: Completed
 
 ---
 

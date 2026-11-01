@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CryptoPulse trade history placeholder.">
-    <title>Trade history · CryptoPulse</title>
+    <meta name="description" content="Review and filter executed CryptoPulse paper trades.">
+    <title>Trade History · CryptoPulse</title>
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/history.js" defer></script>
   </head>
   <body data-auth-page="protected">
     <header class="site-header">
@@ -30,15 +31,106 @@
         </nav>
       </div>
     </header>
-    <main class="page-shell">
+    <main class="page-shell" data-history-page>
       <p data-auth-message role="status" aria-live="polite"></p>
       <p class="eyebrow">Activiteit</p>
-      <h1>Trade history</h1>
-      <p class="page-description">Deze placeholder wordt later gebruikt voor de historie van gesimuleerde transacties en beslissingen.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alleen simulatie; er bestaan nog geen paper trades.</span></div>
-      <section class="placeholder-card" aria-labelledby="history-placeholder">
-        <h2 id="history-placeholder">History placeholder</h2>
-        <p class="card-description">Er is geen trade- of beslissingshistorie beschikbaar in Phase 01.</p>
+      <h1>Trade History</h1>
+      <p class="page-description">Doorzoek en analyseer opgeslagen paper-trade-uitvoeringen. Alle gegevens zijn simulaties; er worden geen echte orders geplaatst.</p>
+      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alle bedragen en uitvoeringen zijn gesimuleerd.</span></div>
+      <p data-history-loading role="status" aria-live="polite">Trade history laden…</p>
+      <div class="dashboard-error" data-history-error role="alert" hidden></div>
+      <button class="dashboard-retry" data-history-retry type="button" hidden>Opnieuw proberen</button>
+
+      <section class="dashboard-section" aria-labelledby="trade-history-statistics">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Alle opgeslagen SELL-uitvoeringen</p>
+            <h2 id="trade-history-statistics">Trade Statistics</h2>
+          </div>
+          <span class="dashboard-muted">All-time · onafhankelijk van filters</span>
+        </div>
+        <dl class="dashboard-metrics history-statistics">
+          <div class="metric-card"><dt>Winning Trades</dt><dd data-history-value="winningTrades">—</dd></div>
+          <div class="metric-card"><dt>Losing Trades</dt><dd data-history-value="losingTrades">—</dd></div>
+          <div class="metric-card"><dt>Average Profit</dt><dd data-history-value="averageProfit">—</dd></div>
+          <div class="metric-card"><dt>Average Loss</dt><dd data-history-value="averageLoss">—</dd></div>
+          <div class="metric-card"><dt>Best Trade</dt><dd data-history-value="bestTrade">—</dd></div>
+          <div class="metric-card"><dt>Worst Trade</dt><dd data-history-value="worstTrade">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="dashboard-panel history-panel" aria-labelledby="trade-history-heading">
+        <div class="panel-heading history-heading">
+          <div><p class="eyebrow">Uitvoering</p><h2 id="trade-history-heading">Paper Trades</h2></div>
+          <span class="count-pill"><span data-history-value="totalCount">0</span> trades</span>
+        </div>
+        <form class="history-filters" data-history-filters>
+          <label>
+            Search market
+            <input data-history-search name="search" type="search" maxlength="32" pattern="[A-Za-z0-9._-]{0,32}" title="Use a market-symbol prefix, such as BTC.">
+          </label>
+          <label>
+            Action
+            <select data-history-side name="side">
+              <option value="all">All actions</option>
+              <option value="buy">BUY</option>
+              <option value="sell">SELL</option>
+            </select>
+          </label>
+          <label>
+            Period
+            <select data-history-period name="period">
+              <option value="all">All time</option>
+              <option value="24h">24 hours</option>
+              <option value="7d">7 days</option>
+              <option value="30d">30 days</option>
+            </select>
+          </label>
+          <label>
+            Sort
+            <select data-history-sort name="sort">
+              <option value="newest">Date · newest</option>
+              <option value="oldest">Date · oldest</option>
+              <option value="market">Market · A–Z</option>
+              <option value="action">Action · A–Z</option>
+              <option value="price-high">Price · high to low</option>
+              <option value="price-low">Price · low to high</option>
+              <option value="quantity-high">Quantity · high to low</option>
+              <option value="quantity-low">Quantity · low to high</option>
+              <option value="fees-high">Fees · high to low</option>
+              <option value="fees-low">Fees · low to high</option>
+              <option value="pnl-high">P&amp;L · high to low</option>
+              <option value="pnl-low">P&amp;L · low to high</option>
+            </select>
+          </label>
+          <button class="history-search-button" type="submit">Search</button>
+        </form>
+
+        <p class="history-result-count"><span data-history-value="totalCount">0</span> matching trades</p>
+        <p class="dashboard-empty" data-history-empty hidden>No paper trades match these filters.</p>
+        <div class="history-table-wrap">
+          <table class="history-table" data-history-table hidden>
+            <caption class="visually-hidden">Stored paper trade executions</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Market</th>
+                <th scope="col">Action</th>
+                <th scope="col">Price</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Fees</th>
+                <th scope="col">P&amp;L</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody data-history-rows></tbody>
+          </table>
+        </div>
+        <nav class="history-pagination" aria-label="Trade history pages">
+          <button class="history-page-button" data-history-previous type="button" disabled>Previous</button>
+          <span data-history-value="pageNumber" aria-live="polite">0 / 0</span>
+          <button class="history-page-button" data-history-next type="button" disabled>Next</button>
+        </nav>
       </section>
     </main>
     <footer class="site-footer">

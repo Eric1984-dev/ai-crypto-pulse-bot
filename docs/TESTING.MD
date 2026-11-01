@@ -208,6 +208,18 @@ npm.cmd run build
 
 These tests use deterministic stored-data fixtures and mocked Supabase requests. They do not verify a live database or deployment. The scanner uses the existing `/api/market-summary` function, so it does not increase Vercel's serverless function count.
 
+## Phase 10 Trade History coverage
+
+Trade-history API/UI tests cover symbol search, action and rolling-period filters, sorting, stable server-side pagination, clamping after history shrinks, empty results, million-row count behavior with a single bounded page, response validation, text-safe rendering, BUY realized-P&L handling, and the dashboard link. The PGlite migration test verifies the SQL aggregate calculations for profitable, losing, breakeven, and BUY rows, confirms user-scoped RLS results, and denies RPC execution to `anon`.
+
+```powershell
+node --test tests/trade-history.test.js tests/database-migrations.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+The API tests mock PostgREST and the database integration runs in PGlite. These checks do not prove that the migration was applied to the configured remote Supabase project or validate a production deployment.
+
 ---
 
 ## Regression Testing

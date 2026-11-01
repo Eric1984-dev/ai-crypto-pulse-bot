@@ -57,6 +57,8 @@ The objects live in the `public` schema. Supabase-managed objects such as `auth.
 
 Phase 09 Market Scanner adds no tables, columns, indexes, policies, or migrations. It performs authenticated read-only queries against enabled watched markets, snapshots, daily/hourly candles, and stored AI decisions. Candle and decision reads use bounded PostgREST range pagination so the default response cap does not silently omit later rows; scanner results are derived in memory and are not persisted.
 
+Phase 10 Trade History adds no tables or columns. It pages stored trade rows through the existing authenticated dashboard API and relies on the existing `AI_Crypto_Bot_Trades` portfolio ownership policy. Its new stable `AI_Crypto_Bot_Trade_History_Stats()` SQL function is `SECURITY INVOKER`, reads only `SELL` rows visible under RLS, and computes all-time closed/winning/losing counts, average positive/negative realized P&L, and best/worst realized P&L in the database. `PUBLIC` and `anon` cannot execute it; `authenticated` can. The function avoids transferring the full history to the server or browser just to calculate statistics.
+
 ## Relationships and deletion behavior
 
 - `AI_Crypto_Bot_Profiles.id` references `auth.users.id`; deleting an Auth user cascades to its profile.
@@ -101,6 +103,7 @@ Primary-key and unique constraints provide indexes for row IDs, profile email, w
 - Portfolio ownership lookups.
 - Enabled-market priority ordering.
 - Portfolio position/status and trade-history queries.
+- Trade date filters and ordering reuse the existing portfolio/time index; statistics aggregate in PostgreSQL under the existing trade RLS policy. Page-size limits keep response transfers bounded.
 - Market-data freshness.
 - Strategy change, performance, and backtest history.
 - AI decision and scanner-event history by symbol and time.
@@ -125,12 +128,13 @@ Migration files are stored in `supabase/migrations/` and run in timestamp order:
 1. `20261031190000_create_agent_tables.sql` creates the prefixed schema, constraints, indexes, Auth synchronization triggers, RLS policies, and grants.
 2. `20261031190100_seed_initial_data.sql` inserts default markets and initial agent/emergency states.
 3. `20261101154600_phase08_paper_trading.sql` adds the trade-to-decision reference, provisions paper portfolios, and installs service-role-only valuation, risk, and execution functions.
+4. `20261102120000_trade_history_stats.sql` adds the authenticated, RLS-preserving aggregate function for all-time stored SELL-trade statistics.
 
 For local Supabase development, install the Supabase CLI and Docker, then run `supabase start` and `supabase db reset`. A linked project can apply reviewed pending migrations with `supabase db push`. Do not run remote migrations until the target database has been inspected for existing objects using this prefix and a backup/restore plan is available. The migrations fail on naming collisions rather than silently accepting an unknown schema.
 
 Migrations are append-only. Corrective schema changes must use a new reviewed migration; do not edit an already-applied migration or modify production tables outside the migration history. Restoring a prior database state requires the approved backup/restore procedure.
 
-The automated database suite executes all three SQL migrations and exercises them in an embedded PostgreSQL engine. It covers RLS ownership, role grants, Auth/profile/portfolio provisioning, seed idempotency, trade idempotency, real-decision execution, position limits, fees, slippage, cooldown, valuation, drawdowns, and emergency stop. It does not connect to a Supabase project. Local Supabase CLI reset/push and remote provider checks must be run separately where the CLI, Docker, and project access are available.
+The automated database suite executes all four SQL migrations and exercises them in an embedded PostgreSQL engine. It covers RLS ownership, role grants, Auth/profile/portfolio provisioning, seed idempotency, trade idempotency and aggregate-statistics isolation, real-decision execution, position limits, fees, slippage, cooldown, valuation, drawdowns, and emergency stop. It does not connect to a Supabase project. Local Supabase CLI reset/push and remote provider checks must be run separately where the CLI, Docker, and project access are available.
 
 ## Phase 08 paper-trading transaction
 

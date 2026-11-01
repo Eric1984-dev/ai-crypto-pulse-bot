@@ -78,6 +78,56 @@ Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configur
 
 The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. The separate market-summary request is refreshed with it. Both browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
 
+### Trade History view
+
+The existing `GET /api/dashboard-data` function also serves the authenticated trade-history page when requested with `view=trade-history`; this does not add a Vercel Function. Optional query parameters:
+
+- `page`: positive, 1-based page number. Results contain at most 25 trades; out-of-range pages are clamped to the last available page.
+- `search`: up to 32 ASCII letters, digits, dot, underscore, or hyphen; performs a case-normalized market-symbol prefix search.
+- `side`: `all`, `buy`, or `sell`.
+- `period`: `all`, `24h`, `7d`, or `30d`; the shorter periods use a rolling UTC cutoff.
+- `sort`: `newest`, `oldest`, `market`, `action`, `price-high`, `price-low`, `quantity-high`, `quantity-low`, `fees-high`, `fees-low`, `pnl-high`, or `pnl-low`.
+
+The database count and the selected page use the caller's verified JWT and existing trade-table RLS policy. No trade rows are loaded into the browser except the requested page. The response includes the filtered exact count, page metadata, and the selected rows (`id`, `symbol`, `side`, `price`, `quantity`, `fees`, `realized_pnl`, and `created_at`).
+
+Success response:
+
+```json
+{
+  "data": {
+    "page": 1,
+    "pageSize": 25,
+    "totalCount": 1,
+    "totalPages": 1,
+    "sort": "newest",
+    "filters": { "search": "", "side": "all", "period": "all" },
+    "items": [{
+      "id": "stored-trade-id",
+      "symbol": "BTC-EUR",
+      "side": "SELL",
+      "price": "65000",
+      "quantity": "0.01",
+      "fees": "0.25",
+      "realized_pnl": "12.5",
+      "created_at": "2026-03-20T12:00:00.000Z"
+    }],
+    "stats": {
+      "closedTrades": 1,
+      "winningTrades": 1,
+      "losingTrades": 0,
+      "averageProfit": 12.5,
+      "averageLoss": null,
+      "bestTrade": 12.5,
+      "worstTrade": 12.5
+    }
+  }
+}
+```
+
+Statistics are all-time and intentionally independent of the current list filters/page. The `AI_Crypto_Bot_Trade_History_Stats()` stable `SECURITY INVOKER` RPC aggregates only the caller's RLS-visible stored SELL executions: profitable/losing counts use realized P&L above/below zero, averages include only positive or negative values respectively, and best/worst use the maximum/minimum realized P&L. Breakeven SELLs count as closed but neither winning nor losing. BUY rows show no realized P&L because their stored zero is not a realized result. Every persisted trade is shown with status `Uitgevoerd · paper`; the trades table has no separate status column.
+
+The page uses the existing 30-second visible-tab refresh cadence, with same-origin credentials and `no-store` requests. An empty result is a successful empty page, not an API error. Invalid view/filter values return `400`; unauthenticated sessions return `401`; missing permissions, migration, configuration, or database availability fail closed with the existing generic `503` dashboard response.
+
 ## Phase 05 Agent Status endpoint
 
 ### GET /api/agent-status

@@ -18,6 +18,22 @@ const limits = Object.freeze({
   realizedTrades: 1000
 });
 
+const tradeHistoryPageSize = 25;
+const tradeHistorySorts = Object.freeze({
+  newest: "created_at.desc,id.desc",
+  oldest: "created_at.asc,id.asc",
+  market: "symbol.asc,created_at.desc,id.desc",
+  action: "side.asc,created_at.desc,id.desc",
+  "price-high": "price.desc,created_at.desc,id.desc",
+  "price-low": "price.asc,created_at.desc,id.desc",
+  "quantity-high": "quantity.desc,created_at.desc,id.desc",
+  "quantity-low": "quantity.asc,created_at.desc,id.desc",
+  "fees-high": "fees.desc,created_at.desc,id.desc",
+  "fees-low": "fees.asc,created_at.desc,id.desc",
+  "pnl-high": "realized_pnl.desc,created_at.desc,id.desc",
+  "pnl-low": "realized_pnl.asc,created_at.desc,id.desc"
+});
+
 export function createHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -65,9 +81,26 @@ export function createHandler({
     }
 
     try {
-      const data = await loadDashboardData({ config, accessToken, fetchImpl, now });
+      const request = readDashboardRequest(req);
+      if (!request) {
+        sendJson(res, 400, {
+          error: { code: "INVALID_DASHBOARD_VIEW", message: "The requested dashboard view is invalid." }
+        });
+        return;
+      }
+
+      const data = request.view === "trade-history"
+        ? await loadTradeHistory({ config, accessToken, fetchImpl, now, params: request.params })
+        : await loadDashboardData({ config, accessToken, fetchImpl, now });
       sendJson(res, 200, { data });
     } catch (error) {
+      if (error instanceof InvalidTradeHistoryRequestError) {
+        sendJson(res, 400, {
+          error: { code: "INVALID_TRADE_HISTORY_QUERY", message: "The trade history filters are invalid." }
+        });
+        return;
+      }
+
       if (error instanceof InvalidSessionError) {
         clearCookie(res, env);
         sendJson(res, 401, {
@@ -89,6 +122,168 @@ export function createHandler({
       });
     }
   };
+}
+
+function readDashboardRequest(req) {
+  let url;
+  try {
+    url = new URL(typeof req.url === "string" ? req.url : "/", "http://localhost");
+  } catch {
+    return null;
+  }
+  const views = url.searchParams.getAll("view");
+  if (views.length > 1 || (views.length === 1 && views[0] !== "trade-history")) {
+    return null;
+  }
+  return {
+    view: views[0] || "dashboard",
+    params: url.searchParams
+  };
+}
+
+async function loadTradeHistory({ config, accessToken, fetchImpl, now, params }) {
+  const currentTime = now();
+  if (!(currentTime instanceof Date) || !Number.isFinite(currentTime.getTime())) {
+    throw new DashboardDataError("Invalid trade-history clock.");
+  }
+  const filters = parseTradeHistoryFilters(params, currentTime);
+  const [totalCount, stats] = await Promise.all([
+    fetchCount(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", filters.query),
+    fetchTradeHistoryStats(config, accessToken, fetchImpl)
+  ]);
+  const totalPages = Math.ceil(totalCount / tradeHistoryPageSize);
+  const page = totalPages ? Math.min(filters.page, totalPages) : 1;
+  const pageResult = totalCount
+    ? await fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
+      ...filters.query,
+      select: "id,symbol,side,price,quantity,fees,realized_pnl,created_at",
+      order: tradeHistorySorts[filters.sort],
+      limit: String(tradeHistoryPageSize),
+      offset: String((page - 1) * tradeHistoryPageSize)
+    })
+    : { rows: [] };
+
+  return {
+    page,
+    pageSize: tradeHistoryPageSize,
+    totalCount,
+    totalPages,
+    sort: filters.sort,
+    filters: {
+      search: filters.search,
+      side: filters.side,
+      period: filters.period
+    },
+    items: pageResult.rows,
+    stats
+  };
+}
+
+function parseTradeHistoryFilters(params, currentTime) {
+  const pageValue = readSingleQueryValue(params, "page");
+  const page = pageValue === null ? 1 : Number(pageValue);
+  if (!Number.isSafeInteger(page) || page < 1) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+
+  const rawSearch = readSingleQueryValue(params, "search");
+  const search = rawSearch === null ? "" : rawSearch.trim().toUpperCase();
+  if (search.length > 32 || (search && !/^[A-Z0-9._-]+$/.test(search))) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+
+  const side = (readSingleQueryValue(params, "side") || "all").toUpperCase();
+  if (!["ALL", "BUY", "SELL"].includes(side)) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+
+  const period = readSingleQueryValue(params, "period") || "all";
+  if (!["all", "24h", "7d", "30d"].includes(period)) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+
+  const sort = readSingleQueryValue(params, "sort") || "newest";
+  if (!Object.prototype.hasOwnProperty.call(tradeHistorySorts, sort)) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+
+  const query = {};
+  if (search) {
+    query.symbol = `like.${search}*`;
+  }
+  if (side !== "ALL") {
+    query.side = `eq.${side}`;
+  }
+  const periodDurationMs = {
+    "24h": 24 * 60 * 60 * 1000,
+    "7d": 7 * 24 * 60 * 60 * 1000,
+    "30d": 30 * 24 * 60 * 60 * 1000
+  }[period];
+  if (periodDurationMs) {
+    query.created_at = `gte.${new Date(currentTime.getTime() - periodDurationMs).toISOString()}`;
+  }
+
+  return { page, search, side: side.toLowerCase(), period, sort, query };
+}
+
+function readSingleQueryValue(params, key) {
+  const values = params.getAll(key);
+  if (values.length > 1) {
+    throw new InvalidTradeHistoryRequestError();
+  }
+  return values.length ? values[0] : null;
+}
+
+async function fetchTradeHistoryStats(config, accessToken, fetchImpl) {
+  const url = new URL("/rest/v1/rpc/AI_Crypto_Bot_Trade_History_Stats", config.supabaseUrl);
+  const response = await fetchImpl(url.toString(), {
+    method: "GET",
+    headers: createReadHeaders(config, accessToken),
+    cache: "no-store"
+  });
+  if (response.status === 401) {
+    throw new InvalidSessionError();
+  }
+  if (!response.ok) {
+    throw new DashboardDataError("Supabase rejected a trade-history statistics request.");
+  }
+
+  let rows;
+  try {
+    rows = await response.json();
+  } catch {
+    throw new DashboardDataError("Supabase returned invalid trade-history statistics.");
+  }
+  if (!Array.isArray(rows) || rows.length !== 1) {
+    throw new DashboardDataError("Supabase returned unexpected trade-history statistics.");
+  }
+
+  const row = rows[0];
+  const stats = {
+    closedTrades: readNonnegativeInteger(row.closed_trade_count, "closed_trade_count"),
+    winningTrades: readNonnegativeInteger(row.winning_trade_count, "winning_trade_count"),
+    losingTrades: readNonnegativeInteger(row.losing_trade_count, "losing_trade_count"),
+    averageProfit: readNullableNumber(row.average_profit, "average_profit"),
+    averageLoss: readNullableNumber(row.average_loss, "average_loss"),
+    bestTrade: readNullableNumber(row.best_trade, "best_trade"),
+    worstTrade: readNullableNumber(row.worst_trade, "worst_trade")
+  };
+  if (stats.winningTrades + stats.losingTrades > stats.closedTrades) {
+    throw new DashboardDataError("Supabase returned inconsistent trade-history statistics.");
+  }
+  return stats;
+}
+
+function readNonnegativeInteger(value, field) {
+  const number = toFiniteNumber(value, field);
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new DashboardDataError(`Invalid trade-history count: ${field}.`);
+  }
+  return number;
+}
+
+function readNullableNumber(value, field) {
+  return value === null ? null : toFiniteNumber(value, field);
 }
 
 async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
@@ -299,15 +494,7 @@ async function fetchTable(config, accessToken, fetchImpl, table, filters, includ
     url.searchParams.set(key, value);
   }
 
-  const headers = {
-    apikey: config.supabaseAnonKey,
-    authorization: `Bearer ${accessToken}`,
-    accept: "application/json"
-  };
-  if (includeCount) {
-    headers.prefer = "count=exact";
-  }
-
+  const headers = createReadHeaders(config, accessToken, includeCount);
   const response = await fetchImpl(url.toString(), { headers, cache: "no-store" });
   if (response.status === 401) {
     throw new InvalidSessionError();
@@ -332,6 +519,18 @@ async function fetchTable(config, accessToken, fetchImpl, table, filters, includ
   };
 }
 
+function createReadHeaders(config, accessToken, includeCount = false) {
+  const headers = {
+    apikey: config.supabaseAnonKey,
+    authorization: `Bearer ${accessToken}`,
+    accept: "application/json"
+  };
+  if (includeCount) {
+    headers.prefer = "count=exact";
+  }
+  return headers;
+}
+
 function readExactCount(headers) {
   const contentRange = headers.get("content-range");
   const total = contentRange && contentRange.slice(contentRange.lastIndexOf("/") + 1);
@@ -343,6 +542,7 @@ function readExactCount(headers) {
 
 class InvalidSessionError extends Error {}
 class DashboardDataError extends Error {}
+class InvalidTradeHistoryRequestError extends Error {}
 
 function setResponseHeaders(res) {
   res.setHeader("Cache-Control", "no-store");
