@@ -13,7 +13,7 @@ Phase 10 is implemented and locally validated. No Phase 11 functionality was sta
 
 ## Trade History Design
 
-The history page displays stored execution date, market, BUY/SELL action, price, quantity, fees, realized P&L, and status. Because the trade table has no status column and rows are recorded only for executed paper trades, the status is shown as `Uitgevoerd · paper`. BUY rows show P&L as unavailable because their stored zero is not realized P&L.
+The history page displays stored execution date, market, BUY/SELL action, price, quantity, fees, realized P&L, and status. Because the trade table has no status column and rows are recorded only for executed paper trades, the status is shown as `Executed · Paper Trade`. BUY rows show P&L as unavailable because their stored zero is not realized P&L.
 
 Price rendering is shared by the dashboard, portfolio, and trade-history views: values below €1 allow up to five fractional digits, while values at or above €1 keep two. This is display-only; fees, P&L, totals, and calculations retain their existing behavior.
 
@@ -85,3 +85,9 @@ A shared presentation formatter now displays prices below €1 with up to five d
 - Focused dashboard, portfolio, trade-history, and price-formatting tests: **30 passed, 0 failed**.
 - `npm.cmd run build`: **passed**.
 - The complete test suite was not rerun for this presentation-only follow-up.
+
+## Trade Value Presentation Follow-up
+
+Trade History now includes an additional Trade Value column. BUY rows display invested amount, fees, and total cost; SELL rows display gross proceeds, fees, net proceeds, and stored realized P&L. Portfolio trade details show the same breakdown alongside the execution price and time.
+
+Gross trade amounts are presented from the stored execution price multiplied by quantity. Existing stored fees and realized P&L are reused; no paper-trading logic, database calculation, schema, API endpoint, or Vercel Function was changed. The displayed status is `Executed · Paper Trade`.

@@ -2,7 +2,13 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { formatPrice, formatTimestamp } = require("../js/formatters.js");
+const {
+  formatCurrency,
+  formatPrice,
+  formatSignedCurrency,
+  formatTimestamp,
+  formatTradeValueDetails
+} = require("../js/formatters.js");
 
 test("price formatting preserves five decimals below one euro and two decimals from one euro", () => {
   assert.match(formatPrice(0.00453954), /0\.00454$/);
@@ -17,6 +23,33 @@ test("price formatting returns the existing empty marker for absent or invalid v
   assert.equal(formatPrice(null), "—");
   assert.equal(formatPrice(undefined), "—");
   assert.equal(formatPrice("not-a-price"), "—");
+});
+
+test("trade value details display BUY cost and SELL proceeds from stored execution fields", () => {
+  assert.deepEqual(formatTradeValueDetails({
+    side: "BUY",
+    price: "1000",
+    quantity: "1",
+    fees: "2.5"
+  }), [
+    "Invested Amount: €1,000.00",
+    "Fees: €2.50",
+    "Total Cost: €1,002.50"
+  ]);
+  assert.deepEqual(formatTradeValueDetails({
+    side: "SELL",
+    price: "1124",
+    quantity: "1",
+    fees: "2.81",
+    realized_pnl: "118.69"
+  }), [
+    "Gross Proceeds: €1,124.00",
+    "Fees: €2.81",
+    "Net Proceeds: €1,121.19",
+    "Realized P&L: +€118.69"
+  ]);
+  assert.equal(formatCurrency(null), "—");
+  assert.equal(formatSignedCurrency(-4.5), "-€4.50");
 });
 
 test("timestamp formatting uses Europe/Brussels in standard and daylight time", () => {

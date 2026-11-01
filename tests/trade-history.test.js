@@ -304,8 +304,21 @@ test("trade history renders all required fields as text and treats buys as unrea
     totalCount: 26,
     totalPages: 2,
     items: [
-      createTradeRow({ symbol: "<img src=x>", price: "0.00453954" }),
-      createTradeRow({ id: "trade-2", side: "BUY", price: "0.05671234", realized_pnl: "0" }),
+      createTradeRow({
+        symbol: "<img src=x>",
+        side: "BUY",
+        price: "1000",
+        quantity: "1",
+        fees: "2.5",
+        realized_pnl: "0"
+      }),
+      createTradeRow({
+        id: "trade-2",
+        price: "1124",
+        quantity: "1",
+        fees: "2.81",
+        realized_pnl: "118.69"
+      }),
       createTradeRow({ id: "trade-3", price: "0.98123456" }),
       createTradeRow({ id: "trade-4", price: "12.3456" }),
       createTradeRow({ id: "trade-5", price: "69421.22" })
@@ -326,13 +339,31 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.equal(rows.children.length, 5);
   assert.match(rows.children[0].children[0].textContent, /12:00/);
   assert.equal(rows.children[0].children[1].textContent, "<img src=x>");
-  assert.match(rows.children[0].children[3].textContent, /0\.00454$/);
-  assert.match(rows.children[1].children[3].textContent, /0\.05671$/);
+  assert.match(rows.children[0].children[3].textContent, /1,000\.00$/);
+  assert.match(rows.children[1].children[3].textContent, /1,124\.00$/);
   assert.match(rows.children[2].children[3].textContent, /0\.98123$/);
   assert.match(rows.children[3].children[3].textContent, /12\.35$/);
   assert.match(rows.children[4].children[3].textContent, /69,421\.22$/);
-  assert.equal(rows.children[0].children[7].textContent, "Executed · paper");
-  assert.equal(rows.children[1].children[6].textContent, "—");
+  assert.deepEqual(
+    rows.children[0].children[5].children[0].children.map((line) => line.textContent),
+    [
+      "Invested Amount: €1,000.00",
+      "Fees: €2.50",
+      "Total Cost: €1,002.50"
+    ]
+  );
+  assert.deepEqual(
+    rows.children[1].children[5].children[0].children.map((line) => line.textContent),
+    [
+      "Gross Proceeds: €1,124.00",
+      "Fees: €2.81",
+      "Net Proceeds: €1,121.19",
+      "Realized P&L: +€118.69"
+    ]
+  );
+  assert.equal(rows.children[0].children[8].textContent, "Executed · Paper Trade");
+  assert.equal(rows.children[0].children[7].textContent, "—");
+  assert.equal(rows.children[1].children[7].textContent, "+€118.69");
   assert.equal(previous.disabled, false);
   assert.equal(next.disabled, true);
   assert.equal(elements.get('[data-history-value="pageNumber"]').textContent, "2 / 2");

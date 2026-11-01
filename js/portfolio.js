@@ -11,11 +11,6 @@
   }
 })(globalThis, function createPortfolioApi(formatters) {
   const refreshIntervalMs = 30000;
-  const currencyFormat = new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2
-  });
   const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
 
   async function requestPortfolioData(fetchImpl) {
@@ -66,7 +61,7 @@
     ]);
     renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatNumber(item.quantity)} units`,
-      `${formatters.formatPrice(item.price)} · Fee ${formatCurrency(item.fees)} · P&L ${formatCurrency(item.realized_pnl)} · Executed ${formatters.formatTimestamp(item.created_at)}`
+      `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`
     ]);
   }
 
@@ -224,8 +219,7 @@
   }
 
   function formatCurrency(value) {
-    const number = numericValue(value);
-    return number === null ? "—" : currencyFormat.format(number);
+    return formatters.formatCurrency(value);
   }
 
   function formatNumber(value) {

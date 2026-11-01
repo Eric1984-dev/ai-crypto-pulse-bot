@@ -936,7 +936,7 @@ a:focus-visible {
 
 .history-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 1000px;
   border-collapse: collapse;
   font-size: 12px;
   text-align: left;
@@ -959,6 +959,23 @@ a:focus-visible {
 
 .history-table td {
   color: #e4eee8;
+}
+
+.history-table td.trade-value-cell {
+  white-space: normal;
+}
+
+.trade-value-breakdown {
+  display: grid;
+  gap: 3px;
+  min-width: 155px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.trade-value-breakdown span {
+  white-space: nowrap;
 }
 
 .history-table tbody tr:last-child td {

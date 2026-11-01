@@ -74,6 +74,9 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Add a Trade Value breakdown to Trade History and Portfolio trade details: BUY invested amount, fees, and total cost; SELL gross proceeds, fees, net proceeds, and realized P&L
+- Reuse stored execution price, quantity, fees, and realized P&L with shared EUR presentation formatters; no trading logic, database calculations, API endpoints, or Vercel Functions changed
+- Standardize the trade status label to `Executed · Paper Trade` and use `Execution` terminology on Portfolio and Trade History
 - Standardize all user-facing interface copy, accessibility labels, authentication feedback, loading and error states, and financial number formatting in English
 - Keep the dashboard limited to portfolio and agent summaries; show watched-market symbols and priorities without scanner rankings, prices, or scanner-data requests
 - Standardize protected and public navigation labels, paper-trading descriptions, and trade-execution terminology across all pages

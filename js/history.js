@@ -12,11 +12,6 @@
 })(globalThis, function createTradeHistoryApi(formatters) {
   const pageSize = 25;
   const refreshIntervalMs = 30000;
-  const currencyFormat = new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2
-  });
   const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
   function buildTradeHistoryUrl({
     page = 1,
@@ -134,13 +129,26 @@
       trade.side,
       formatters.formatPrice(trade.price),
       formatNumber(trade.quantity),
+      formatters.formatTradeValueDetails(trade),
       formatCurrency(trade.fees),
-      trade.side === "SELL" ? formatCurrency(trade.realized_pnl) : "—",
-      "Executed · paper"
+      trade.side === "SELL" ? formatters.formatSignedCurrency(trade.realized_pnl) : "—",
+      "Executed · Paper Trade"
     ];
-    for (const value of values) {
+    for (const [index, value] of values.entries()) {
       const cell = documentRef.createElement("td");
-      cell.textContent = value === null || value === undefined ? "—" : value;
+      if (index === 5) {
+        cell.className = "trade-value-cell";
+        const breakdown = documentRef.createElement("div");
+        breakdown.className = "trade-value-breakdown";
+        for (const detail of value) {
+          const line = documentRef.createElement("span");
+          line.textContent = detail;
+          breakdown.append(line);
+        }
+        cell.append(breakdown);
+      } else {
+        cell.textContent = value === null || value === undefined ? "—" : value;
+      }
       row.append(cell);
     }
     return row;
@@ -340,8 +348,7 @@
   }
 
   function formatCurrency(value) {
-    const number = numericValue(value);
-    return number === null ? "—" : currencyFormat.format(number);
+    return formatters.formatCurrency(value);
   }
 
   function formatNumber(value) {
