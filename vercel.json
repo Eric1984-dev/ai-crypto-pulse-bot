@@ -12,6 +12,8 @@
     { "src": "^/history\\.html$", "dest": "/api/protected-page?page=history" },
     { "src": "^/settings$", "dest": "/api/protected-page?page=settings" },
     { "src": "^/settings\\.html$", "dest": "/api/protected-page?page=settings" },
+    { "src": "^/admin$", "dest": "/api/protected-page?page=admin" },
+    { "src": "^/admin\\.html$", "dest": "/api/protected-page?page=admin" },
     { "handle": "filesystem" }
   ],
   "functions": {

@@ -4,7 +4,8 @@
     "/portfolio.html",
     "/scanner.html",
     "/history.html",
-    "/settings.html"
+    "/settings.html",
+    "/admin.html"
   ]);
   const pageType = document.body.dataset.authPage;
   const nextPath = window.CryptoPulseAuth.safeNextPath(

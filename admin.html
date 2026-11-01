@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CryptoPulse administrator actions.">
+    <title>Admin · CryptoPulse</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+  </head>
+  <body data-auth-page="protected">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <details class="nav-dropdown">
+            <summary class="nav-trigger">Menu</summary>
+            <div class="nav-menu">
+              <a data-nav-link href="/dashboard.html">Dashboard</a>
+              <a data-nav-link href="/portfolio.html">Portfolio</a>
+              <a data-nav-link href="/scanner.html">Scanner</a>
+              <a data-nav-link href="/history.html">Trade history</a>
+              <a data-nav-link href="/settings.html">Settings</a>
+              <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
+              <span class="account-email" data-user-email></span>
+              <button class="nav-action" data-auth-logout type="button">Log out</button>
+            </div>
+          </details>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell">
+      <p data-auth-message role="status" aria-live="polite"></p>
+      <p data-admin-access-message role="status" aria-live="polite">Checking administrator access…</p>
+      <section class="dashboard-panel dashboard-admin-actions" data-admin-page aria-labelledby="admin-actions-heading" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Administrator</p>
+            <h1 id="admin-actions-heading">Admin Actions</h1>
+          </div>
+        </div>
+        <p class="card-description">Run AI analysis or paper trading with the existing engine and risk controls.</p>
+        <div class="admin-action-buttons">
+          <button class="admin-action-button" data-admin-action="ai-analysis" type="button">Execute AI Analysis</button>
+          <button class="admin-action-button" data-admin-action="paper-trading" type="button">Execute Paper Trading</button>
+        </div>
+        <div class="admin-action-output" data-admin-action-output role="region" aria-live="polite" hidden>
+          <p class="admin-action-status" data-admin-action-status role="status"></p>
+          <p class="dashboard-muted">Execution duration: <span data-admin-action-duration>—</span></p>
+          <pre class="admin-action-summary" data-admin-action-summary></pre>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>
+    </footer>
+  </body>
+</html>

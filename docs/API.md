@@ -274,7 +274,7 @@ The authenticated `GET /api/dashboard-data` response includes real realized and 
 
 ### GET /api/admin-actions
 
-Verifies the current HttpOnly Supabase session against Supabase Auth and checks the verified user ID against the server-only `ADMIN_USER_IDS` environment variable. The allowlist is a comma-separated list of Supabase Auth user UUIDs. An authorized administrator receives `{ "data": { "isAdmin": true } }`; ordinary authenticated users receive `403`, and missing/expired sessions receive `401`. The dashboard keeps the Admin Actions section hidden unless this check succeeds.
+Verifies the current HttpOnly Supabase session against Supabase Auth and checks the verified user ID against the server-only `ADMIN_USER_IDS` environment variable. The allowlist is a comma-separated list of Supabase Auth user UUIDs. An authorized administrator receives `{ "data": { "isAdmin": true } }`; ordinary authenticated users receive `403`, and missing/expired sessions receive `401`. The dedicated protected `admin.html` page keeps its actions and Admin navigation link hidden unless this check succeeds.
 
 ### POST /api/admin-actions
 

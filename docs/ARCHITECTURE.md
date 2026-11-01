@@ -544,6 +544,8 @@ Phase 02 uses Supabase Authentication for registration, password login, logout, 
 
 Protected Vercel rewrites validate that cookie with Supabase Auth before returning page HTML; invalid or missing sessions are redirected to login. The anon key is public by design. Phase 04's `/api/dashboard-data` endpoint reads the cookie, validates its access token with Supabase Auth, then makes read-only PostgREST requests using the anon key and the same user JWT. Supabase RLS remains authoritative for user-owned rows. The HttpOnly cookie itself is not a database authorization token.
 
+Admin Actions live on a separate protected `admin.html` page. The existing `/api/admin-actions` endpoint verifies the authenticated user against the server-only `ADMIN_USER_IDS` allowlist; the Admin navigation link and page actions remain hidden until that authorization succeeds. The existing endpoint and server-side authorization are reused.
+
 Phase 05's `/api/agent-status` endpoint independently verifies the same cookie and reads only `AI_Crypto_Bot_Status.status` with the user's JWT. The dashboard polls this endpoint every 15 seconds while visible; it pauses polling when hidden and renders no frontend-selected status. Missing or invalid status becomes `UNKNOWN`.
 
 Database data access controls include:

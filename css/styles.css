@@ -158,6 +158,10 @@ a {
   color: #f3fbf6;
 }
 
+.primary-nav .nav-menu [hidden] {
+  display: none;
+}
+
 .page-shell {
   min-height: calc(100vh - 146px);
   padding-block: 68px 88px;

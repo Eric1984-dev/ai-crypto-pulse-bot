@@ -112,7 +112,7 @@ The AI Engine is analysis-only. It does not create trades or mutate portfolios; 
 - [x] Fee-, slippage-, P&L-, waarderings- en win-rateberekeningen
 - [x] Idempotente scheduler-API en auditlink tussen trade en AI-beslissing
 - [x] Dashboard- en portfoliopagina gekoppeld aan echte RLS-afgeschermde gegevens
-- [x] Admin-only dashboardacties voor directe AI-analyse en paper-tradinguitvoering met behoud van bestaande veiligheidscontroles
+- [x] Afzonderlijke beschermde Admin-pagina voor Admin-only AI-analyse en paper-tradinguitvoering met behoud van bestaande veiligheidscontroles
 - [x] Database-, API-, UI-, risicoregressietests en documentatie
 
 Status: Completed

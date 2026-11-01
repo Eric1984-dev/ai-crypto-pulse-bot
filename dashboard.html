@@ -9,6 +9,7 @@
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/admin.js" defer></script>
     <script src="/js/realtime.js" defer></script>
     <script src="/js/formatters.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
@@ -28,6 +29,7 @@
               <a data-nav-link href="/scanner.html">Scanner</a>
               <a data-nav-link href="/history.html">Trade history</a>
               <a data-nav-link href="/settings.html">Settings</a>
+              <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
               <span class="account-email" data-user-email></span>
               <button class="nav-action" data-auth-logout type="button">Log out</button>
             </div>
@@ -217,24 +219,6 @@
         <div class="chart-frame">
           <canvas data-portfolio-chart aria-label="Portfolio value history chart" role="img" hidden></canvas>
           <p class="dashboard-empty" data-dashboard-chart-empty>Portfolio history will appear after the first database snapshot.</p>
-        </div>
-      </section>
-
-      <section class="dashboard-panel dashboard-admin-actions" data-admin-actions aria-labelledby="admin-actions-heading" hidden>
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Administrator</p>
-            <h2 id="admin-actions-heading">Admin Actions</h2>
-          </div>
-        </div>
-        <div class="admin-action-buttons">
-          <button class="admin-action-button" data-admin-action="ai-analysis" type="button">Execute AI Analysis</button>
-          <button class="admin-action-button" data-admin-action="paper-trading" type="button">Execute Paper Trading</button>
-        </div>
-        <div class="admin-action-output" data-admin-action-output role="region" aria-live="polite" hidden>
-          <p class="admin-action-status" data-admin-action-status role="status"></p>
-          <p class="dashboard-muted">Execution duration: <span data-admin-action-duration>—</span></p>
-          <pre class="admin-action-summary" data-admin-action-summary></pre>
         </div>
       </section>
 

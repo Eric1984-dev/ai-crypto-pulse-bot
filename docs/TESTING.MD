@@ -190,8 +190,11 @@ The Phase 08 PGlite suite executes the schema, seed, and paper-trading migration
 
 The scheduler/API tests verify POST-only handling, timing-safe cron authorization, mandatory `ENABLE_LIVE_TRADING=false`, server-only service-role use, no-store RPC requests, malformed/provider failure handling, metrics, and that paper execution calls only Supabase rather than an exchange endpoint. Portfolio UI tests verify real summary/position/trade rendering, safe text insertion, response validation, and authenticated no-store reads.
 
+`tests/admin.test.js` verifies allowlist-based Admin page access, hidden-by-default Admin navigation, non-admin denial, action requests, duplicate-action prevention, and progress/error states. Authentication and project-setup tests cover the protected Admin route and its navigation placement.
+
 ```powershell
 node --test tests/database-migrations.test.js tests/paper-trading.test.mjs tests/portfolio.test.js tests/dashboard.test.js
+node --test tests/admin.test.js
 npm.cmd test
 npm.cmd run build
 ```

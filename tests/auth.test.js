@@ -349,7 +349,7 @@ test("Supabase client persists sessions and handles auth redirect URLs", () => {
 });
 
 test("post-login redirects allow only protected internal pages", () => {
-  const allowed = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/settings.html"];
+  const allowed = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/settings.html", "/admin.html"];
 
   assert.equal(safeNextPath("/scanner", allowed), "/scanner.html");
   assert.equal(safeNextPath("//attacker.example", allowed), "/dashboard.html");
@@ -604,7 +604,7 @@ test("unauthenticated requests redirect before protected page content is read", 
 
 test("all required protected pages are served only after session verification", async () => {
   const protectedPage = await protectedPageModule;
-  const pages = ["dashboard", "portfolio", "scanner", "history", "settings"];
+  const pages = ["dashboard", "portfolio", "scanner", "history", "settings", "admin"];
   const handler = protectedPage.createHandler({
     env: authEnv,
     verify: async (token) => token === testAccessToken,
@@ -682,7 +682,7 @@ test("authentication pages expose the required forms", () => {
 });
 
 test("every protected page exposes a logout control", () => {
-  for (const page of ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "settings.html"]) {
+  for (const page of ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "settings.html", "admin.html"]) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     assert.match(html, /<button[^>]*data-auth-logout[^>]*>/);
   }
