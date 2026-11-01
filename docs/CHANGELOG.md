@@ -17,7 +17,8 @@ All notable project changes should be documented here.
 
 - Phase 13 Analytics now defaults to a 30-day history window and supports 90- and 365-day ranges for historical trades, AI decisions, and snapshots; current positions and account totals remain current-state metrics
 - Bounded Analytics reads with exact RLS-visible counts and up to four concurrent 500-row pages per source, avoiding full all-history decision scans and detecting truncated pages
-- Added safe query-level Analytics failure logs and aligned all four Analytics CSV reports with the selected range, without adding an API function or database object
+- Added temporary Analytics/Analytics Export diagnostics that log the exact failing dataset, request query, response status, and Supabase error fields. Development responses include diagnostics; production responses remain generic.
+- Analytics CSV reports use the selected period through the existing dashboard-data function, without adding an API function or database object
 
 ### Added
 

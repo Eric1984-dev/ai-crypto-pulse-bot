@@ -4,12 +4,12 @@
 
 - The hosted Supabase migration history, RLS/grants, and Realtime publication state have not been verified in this environment. The Phase 11 publication migration and live Realtime/reconnect smoke tests remain pending.
 - Production authentication, dashboard, scanner, Bitvavo ingestion, AI analysis, paper-trading jobs, and Admin Actions have not been smoke-tested against a deployed Vercel/Supabase environment.
-- Analytics previously returned a generic `503 DASHBOARD_DATA_UNAVAILABLE` while scanning all retained decisions. The code now applies bounded date windows and logs safe query-level diagnostics, but the original hosted failing table/query and the fix's production behavior remain unverified until deployed logs are checked.
+- Analytics and Analytics Exports still return `503 DASHBOARD_DATA_UNAVAILABLE`. The supplied production log localizes the failure to `AI_Crypto_Bot_AI_Decisions`, query `analytics.ai-decisions`, page 3 (`1000-1499`), HTTP `416/PGRST103`; the Supabase message/details were not captured. Temporary query diagnostics now capture the exact query and error fields, but the precise range rejection and deployed behavior remain unresolved pending redeployment and log review.
 - A prior Market Scanner HTTP 503 (`MARKET_DATA_UNAVAILABLE`) was associated with a failing database/PostgREST read, but its original query and production root cause remain unconfirmed. The later-range `416/PGRST103` pagination case has a targeted fix; production errors remain generic.
 - Market snapshot, candle refresh, AI analysis, and paper-trading execution require configured external scheduler jobs. Production scheduler configuration and execution are unverified.
 - Admin Actions require the server-side `ADMIN_USER_IDS` allowlist to be configured and verified.
 
-See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md) for status classification, evidence, and recommended follow-up.
+See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md) for status classification, [the Analytics root-cause report](reports/ANALYTICS_ROOT_CAUSE_REPORT.md) for the latest evidence, and recommended follow-up.
 
 ## Scope Limitations
 

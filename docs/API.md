@@ -155,7 +155,7 @@ Calculation and attribution semantics:
 - BUY outcomes use a paired subsequent SELL result; SELL outcomes use their stored realized P&L. HOLD is scored only when an open position exists, using its subsequent realized result or current unrealized P&L if still open. Decisions without an attributable outcome are marked unscored. This is outcome attribution, not a counterfactual test of alternative decisions.
 - Portfolio daily/weekly/monthly performance and the equity/drawdown curves are derived from stored snapshots; no missing history is fabricated.
 
-Unauthenticated sessions return `401`; invalid data views or periods return `400`; authentication or database unavailability returns the existing generic `503` response. For Analytics failures, internal logs include only the query identifier, table, operation, page/range, HTTP status, allowlisted database error code, and failure category. They never include rows, response bodies, access tokens, or secrets. These logs identify the first failing source query after deployment; local mocks cannot establish which query failed in the previously observed hosted 503. Responses are `no-store`. Hosted Supabase behavior is not established by local mocked tests.
+Unauthenticated sessions return `401`; invalid data views or periods return `400`; authentication or database unavailability returns the existing generic `503` response. Temporary Analytics failure logs include the request view/export type, exact dataset, exact PostgREST method/path/query, operation, page/range, HTTP status, allowlisted database error code, Supabase message/details/hint, and failure category. They do not include rows, access tokens, request headers, or the full response body. When `NODE_ENV=development`, the same query diagnostics are returned under `error.diagnostics`; production responses contain only the existing generic error code and message. Use these logs to identify which source query failed after deployment; local mocks cannot establish hosted Supabase behavior. Remove the temporary diagnostics after the production root cause is confirmed. Responses are `no-store`.
 
 ### CSV Exports view
 
@@ -178,6 +178,8 @@ Export columns:
 - **AI Analytics**: confidence-bucket, action, strategy, and market outcome summaries, including scored/unscored decisions and attributed P&L.
 
 Analytics reports support the same rolling 30-, 90-, and 365-day ranges as the Analytics page; their count is based on report rows rather than source trade/decision counts. The default Analytics range is 30 days. Raw data exports continue to use their existing 24-hour, 7-day, 30-day, and all-data filters.
+
+Analytics Export count/download failures use the same Analytics source loader and query diagnostics as the Analytics page. Production responses remain generic; development diagnostics identify the request view and export type as well as the failing source query.
 
 The export view returns `400` for invalid export types or periods and `401` for missing or expired sessions. Configuration, permission, and database failures use the existing generic `503` response. Once streaming starts, a later storage failure terminates the stream rather than returning a success-shaped partial file. Responses are `no-store` and contain no provider credentials or raw database errors.
 

@@ -150,19 +150,33 @@ function createSupabaseFetch({
   rows = createAnalyticsRows(),
   calls = [],
   failTable = null,
+  failMethod = null,
+  failRange = null,
   failStatus = 500,
-  failCode = null
+  failCode = null,
+  failMessage = "Simulated Supabase failure.",
+  failDetails = null,
+  failHint = null
 } = {}) {
   return async (url, options) => {
     const parsedUrl = new URL(url);
     const table = parsedUrl.pathname.split("/").pop();
     const query = parsedUrl.searchParams;
     calls.push({ table, query: new URLSearchParams(query), options });
-    if (table === failTable) {
+    if (table === failTable
+      && (!failMethod || options.method === failMethod)
+      && (!failRange || options.headers.range === failRange)) {
       return {
         status: failStatus,
         ok: false,
-        async json() { return { code: failCode }; }
+        async json() {
+          return {
+            code: failCode,
+            message: failMessage,
+            details: failDetails,
+            hint: failHint
+          };
+        }
       };
     }
 
@@ -649,10 +663,11 @@ test("dashboard-data serves analytics and its CSV counts through existing authen
   assert.equal(JSON.parse(countResponse.body).data.recordCount, 12);
 });
 
-test("analytics query failures log safe table, operation, range, status, and database-code diagnostics", async () => {
+test("analytics query failures log exact query and Supabase message while keeping production response generic", async () => {
   const logs = [];
   const handler = createHandler({
     env: {
+      NODE_ENV: "production",
       SUPABASE_URL: config.supabaseUrl,
       SUPABASE_ANON_KEY: config.supabaseAnonKey
     },
@@ -660,7 +675,10 @@ test("analytics query failures log safe table, operation, range, status, and dat
     fetchImpl: createSupabaseFetch({
       failTable: "AI_Crypto_Bot_AI_Decisions",
       failStatus: 403,
-      failCode: "42501"
+      failCode: "42501",
+      failMessage: "permission denied for table AI_Crypto_Bot_AI_Decisions",
+      failDetails: "Supabase error detail.",
+      failHint: "Supabase error hint."
     }),
     now: () => now,
     logger: { error: (message) => logs.push(message) }
@@ -673,10 +691,165 @@ test("analytics query failures log safe table, operation, range, status, and dat
   }, response);
 
   assert.equal(response.statusCode, 503);
-  assert.equal(JSON.parse(response.body).error.code, "DASHBOARD_DATA_UNAVAILABLE");
+  assert.deepEqual(JSON.parse(response.body), {
+    error: {
+      code: "DASHBOARD_DATA_UNAVAILABLE",
+      message: "Dashboard data is temporarily unavailable."
+    }
+  });
   assert.match(logs[0], /QUERY=analytics\.ai-decisions TABLE=AI_Crypto_Bot_AI_Decisions OPERATION=COUNT/);
-  assert.match(logs[0], /HTTP_STATUS=403 ERROR_CODE=42501 FAILURE_CATEGORY=RLS_OR_PERMISSION/);
+  assert.match(logs[0], /DATASET=AI_Crypto_Bot_AI_Decisions/);
+  assert.match(logs[0], /HTTP_STATUS=403 ERROR_CODE=42501/);
+  assert.match(logs[0], /FAILURE_CATEGORY=RLS_OR_PERMISSION/);
+  assert.match(logs[0], /REQUEST_QUERY="HEAD \/rest\/v1\/AI_Crypto_Bot_AI_Decisions\?/);
+  assert.match(logs[0], /SUPABASE_MESSAGE="permission denied for table AI_Crypto_Bot_AI_Decisions"/);
+  assert.match(logs[0], /SUPABASE_DETAILS="Supabase error detail\." SUPABASE_HINT="Supabase error hint\."/);
   assert.doesNotMatch(logs[0], /test-anon-key|header\.payload\.signature|response body/i);
+});
+
+test("development analytics diagnostics identify every failing source dataset", async () => {
+  const cases = [
+    ["AI_Crypto_Bot_Portfolios", "analytics.portfolios"],
+    ["AI_Crypto_Bot_Positions", "analytics.positions"],
+    ["AI_Crypto_Bot_Trades", "analytics.trades"],
+    ["AI_Crypto_Bot_AI_Decisions", "analytics.ai-decisions"],
+    ["AI_Crypto_Bot_Portfolio_Snapshots", "analytics.portfolio-snapshots"]
+  ];
+
+  for (const [table, queryName] of cases) {
+    const handler = createHandler({
+      env: {
+        NODE_ENV: "development",
+        SUPABASE_URL: config.supabaseUrl,
+        SUPABASE_ANON_KEY: config.supabaseAnonKey
+      },
+      verify: async () => true,
+      fetchImpl: createSupabaseFetch({
+        failTable: table,
+        failStatus: 403,
+        failCode: "42501",
+        failMessage: `permission denied for table ${table}`,
+        failDetails: `Access denied for ${table}.`
+      }),
+      now: () => now,
+      logger: { error() {} }
+    });
+    const response = createResponse();
+    await handler({
+      method: "GET",
+      url: "/api/dashboard-data?view=analytics&period=90d",
+      headers: { cookie: `cp_access_token=${accessToken}` }
+    }, response);
+
+    const error = JSON.parse(response.body).error;
+    assert.equal(response.statusCode, 503, table);
+    assert.equal(error.diagnostics.dataset, table);
+    assert.equal(error.diagnostics.queryName, queryName);
+    assert.match(error.diagnostics.query, new RegExp(`/rest/v1/${table}\\?`));
+    assert.equal(error.diagnostics.responseStatus, 403);
+    assert.equal(error.diagnostics.supabaseCode, "42501");
+    assert.equal(error.diagnostics.supabaseMessage, `permission denied for table ${table}`);
+    assert.equal(error.diagnostics.supabaseDetails, `Access denied for ${table}.`);
+    assert.equal(error.diagnostics.view, "analytics");
+  }
+});
+
+test("Analytics export failures include query diagnostics only in development", async () => {
+  for (const url of [
+    "/api/dashboard-data?view=export-count&type=analytics-summary&period=90d",
+    "/api/dashboard-data?view=export&type=portfolio-analytics&period=90d"
+  ]) {
+    const handler = createHandler({
+      env: {
+        NODE_ENV: "development",
+        SUPABASE_URL: config.supabaseUrl,
+        SUPABASE_ANON_KEY: config.supabaseAnonKey
+      },
+      verify: async () => true,
+      fetchImpl: createSupabaseFetch({
+        failTable: "AI_Crypto_Bot_Portfolio_Snapshots",
+        failStatus: 416,
+        failCode: "PGRST103",
+        failMessage: "Requested range not satisfiable",
+        failDetails: "Requested offset 1000 is outside the visible result set."
+      }),
+      now: () => now,
+      logger: { error() {} }
+    });
+    const response = createResponse();
+    await handler({
+      method: "GET",
+      url,
+      headers: { cookie: `cp_access_token=${accessToken}` }
+    }, response);
+
+    const error = JSON.parse(response.body).error;
+    assert.equal(response.statusCode, 503);
+    assert.equal(error.diagnostics.view, url.includes("view=export-count") ? "export-count" : "export");
+    assert.equal(error.diagnostics.exportType, url.includes("view=export-count")
+      ? "analytics-summary"
+      : "portfolio-analytics");
+    assert.equal(error.diagnostics.dataset, "AI_Crypto_Bot_Portfolio_Snapshots");
+    assert.equal(error.diagnostics.supabaseCode, "PGRST103");
+    assert.equal(error.diagnostics.supabaseMessage, "Requested range not satisfiable");
+    assert.equal(error.diagnostics.supabaseDetails, "Requested offset 1000 is outside the visible result set.");
+  }
+});
+
+test("development diagnostics capture the exact 416 AI-decision page failure", async () => {
+  const decisions = Array.from({ length: 1501 }, (_, index) => ({
+    id: `decision-${String(index).padStart(4, "0")}`,
+    symbol: "BTC-EUR",
+    decision: "WAIT",
+    confidence: "70",
+    strategy_name: null,
+    strategy_version: null,
+    created_at: "2026-03-20T10:00:00.000Z"
+  }));
+  const logs = [];
+  const handler = createHandler({
+    env: {
+      NODE_ENV: "development",
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey
+    },
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({
+      rows: { ...createAnalyticsRows(), AI_Crypto_Bot_AI_Decisions: decisions },
+      failTable: "AI_Crypto_Bot_AI_Decisions",
+      failMethod: "GET",
+      failRange: "1000-1499",
+      failStatus: 416,
+      failCode: "PGRST103",
+      failMessage: "Requested range not satisfiable",
+      failDetails: "Requested offset 1000 is outside the visible result set."
+    }),
+    now: () => now,
+    logger: { error: (message) => logs.push(message) }
+  });
+  const response = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=analytics&period=90d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, response);
+
+  const error = JSON.parse(response.body).error;
+  assert.equal(response.statusCode, 503);
+  assert.equal(error.diagnostics.dataset, "AI_Crypto_Bot_AI_Decisions");
+  assert.equal(error.diagnostics.queryName, "analytics.ai-decisions");
+  assert.equal(error.diagnostics.operation, "SELECT");
+  assert.equal(error.diagnostics.page, 3);
+  assert.equal(error.diagnostics.range, "1000-1499");
+  assert.equal(error.diagnostics.responseStatus, 416);
+  assert.equal(error.diagnostics.supabaseCode, "PGRST103");
+  assert.equal(error.diagnostics.supabaseMessage, "Requested range not satisfiable");
+  assert.equal(error.diagnostics.supabaseDetails, "Requested offset 1000 is outside the visible result set.");
+  assert.equal(error.diagnostics.failureCategory, "RANGE_NOT_SATISFIABLE");
+  assert.match(error.diagnostics.query, /GET \/rest\/v1\/AI_Crypto_Bot_AI_Decisions\?/);
+  assert.match(logs[0], /PAGE=3 RANGE=1000-1499/);
+  assert.match(logs[0], /HTTP_STATUS=416 ERROR_CODE=PGRST103/);
+  assert.match(logs[0], /SUPABASE_MESSAGE="Requested range not satisfiable"/);
 });
 
 test("expired analytics database sessions remain authentication failures", async () => {

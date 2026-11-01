@@ -62,6 +62,7 @@ export function createHandler({
   const analyticsService = createAnalyticsService({ fetchImpl });
   const analyticsExportsService = createAnalyticsExportsService({ analyticsService });
   return async function handler(req, res) {
+    let requestContext = null;
     setResponseHeaders(res);
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
@@ -109,6 +110,12 @@ export function createHandler({
         });
         return;
       }
+      requestContext = {
+        view: request.view,
+        exportType: request.view === "export" || request.view === "export-count"
+          ? request.params.get("type")
+          : null
+      };
 
       if (request.view === "export-count") {
         const exportType = request.params.get("type");
@@ -209,9 +216,14 @@ export function createHandler({
         || error instanceof AnalyticsDataError
         || error instanceof ExportDataError
         || error instanceof TypeError) {
-        logAnalyticsQueryFailure(logger, error);
+        logAnalyticsQueryFailure(logger, error, requestContext);
+        const diagnostics = createDevelopmentDiagnostics(env, error, requestContext);
         sendJson(res, 503, {
-          error: { code: "DASHBOARD_DATA_UNAVAILABLE", message: "Dashboard data is temporarily unavailable." }
+          error: {
+            code: "DASHBOARD_DATA_UNAVAILABLE",
+            message: "Dashboard data is temporarily unavailable.",
+            ...(diagnostics ? { diagnostics } : {})
+          }
         });
         return;
       }
@@ -244,7 +256,7 @@ function readExportPeriod(params, exportType) {
   return values[0] || (isAnalyticsExportType(exportType) ? "30d" : "all");
 }
 
-function logAnalyticsQueryFailure(logger, error) {
+function logAnalyticsQueryFailure(logger, error, requestContext) {
   const diagnostics = error && typeof error === "object"
     ? error.analyticsDiagnostics
     : null;
@@ -254,12 +266,46 @@ function logAnalyticsQueryFailure(logger, error) {
   const field = (value) => value === null || value === undefined || value === ""
     ? "unknown"
     : String(value).replaceAll(/[^A-Za-z0-9_.:-]/g, "_");
+  const exact = (value) => typeof value === "string" ? JSON.stringify(value) : "unknown";
   logger.error(
-    `Analytics query failed. QUERY=${field(diagnostics.queryName)} TABLE=${field(diagnostics.tableName)} `
+    `Analytics query failed. VIEW=${field(requestContext?.view)} `
+      + `EXPORT_TYPE=${field(requestContext?.exportType)} DATASET=${field(diagnostics.tableName)} `
+      + `QUERY=${field(diagnostics.queryName)} TABLE=${field(diagnostics.tableName)} `
       + `OPERATION=${field(diagnostics.operationName)} PAGE=${field(diagnostics.pageNumber)} `
-      + `RANGE=${field(diagnostics.range)} HTTP_STATUS=${field(diagnostics.httpStatus)} `
-      + `ERROR_CODE=${field(diagnostics.databaseCode)} FAILURE_CATEGORY=${field(diagnostics.failureCategory)}`
+      + `RANGE=${field(diagnostics.range)} REQUEST_QUERY=${exact(diagnostics.query)} `
+      + `HTTP_STATUS=${field(diagnostics.httpStatus)} ERROR_CODE=${field(diagnostics.databaseCode)} `
+      + `SUPABASE_MESSAGE=${exact(diagnostics.databaseMessage)} `
+      + `SUPABASE_DETAILS=${exact(diagnostics.databaseDetails)} SUPABASE_HINT=${exact(diagnostics.databaseHint)} `
+      + `FAILURE_CATEGORY=${field(diagnostics.failureCategory)}`
   );
+}
+
+function createDevelopmentDiagnostics(env, error, requestContext) {
+  if (env.NODE_ENV !== "development") {
+    return null;
+  }
+  const source = error && typeof error === "object"
+    ? error.analyticsDiagnostics
+    : null;
+  if (!source) {
+    return null;
+  }
+  return {
+    view: requestContext?.view ?? null,
+    exportType: requestContext?.exportType ?? null,
+    dataset: source.tableName ?? null,
+    queryName: source.queryName ?? null,
+    query: source.query ?? null,
+    operation: source.operationName ?? null,
+    page: source.pageNumber ?? null,
+    range: source.range ?? null,
+    responseStatus: source.httpStatus ?? null,
+    supabaseCode: source.databaseCode ?? null,
+    supabaseMessage: source.databaseMessage ?? null,
+    supabaseDetails: source.databaseDetails ?? null,
+    supabaseHint: source.databaseHint ?? null,
+    failureCategory: source.failureCategory ?? null
+  };
 }
 
 function readDashboardRequest(req) {

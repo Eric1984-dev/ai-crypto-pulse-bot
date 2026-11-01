@@ -185,11 +185,11 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 - [x] Add Analytics Summary, Trade Analytics, Portfolio Analytics, and AI Analytics CSV exports to the existing Exports page and authenticated dashboard-data function
 - [x] Paginate existing data reads, bound rendered time series, and test empty and large datasets
 - [x] Bound historical Analytics to selectable rolling 30-, 90-, and 365-day ranges (default 30 days), while retaining current position and account metrics
-- [x] Prefetch no more than four 500-row pages per source, validate exact RLS-visible counts, and log safe query/table/page diagnostics on failures
+- [x] Prefetch no more than four 500-row pages per source, validate exact RLS-visible counts, and log exact dataset/query/status/Supabase error diagnostics on failures; include diagnostics in development responses only
 - [x] Validate 100,001 AI decisions, 100,001 snapshots, and 10,001 trades without loading full source histories into browser memory
 - [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Status: Analytics production-loading fix is implemented and locally validated. No new database objects or Vercel Functions were added; API function count remains 12. The previously observed hosted 503's exact failing query remains unconfirmed until the fix is deployed and the new safe logs are inspected. Phase 14 has not started.
+Status: Analytics production-loading fix is implemented and locally validated. A production log identifies `AI_Crypto_Bot_AI_Decisions`, query `analytics.ai-decisions`, page 3 (`1000-1499`), HTTP 416, and `PGRST103`; the Supabase message/details were not present in that log. Temporary instrumentation now captures the exact query and error details. No new database objects or Vercel Functions were added; Phase 14 has not started.
 
 ---
 
