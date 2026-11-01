@@ -511,9 +511,73 @@ a:focus-visible {
 }
 
 .metric-card dt {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.metric-label {
+  flex: 1 1 auto;
+}
+
+.kpi-info-trigger {
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  margin: -4px -4px 0 0;
+  padding: 0;
+  border: 1px solid #47795a;
+  border-radius: 50%;
+  background: #14221a;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kpi-info-trigger:hover,
+.kpi-info-trigger[aria-expanded="true"] {
+  background: #193d2b;
+}
+
+.kpi-info-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.kpi-info-popover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(280px, calc(100vw - 48px));
+  padding: 12px;
+  border: 1px solid #47795a;
+  border-radius: 10px;
+  background: #101714;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 40%);
+  color: #e6eee9;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.kpi-info-popover[hidden] {
+  display: none;
+}
+
+.metric-card:nth-child(2n) .kpi-info-popover {
+  right: 0;
+  left: auto;
 }
 
 .metric-card dd {
@@ -979,6 +1043,16 @@ a:focus-visible {
     gap: 12px;
   }
 
+  .metric-card:nth-child(2n) .kpi-info-popover {
+    right: auto;
+    left: 0;
+  }
+
+  .metric-card:nth-child(3n) .kpi-info-popover {
+    right: 0;
+    left: auto;
+  }
+
   .history-statistics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1004,6 +1078,16 @@ a:focus-visible {
   .dashboard-metrics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
+  }
+
+  .metric-card:nth-child(3n) .kpi-info-popover {
+    right: auto;
+    left: 0;
+  }
+
+  .metric-card:nth-child(4n) .kpi-info-popover {
+    right: 0;
+    left: auto;
   }
 
   .history-filters {

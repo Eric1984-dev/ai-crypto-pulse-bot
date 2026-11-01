@@ -475,6 +475,70 @@
     return Number.isFinite(number) ? number : null;
   }
 
+  function initializeKpiInfo(documentRef) {
+    const triggers = Array.from(documentRef.querySelectorAll("[data-dashboard-kpi-info]"));
+    let openInfo = null;
+
+    function closeOpenInfo(restoreFocus = false) {
+      if (!openInfo) {
+        return;
+      }
+      const { trigger, popover } = openInfo;
+      popover.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      openInfo = null;
+      if (restoreFocus && typeof trigger.focus === "function") {
+        trigger.focus();
+      }
+    }
+
+    const entries = triggers.map((trigger) => {
+      const popover = documentRef.getElementById(trigger.getAttribute("aria-controls"));
+      if (!popover) {
+        return null;
+      }
+      const onClick = () => {
+        if (openInfo && openInfo.trigger === trigger) {
+          closeOpenInfo();
+          return;
+        }
+        closeOpenInfo();
+        popover.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        openInfo = { trigger, popover };
+      };
+      trigger.addEventListener("click", onClick);
+      return { trigger, onClick };
+    }).filter(Boolean);
+
+    function onDocumentClick(event) {
+      if (openInfo
+        && !openInfo.trigger.contains(event.target)
+        && !openInfo.popover.contains(event.target)) {
+        closeOpenInfo();
+      }
+    }
+
+    function onDocumentKeydown(event) {
+      if (event.key === "Escape" && openInfo) {
+        event.preventDefault();
+        closeOpenInfo(true);
+      }
+    }
+
+    documentRef.addEventListener("click", onDocumentClick);
+    documentRef.addEventListener("keydown", onDocumentKeydown);
+
+    return function disposeKpiInfo() {
+      closeOpenInfo();
+      for (const { trigger, onClick } of entries) {
+        trigger.removeEventListener("click", onClick);
+      }
+      documentRef.removeEventListener("click", onDocumentClick);
+      documentRef.removeEventListener("keydown", onDocumentKeydown);
+    };
+  }
+
   function startDashboard({
     windowRef = window,
     documentRef = document,
@@ -488,6 +552,7 @@
       ? windowRef.clearInterval.bind(windowRef)
       : globalThis.clearInterval
   } = {}) {
+    const disposeKpiInfo = initializeKpiInfo(documentRef);
     let chart = null;
     let requestInProgress = false;
     let statusRequestInProgress = false;
@@ -934,6 +999,7 @@
       if (typeof documentRef.removeEventListener === "function") {
         documentRef.removeEventListener("visibilitychange", onVisibilityChange);
       }
+      disposeKpiInfo();
       if (typeof windowRef.removeEventListener === "function") {
         windowRef.removeEventListener("pagehide", onPageHide);
         windowRef.removeEventListener("pageshow", onPageShow);
@@ -974,6 +1040,7 @@
   return {
     createPortfolioChartConfig,
     emptyDashboardData,
+    initializeKpiInfo,
     requestAdminAction,
     requestAdminStatus,
     requestAgentStatus,

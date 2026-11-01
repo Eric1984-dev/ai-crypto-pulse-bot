@@ -76,7 +76,7 @@ test("dashboard keeps the paper-mode notice and removes redundant visible descri
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
 
   assert.match(html, /<h1 class="visually-hidden">Dashboard<\/h1>/);
-  assert.match(html, /<strong>PAPER ACTIVE<\/strong>\s*<span>Alle bedragen zijn gesimuleerd\. Dit dashboard plaatst geen orders\.<\/span>/);
+  assert.match(html, /<strong>PAPER ACTIVE<\/strong>\s*<span>All amounts are simulated\. This dashboard does not place real orders\.<\/span>/);
   assert.doesNotMatch(html, /Paper portfolio|Je agent, portefeuille en recente activiteit uit Supabase\./);
   assert.doesNotMatch(html, /Status wordt gelezen uit AI_Crypto_Bot_Status|Visualisatie van de actuele status uit AI_Crypto_Bot_Status/);
 });

@@ -526,6 +526,135 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /first database snapshot/);
 });
 
+test("dashboard KPI information is accessible, English-only, and covers all portfolio metrics", () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  const requiredKpis = [
+    ["portfolio-value", "Portfolio Value"],
+    ["total-pnl", "Total P&amp;L"],
+    ["realized-pnl", "Realized P&amp;L"],
+    ["unrealized-pnl", "Unrealized P&amp;L"],
+    ["daily-pnl", "Daily P&amp;L"],
+    ["win-rate", "Win Rate"],
+    ["open-positions", "Open Positions"],
+    ["available-balance", "Available Balance"],
+    ["ai-decisions", "AI Decisions"],
+    ["paper-trades", "Paper Trades"],
+    ["tracked-markets", "Tracked Markets"],
+    ["markets-with-data", "Markets with Data"]
+  ];
+
+  assert.match(html, /<html lang="en"/);
+  assert.equal((html.match(/data-dashboard-kpi-info/g) || []).length, requiredKpis.length);
+  for (const [id, label] of requiredKpis) {
+    assert.match(html, new RegExp(`aria-label="Explain ${label}"`));
+    assert.match(html, new RegExp(`aria-controls="kpi-info-${id}"`));
+    assert.match(html, new RegExp(`aria-describedby="kpi-info-${id}"`));
+    assert.match(html, new RegExp(`id="kpi-info-${id}" role="tooltip" hidden`));
+  }
+  assert.doesNotMatch(
+    html,
+    /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i
+  );
+});
+
+test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {
+  function createInfoElement(controlId = null) {
+    return {
+      attributes: controlId ? { "aria-controls": controlId, "aria-expanded": "false" } : {},
+      descendants: new Set(),
+      hidden: true,
+      listeners: {},
+      addEventListener(name, callback) {
+        this.listeners[name] = callback;
+      },
+      removeEventListener(name) {
+        delete this.listeners[name];
+      },
+      setAttribute(name, value) {
+        this.attributes[name] = value;
+      },
+      getAttribute(name) {
+        return this.attributes[name] || null;
+      },
+      contains(target) {
+        return target === this || this.descendants.has(target);
+      },
+      focus() {
+        this.focused = true;
+      },
+      dispatch(name, event = {}) {
+        this.listeners[name]?.(event);
+      }
+    };
+  }
+
+  const firstTrigger = createInfoElement("kpi-info-first");
+  const secondTrigger = createInfoElement("kpi-info-second");
+  const firstPopover = createInfoElement();
+  const secondPopover = createInfoElement();
+  const firstPopoverContent = {};
+  firstPopover.descendants.add(firstPopoverContent);
+  const documentRef = {
+    listeners: {},
+    querySelectorAll() {
+      return [firstTrigger, secondTrigger];
+    },
+    getElementById(id) {
+      return {
+        "kpi-info-first": firstPopover,
+        "kpi-info-second": secondPopover
+      }[id] || null;
+    },
+    addEventListener(name, callback) {
+      this.listeners[name] = callback;
+    },
+    removeEventListener(name) {
+      delete this.listeners[name];
+    },
+    dispatch(name, event = {}) {
+      this.listeners[name]?.(event);
+    }
+  };
+  const dispose = dashboard.initializeKpiInfo(documentRef);
+
+  firstTrigger.dispatch("click");
+  documentRef.dispatch("click", { target: firstTrigger });
+  assert.equal(firstPopover.hidden, false);
+  assert.equal(firstTrigger.attributes["aria-expanded"], "true");
+
+  documentRef.dispatch("click", { target: firstPopoverContent });
+  assert.equal(firstPopover.hidden, false);
+
+  secondTrigger.dispatch("click");
+  documentRef.dispatch("click", { target: secondTrigger });
+  assert.equal(firstPopover.hidden, true);
+  assert.equal(firstTrigger.attributes["aria-expanded"], "false");
+  assert.equal(secondPopover.hidden, false);
+
+  let escapePrevented = false;
+  documentRef.dispatch("keydown", {
+    key: "Escape",
+    preventDefault() {
+      escapePrevented = true;
+    }
+  });
+  assert.equal(secondPopover.hidden, true);
+  assert.equal(secondTrigger.attributes["aria-expanded"], "false");
+  assert.equal(secondTrigger.focused, true);
+  assert.equal(escapePrevented, true);
+
+  firstTrigger.dispatch("click");
+  documentRef.dispatch("click", { target: firstTrigger });
+  documentRef.dispatch("click", { target: {} });
+  assert.equal(firstPopover.hidden, true);
+  assert.equal(firstTrigger.attributes["aria-expanded"], "false");
+
+  dispose();
+  assert.equal(firstTrigger.listeners.click, undefined);
+  assert.equal(documentRef.listeners.click, undefined);
+  assert.equal(documentRef.listeners.keydown, undefined);
+});
+
 test("chart rendering failures do not hide already-rendered dashboard values", () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   class BrokenChart {

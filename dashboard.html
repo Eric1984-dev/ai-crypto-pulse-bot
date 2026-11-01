@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl" class="auth-pending">
+<html lang="en" class="auth-pending">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
-        <nav class="primary-nav" aria-label="Hoofdnavigatie">
+        <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
@@ -26,9 +26,9 @@
               <a data-nav-link href="/portfolio.html">Portfolio</a>
               <a data-nav-link href="/scanner.html">Scanner</a>
               <a data-nav-link href="/history.html">Trade history</a>
-              <a data-nav-link href="/settings.html">Instellingen</a>
+              <a data-nav-link href="/settings.html">Settings</a>
               <span class="account-email" data-user-email></span>
-              <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+              <button class="nav-action" data-auth-logout type="button">Log out</button>
             </div>
           </details>
         </nav>
@@ -40,67 +40,139 @@
       <div class="mode-banner">
         <span class="mode-dot" aria-hidden="true"></span>
         <strong>PAPER ACTIVE</strong>
-        <span>Alle bedragen zijn gesimuleerd. Dit dashboard plaatst geen orders.</span>
+        <span>All amounts are simulated. This dashboard does not place real orders.</span>
       </div>
-      <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite" hidden>Databasegegevens laden…</span>
+      <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite" hidden>Loading dashboard data…</span>
       <div class="dashboard-error" data-dashboard-error role="alert" hidden></div>
-      <button class="dashboard-retry" data-dashboard-retry type="button" hidden>Opnieuw proberen</button>
+      <button class="dashboard-retry" data-dashboard-retry type="button" hidden>Try again</button>
 
       <section class="dashboard-section" aria-labelledby="summary-heading">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Overzicht</p>
+            <p class="eyebrow">Overview</p>
             <h2 id="summary-heading">Portfolio summary</h2>
           </div>
           <span class="dashboard-muted"><span data-dashboard-value="portfolioCount">—</span> portfolios</span>
         </div>
         <dl class="dashboard-metrics">
           <div class="metric-card metric-card-primary">
-            <dt>Portfolio Value</dt>
+            <dt>
+              <span class="metric-label">Portfolio Value</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Portfolio Value" aria-controls="kpi-info-portfolio-value" aria-describedby="kpi-info-portfolio-value" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-portfolio-value" role="tooltip" hidden>The combined current value of your simulated portfolios, including available cash and open positions.</span>
+            </dt>
             <dd data-dashboard-value="portfolioValue">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Total P&amp;L</dt>
+            <dt>
+              <span class="metric-label">Total P&amp;L</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Total P&amp;L" aria-controls="kpi-info-total-pnl" aria-describedby="kpi-info-total-pnl" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-total-pnl" role="tooltip" hidden>Your total profit or loss compared with the starting balance of your simulated portfolios.</span>
+            </dt>
             <dd data-dashboard-value="totalPnl">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Realized P&amp;L</dt>
+            <dt>
+              <span class="metric-label">Realized P&amp;L</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Realized P&amp;L" aria-controls="kpi-info-realized-pnl" aria-describedby="kpi-info-realized-pnl" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-realized-pnl" role="tooltip" hidden>Profit or loss recorded on completed sell trades.</span>
+            </dt>
             <dd data-dashboard-value="realizedPnl">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Unrealized P&amp;L</dt>
+            <dt>
+              <span class="metric-label">Unrealized P&amp;L</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Unrealized P&amp;L" aria-controls="kpi-info-unrealized-pnl" aria-describedby="kpi-info-unrealized-pnl" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-unrealized-pnl" role="tooltip" hidden>Estimated profit or loss on open positions, based on their current prices.</span>
+            </dt>
             <dd data-dashboard-value="unrealizedPnl">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Daily P&amp;L <span class="metric-detail">(realized, UTC)</span></dt>
+            <dt>
+              <span class="metric-label">Daily P&amp;L <span class="metric-detail">(realized, UTC)</span></span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Daily P&amp;L" aria-controls="kpi-info-daily-pnl" aria-describedby="kpi-info-daily-pnl" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-daily-pnl" role="tooltip" hidden>Realized profit or loss from sell trades recorded since midnight UTC today.</span>
+            </dt>
             <dd data-dashboard-value="dailyPnl">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Win Rate <span class="metric-detail">(sell trades)</span></dt>
+            <dt>
+              <span class="metric-label">Win Rate <span class="metric-detail">(sell trades)</span></span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Win Rate" aria-controls="kpi-info-win-rate" aria-describedby="kpi-info-win-rate" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-win-rate" role="tooltip" hidden>The percentage of recorded sell trades with a positive profit or loss value.</span>
+            </dt>
             <dd data-dashboard-value="winRate">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Open Positions</dt>
+            <dt>
+              <span class="metric-label">Open Positions</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Open Positions" aria-controls="kpi-info-open-positions" aria-describedby="kpi-info-open-positions" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-open-positions" role="tooltip" hidden>The number of positions currently open in your simulated portfolios.</span>
+            </dt>
             <dd data-dashboard-value="openPositions">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Available Balance</dt>
+            <dt>
+              <span class="metric-label">Available Balance</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Available Balance" aria-controls="kpi-info-available-balance" aria-describedby="kpi-info-available-balance" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-available-balance" role="tooltip" hidden>Cash currently available in your simulated portfolios.</span>
+            </dt>
             <dd data-dashboard-value="availableBalance">—</dd>
           </div>
           <div class="metric-card">
-            <dt>AI Decisions</dt>
+            <dt>
+              <span class="metric-label">AI Decisions</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain AI Decisions" aria-controls="kpi-info-ai-decisions" aria-describedby="kpi-info-ai-decisions" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-ai-decisions" role="tooltip" hidden>The number of AI decisions recorded for your account.</span>
+            </dt>
             <dd data-dashboard-value="aiDecisions">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Paper Trades</dt>
+            <dt>
+              <span class="metric-label">Paper Trades</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Paper Trades" aria-controls="kpi-info-paper-trades" aria-describedby="kpi-info-paper-trades" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-paper-trades" role="tooltip" hidden>The number of simulated buy and sell trades recorded for your account.</span>
+            </dt>
             <dd data-dashboard-value="paperTrades">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Tracked Markets</dt>
+            <dt>
+              <span class="metric-label">Tracked Markets</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Tracked Markets" aria-controls="kpi-info-tracked-markets" aria-describedby="kpi-info-tracked-markets" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-tracked-markets" role="tooltip" hidden>The number of markets currently enabled for tracking.</span>
+            </dt>
             <dd data-dashboard-value="trackedMarkets">—</dd>
           </div>
           <div class="metric-card">
-            <dt>Markets with Data</dt>
+            <dt>
+              <span class="metric-label">Markets with Data</span>
+              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Markets with Data" aria-controls="kpi-info-markets-with-data" aria-describedby="kpi-info-markets-with-data" aria-expanded="false">
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+              <span class="kpi-info-popover" id="kpi-info-markets-with-data" role="tooltip" hidden>The number of tracked markets with usable market data available.</span>
+            </dt>
             <dd data-dashboard-value="marketsWithData">—</dd>
           </div>
         </dl>
@@ -152,7 +224,7 @@
             </div>
             <span class="status-pill" data-dashboard-status="emergency" data-state="unknown">UNKNOWN</span>
           </div>
-          <p class="card-description">Emergency State is afzonderlijk opgeslagen en verandert Agent Status niet.</p>
+          <p class="card-description">Emergency State is stored separately and does not change Agent Status.</p>
         </article>
       </section>
 
@@ -227,7 +299,7 @@
       </section>
     </main>
     <footer class="site-footer">
-      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>Geen echte orders.</p></div>
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>
     </footer>
   </body>
 </html>

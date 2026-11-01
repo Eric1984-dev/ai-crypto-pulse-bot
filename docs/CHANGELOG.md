@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Accessible, keyboard-operable explanations for all 12 dashboard portfolio KPIs, with responsive popovers and outside-click dismissal
 - Phase 10 trade history with authenticated server-side search, action/time filters, allowlisted sorting, stable 25-row pagination, and actual stored-trade statistics
 - SECURITY INVOKER trade-history aggregate RPC, RLS/grant coverage, responsive history page, dashboard link, regression tests, and Phase 10 completion report
 - Production-safe market-summary storage failure logs now include query, table, operation, page/range, HTTP status, Supabase code, and failure category without logging credentials, request data, or response bodies
@@ -68,6 +69,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Convert all static dashboard interface copy to English
 - Format EUR prices below €1 with up to five decimal places in position and trade views; prices from €1 use two decimals, while fees, P&L, and portfolio totals retain existing formatting
 - Replace the history placeholder with an auto-refreshing, responsive paper-trade ledger; BUY rows show unrealized P&L as unavailable, while all-time statistics use stored SELL realized P&L
 - Replace the scanner placeholder with timeframe-filtered rankings refreshed from stored market data; keep the existing `/api/market-summary` endpoint and Vercel function count unchanged
