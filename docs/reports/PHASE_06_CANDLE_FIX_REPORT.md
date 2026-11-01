@@ -36,8 +36,8 @@ Documentation:
 - `docs/SCHEDULING.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_06_COMPLETION_REPORT.md`
-- `docs/PHASE_06_CANDLE_FIX_REPORT.md`
+- `docs/reports/PHASE_06_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_FIX_REPORT.md`
 
 ## Tests and validation
 

@@ -29,7 +29,7 @@
 
 ## Scanner relocation verification
 
-- The dedicated [scanner.html](./scanner.html) page remains the only UI location for **Top Gainers**, **Top Losers**, **Highest Volume**, **Strongest Momentum**, and **AI Opportunities**.
+- The dedicated [scanner.html](../../scanner.html) page remains the only UI location for **Top Gainers**, **Top Losers**, **Highest Volume**, **Strongest Momentum**, and **AI Opportunities**.
 - Regression tests assert that the Dashboard contains none of those rankings and does not request `/api/market-summary`.
 - Scanner data continues to use the existing `/api/market-summary` endpoint. No API endpoint or Vercel Function was added.
 
@@ -38,7 +38,7 @@
 - Pages: `admin.html`, `dashboard.html`, `history.html`, `index.html`, `login.html`, `portfolio.html`, `register.html`, `reset-password.html`, `scanner.html`, `settings.html`
 - Shared UI scripts: `js/admin.js`, `js/dashboard.js`, `js/formatters.js`, `js/history.js`, `js/portfolio.js`, `js/realtime.js`, `js/scanner.js`
 - Regression tests: `tests/admin.test.js`, `tests/dashboard.test.js`, `tests/portfolio.test.js`, `tests/price-formatting.test.js`, `tests/realtime.test.js`, `tests/trade-history.test.js`
-- Documentation: `README.md`, `docs/CHANGELOG.md`, `UI_LANGUAGE_STANDARDIZATION_REPORT.md`
+- Documentation: `README.md`, `docs/CHANGELOG.md`, `docs/reports/UI_LANGUAGE_STANDARDIZATION_REPORT.md`
 
 ## Phase and validation
 

@@ -36,7 +36,7 @@ Replaced the diffuse neural-cloud layout with a front-facing bilateral brain dra
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_FINAL_REDESIGN_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_REDESIGN_REPORT.md`
 
 ## Validation
 

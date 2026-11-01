@@ -41,9 +41,9 @@ The market snapshot endpoint and candle endpoint expose separate metrics. `/api/
 - `docs/SCHEDULING.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_06_COMPLETION_REPORT.md`
-- `docs/PHASE_06_CANDLE_FIX_REPORT.md`
-- `docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
+- `docs/reports/PHASE_06_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_FIX_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
 
 ## Tests and validation
 

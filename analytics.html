@@ -41,13 +41,21 @@
       <p data-auth-message role="status" aria-live="polite"></p>
       <p class="eyebrow">Performance</p>
       <h1>Analytics &amp; Strategy Insights</h1>
-      <p class="page-description">Evaluate realized trade outcomes, AI decision quality, and portfolio performance using stored paper-trading data. Metrics are account-scoped and use all retained history.</p>
+      <p class="page-description">Evaluate recent realized trade outcomes, AI decision quality, and portfolio performance using account-scoped paper-trading data. Current balances, open positions, and total P&amp;L remain current account metrics.</p>
       <div class="mode-banner">
         <span class="mode-dot" aria-hidden="true"></span>
         <strong>PAPER ACTIVE</strong>
         <span>Analytics report simulated activity only and do not place orders.</span>
       </div>
       <div class="analytics-toolbar">
+        <label class="export-filter">
+          History range
+          <select data-analytics-range aria-label="Analytics history range">
+            <option value="30d" selected>Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="365d">Last 365 Days</option>
+          </select>
+        </label>
         <p class="dashboard-muted" data-analytics-updated role="status" aria-live="polite"></p>
         <a class="history-search-button" href="/exports.html#analytics-exports">Export Analytics CSVs</a>
       </div>
@@ -71,7 +79,7 @@
           <div class="metric-card"><dt>Profit Factor</dt><dd data-analytics-value="profitFactor">—</dd></div>
           <div class="metric-card"><dt>Realized P&amp;L</dt><dd data-analytics-value="realizedPnl">—</dd></div>
           <div class="metric-card"><dt>Unrealized P&amp;L</dt><dd data-analytics-value="unrealizedPnl">—</dd></div>
-          <div class="metric-card"><dt>Total P&amp;L</dt><dd data-analytics-value="totalPnl">—</dd></div>
+          <div class="metric-card"><dt>Total P&amp;L (All Time)</dt><dd data-analytics-value="totalPnl">—</dd></div>
           <div class="metric-card"><dt>Best Trade</dt><dd data-analytics-value="bestTrade">—</dd></div>
           <div class="metric-card"><dt>Worst Trade</dt><dd data-analytics-value="worstTrade">—</dd></div>
           <div class="metric-card"><dt>Largest Winner</dt><dd data-analytics-value="largestWinner">—</dd></div>

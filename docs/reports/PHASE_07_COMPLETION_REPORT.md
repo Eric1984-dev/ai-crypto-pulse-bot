@@ -36,7 +36,7 @@ The endpoint uses the server-only service role for database reads and writes. Th
 
 `POST /api/ai-analysis` is protected by the shared timing-safe `CRON_SECRET` Bearer check. It requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in the server environment. It has no request body and returns the run status and analyzed/stored/waiting counts. It returns generic errors rather than raw database details.
 
-No Vercel Cron route or external scheduler has been configured by this change. An operator can call the endpoint from an external scheduler, including cron-job.org, as documented in [Scheduling](./SCHEDULING.md) and [Deployment](./DEPLOYMENT.md).
+No Vercel Cron route or external scheduler has been configured by this change. An operator can call the endpoint from an external scheduler, including cron-job.org, as documented in [Scheduling](../SCHEDULING.md) and [Deployment](../DEPLOYMENT.md).
 
 ## Database usage
 
@@ -62,8 +62,8 @@ Added:
 - `lib/ai-engine.mjs`
 - `lib/cron-auth.js`
 - `tests/ai-engine.test.mjs`
-- `docs/PHASE_07_COMPLETION_REPORT.md`
-- `docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md`
+- `docs/reports/PHASE_07_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md`
 
 Modified:
 

@@ -10,6 +10,16 @@ function createNode() {
     append(child) {
       this.children.push(child);
     },
+    addEventListener(name, callback) {
+      this.listeners ||= {};
+      this.listeners[name] = callback;
+    },
+    removeEventListener(name) {
+      delete this.listeners?.[name];
+    },
+    async trigger(name) {
+      return this.listeners?.[name]?.({ preventDefault() {} });
+    },
     replaceChildren(...children) {
       this.children = children;
     },
@@ -38,6 +48,7 @@ function createDocument() {
 function buildAnalyticsData() {
   return {
     generatedAt: "2026-03-20T12:00:00.000Z",
+    period: "30d",
     tradePerformance: {
       winRate: 75,
       lossRate: 25,
@@ -115,7 +126,7 @@ test("analytics API request uses the existing authenticated dashboard-data view"
     return { ok: true, status: 200, async json() { return { data }; } };
   });
 
-  assert.equal(request.url, "/api/dashboard-data?view=analytics");
+  assert.equal(request.url, "/api/dashboard-data?view=analytics&period=30d");
   assert.equal(request.options.credentials, "same-origin");
   assert.equal(request.options.cache, "no-store");
   assert.equal(result, data);
@@ -134,5 +145,38 @@ test("analytics page renders EUR metrics, outcome tables, portfolio periods, and
   assert.equal(documentRef.querySelector('[data-analytics-period="daily"]').children.length, 1);
   assert.equal(documentRef.querySelector('[data-analytics-period-empty="weekly"]').hidden, false);
   assert.equal(documentRef.querySelector('[data-analytics-chart-empty="equity"]').hidden, false);
-  assert.match(documentRef.querySelector("[data-analytics-updated]").textContent, /all retained history/);
+  assert.match(documentRef.querySelector("[data-analytics-updated]").textContent, /Last 30 days/);
+});
+
+test("analytics range changes request only the selected supported period", async () => {
+  const documentRef = createDocument();
+  const range = documentRef.querySelector("[data-analytics-range]");
+  range.value = "30d";
+  const requests = [];
+  const windowRef = {
+    fetch: async (url) => {
+      requests.push(url);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { data: buildAnalyticsData() };
+        }
+      };
+    },
+    addEventListener() {},
+    removeEventListener() {},
+    location: { assign() {} }
+  };
+  const cleanup = analytics.startAnalytics({ windowRef, documentRef });
+  await new Promise((resolve) => setImmediate(resolve));
+  range.value = "90d";
+  await range.trigger("change");
+  await new Promise((resolve) => setImmediate(resolve));
+  cleanup();
+
+  assert.deepEqual(requests, [
+    "/api/dashboard-data?view=analytics&period=30d",
+    "/api/dashboard-data?view=analytics&period=90d"
+  ]);
 });

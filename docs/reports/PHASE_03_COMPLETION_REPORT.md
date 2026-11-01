@@ -27,7 +27,7 @@
 - `scripts/validate-database.js`
 - `tests/database-migrations.test.js`
 - `package-lock.json`
-- `docs/PHASE_03_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_03_COMPLETION_REPORT.md`
 
 **Modified**
 

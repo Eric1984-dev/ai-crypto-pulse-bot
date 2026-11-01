@@ -59,7 +59,7 @@ Price rankings require a valid market snapshot no older than 15 minutes. Missing
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_09_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_09_COMPLETION_REPORT.md`
 
 ## Tests and validation
 

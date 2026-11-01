@@ -125,6 +125,8 @@ docs/*
 
 synchronized with implementation.
 
+Store all new project reports (phase, validation, fix, audit, and enhancement reports) in `docs/reports/`. Do not create reports in the repository root, and update any links when moving existing reports.
+
 ---
 
 ## Testing

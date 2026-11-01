@@ -131,7 +131,15 @@
             <h2 id="analytics-exports-heading">Analytics Exports</h2>
           </div>
         </div>
-        <p class="card-description">Analytics reports use all retained account history. Portfolio time-series exports include the latest 365 recorded UTC days.</p>
+        <p class="card-description">Choose a shared history range for all Analytics reports. Current balances and total P&amp;L remain current account metrics; portfolio time-series exports are limited to the selected range.</p>
+        <label class="export-filter">
+          Analytics history range
+          <select data-analytics-export-period>
+            <option value="30d" selected>Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="365d">Last 365 Days</option>
+          </select>
+        </label>
         <div class="export-grid">
           <section class="dashboard-panel export-card" data-export-card="analytics-summary" aria-labelledby="export-analytics-summary-heading">
             <p class="eyebrow">Key metrics</p>

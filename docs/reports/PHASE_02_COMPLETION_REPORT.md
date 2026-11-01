@@ -28,7 +28,7 @@ No Phase 03 database schema, migrations, RLS policies, market data, Bitvavo, AI,
 - `lib/auth-session.js`
 - `js/auth-service.js`, `js/auth.js`
 - `tests/auth.test.js`
-- `docs/PHASE_02_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_02_COMPLETION_REPORT.md`
 
 **Modified**
 

@@ -41,6 +41,6 @@ No separate device-by-device FPS benchmark was run; performance results are base
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_COMPLETION_REPORT.md`
-- `docs/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
-- `docs/PHASE_05_FINAL_FIX_REPORT.md`
+- `docs/reports/PHASE_05_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_FIX_REPORT.md`

@@ -26,7 +26,7 @@
 - `docs/DATABASE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/TIMEZONE_STANDARDIZATION_REPORT.md`
+- `docs/reports/TIMEZONE_STANDARDIZATION_REPORT.md`
 
 ## Tests Executed
 

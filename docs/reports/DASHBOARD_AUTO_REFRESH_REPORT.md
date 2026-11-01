@@ -19,8 +19,8 @@ The authenticated dashboard refreshes database-backed dashboard data every 30 se
 - `js/dashboard.js` — visibility-aware full-data polling, foreground refresh, duplicate-load protection, and stale-view preservation on transient errors.
 - `tests/dashboard.test.js` — periodic and foreground refresh, hidden-page pause/resume, in-flight duplicate suppression, and failure-state regression coverage.
 - `README.md`, `ROADMAP.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, and `docs/CHANGELOG.md` — documented behavior and test coverage.
-- `docs/PHASE_04_COMPLETION_REPORT.md` — follow-up note.
-- `docs/DASHBOARD_AUTO_REFRESH_REPORT.md` — this report.
+- `docs/reports/PHASE_04_COMPLETION_REPORT.md` — follow-up note.
+- `docs/reports/DASHBOARD_AUTO_REFRESH_REPORT.md` — this report.
 
 ## Validation
 

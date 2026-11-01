@@ -56,9 +56,9 @@ Snapshot and candle routes report their duration and processed-record counts ind
 - Vercel/environment and validation: `vercel.json`, `.env.example`, `scripts/validate-project.js`, `scripts/validate-database.js`
 - Tests: `tests/market-data.test.mjs`, `tests/dashboard.test.js`, `tests/database-migrations.test.js`
 - Documentation: `README.md`, `ROADMAP.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/DEPLOYMENT.md`, `docs/TESTING.MD`, `docs/CHANGELOG.md`
-- This completion report: `docs/PHASE_06_COMPLETION_REPORT.md`
-- Incremental candle optimization report: `docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
-- Candle batching report: `docs/PHASE_06_CANDLE_BATCHING_REPORT.md`
+- This completion report: `docs/reports/PHASE_06_COMPLETION_REPORT.md`
+- Incremental candle optimization report: `docs/reports/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
+- Candle batching report: `docs/reports/PHASE_06_CANDLE_BATCHING_REPORT.md`
 
 ## Tests and validation
 

@@ -46,7 +46,7 @@ The dashboard is a protected, database-backed view. It reads through a Vercel Fu
 - `docs/TESTING.md`
 - `docs/CHANGELOG.md`
 - `docs/KNOWN_ISSUES.md`
-- `docs/PHASE_04_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_04_COMPLETION_REPORT.md`
 
 ## Validation results
 

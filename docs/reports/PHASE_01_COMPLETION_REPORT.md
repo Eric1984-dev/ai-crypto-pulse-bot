@@ -24,7 +24,7 @@ No authentication, database logic, AI engine, Bitvavo integration, market-data r
 - Pages: `index.html`, `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html`, `settings.html`
 - Project setup: `package.json`, `api/README.md`, `css/styles.css`, `js/main.js`, `scripts/validate-project.js`, `tests/project-setup.test.js`
 - Root docs: `README.md`, `ROADMAP.md`
-- Project docs: `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`, `docs/DEPLOYMENT.md`, `docs/KNOWN_ISSUES.md`, `docs/PHASE_01_COMPLETION_REPORT.md`, `docs/RISK_MANAGEMENT.md`, `docs/SCHEDULING.md`, `docs/TESTING.MD`
+- Project docs: `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`, `docs/DEPLOYMENT.md`, `docs/KNOWN_ISSUES.md`, `docs/reports/PHASE_01_COMPLETION_REPORT.md`, `docs/RISK_MANAGEMENT.md`, `docs/SCHEDULING.md`, `docs/TESTING.MD`
 
 ## Validation results
 

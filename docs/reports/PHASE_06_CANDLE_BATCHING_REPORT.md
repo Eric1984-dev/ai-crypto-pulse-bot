@@ -65,10 +65,10 @@ Documentation:
 - `docs/DEPLOYMENT.md`
 - `docs/SCHEDULING.md`
 - `docs/TESTING.md`
-- `docs/PHASE_06_COMPLETION_REPORT.md`
-- `docs/PHASE_06_CANDLE_FIX_REPORT.md`
-- `docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
-- `docs/PHASE_06_CANDLE_BATCHING_REPORT.md`
+- `docs/reports/PHASE_06_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_FIX_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
+- `docs/reports/PHASE_06_CANDLE_BATCHING_REPORT.md`
 
 `api/market-refresh.mjs` retains its existing handler contract; its delegated service operation is now snapshot-only.
 

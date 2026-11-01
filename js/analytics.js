@@ -21,8 +21,19 @@
     timeZone: "Europe/Brussels"
   });
 
-  async function requestAnalytics(fetchImpl) {
-    const response = await fetchImpl("/api/dashboard-data?view=analytics", {
+  const supportedPeriods = new Set(["30d", "90d", "365d"]);
+  const periodLabels = new Map([
+    ["30d", "Last 30 days"],
+    ["90d", "Last 90 days"],
+    ["365d", "Last 365 days"]
+  ]);
+
+  async function requestAnalytics(fetchImpl, period = "30d") {
+    if (!supportedPeriods.has(period)) {
+      throw new TypeError("A valid analytics date range is required.");
+    }
+    const params = new URLSearchParams({ view: "analytics", period });
+    const response = await fetchImpl(`/api/dashboard-data?${params}`, {
       method: "GET",
       cache: "no-store",
       credentials: "same-origin",
@@ -115,7 +126,7 @@
     renderDataQuality(documentRef, data.dataQuality);
     const updated = documentRef.querySelector("[data-analytics-updated]");
     if (updated) {
-      updated.textContent = `Updated ${formatTimestamp(data.generatedAt)} · all retained history`;
+      updated.textContent = `Updated ${formatTimestamp(data.generatedAt)} · ${periodLabels.get(data.period) || periodLabels.get("30d")}`;
     }
     return charts;
   }
@@ -314,14 +325,30 @@
     const loading = documentRef.querySelector("[data-analytics-loading]");
     const error = documentRef.querySelector("[data-analytics-error]");
     const retry = documentRef.querySelector("[data-analytics-retry]");
+    const periodSelect = documentRef.querySelector("[data-analytics-range]");
     let charts = new Map();
     let activeLoad = null;
+    let activePeriod = null;
+    let requestSequence = 0;
     let disposed = false;
 
     const refresh = () => {
-      if (disposed || activeLoad) {
-        return activeLoad || Promise.resolve();
+      if (disposed) {
+        return Promise.resolve();
       }
+      const period = periodSelect?.value || "30d";
+      if (!supportedPeriods.has(period)) {
+        if (error) {
+          error.textContent = "Select a valid analytics date range.";
+          error.hidden = false;
+        }
+        return Promise.resolve();
+      }
+      if (activeLoad && activePeriod === period) {
+        return activeLoad;
+      }
+      const currentSequence = ++requestSequence;
+      activePeriod = period;
       if (loading) {
         loading.hidden = false;
       }
@@ -332,14 +359,14 @@
         error.hidden = true;
         error.textContent = "";
       }
-      activeLoad = requestAnalytics(fetchImpl)
+      const currentLoad = requestAnalytics(fetchImpl, period)
         .then((data) => {
-          if (!disposed) {
+          if (!disposed && currentSequence === requestSequence) {
             charts = renderAnalytics(data, documentRef, ChartConstructor, charts);
           }
         })
         .catch((requestError) => {
-          if (disposed) {
+          if (disposed || currentSequence !== requestSequence) {
             return;
           }
           if (requestError.status === 401 && typeof windowRef.location?.assign === "function") {
@@ -355,12 +382,16 @@
           }
         })
         .finally(() => {
-          if (loading) {
-            loading.hidden = true;
+          if (currentSequence === requestSequence) {
+            if (loading) {
+              loading.hidden = true;
+            }
+            activeLoad = null;
+            activePeriod = null;
           }
-          activeLoad = null;
         });
-      return activeLoad;
+      activeLoad = currentLoad;
+      return currentLoad;
     };
 
     const cleanup = () => {
@@ -369,6 +400,7 @@
       }
       disposed = true;
       retry?.removeEventListener("click", refresh);
+      periodSelect?.removeEventListener("change", refresh);
       windowRef.removeEventListener?.("pagehide", cleanup);
       for (const chart of charts.values()) {
         chart?.destroy?.();
@@ -376,6 +408,7 @@
       charts.clear();
     };
     retry?.addEventListener("click", refresh);
+    periodSelect?.addEventListener("change", refresh);
     windowRef.addEventListener?.("pagehide", cleanup, { once: true });
     void refresh();
     return cleanup;

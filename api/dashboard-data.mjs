@@ -6,7 +6,9 @@ import {
   ExportSessionError
 } from "../lib/exports.mjs";
 import {
+  ANALYTICS_PERIODS,
   AnalyticsDataError,
+  AnalyticsRequestError,
   createAnalyticsService
 } from "../lib/analytics.mjs";
 import {
@@ -53,7 +55,8 @@ export function createHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
   verify = (token, config) => verifyAccessToken(token, config, fetchImpl),
-  now = () => new Date()
+  now = () => new Date(),
+  logger = console
 } = {}) {
   const exportsService = createExportsService({ fetchImpl });
   const analyticsService = createAnalyticsService({ fetchImpl });
@@ -109,7 +112,7 @@ export function createHandler({
 
       if (request.view === "export-count") {
         const exportType = request.params.get("type");
-        const period = request.params.get("period") || "all";
+        const period = readExportPeriod(request.params, exportType);
         const service = isAnalyticsExportType(exportType) ? analyticsExportsService : exportsService;
         const recordCount = await service.getRecordCount({
           config,
@@ -135,7 +138,7 @@ export function createHandler({
           config,
           accessToken,
           exportType,
-          period: request.params.get("period") || "all",
+          period: readExportPeriod(request.params, exportType),
           now: now(),
           response: res
         });
@@ -146,7 +149,12 @@ export function createHandler({
       if (request.view === "trade-history") {
         data = await loadTradeHistory({ config, accessToken, fetchImpl, now, params: request.params });
       } else if (request.view === "analytics") {
-        data = await analyticsService.load({ config, accessToken, now: now() });
+        data = await analyticsService.load({
+          config,
+          accessToken,
+          now: now(),
+          period: readAnalyticsPeriod(request.params)
+        });
         data.exportCounts = getAnalyticsExportCounts(data);
       } else {
         data = await loadDashboardData({ config, accessToken, fetchImpl, now });
@@ -163,6 +171,13 @@ export function createHandler({
       if (error instanceof ExportRequestError) {
         sendJson(res, 400, {
           error: { code: "INVALID_EXPORT_QUERY", message: "The export type or date filter is invalid." }
+        });
+        return;
+      }
+
+      if (error instanceof AnalyticsRequestError) {
+        sendJson(res, 400, {
+          error: { code: "INVALID_ANALYTICS_PERIOD", message: "The analytics date range is invalid." }
         });
         return;
       }
@@ -194,6 +209,7 @@ export function createHandler({
         || error instanceof AnalyticsDataError
         || error instanceof ExportDataError
         || error instanceof TypeError) {
+        logAnalyticsQueryFailure(logger, error);
         sendJson(res, 503, {
           error: { code: "DASHBOARD_DATA_UNAVAILABLE", message: "Dashboard data is temporarily unavailable." }
         });
@@ -206,6 +222,44 @@ export function createHandler({
       });
     }
   };
+}
+
+function readAnalyticsPeriod(params) {
+  const values = params.getAll("period");
+  if (values.length > 1) {
+    throw new AnalyticsRequestError("The analytics period is invalid.");
+  }
+  const period = values[0] || "30d";
+  if (!ANALYTICS_PERIODS.includes(period)) {
+    throw new AnalyticsRequestError("The analytics period is invalid.");
+  }
+  return period;
+}
+
+function readExportPeriod(params, exportType) {
+  const values = params.getAll("period");
+  if (values.length > 1) {
+    throw new ExportRequestError("The export period is invalid.");
+  }
+  return values[0] || (isAnalyticsExportType(exportType) ? "30d" : "all");
+}
+
+function logAnalyticsQueryFailure(logger, error) {
+  const diagnostics = error && typeof error === "object"
+    ? error.analyticsDiagnostics
+    : null;
+  if (!diagnostics || typeof logger?.error !== "function") {
+    return;
+  }
+  const field = (value) => value === null || value === undefined || value === ""
+    ? "unknown"
+    : String(value).replaceAll(/[^A-Za-z0-9_.:-]/g, "_");
+  logger.error(
+    `Analytics query failed. QUERY=${field(diagnostics.queryName)} TABLE=${field(diagnostics.tableName)} `
+      + `OPERATION=${field(diagnostics.operationName)} PAGE=${field(diagnostics.pageNumber)} `
+      + `RANGE=${field(diagnostics.range)} HTTP_STATUS=${field(diagnostics.httpStatus)} `
+      + `ERROR_CODE=${field(diagnostics.databaseCode)} FAILURE_CATEGORY=${field(diagnostics.failureCategory)}`
+  );
 }
 
 function readDashboardRequest(req) {

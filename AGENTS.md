@@ -311,6 +311,8 @@ Do not claim coverage targets were met unless measured.
 
 Documentation must stay synchronized with implementation.
 
+Store generated reports in `docs/reports/`, including future phase, validation, fix, audit, and enhancement reports. Do not create report files in the repository root; update links when reports move.
+
 Update when applicable:
 
 README.md

@@ -142,25 +142,27 @@ The response contains:
 - `dataQuality`: unmatched or unpaired trade/decision counts.
 - `exportCounts`: report-row counts for the four Analytics CSV types.
 
-Historical tables are read in stable pages of at most 500 rows. Trade and decision streams are merged by market and timestamp; only bounded aggregates and series are returned to the browser. The UI series are capped at 365 daily, 260 weekly, and 120 monthly points. Maximum drawdown is calculated across the full stored snapshot history.
+The optional `period` parameter accepts `30d`, `90d`, or `365d` and defaults to `30d`; ranges are rolling UTC windows. It filters historical trades, AI decisions, and portfolio snapshots. Current portfolio values, total account P&L, and open/closed position metrics remain current account metrics. The selected period is returned as `period` and its UTC cutoff as `periodStart`.
+
+The service reads stable pages of at most 500 rows, prefetching at most four pages per source query. Exact RLS-scoped counts bound the final page; short, missing, or inconsistent pages fail closed rather than returning partial analytics. Trade and decision streams are merged by market and timestamp, while snapshot calculations run concurrently. Only aggregates and bounded series are returned to the browser; daily, weekly, and monthly series remain capped at 365, 260, and 120 points. Portfolio drawdown and period performance use snapshots within the selected range. The first available in-range snapshot establishes the period baseline; current account total P&L remains all-time.
 
 Calculation and attribution semantics:
 
-- Win/loss rates divide winning/losing SELL trades by all SELL trades; breakeven SELL trades remain in the denominator but count as neither wins nor losses. Average loss remains signed. Profit factor is gross realized gains divided by the absolute gross realized losses, and is unavailable when there are no realized losses.
-- Realized P&L sums stored SELL `realized_pnl`; unrealized P&L sums stored `unrealized_pnl` for OPEN positions. Total P&L is the sum of current portfolio values less combined starting balances.
+- Win/loss rates divide winning/losing SELL trades by all SELL trades in the selected range; breakeven SELL trades remain in the denominator but count as neither wins nor losses. Average loss remains signed. Profit factor is gross realized gains divided by the absolute gross realized losses, and is unavailable when there are no realized losses.
+- Realized P&L sums stored SELL `realized_pnl` in the selected range; unrealized P&L sums stored `unrealized_pnl` for current OPEN positions. Total P&L is the sum of current portfolio values less combined starting balances and remains an all-time account metric.
 - Hold time is inferred from paired BUY/SELL trade timestamps. It is unavailable when no pairs exist.
 - Confidence buckets are non-overlapping: `70 <= confidence < 75`, `75 <= confidence < 80`, `80 <= confidence < 85`, and `85 <= confidence <= 100`. Values below 70 are reported separately.
 - BUY outcomes use a paired subsequent SELL result; SELL outcomes use their stored realized P&L. HOLD is scored only when an open position exists, using its subsequent realized result or current unrealized P&L if still open. Decisions without an attributable outcome are marked unscored. This is outcome attribution, not a counterfactual test of alternative decisions.
 - Portfolio daily/weekly/monthly performance and the equity/drawdown curves are derived from stored snapshots; no missing history is fabricated.
 
-Unauthenticated sessions return `401`; invalid data views return `400`; authentication or database unavailability returns the existing generic `503` response. Responses are `no-store`. Hosted Supabase behavior is not established by local mocked tests.
+Unauthenticated sessions return `401`; invalid data views or periods return `400`; authentication or database unavailability returns the existing generic `503` response. For Analytics failures, internal logs include only the query identifier, table, operation, page/range, HTTP status, allowlisted database error code, and failure category. They never include rows, response bodies, access tokens, or secrets. These logs identify the first failing source query after deployment; local mocks cannot establish which query failed in the previously observed hosted 503. Responses are `no-store`. Hosted Supabase behavior is not established by local mocked tests.
 
 ### CSV Exports view
 
 The protected Exports page reuses the authenticated `GET /api/dashboard-data` function; it adds no endpoint or Vercel Function. Both views require a verified session and use the caller's JWT and existing RLS policies:
 
-- `view=export-count&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all>` returns `{ "data": { "exportType": "...", "period": "...", "recordCount": 123 } }`. Analytics report types accept `period=all` only; their count is the number of CSV report rows.
-- `view=export&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all>` streams a CSV response. Raw datasets are read from Supabase in stable, 500-row Range pages and written incrementally; they are not accumulated as a full dataset in application memory. Analytics exports calculate from the paginated analytics view and stream the resulting report rows.
+- `view=export-count&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` returns `{ "data": { "exportType": "...", "period": "...", "recordCount": 123 } }`. For Analytics report types, `period=<30d|90d|365d>` returns the generated CSV report-row count; it defaults to `30d`.
+- `view=export&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all|90d|365d>` streams a CSV response. Raw datasets retain their existing filters and are read in stable, 500-row Range pages written incrementally. Analytics exports use the same selected period and Analytics calculations as the dedicated page.
 
 The date filters use rolling UTC cutoffs. The CSV is UTF-8 with a BOM, CRLF line endings, a header row, standard quoting, and spreadsheet-formula neutralization for untrusted text.
 
@@ -175,7 +177,7 @@ Export columns:
 - **Portfolio Analytics**: one row per retained daily period with portfolio value, period P&L, drawdown, and growth.
 - **AI Analytics**: confidence-bucket, action, strategy, and market outcome summaries, including scored/unscored decisions and attributed P&L.
 
-Analytics reports use all retained history and have no date filter. The export count is based on report rows rather than source trade/decision counts.
+Analytics reports support the same rolling 30-, 90-, and 365-day ranges as the Analytics page; their count is based on report rows rather than source trade/decision counts. The default Analytics range is 30 days. Raw data exports continue to use their existing 24-hour, 7-day, 30-day, and all-data filters.
 
 The export view returns `400` for invalid export types or periods and `401` for missing or expired sessions. Configuration, permission, and database failures use the existing generic `503` response. Once streaming starts, a later storage failure terminates the stream rather than returning a success-shaped partial file. Responses are `no-store` and contain no provider credentials or raw database errors.
 

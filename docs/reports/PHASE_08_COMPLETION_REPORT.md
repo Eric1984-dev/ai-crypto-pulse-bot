@@ -26,7 +26,7 @@ The paper-trading service accesses no Bitvavo or exchange endpoint, private exch
 
 ## Database changes
 
-Migration [`20261101154600_phase08_paper_trading.sql`](../supabase/migrations/20261101154600_phase08_paper_trading.sql):
+Migration [`20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql):
 
 - Adds nullable `AI_Crypto_Bot_Trades.ai_decision_id` with a restrictive foreign key for audit traceability; legacy trade rows remain valid.
 - Adds lookup indexes for latest decisions, trade cooldowns, and decision-linked trades.
@@ -58,10 +58,10 @@ Migration [`20261101154600_phase08_paper_trading.sql`](../supabase/migrations/20
 
 ## Files changed
 
-- Application: [`api/paper-trading.mjs`](../api/paper-trading.mjs), [`lib/paper-trading.mjs`](../lib/paper-trading.mjs), [`api/dashboard-data.mjs`](../api/dashboard-data.mjs), [`js/dashboard.js`](../js/dashboard.js), [`dashboard.html`](../dashboard.html), [`js/portfolio.js`](../js/portfolio.js), [`portfolio.html`](../portfolio.html)
-- Database/validation: [`supabase/migrations/20261101154600_phase08_paper_trading.sql`](../supabase/migrations/20261101154600_phase08_paper_trading.sql), [`scripts/validate-project.js`](../scripts/validate-project.js)
-- Tests: [`tests/database-migrations.test.js`](../tests/database-migrations.test.js), [`tests/paper-trading.test.mjs`](../tests/paper-trading.test.mjs), [`tests/portfolio.test.js`](../tests/portfolio.test.js), [`tests/dashboard.test.js`](../tests/dashboard.test.js)
-- Documentation: [`README.md`](../README.md), [`ROADMAP.md`](../ROADMAP.md), [`docs/API.md`](./API.md), [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md), [`docs/DATABASE.md`](./DATABASE.md), [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md), [`docs/KNOWN_ISSUES.md`](./KNOWN_ISSUES.md), [`docs/RISK_MANAGEMENT.md`](./RISK_MANAGEMENT.md), [`docs/SCHEDULING.md`](./SCHEDULING.md), [`docs/TESTING.MD`](./TESTING.MD), [`docs/CHANGELOG.md`](./CHANGELOG.md)
+- Application: [`api/paper-trading.mjs`](../../api/paper-trading.mjs), [`lib/paper-trading.mjs`](../../lib/paper-trading.mjs), [`api/dashboard-data.mjs`](../../api/dashboard-data.mjs), [`js/dashboard.js`](../../js/dashboard.js), [`dashboard.html`](../../dashboard.html), [`js/portfolio.js`](../../js/portfolio.js), [`portfolio.html`](../../portfolio.html)
+- Database/validation: [`supabase/migrations/20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql), [`scripts/validate-project.js`](../../scripts/validate-project.js)
+- Tests: [`tests/database-migrations.test.js`](../../tests/database-migrations.test.js), [`tests/paper-trading.test.mjs`](../../tests/paper-trading.test.mjs), [`tests/portfolio.test.js`](../../tests/portfolio.test.js), [`tests/dashboard.test.js`](../../tests/dashboard.test.js)
+- Documentation: [`README.md`](../../README.md), [`ROADMAP.md`](../../ROADMAP.md), [`docs/API.md`](../API.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/DATABASE.md`](../DATABASE.md), [`docs/DEPLOYMENT.md`](../DEPLOYMENT.md), [`docs/KNOWN_ISSUES.md`](../KNOWN_ISSUES.md), [`docs/RISK_MANAGEMENT.md`](../RISK_MANAGEMENT.md), [`docs/SCHEDULING.md`](../SCHEDULING.md), [`docs/TESTING.MD`](../TESTING.MD), [`docs/CHANGELOG.md`](../CHANGELOG.md)
 
 ## Tests and validation
 

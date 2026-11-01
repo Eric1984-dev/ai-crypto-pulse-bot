@@ -33,7 +33,7 @@ The final Agent Brain silhouette refresh is implemented within Phase 05. Phase 0
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md`
 
 ## Validation
 

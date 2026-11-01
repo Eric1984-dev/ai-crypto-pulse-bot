@@ -262,7 +262,7 @@ npm.cmd run build
 
 In this validation run, `npm.cmd test` passed 169 tests with 0 failures, and `npm.cmd run build` passed static project validation plus migration validation for 16 prefixed tables, RLS coverage, and initial seed consistency. The `api/` directory contains 12 function files.
 
-Automated tests use fakes, fixtures, mocked HTTP/PostgREST responses, or local PGlite where documented above. They do not prove live Supabase Auth/database/Realtime behavior, a Vercel deployment, Bitvavo availability, or external scheduler configuration. The hosted Realtime publication migration and production smoke tests remain pending. See [the Phase 12 system validation report](../PHASE_12_SYSTEM_VALIDATION_REPORT.md) for per-component ratings, production findings, risks, and recommendations. Phase 13 has not started.
+Automated tests use fakes, fixtures, mocked HTTP/PostgREST responses, or local PGlite where documented above. They do not prove live Supabase Auth/database/Realtime behavior, a Vercel deployment, Bitvavo availability, or external scheduler configuration. The hosted Realtime publication migration and production smoke tests remain pending. See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md) for per-component ratings, production findings, risks, and recommendations. Phase 13 has not started.
 
 ---
 
@@ -282,7 +282,7 @@ Supabase requests are mocked; these checks do not prove remote RLS configuration
 
 ## Phase 13 Analytics validation
 
-Analytics tests cover SELL-based win/loss and breakeven handling, signed average loss, realized/unrealized/total P&L, profit factor, paired-trade hold time, confidence-range boundaries including 100, BUY/SELL/HOLD attribution, strategy and symbol grouping, portfolio growth and daily/weekly/monthly performance, snapshot drawdown, empty data, and 1,201 trades paginated across 500-row reads. Export tests validate all four Analytics CSV types, row counts, headers, report content, and reuse of the authenticated dashboard-data route. UI tests verify loading/empty/error states, rendered metrics, and that four Analytics export cards share one analytics count request.
+Analytics tests cover SELL-based win/loss and breakeven handling, signed average loss, realized/unrealized/total P&L, profit factor, paired-trade hold time, confidence-range boundaries including 100, BUY/SELL/HOLD attribution, strategy and symbol grouping, period-scoped portfolio growth/drawdown and daily/weekly/monthly performance, empty data, invalid ranges, and safe query-level diagnostics. A generated large-history test processes 100,001 AI decisions, 100,001 snapshots, and 10,001 trades through 500-row pages with a maximum of four prefetched pages per source. Export tests validate all four Analytics CSV types and ensure counts and downloads follow the selected 30/90/365-day range through the existing authenticated dashboard-data route. UI tests verify loading/empty/error states, rendered metrics, range requests, and shared count requests.
 
 ```powershell
 node --test tests/analytics.test.mjs tests/analytics-ui.test.js tests/exports.test.mjs tests/exports-ui.test.js tests/project-setup.test.js tests/auth.test.js
@@ -290,7 +290,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-In the Phase 13 validation run, the complete `npm.cmd test` suite passed 196 tests with 0 failures. `npm.cmd run build` passed static project validation and database migration validation (16 prefixed tables, RLS coverage, and initial seed consistency). The API directory contains exactly 12 function files. Tests use mocked Supabase/PostgREST responses; they do not prove hosted database correctness, production-scale latency, or Vercel deployment behavior. Analytics export reports process all retained history and can become slow for very large accounts despite bounded-page reads and bounded browser series. See [the Phase 13 Analytics report](../PHASE_13_ANALYTICS_REPORT.md) for calculation methodology and limitations. Phase 14 has not started.
+The original Phase 13 validation run passed 196 tests. After the production-loading follow-up, `npm.cmd test` passed 202 tests with 0 failures and `npm.cmd run build` passed static project and database migration validation. The API directory contains 12 function files. Tests use mocked Supabase/PostgREST responses; they do not prove hosted database correctness, Vercel deployment behavior, or production request latency. The Analytics page and reports default to 30 days and support 90 and 365 days; page reads are bounded and concurrent, but processing a very large 365-day window can still take time. See [the production fix report](reports/PHASE_13_ANALYTICS_PRODUCTION_FIX_REPORT.md) for measured coverage and outstanding deployment checks. Phase 14 has not started.
 
 ---
 

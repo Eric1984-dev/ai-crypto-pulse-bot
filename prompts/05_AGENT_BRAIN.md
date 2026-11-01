@@ -5,8 +5,8 @@ Read completely before making changes:
 - ROADMAP.md
 - ARCHITECTURE.md
 - DATABASE.md
-- docs/PHASE_03_COMPLETION_REPORT.md
-- docs/PHASE_04_COMPLETION_REPORT.md
+- docs/reports/PHASE_03_COMPLETION_REPORT.md
+- docs/reports/PHASE_04_COMPLETION_REPORT.md
 - prompts/05_AGENT_BRAIN.md
 - .github/copilot-instructions.md
 

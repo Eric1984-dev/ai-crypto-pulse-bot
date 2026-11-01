@@ -25,8 +25,8 @@ The bilateral brain silhouette, dashboard position, Supabase status integration,
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_FINAL_REDESIGN_REPORT.md`
-- `docs/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_REDESIGN_REPORT.md`
+- `docs/reports/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md`
 
 ## Validation
 

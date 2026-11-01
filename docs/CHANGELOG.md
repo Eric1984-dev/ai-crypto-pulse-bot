@@ -8,9 +8,16 @@ All notable project changes should be documented here.
 
 ### Validation
 
-- Completed the Phase 12 system audit and generated `PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
+- Completed the Phase 12 system audit and generated `reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
 - Recorded a 50% production-readiness score (WARNING), the six known production findings, and the hosted Supabase, Realtime, provider, and external-scheduler checks still outstanding; verified the API function count remains 12
 - Corrected stale Dashboard/scanner documentation and Known Issues status to match current behavior and implementation
+- Analytics production-loading follow-up passed all 202 automated tests and static/database build validation; hosted Supabase/Vercel behavior remains unverified
+
+### Fixed
+
+- Phase 13 Analytics now defaults to a 30-day history window and supports 90- and 365-day ranges for historical trades, AI decisions, and snapshots; current positions and account totals remain current-state metrics
+- Bounded Analytics reads with exact RLS-visible counts and up to four concurrent 500-row pages per source, avoiding full all-history decision scans and detecting truncated pages
+- Added safe query-level Analytics failure logs and aligned all four Analytics CSV reports with the selected range, without adding an API function or database object
 
 ### Added
 

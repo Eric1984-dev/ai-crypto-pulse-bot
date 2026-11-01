@@ -31,8 +31,8 @@
 - `tests/portfolio.test.js`
 - `README.md`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_10_COMPLETION_REPORT.md`
-- `TRADE_HISTORY_ENHANCEMENT_REPORT.md`
+- `docs/reports/PHASE_10_COMPLETION_REPORT.md`
+- `docs/reports/TRADE_HISTORY_ENHANCEMENT_REPORT.md`
 
 ## Scope safeguards
 

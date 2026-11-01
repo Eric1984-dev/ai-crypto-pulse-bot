@@ -172,7 +172,7 @@ Status: Implementation complete; production validation pending.
 - [x] Classify known production findings, risks, limitations, and unresolved checks
 - [x] Generate the Phase 12 system validation report and update testing/changelog documentation
 
-Status: Validation audit complete; production readiness WARNING (50%). Hosted production checks remain open. Phase 13 has not started.
+Status: Validation audit complete; production readiness WARNING (50%). Hosted production checks remain open. Phase 13 Analytics followed this audit; Phase 14 has not started.
 
 ---
 
@@ -184,9 +184,12 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 - [x] Display portfolio growth, equity curve, daily/weekly/monthly performance, and drawdown history
 - [x] Add Analytics Summary, Trade Analytics, Portfolio Analytics, and AI Analytics CSV exports to the existing Exports page and authenticated dashboard-data function
 - [x] Paginate existing data reads, bound rendered time series, and test empty and large datasets
+- [x] Bound historical Analytics to selectable rolling 30-, 90-, and 365-day ranges (default 30 days), while retaining current position and account metrics
+- [x] Prefetch no more than four 500-row pages per source, validate exact RLS-visible counts, and log safe query/table/page diagnostics on failures
+- [x] Validate 100,001 AI decisions, 100,001 snapshots, and 10,001 trades without loading full source histories into browser memory
 - [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Status: Implementation and local validation complete. No new database objects or Vercel Functions were added. Hosted production behavior remains unverified; Phase 14 has not started.
+Status: Analytics production-loading fix is implemented and locally validated. No new database objects or Vercel Functions were added; API function count remains 12. The previously observed hosted 503's exact failing query remains unconfirmed until the fix is deployed and the new safe logs are inspected. Phase 14 has not started.
 
 ---
 

@@ -9,6 +9,7 @@
   }
 })(globalThis, function createExportsApi() {
   const supportedPeriods = new Set(["24h", "7d", "30d", "all"]);
+  const analyticsPeriods = new Set(["30d", "90d", "365d"]);
   const analyticsExportTypes = new Set([
     "analytics-summary",
     "trade-analytics",
@@ -18,7 +19,10 @@
   const countFormat = new Intl.NumberFormat("en-GB");
 
   function buildExportUrl(type, period, view = "export-count") {
-    if (typeof type !== "string" || !type || !supportedPeriods.has(period)
+    const validPeriod = analyticsExportTypes.has(type)
+      ? analyticsPeriods.has(period)
+      : supportedPeriods.has(period);
+    if (typeof type !== "string" || !type || !validPeriod
       || !["export-count", "export"].includes(view)) {
       throw new TypeError("A valid export type, period, and view are required.");
     }
@@ -56,8 +60,12 @@
     return data.recordCount;
   }
 
-  async function requestAnalyticsExportCounts(fetchImpl) {
-    const response = await fetchImpl("/api/dashboard-data?view=analytics", {
+  async function requestAnalyticsExportCounts(fetchImpl, period = "30d") {
+    if (!analyticsPeriods.has(period)) {
+      throw new TypeError("A valid analytics date range is required.");
+    }
+    const params = new URLSearchParams({ view: "analytics", period });
+    const response = await fetchImpl(`/api/dashboard-data?${params}`, {
       method: "GET",
       cache: "no-store",
       credentials: "same-origin",
@@ -79,7 +87,7 @@
       throw new Error("The analytics export count response is invalid.");
     }
     const counts = result && result.data && result.data.exportCounts;
-    if (!counts || typeof counts !== "object"
+    if (!result.data || result.data.period !== period || !counts || typeof counts !== "object"
       || [...analyticsExportTypes].some((type) =>
         !Number.isSafeInteger(counts[type]) || counts[type] < 0
       )) {
@@ -99,9 +107,16 @@
 
     const cleanupCallbacks = [];
     const cards = [...documentRef.querySelectorAll("[data-export-card]")];
-    const analyticsCountsRequest = cards.some((card) =>
-      analyticsExportTypes.has(card.dataset.exportCard)
-    ) ? requestAnalyticsExportCounts(fetchImpl) : null;
+    const analyticsPeriodSelect = documentRef.querySelector("[data-analytics-export-period]");
+    const analyticsCountRequests = new Map();
+    const analyticsCardRefreshers = [];
+
+    function getAnalyticsCounts(period) {
+      if (!analyticsCountRequests.has(period)) {
+        analyticsCountRequests.set(period, requestAnalyticsExportCounts(fetchImpl, period));
+      }
+      return analyticsCountRequests.get(period);
+    }
 
     for (const card of cards) {
       const type = card.dataset.exportCard;
@@ -123,8 +138,13 @@
 
       async function loadCount() {
         const currentRequest = ++requestNumber;
-        const period = periodSelect ? periodSelect.value : "all";
-        if (!supportedPeriods.has(period)) {
+        const period = periodSelect
+          ? periodSelect.value
+          : (analyticsExportTypes.has(type) ? analyticsPeriodSelect?.value || "30d" : "all");
+        const validPeriod = analyticsExportTypes.has(type)
+          ? analyticsPeriods.has(period)
+          : supportedPeriods.has(period);
+        if (!validPeriod) {
           recordCount = null;
           if (downloadButton) {
             downloadButton.disabled = true;
@@ -145,7 +165,7 @@
 
         try {
           const count = analyticsExportTypes.has(type)
-            ? (await analyticsCountsRequest)[type]
+            ? (await getAnalyticsCounts(period))[type]
             : await requestExportCount(fetchImpl, type, period);
           if (disposed || currentRequest !== requestNumber) {
             return;
@@ -184,7 +204,9 @@
           return;
         }
         try {
-          const period = periodSelect ? periodSelect.value : "all";
+          const period = periodSelect
+            ? periodSelect.value
+            : (analyticsExportTypes.has(type) ? analyticsPeriodSelect?.value || "30d" : "all");
           const anchor = documentRef.createElement("a");
           anchor.href = buildExportUrl(type, period, "export");
           anchor.download = `cryptopulse-${type}-${period}.csv`;
@@ -212,8 +234,22 @@
       downloadButton?.addEventListener("click", onDownload);
       windowRef.addEventListener?.("pagehide", onPageHide);
       cleanupCallbacks.push(onPageHide);
+      if (analyticsExportTypes.has(type)) {
+        analyticsCardRefreshers.push(loadCount);
+      }
       void loadCount();
     }
+
+    const onAnalyticsPeriodChange = () => {
+      analyticsCountRequests.clear();
+      for (const refresh of analyticsCardRefreshers) {
+        void refresh();
+      }
+    };
+    analyticsPeriodSelect?.addEventListener("change", onAnalyticsPeriodChange);
+    cleanupCallbacks.push(() => {
+      analyticsPeriodSelect?.removeEventListener("change", onAnalyticsPeriodChange);
+    });
 
     return () => {
       for (const cleanup of cleanupCallbacks) {

@@ -40,12 +40,12 @@ Implemented within Phase 05. Phase 06 was not started. The dashboard layout, Age
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.MD`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_COMPLETION_REPORT.md`
-- `docs/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
-- `docs/PHASE_05_FINAL_FIX_REPORT.md`
-- `docs/PHASE_05_VISUAL_REDESIGN_REPORT.md`
-- `docs/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md`
-- `docs/PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md`
+- `docs/reports/PHASE_05_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_FIX_REPORT.md`
+- `docs/reports/PHASE_05_VISUAL_REDESIGN_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md`
+- `docs/reports/PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md`
 
 ## Validation
 

@@ -38,7 +38,7 @@ Exact counts and portfolio daily-PnL aggregation still require database work pro
 - `scripts/validate-project.js`, `tests/auth.test.js`, `tests/project-setup.test.js` — project and route validation.
 - `tests/exports.test.mjs`, `tests/exports-ui.test.js` — export-service, route, CSV, large-dataset, and UI tests.
 - `README.md`, `docs/API.md`, `docs/TESTING.MD`, `docs/CHANGELOG.md` — project documentation.
-- `EXPORTS_MODULE_REPORT.md` — this report.
+- `docs/reports/EXPORTS_MODULE_REPORT.md` — this report.
 
 ## Tests and build validation
 

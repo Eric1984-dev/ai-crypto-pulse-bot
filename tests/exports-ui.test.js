@@ -59,7 +59,7 @@ function createAnalyticsExportCard(type) {
   };
 }
 
-function createExportsDocument(cards) {
+function createExportsDocument(cards, analyticsPeriod = createControl("30d")) {
   const appended = [];
   const cardList = Array.isArray(cards) ? cards : [cards];
   return {
@@ -69,8 +69,12 @@ function createExportsDocument(cards) {
       }
     },
     appended,
+    analyticsPeriod,
     querySelector(selector) {
-      return selector === "[data-exports-page]" ? {} : null;
+      if (selector === "[data-exports-page]") {
+        return {};
+      }
+      return selector === "[data-analytics-export-period]" ? analyticsPeriod : null;
     },
     querySelectorAll(selector) {
       return selector === "[data-export-card]" ? cardList : [];
@@ -144,7 +148,7 @@ test("export page displays counts, empty states, download status, and failures",
   cleanup();
 });
 
-test("analytics export cards share one analytics request and download all-history CSV", async () => {
+test("analytics export cards share a selected-range request and download range-filtered CSV", async () => {
   const types = ["analytics-summary", "trade-analytics", "portfolio-analytics", "ai-analytics"];
   const cards = types.map(createAnalyticsExportCard);
   const documentRef = createExportsDocument(cards);
@@ -152,13 +156,15 @@ test("analytics export cards share one analytics request and download all-histor
   const windowRef = {
     fetch: async (url) => {
       requests.push(url);
+      const period = new URL(url, "https://cryptopulse.local").searchParams.get("period");
       return {
         status: 200,
         ok: true,
         async json() {
           return {
             data: {
-              exportCounts: Object.fromEntries(types.map((type) => [type, 3]))
+              exportCounts: Object.fromEntries(types.map((type) => [type, 3])),
+              period
             }
           };
         }
@@ -170,7 +176,7 @@ test("analytics export cards share one analytics request and download all-histor
 
   const cleanup = exportsPage.startExports({ windowRef, documentRef });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics").length, 1);
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics&period=30d").length, 1);
   for (const card of cards) {
     assert.equal(card.nodes["[data-export-count]"].textContent, "3 report rows available");
     assert.equal(card.nodes["[data-export-download]"].disabled, false);
@@ -178,7 +184,17 @@ test("analytics export cards share one analytics request and download all-histor
   await cards[0].nodes["[data-export-download]"].trigger("click");
   assert.equal(
     documentRef.appended[0].href,
-    "/api/dashboard-data?view=export&type=analytics-summary&period=all"
+    "/api/dashboard-data?view=export&type=analytics-summary&period=30d"
+  );
+
+  documentRef.analyticsPeriod.value = "90d";
+  await documentRef.analyticsPeriod.trigger("change");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics&period=90d").length, 1);
+  await cards[0].nodes["[data-export-download]"].trigger("click");
+  assert.equal(
+    documentRef.appended[1].href,
+    "/api/dashboard-data?view=export&type=analytics-summary&period=90d"
   );
   cleanup();
 });

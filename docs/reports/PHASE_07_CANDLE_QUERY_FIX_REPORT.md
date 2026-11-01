@@ -37,8 +37,8 @@ The test verifies all six intervals are available in the persisted AI decision i
 - `tests/ai-engine.test.mjs` — capped-response regression coverage.
 - `README.md`, `ROADMAP.md`, and `docs/CHANGELOG.md` — feature status and change history.
 - `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, and `docs/TESTING.md` — behavior, data access, and validation details.
-- `docs/PHASE_07_COMPLETION_REPORT.md` — follow-up implementation note.
-- `docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md` — this report.
+- `docs/reports/PHASE_07_COMPLETION_REPORT.md` — follow-up implementation note.
+- `docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md` — this report.
 
 ## Validation
 

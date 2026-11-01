@@ -31,7 +31,7 @@ This completion report records the original Phase 05 delivery. Its visual implem
 - `js/agent-brain.js`
 - `tests/agent-brain.test.js`
 - `tests/agent-status.test.js`
-- `docs/PHASE_05_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_05_COMPLETION_REPORT.md`
 
 ### Modified
 

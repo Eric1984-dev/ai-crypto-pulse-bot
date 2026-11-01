@@ -28,7 +28,7 @@ The requested `js/agent-brain-status.js` and `js/three-brain.js` files do not ex
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.md`
 - `docs/CHANGELOG.md`
-- `docs/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
+- `docs/reports/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md`
 
 `dashboard.html` and the existing dashboard layout were not changed.
 

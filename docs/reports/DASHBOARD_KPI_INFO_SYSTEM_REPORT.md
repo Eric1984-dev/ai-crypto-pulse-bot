@@ -19,7 +19,7 @@
 - `ROADMAP.md`
 - `docs/CHANGELOG.md`
 - `docs/TESTING.MD`
-- `docs/DASHBOARD_KPI_INFO_SYSTEM_REPORT.md`
+- `docs/reports/DASHBOARD_KPI_INFO_SYSTEM_REPORT.md`
 
 ## Tests Executed
 

@@ -61,7 +61,7 @@ The dashboard retains its existing recent-trades summary and now links directly 
 - `docs/DATABASE.md`
 - `docs/CHANGELOG.md`
 - `docs/TESTING.MD`
-- `docs/PHASE_10_COMPLETION_REPORT.md`
+- `docs/reports/PHASE_10_COMPLETION_REPORT.md`
 
 ## Tests and Validation
 
