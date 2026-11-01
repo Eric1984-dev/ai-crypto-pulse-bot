@@ -16,6 +16,7 @@
   const chartColors = ["#9de7ba", "#80b9ff", "#ffc779", "#d0a6ff", "#ff9f9a"];
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
+  const dashboardRefreshIntervalMs = 30000;
   const threeModuleUrl = "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
   function emptyDashboardData() {
@@ -399,6 +400,9 @@
     let chart = null;
     let requestInProgress = false;
     let statusRequestInProgress = false;
+    let foregroundRefreshPending = false;
+    let dashboardDataLoaded = false;
+    let dashboardPollingTimer = null;
     let statusPollingTimer = null;
     let brain = null;
     let brainInitialization = null;
@@ -412,11 +416,11 @@
     const brainFallback = documentRef.querySelector("[data-agent-brain-fallback]");
 
     async function load() {
-      if (requestInProgress || disposed) {
+      if (requestInProgress || disposed || documentRef.visibilityState === "hidden") {
         return;
       }
       requestInProgress = true;
-      if (loading) {
+      if (loading && !dashboardDataLoaded) {
         loading.hidden = false;
       }
       if (errorBanner) {
@@ -445,18 +449,24 @@
         }
         chart = renderDashboard(data, documentRef, ChartConstructor, chart);
         applyAgentStatus(data.agentStatus && data.agentStatus.status);
+        dashboardDataLoaded = true;
       } catch (error) {
         if (disposed) {
           return;
         }
-        chart = renderDashboard(emptyDashboardData(), documentRef, ChartConstructor, chart);
-        applyAgentStatus(null);
         if (error && error.status === 401) {
+          foregroundRefreshPending = false;
           windowRef.location.replace("/login.html?next=%2Fdashboard.html");
           return;
         }
+        if (!dashboardDataLoaded) {
+          chart = renderDashboard(emptyDashboardData(), documentRef, ChartConstructor, chart);
+          applyAgentStatus(null);
+        }
         if (errorBanner) {
-          errorBanner.textContent = "Dashboard data could not be loaded. Please try again.";
+          errorBanner.textContent = dashboardDataLoaded
+            ? "Dashboard data could not be refreshed. Please try again."
+            : "Dashboard data could not be loaded. Please try again.";
           errorBanner.hidden = false;
         }
         if (retryButton) {
@@ -470,6 +480,7 @@
         if (retryButton) {
           retryButton.disabled = false;
         }
+        runPendingForegroundRefresh();
       }
     }
 
@@ -610,7 +621,8 @@
     }
 
     async function refreshAgentStatus() {
-      if (statusRequestInProgress || disposed || documentRef.visibilityState === "hidden") {
+      if (statusRequestInProgress || requestInProgress || disposed
+        || documentRef.visibilityState === "hidden") {
         return;
       }
       statusRequestInProgress = true;
@@ -624,13 +636,49 @@
           return;
         }
         if (error && error.status === 401) {
+          foregroundRefreshPending = false;
           windowRef.location.replace("/login.html?next=%2Fdashboard.html");
           return;
         }
         applyAgentStatus(null);
       } finally {
         statusRequestInProgress = false;
+        runPendingForegroundRefresh();
       }
+    }
+
+    function startDashboardPolling() {
+      if (dashboardPollingTimer !== null || disposed
+        || documentRef.visibilityState === "hidden"
+        || typeof setIntervalImpl !== "function") {
+        return;
+      }
+      dashboardPollingTimer = setIntervalImpl(load, dashboardRefreshIntervalMs);
+    }
+
+    function stopDashboardPolling() {
+      if (dashboardPollingTimer !== null) {
+        clearIntervalImpl(dashboardPollingTimer);
+        dashboardPollingTimer = null;
+      }
+    }
+
+    function refreshDashboardOnForeground() {
+      if (requestInProgress || statusRequestInProgress) {
+        foregroundRefreshPending = true;
+        return;
+      }
+      foregroundRefreshPending = false;
+      load();
+    }
+
+    function runPendingForegroundRefresh() {
+      if (!foregroundRefreshPending || requestInProgress || statusRequestInProgress
+        || disposed || documentRef.visibilityState === "hidden") {
+        return;
+      }
+      foregroundRefreshPending = false;
+      load();
     }
 
     function startStatusPolling() {
@@ -651,18 +699,21 @@
 
     function onVisibilityChange() {
       if (documentRef.visibilityState === "hidden") {
+        stopDashboardPolling();
         stopStatusPolling();
         return;
       }
       if (documentRef.body.dataset.authPage === "protected"
         && !documentRef.documentElement.classList.contains("auth-pending")) {
+        startDashboardPolling();
         startStatusPolling();
-        refreshAgentStatus();
+        refreshDashboardOnForeground();
       }
     }
 
     function onPageHide(event) {
       if (event && event.persisted) {
+        stopDashboardPolling();
         stopStatusPolling();
         return;
       }
@@ -680,6 +731,8 @@
         return;
       }
       disposed = true;
+      foregroundRefreshPending = false;
+      stopDashboardPolling();
       stopStatusPolling();
       if (typeof documentRef.removeEventListener === "function") {
         documentRef.removeEventListener("visibilitychange", onVisibilityChange);
@@ -706,6 +759,7 @@
         if (documentRef.body.dataset.authPage === "protected"
           && !documentRef.documentElement.classList.contains("auth-pending")) {
           await load();
+          startDashboardPolling();
           startStatusPolling();
         }
         return undefined;

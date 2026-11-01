@@ -23,6 +23,7 @@ Implemented components:
 - Embedded PostgreSQL migration and RLS integration tests
 - Authenticated read-only dashboard API that forwards the caller's JWT to Supabase so RLS remains authoritative
 - Database-backed dashboard summaries, recent activity, and snapshot chart with safe empty/error states
+- Visibility-aware dashboard polling every 30 seconds, with a foreground refresh and duplicate-load protection
 - Three.js Agent Brain visualization driven by the live database status, with bounded rendering, hidden-tab pause, and explicit resource disposal
 - Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
 - Non-destructive watched-market validation/synchronization and 60-second in-memory provider caching

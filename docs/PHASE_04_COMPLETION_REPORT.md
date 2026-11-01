@@ -74,3 +74,7 @@ The automated API tests mock Supabase responses and verify authentication, user-
 
 - Run an authenticated dashboard smoke test against the configured Supabase project and deployed Vercel environment.
 - Perform physical-device testing on iOS and Android.
+
+## Follow-up: automatic dashboard refresh
+
+The full dashboard and market summary now refresh every 30 seconds while the page is visible and refresh immediately when the page returns to the foreground. Both polling timers stop while hidden and restart on return. Existing `no-store` behavior and API endpoints are unchanged; overlapping dashboard loads are coalesced, and a pending foreground refresh runs after an in-flight load completes. See [DASHBOARD_AUTO_REFRESH_REPORT.md](./DASHBOARD_AUTO_REFRESH_REPORT.md) for implementation and validation details.

@@ -55,6 +55,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Refresh complete authenticated dashboard data every 30 seconds while visible and immediately when returning to the foreground; retain no-store requests and coalesce concurrent loads
 - Increase Agent Brain active-neuron halo strength and extend the taller silhouette slightly downward
 - Remove the visible dashboard title/subtitle and redundant Agent Status descriptions while retaining the paper-mode notice, accessible page heading, and status visualization
 - Replace the diffuse node-cloud layout with a front-facing bilateral cortical contour, pronounced center fissure, curved gyri, branching neural paths, and radial neuron halos; both hemispheres share one status color

@@ -76,6 +76,8 @@ Success response:
 
 Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configuration, unavailable Supabase, or invalid database responses: `503`. The endpoint sets `Cache-Control: no-store`; it returns no provider credentials or raw database errors.
 
+The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. The separate market-summary request is refreshed with it. Both browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
+
 ## Phase 05 Agent Status endpoint
 
 ### GET /api/agent-status

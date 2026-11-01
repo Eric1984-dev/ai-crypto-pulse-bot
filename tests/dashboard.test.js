@@ -619,6 +619,138 @@ test("dashboard loads active-market counts and prices from the authenticated mar
   controller.dispose();
 });
 
+test("dashboard refreshes all data periodically and when returning to the foreground", async () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const dashboardData = dashboard.emptyDashboardData();
+  dashboardData.agentStatus = { status: "ACTIVE" };
+  dashboardData.aiDecisions = { count: 1, items: [] };
+  const requests = [];
+  const intervals = new Map();
+  let nextIntervalId = 0;
+  let holdNextDashboardRequest = false;
+  let failNextDashboardRequest = false;
+  let resolveHeldDashboardRequest;
+  const windowRef = {
+    CryptoPulseAuthReady: Promise.resolve(),
+    CryptoPulseAgentBrain: {
+      createAgentBrain: () => ({ available: true, setStatus() {}, dispose() {} })
+    },
+    location: { replace() {} }
+  };
+  const controller = dashboard.startDashboard({
+    windowRef,
+    documentRef: dashboardDocument,
+    ChartConstructor: null,
+    loadThree: async () => ({ scene: true }),
+    fetchImpl: async (url) => {
+      requests.push(url);
+      if (url === "/api/dashboard-data") {
+        if (failNextDashboardRequest) {
+          failNextDashboardRequest = false;
+          return { ok: false, status: 503 };
+        }
+        if (holdNextDashboardRequest) {
+          holdNextDashboardRequest = false;
+          return new Promise((resolve) => {
+            resolveHeldDashboardRequest = () => resolve({
+              ok: true,
+              status: 200,
+              json: async () => ({ data: dashboardData })
+            });
+          });
+        }
+        return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
+      }
+      if (url === "/api/market-summary") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: { activeMarkets: 3, marketsWithData: 2, items: [] }
+          })
+        };
+      }
+      if (url === "/api/agent-status") {
+        return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
+      }
+      throw new Error(`Unexpected dashboard request: ${url}`);
+    },
+    setIntervalImpl(callback, delay) {
+      const id = ++nextIntervalId;
+      intervals.set(id, { callback, delay });
+      return id;
+    },
+    clearIntervalImpl(id) {
+      intervals.delete(id);
+    }
+  });
+  const flushDashboardLoad = async () => {
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  await flushDashboardLoad();
+
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 1);
+  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 1);
+  assert.deepEqual([...intervals.values()].map(({ delay }) => delay).sort(), [15000, 30000]);
+  const dashboardInterval = [...intervals.values()].find(({ delay }) => delay === 30000);
+
+  dashboardData.aiDecisions.count = 2;
+  await dashboardInterval.callback();
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 2);
+  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 2);
+  assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "2");
+
+  holdNextDashboardRequest = true;
+  const heldRefresh = dashboardInterval.callback();
+  await Promise.resolve();
+  const duplicateRefresh = controller.load();
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 3);
+
+  dashboardDocument.visibilityState = "hidden";
+  dashboardDocument.listeners.visibilitychange();
+  assert.equal(intervals.size, 0);
+  const requestCountWhileHidden = requests.length;
+  await dashboardInterval.callback();
+  assert.equal(requests.length, requestCountWhileHidden);
+
+  dashboardData.aiDecisions.count = 4;
+  dashboardDocument.visibilityState = "visible";
+  dashboardDocument.listeners.visibilitychange();
+  assert.equal(intervals.size, 2);
+  resolveHeldDashboardRequest();
+  await Promise.all([heldRefresh, duplicateRefresh]);
+  await flushDashboardLoad();
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 4);
+  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 4);
+  assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "4");
+
+  dashboardDocument.visibilityState = "hidden";
+  dashboardDocument.listeners.visibilitychange();
+  assert.equal(intervals.size, 0);
+  const requestCountAfterBackgrounding = requests.length;
+  await dashboardInterval.callback();
+  assert.equal(requests.length, requestCountAfterBackgrounding);
+
+  dashboardData.aiDecisions.count = 5;
+  dashboardDocument.visibilityState = "visible";
+  dashboardDocument.listeners.visibilitychange();
+  await flushDashboardLoad();
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 5);
+  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 5);
+  assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
+  assert.equal(intervals.size, 2);
+
+  failNextDashboardRequest = true;
+  await dashboardInterval.callback();
+  assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
+  assert.equal(elements.get("[data-dashboard-error]")[0].hidden, false);
+  assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
+
+  controller.dispose();
+  assert.equal(intervals.size, 0);
+});
+
 test("dashboard redirects to login when the data API reports an expired session", async () => {
   const { dashboardDocument } = createDashboardDocument();
   const redirects = [];
@@ -692,9 +824,13 @@ test("dashboard applies live database status updates and pauses polling while hi
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ACTIVE");
   assert.equal(elements.get("[data-agent-brain-fallback]")[0].hidden, true);
   assert.deepEqual(statusUpdates, ["ACTIVE"]);
-  assert.equal(intervals.size, 1);
-  const [intervalId, interval] = intervals.entries().next().value;
+  assert.equal(intervals.size, 2);
+  const [intervalId, interval] = [...intervals.entries()]
+    .find(([, currentInterval]) => currentInterval.delay === 15000);
+  const [dashboardIntervalId, dashboardInterval] = [...intervals.entries()]
+    .find(([, currentInterval]) => currentInterval.delay === 30000);
   assert.equal(interval.delay, 15000);
+  assert.equal(dashboardInterval.delay, 30000);
 
   await controller.refreshAgentStatus();
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
@@ -706,17 +842,19 @@ test("dashboard applies live database status updates and pauses polling while hi
   dashboardDocument.visibilityState = "hidden";
   dashboardDocument.listeners.visibilitychange();
   assert.equal(intervals.size, 0);
-  assert.deepEqual(clearedIntervals, [intervalId]);
+  assert.deepEqual(new Set(clearedIntervals), new Set([intervalId, dashboardIntervalId]));
   const callsBeforeHiddenPoll = statusUpdates.length;
   await interval.callback();
+  await dashboardInterval.callback();
   assert.equal(statusUpdates.length, callsBeforeHiddenPoll);
 
   dashboardDocument.visibilityState = "visible";
   pollStatus = "STOPPED";
+  dashboardData.agentStatus.status = "STOPPED";
   dashboardDocument.listeners.visibilitychange();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "STOPPED");
-  assert.equal(intervals.size, 1);
+  assert.equal(intervals.size, 2);
   controller.dispose();
   assert.equal(intervals.size, 0);
 });

@@ -30,7 +30,7 @@ The build check validates migration filenames, table/policy/index prefixes, per-
 
 ## Phase 04 dashboard validation
 
-Dashboard tests use the Node.js built-in test runner with mocked Supabase PostgREST responses; they do not depend on credentials or create simulated trading records in the database. They cover verified-session requirements, forwarding the caller JWT and anon key, RLS-compatible data requests, summary calculations, error responses, rendering, text-safe list content, empty values, persisted-snapshot chart data, authentication readiness, retry behavior, and expired-session redirects.
+Dashboard tests use the Node.js built-in test runner with mocked Supabase PostgREST responses; they do not depend on credentials or create simulated trading records in the database. They cover verified-session requirements, forwarding the caller JWT and anon key, RLS-compatible data requests, summary calculations, error responses, rendering, text-safe list content, empty values, persisted-snapshot chart data, authentication readiness, retry behavior, expired-session redirects, 30-second full-data polling, immediate foreground refresh, hidden-page pause/resume, no-store requests, and coalescing while a dashboard load is already in progress.
 
 ```powershell
 node --test tests/dashboard.test.js
