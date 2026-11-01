@@ -339,6 +339,98 @@
       brain.add(new THREE.Points(activityGeometry, activityGlowMaterial));
       brain.add(new THREE.Points(activityGeometry, activityMaterial));
 
+      const referenceTraceLayout = createReferenceTraceLayout(THREE);
+      const referenceTraceGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      referenceTraceGeometry.setFromPoints(referenceTraceLayout.segmentPoints);
+      const referenceTraceGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
+        color: 0x168fff,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const referenceTraceMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
+        color: 0x4bcfff,
+        transparent: true,
+        opacity: 0.62,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const referenceTraceGlow = new THREE.LineSegments(
+        referenceTraceGeometry,
+        referenceTraceGlowMaterial
+      );
+      const referenceTraces = new THREE.LineSegments(
+        referenceTraceGeometry,
+        referenceTraceMaterial
+      );
+      referenceTraceGlow.renderOrder = -2;
+      referenceTraces.renderOrder = -1;
+      brain.add(referenceTraceGlow, referenceTraces);
+
+      const referenceTraceNodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      referenceTraceNodeGeometry.setFromPoints(referenceTraceLayout.junctions);
+      const referenceTraceNodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0x83eaff,
+        size: 0.052,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.88,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const referenceTraceNodes = new THREE.Points(
+        referenceTraceNodeGeometry,
+        referenceTraceNodeMaterial
+      );
+      referenceTraceNodes.renderOrder = -1;
+      brain.add(referenceTraceNodes);
+
+      const analyzingNeuronIndices = Array.from(
+        { length: Math.min(52, nodePositions.length) },
+        (_, index) => (index * 149 + 37) % nodePositions.length
+      );
+      const analyzingNeuronGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      analyzingNeuronGeometry.setFromPoints(
+        analyzingNeuronIndices.map((index) => nodePositions[index])
+      );
+      const analyzingNeuronPositionAttribute = analyzingNeuronGeometry.getAttribute("position");
+      const analyzingNeuronGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0x39ff91,
+        size: 0.13,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.24,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const analyzingNeuronMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0x9bffc1,
+        size: 0.058,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.94,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const analyzingNeuronGlow = new THREE.Points(
+        analyzingNeuronGeometry,
+        analyzingNeuronGlowMaterial
+      );
+      const analyzingNeurons = new THREE.Points(
+        analyzingNeuronGeometry,
+        analyzingNeuronMaterial
+      );
+      analyzingNeuronGlow.visible = false;
+      analyzingNeurons.visible = false;
+      analyzingNeuronGlow.renderOrder = 1;
+      analyzingNeurons.renderOrder = 2;
+      brain.add(analyzingNeuronGlow, analyzingNeurons);
+
       function updateVisualIntensity(elapsed, breath) {
         const rawIntensity = pulseIntensity(config, elapsed, breath);
         const strength = Math.max(0, Math.min(1, rawIntensity / 2.4));
@@ -431,6 +523,11 @@
           animatedNodePositions,
           hotspotIndices
           );
+          updateHotspotPositions(
+          analyzingNeuronPositionAttribute,
+          animatedNodePositions,
+          analyzingNeuronIndices
+          );
           updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
           updateEnergyParticles(
           activityGeometry,
@@ -470,6 +567,9 @@
         setMaterialColor(hotspotGlowMaterial, config.color);
         setMaterialColor(activityMaterial, config.color);
         setMaterialColor(activityGlowMaterial, config.color);
+        const analyzing = config.status === "ANALYZING";
+        analyzingNeuronGlow.visible = analyzing;
+        analyzingNeurons.visible = analyzing;
         connectionMaterial.color.setHex(0xffffff);
         connectionGlowMaterial.color.setHex(0xffffff);
         activityGeometry.setDrawRange(0, config.activityPoints);
@@ -493,6 +593,11 @@
           hotspotPositionAttribute,
           animatedNodePositions,
           hotspotIndices
+        );
+        updateHotspotPositions(
+          analyzingNeuronPositionAttribute,
+          animatedNodePositions,
+          analyzingNeuronIndices
         );
         updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
         updateEnergyParticles(
@@ -900,6 +1005,51 @@
         : new THREE.Vector3());
     }
     return points;
+  }
+
+  function createReferenceTraceLayout(THREE) {
+    const segmentPoints = [];
+    const junctions = [];
+
+    function addPath(coordinates, z, includeBends = false) {
+      const points = coordinates.map(([x, y]) => new THREE.Vector3(x, y, z));
+      for (let index = 0; index < points.length - 1; index += 1) {
+        segmentPoints.push(points[index], points[index + 1]);
+      }
+      junctions.push(points[0]);
+      if (includeBends) {
+        junctions.push(...points.slice(1, -1));
+      }
+      junctions.push(points[points.length - 1]);
+    }
+
+    for (let lane = 0; lane < 3; lane += 1) {
+      const centerY = (lane - 1) * 0.14;
+      const coordinates = [];
+      for (let index = 0; index <= 28; index += 1) {
+        const progress = index / 28;
+        coordinates.push([
+          -1.24 + progress * 0.66,
+          centerY + Math.sin(progress * Math.PI * 4 + lane * 0.72) * 0.052
+        ]);
+      }
+      addPath(coordinates, -0.055);
+    }
+
+    const circuitPaths = [
+      [[0.48, 0.37], [0.72, 0.37], [0.88, 0.5], [1.2, 0.5]],
+      [[0.56, 0.23], [0.78, 0.23], [0.94, 0.37], [1.2, 0.37]],
+      [[0.64, 0.06], [1.2, 0.06]],
+      [[0.62, -0.12], [0.82, -0.12], [0.98, -0.28], [1.2, -0.28]],
+      [[0.48, -0.34], [0.7, -0.34], [0.88, -0.5], [1.2, -0.5]],
+      [[0.68, 0.34], [0.82, 0.48], [1.02, 0.48], [1.18, 0.54]],
+      [[0.7, -0.31], [0.86, -0.47], [1.04, -0.47], [1.18, -0.54]]
+    ];
+    for (const path of circuitPaths) {
+      addPath(path, -0.045, true);
+    }
+
+    return { junctions, segmentPoints };
   }
 
   function createConnectionLinePoints(nodePositions, connectionPairs) {

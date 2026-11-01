@@ -19,6 +19,7 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
     brainGroups: [],
     materialInstances: [],
     lineSegmentGeometries: [],
+    lineSegments: [],
     points: [],
     cancelledFrames: [],
     disconnectedObservers: 0,
@@ -295,6 +296,7 @@ function createBrainHarness({ mobile = false, visibilityState = "visible", rende
         this.geometry = geometry;
         this.material = material;
         calls.lineSegmentGeometries.push(geometry);
+        calls.lineSegments.push(this);
       }
     },
     Points: class extends FakeObject3D {
@@ -402,6 +404,36 @@ test("Agent Brain caps renderer pixel ratio for desktop and mobile performance",
   assert.equal(agentBrain.performanceLimits.maxActivityPoints, 48);
   assert.equal(agentBrain.performanceLimits.maxNeuralNodes, 720);
   assert.equal(agentBrain.performanceLimits.maxConnections, 2160);
+});
+
+test("Agent Brain adds reference-inspired traces and green neurons only while analyzing", () => {
+  const harness = createBrainHarness();
+  const brain = agentBrain.createAgentBrain({
+    THREE: harness.THREE,
+    container: harness.container,
+    windowRef: harness.windowRef,
+    documentRef: harness.documentRef,
+    initialStatus: "IDLE"
+  });
+  const referenceTrace = harness.calls.lineSegments.find(({ material }) =>
+    material.color.value === 0x4bcfff
+  );
+  const analysisNeurons = harness.calls.points.filter(({ material }) =>
+    material.color.value === 0x9bffc1
+  );
+
+  assert.ok(referenceTrace);
+  assert.ok(referenceTrace.renderOrder < 0);
+  assert.ok(referenceTrace.geometry.getAttribute("position").count > 180);
+  assert.equal(analysisNeurons.length, 1);
+  assert.equal(analysisNeurons[0].geometry.getAttribute("position").count, 52);
+  assert.equal(analysisNeurons[0].visible, false);
+
+  assert.equal(brain.setStatus("ANALYZING").status, "ANALYZING");
+  assert.equal(analysisNeurons[0].visible, true);
+  assert.equal(brain.setStatus("ACTIVE").status, "ACTIVE");
+  assert.equal(analysisNeurons[0].visible, false);
+  brain.dispose();
 });
 
 test("Agent Brain drives independent neuron and traveling signal activity without rotating", () => {
@@ -608,10 +640,14 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.ok(leftContourTop > 0.46);
   assert.ok(leftContourBottom < -0.4);
   const uniqueLineGeometries = [...new Set(harness.calls.lineSegmentGeometries)];
-  assert.equal(uniqueLineGeometries.length, 1);
-  assert.ok(harness.calls.lineSegmentGeometries.every((geometry) =>
+  assert.equal(uniqueLineGeometries.length, 2);
+  assert.ok(harness.calls.lineSegmentGeometries.slice(0, 2).every((geometry) =>
     geometry === harness.calls.lineSegmentGeometries[0]
   ));
+  assert.ok(harness.calls.lineSegmentGeometries.slice(2).every((geometry) =>
+    geometry === harness.calls.lineSegmentGeometries[2]
+  ));
+  assert.notEqual(harness.calls.lineSegmentGeometries[0], harness.calls.lineSegmentGeometries[2]);
   assert.ok(harness.calls.lineSegmentGeometries[0].getAttribute("position").count
     <= agentBrain.performanceLimits.maxConnections * 2);
   let leftHemisphereConnections = 0;
