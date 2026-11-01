@@ -8,7 +8,7 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard, portfolio, scanner, trade history en instellingen zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API.
-- Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie, haalt publieke Bitvavo-tickers en candles op, vernieuwt via de scheduler snapshots plus alle zes candle-intervallen voor actieve markten en slaat gegevens op in bestaande tabellen.
+- Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie, haalt publieke Bitvavo-tickers en candles op, vernieuwt snapshots plus candles incrementeel vanaf de laatst opgeslagen candle per markt/interval en slaat gegevens op in bestaande tabellen. De schedulerresponse en Vercel-logs rapporteren runtimeduur en verwerkte records.
 - Phase 07 analyseert echte markt snapshots en candledata met EMA, RSI, MACD, momentum, volume en volatiliteit. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; ontbrekende of verouderde input levert veilige `WAIT`- of lagere-confidence `HOLD`-beslissingen op.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met iets hogere hersenhelften (circa 16%), een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. Alle 720 neuronen pulseren onafhankelijk; maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Inactieve verbindingen blijven gedimd en lichten alleen op wanneer een signaal passeert. De visualisatie heeft geen volume, shell, fog, mesh of externe circuitsporen. Beide hersenhelften delen dezelfde statuskleur.
 - Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; paper-trade-uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd. De AI Engine genereert uitsluitend analysebeslissingen en voert geen trades uit.
@@ -74,5 +74,6 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 05 Final Redesign Report](./docs/PHASE_05_FINAL_REDESIGN_REPORT.md)
 - [Phase 05 Neural Activity Refinement Report](./docs/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md)
 - [Phase 06 completion report](./docs/PHASE_06_COMPLETION_REPORT.md)
+- [Phase 06 candle refresh optimization report](./docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md)
 - [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
 - [Phase 07 completion report](./docs/PHASE_07_COMPLETION_REPORT.md)

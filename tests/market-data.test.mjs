@@ -90,7 +90,7 @@ function createHarness({
           if (failCandleInterval === url.searchParams.get("interval")) {
             return jsonResponse({}, failCandleIntervalStatus);
           }
-          return jsonResponse(candleRows);
+          return jsonResponse(typeof candleRows === "function" ? candleRows(url) : candleRows);
         } finally {
           activeCandleRequests -= 1;
         }
@@ -140,6 +140,13 @@ function createHarness({
     const intervalFilter = url.searchParams.get("interval");
     if (intervalFilter && intervalFilter.startsWith("eq.")) {
       rows = rows.filter((row) => row.interval === intervalFilter.slice(3));
+    }
+    if (url.searchParams.get("order") === "timestamp.desc") {
+      rows = [...rows].sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
+    }
+    const limit = Number(url.searchParams.get("limit"));
+    if (Number.isInteger(limit) && limit >= 0) {
+      rows = rows.slice(0, limit);
     }
     return jsonResponse(rows);
   };
@@ -436,9 +443,16 @@ test("scheduled refresh stores all six candle intervals alongside ticker snapsho
     missing: 0,
     failed: 0,
     cached: 0,
+    unchanged: 0,
+    providerRequests: 6,
     skipped: 0,
     candlesUpserted: 6
   });
+  assert.equal(result.metrics.recordsProcessed.marketData, 1);
+  assert.equal(result.metrics.recordsProcessed.candles, 6);
+  assert.equal(result.metrics.recordsProcessed.total, 7);
+  assert.ok(result.metrics.marketRefreshDurationMs >= 0);
+  assert.ok(result.metrics.candleRefreshDurationMs >= 0);
   assert.equal(
     providerCalls.filter((path) => path.includes("/candles")).length,
     6
@@ -455,6 +469,7 @@ test("market refresh API triggers scheduled candle collection", async () => {
   const harness = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
   });
+  let loggedMetrics;
   const handler = createMarketRefreshHandler({
     env: {
       SUPABASE_URL: config.supabaseUrl,
@@ -463,7 +478,12 @@ test("market refresh API triggers scheduled candle collection", async () => {
       CRON_SECRET: "test-cron-secret"
     },
     service: harness.service,
-    logger: { error() {} }
+    logger: {
+      error() {},
+      info(_message, metrics) {
+        loggedMetrics = metrics;
+      }
+    }
   });
   const response = responseCapture();
   await handler({
@@ -476,6 +496,8 @@ test("market refresh API triggers scheduled candle collection", async () => {
   assert.equal(response.statusCode, 200);
   assert.equal(data.candleRefresh.refreshed, 6);
   assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 6);
+  assert.equal(loggedMetrics.candleRefreshDurationMs, data.metrics.candleRefreshDurationMs);
+  assert.equal(loggedMetrics.recordsProcessed.total, 7);
 });
 
 test("scheduled refresh refetches an interval when an earlier request cached a smaller history limit", async () => {
@@ -490,6 +512,7 @@ test("scheduled refresh refetches an interval when an earlier request cached a s
     interval: "1m",
     limit: 1
   });
+  harness.clock.value = new Date(fixedNow.getTime() + 2 * 60_000);
   const scheduled = await harness.service.refreshScheduledMarkets({ config, serviceRoleKey });
 
   assert.equal(scheduled.candleRefresh.refreshed, 6);
@@ -507,7 +530,7 @@ test("scheduled candle refresh uses bounded concurrency and reuses the 60-second
       validTicker,
       { ...validTicker, market: "ETH-EUR", open: "50", last: "55", high: "60", low: "45" }
     ],
-    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    candleRows: [[fixedNow.getTime() - 10 * 60_000, "100", "120", "90", "110", "25"]],
     providerDelayMs: 2
   });
   const first = await service.refreshScheduledMarkets({ config, serviceRoleKey });
@@ -518,8 +541,93 @@ test("scheduled candle refresh uses bounded concurrency and reuses the 60-second
   assert.equal(first.candleRefresh.attempted, 12);
   assert.ok(getMaxConcurrentCandleRequests() > 1);
   assert.ok(getMaxConcurrentCandleRequests() <= 4);
-  assert.equal(second.candleRefresh.cached, 12);
+  assert.equal(second.candleRefresh.cached, 4);
+  assert.equal(second.candleRefresh.unchanged, 8);
   assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, candleCalls);
+});
+
+test("scheduled candle refresh requests only the incremental range after each stored latest candle", async () => {
+  const intervalMs = {
+    "1m": 60_000,
+    "5m": 5 * 60_000,
+    "15m": 15 * 60_000,
+    "1h": 60 * 60_000,
+    "4h": 4 * 60 * 60_000,
+    "1d": 24 * 60 * 60_000
+  };
+  const storedCandles = Object.entries(intervalMs).map(([interval, duration]) => {
+    const timestamp = Math.floor(fixedNow.getTime() / duration) * duration - duration * 2;
+    return {
+      symbol: "BTC-EUR",
+      interval,
+      open: 100,
+      high: 120,
+      low: 90,
+      close: 110,
+      volume: 25,
+      timestamp: new Date(timestamp).toISOString()
+    };
+  });
+  const { service, providerCalls, database } = createHarness({
+    candles: storedCandles,
+    candleRows(url) {
+      const interval = url.searchParams.get("interval");
+      const start = Number(url.searchParams.get("start"));
+      return [
+        [start, "100", "120", "90", "111", "25"],
+        [start + intervalMs[interval], "100", "120", "90", "112", "25"]
+      ];
+    }
+  });
+
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const candleRequests = providerCalls
+    .filter((path) => path.includes("/candles"))
+    .map((path) => new URL(path, "https://api.bitvavo.com"));
+
+  assert.equal(candleRequests.length, 6);
+  for (const request of candleRequests) {
+    const interval = request.searchParams.get("interval");
+    const latest = storedCandles.find((candle) => candle.interval === interval);
+    assert.equal(request.searchParams.get("start"), String(Date.parse(latest.timestamp)));
+    assert.equal(request.searchParams.get("limit"), "3");
+  }
+  assert.equal(result.candleRefresh.candlesUpserted, 12);
+  assert.equal(result.metrics.recordsProcessed.candles, 12);
+  assert.equal(database["AI_Crypto_Bot_Candles"].length, 12);
+  assert.equal(
+    database["AI_Crypto_Bot_Candles"].filter(({ close }) => close === 112).length,
+    6
+  );
+});
+
+test("scheduled candle refresh skips intervals with no completed candle", async () => {
+  const intervalMs = {
+    "1m": 60_000,
+    "5m": 5 * 60_000,
+    "15m": 15 * 60_000,
+    "1h": 60 * 60_000,
+    "4h": 4 * 60 * 60_000,
+    "1d": 24 * 60 * 60_000
+  };
+  const candles = Object.entries(intervalMs).map(([interval, duration]) => ({
+    symbol: "BTC-EUR",
+    interval,
+    open: 100,
+    high: 120,
+    low: 90,
+    close: 110,
+    volume: 25,
+    timestamp: new Date(Math.floor(fixedNow.getTime() / duration) * duration).toISOString()
+  }));
+  const { service, providerCalls, writes } = createHarness({ candles });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.candleRefresh.status, "up-to-date");
+  assert.equal(result.candleRefresh.unchanged, 6);
+  assert.equal(result.candleRefresh.providerRequests, 0);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 0);
+  assert.equal(writes.some(({ table }) => table === "AI_Crypto_Bot_Candles"), false);
 });
 
 test("scheduled candle refresh continues after provider errors and records failures", async () => {

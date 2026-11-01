@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 06 incremental candle refresh using latest stored timestamps, due-interval scheduling, bounded range requests, batch latest-candle reads, and market/candle runtime metrics
 - Phase 06 scheduled candle refresh across all six supported intervals for enabled, Bitvavo-valid watched markets, with bounded concurrency, limit-aware cached upserts, provider/storage circuit breakers, explicit partial results, and regression coverage
 - Phase 07 deterministic AI analysis service and scheduler-protected endpoint, using existing market/candle/decision/status tables only
 - Confidence-scored BUY/SELL/HOLD/WAIT decisions, missing-data fallbacks, status transitions, and regression tests

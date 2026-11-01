@@ -37,7 +37,9 @@ No `Agent_*` tables or database migrations were added. Authenticated reads prese
 
 ## Caching and refresh behavior
 
-Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary ticker refreshes. An external scheduler can invoke the refresh endpoint to update ticker snapshots and fetch up to 500 recent candles per enabled, valid market and supported interval. Candle requests run with a maximum concurrency of four and use the existing `(symbol, interval, timestamp)` upsert key. Authenticated market requests can still refresh an individually selected symbol and interval. Independent serverless instances have separate in-memory caches.
+Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary ticker refreshes. The scheduled endpoint incrementally refreshes candles: it batch-reads latest stored timestamps, skips intervals with no completed new candle, requests the gap from the latest timestamp with a limit based on the gap (capped at 500), and overlaps the latest candle once for final-value updates. A pair without stored history receives a bounded bootstrap. Candle requests run with a maximum concurrency of four and use the existing `(symbol, interval, timestamp)` upsert key. Authenticated market requests can still refresh an individually selected symbol and interval. Independent serverless instances have separate in-memory caches.
+
+The scheduled response and Vercel logs include total market-refresh duration, market-data refresh duration, candle-refresh duration, and counts of market snapshots and candle rows processed.
 
 ## Endpoints created
 
@@ -54,6 +56,7 @@ Provider responses are cached in memory for 60 seconds. Persisted snapshot times
 - Tests: `tests/market-data.test.mjs`, `tests/dashboard.test.js`, `tests/database-migrations.test.js`
 - Documentation: `README.md`, `ROADMAP.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/DEPLOYMENT.md`, `docs/TESTING.MD`, `docs/CHANGELOG.md`
 - This completion report: `docs/PHASE_06_COMPLETION_REPORT.md`
+- Incremental candle optimization report: `docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
 
 ## Tests and validation
 
@@ -65,7 +68,7 @@ Provider responses are cached in memory for 60 seconds. Persisted snapshot times
 ## Known limitations
 
 - In-memory caches are per serverless instance; database `captured_at` freshness provides cross-instance protection for ticker snapshots.
-- Scheduled candle refresh fetches the latest 500 records per market/interval; deeper history requires repeated scheduled upserts over time or a separate backfill process.
+- Scheduled candle refresh bootstraps empty market/interval histories with up to 500 records and then fetches only due incremental ranges. After a long outage, the 500-record per-run cap may require subsequent scheduled runs to catch up.
 - Scheduled refresh requires `SUPABASE_SERVICE_ROLE_KEY` and a strong `CRON_SECRET` in server-side Vercel environment configuration, plus a configured external scheduler or supported Vercel Cron plan.
 - No signal generation, scanning decisions, AI, trading, backtesting, or live trading is included.
 

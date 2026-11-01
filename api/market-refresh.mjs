@@ -43,11 +43,18 @@ export function createMarketRefreshHandler({
       return;
     }
 
+    const refreshStartedAt = performance.now();
     try {
       const data = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+      logSuccess(logger, data.metrics);
       sendJson(res, 200, { data });
     } catch (error) {
-      logFailure(logger, "Scheduled market refresh failed.", error);
+      logFailure(
+        logger,
+        "Scheduled market refresh failed.",
+        error,
+        elapsedMilliseconds(refreshStartedAt)
+      );
       sendJson(res, 503, {
         error: { code: "MARKET_REFRESH_UNAVAILABLE", message: "Market refresh is temporarily unavailable." }
       });
@@ -67,11 +74,21 @@ function sendJson(res, statusCode, body) {
   res.end(JSON.stringify(body));
 }
 
-function logFailure(logger, message, error) {
+function logSuccess(logger, metrics) {
+  if (logger && typeof logger.info === "function" && metrics) {
+    logger.info("Scheduled market refresh completed.", metrics);
+  }
+}
+
+function logFailure(logger, message, error, marketRefreshDurationMs) {
   const code = error instanceof Error ? error.code || error.name : "UnknownError";
   if (logger && typeof logger.error === "function") {
-    logger.error(message, code);
+    logger.error(message, code, { marketRefreshDurationMs });
   }
+}
+
+function elapsedMilliseconds(startedAt) {
+  return Math.max(0, Math.round(performance.now() - startedAt));
 }
 
 export default createMarketRefreshHandler();

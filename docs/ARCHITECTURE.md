@@ -273,6 +273,8 @@ without modifying application code.
 
 # Phase 06 Market Data Flow
 
+Scheduled candle work batch-reads latest timestamps for each supported interval, skips pairs without a completed new candle, then fetches only the range from the latest stored candle. One overlapping candle is upserted to finalize mutable values; a pair with no history receives a bounded 500-candle bootstrap. Refresh-duration and records-processed metrics are returned by the endpoint and written to function logs.
+
 External scheduler / Vercel Cron where available / authenticated market request
 ↓
 Market Data Service

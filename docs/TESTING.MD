@@ -56,7 +56,7 @@ Rendering uses a pinned Three.js ES module loaded on demand. Each neuron has an 
 
 ## Phase 06 Bitvavo market-data validation
 
-Market-data tests use mocked public Bitvavo responses and mocked PostgREST calls. They verify ticker and candle parsing/persistence, invalid configured market logging and non-insertion, empty provider responses, timeouts, rate limits, offline fallbacks, storage failures, scanner-event writes, 60-second catalog/ticker/candle caching, authenticated market/summary endpoints, query validation, the cron-secret guard, scheduled refresh of all six candle intervals, bounded candle-fetch concurrency, cache-limit upgrades, partial per-market failures, rate-limit circuit breaking, storage-failure stopping behavior, and dashboard integration with stored snapshots and market counts. No private Bitvavo endpoint or API key is used.
+Market-data tests use mocked public Bitvavo responses and mocked PostgREST calls. They verify ticker and candle parsing/persistence, invalid configured market logging and non-insertion, empty provider responses, timeouts, rate limits, offline fallbacks, storage failures, scanner-event writes, 60-second catalog/ticker/candle caching, authenticated market/summary endpoints, query validation, the cron-secret guard, scheduled refresh of all six candle intervals, bounded candle-fetch concurrency, cache-limit upgrades, partial per-market failures, rate-limit circuit breaking, storage-failure stopping behavior, incremental latest-timestamp queries and range limits, up-to-date interval skipping, refresh metrics, and dashboard integration with stored snapshots and market counts. No private Bitvavo endpoint or API key is used.
 
 ```powershell
 node --test tests/market-data.test.mjs tests/dashboard.test.js
