@@ -56,7 +56,7 @@ Rendering uses a pinned Three.js ES module loaded on demand. Each neuron has an 
 
 ## Phase 06 Bitvavo market-data validation
 
-Market-data tests use mocked public Bitvavo responses and mocked PostgREST calls. They verify ticker and candle parsing/persistence, invalid configured market logging and non-insertion, empty provider responses, timeouts, rate limits, offline fallbacks, storage failures, scanner-event writes, 60-second catalog/ticker/candle caching, authenticated market/summary endpoints, query validation, the cron-secret guard, scheduled refresh of all six candle intervals, bounded candle-fetch concurrency, cache-limit upgrades, partial per-market failures, rate-limit circuit breaking, storage-failure stopping behavior, incremental latest-timestamp queries and range limits, up-to-date interval skipping, refresh metrics, and dashboard integration with stored snapshots and market counts. No private Bitvavo endpoint or API key is used.
+Market-data tests use mocked public Bitvavo responses and mocked PostgREST calls. They verify ticker and candle parsing/persistence, invalid configured market logging and non-insertion, empty provider responses, timeouts, rate limits, offline fallbacks, storage failures, scanner-event writes, 60-second catalog/ticker/candle caching, authenticated market/summary endpoints, query validation, and the cron-secret guard. Scheduled snapshot tests assert `/api/market-refresh` performs no candle requests or writes. Candle-job tests cover authorization, interval and batch validation, deterministic five-market batch selection, one-interval processing, bounded concurrency, cache-limit upgrades, incremental latest-timestamp queries and range limits, up-to-date skipping, partial failures, provider/storage failure states, and separate runtime metrics. Dashboard tests verify stored market snapshots and counts. No private Bitvavo endpoint or API key is used.
 
 ```powershell
 node --test tests/market-data.test.mjs tests/dashboard.test.js
@@ -64,7 +64,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm run build` additionally validates the market endpoints, shared market-data service, and server-only environment template without requiring a Vercel Cron configuration. Project tests verify that `/api/market-refresh` remains available when Vercel Cron is absent. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
+`npm run build` additionally validates the market endpoints, shared market-data service, and server-only environment template without requiring a Vercel Cron configuration. Project tests verify both scheduled endpoints remain available when Vercel Cron is absent. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
 
 ## Phase 07 AI engine validation
 

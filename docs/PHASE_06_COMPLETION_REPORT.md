@@ -10,7 +10,7 @@
 - Added authenticated market and market-summary APIs, plus a server-side market refresh endpoint callable by an external scheduler.
 - Validated configured markets before synchronization. Only missing valid markets are inserted; existing watched-market settings are preserved, and invalid configured markets are logged rather than inserted.
 - Added 60-second in-memory caching for Bitvavo market catalog, tickers, and requested candle intervals.
-- Extended the scheduled refresh follow-up to refresh stale ticker snapshots and all six supported candle intervals for enabled, Bitvavo-valid watched markets, with bounded concurrency and idempotent upserts.
+- Kept `/api/market-refresh` focused on watched-market synchronization and ticker snapshots. Candle ingestion runs separately through `/api/candle-refresh`, in deterministic batches of up to five markets and one supported interval per invocation.
 - Added safe fallback to stored market snapshots and candles when the public provider is empty, rate-limited, timed out, or unavailable.
 - Integrated active-market and markets-with-data counts into the dashboard and added stored price / 24-hour change details to watched markets.
 
@@ -37,15 +37,16 @@ No `Agent_*` tables or database migrations were added. Authenticated reads prese
 
 ## Caching and refresh behavior
 
-Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary ticker refreshes. The scheduled endpoint incrementally refreshes candles: it batch-reads latest stored timestamps, skips intervals with no completed new candle, requests the gap from the latest timestamp with a limit based on the gap (capped at 500), and overlaps the latest candle once for final-value updates. A pair without stored history receives a bounded bootstrap. Candle requests run with a maximum concurrency of four and use the existing `(symbol, interval, timestamp)` upsert key. Authenticated market requests can still refresh an individually selected symbol and interval. Independent serverless instances have separate in-memory caches.
+Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary ticker refreshes. The candle endpoint incrementally reads latest stored timestamps for the requested interval, skips markets without a completed new candle, requests the gap from the latest timestamp with a limit based on the gap (capped at 500), and overlaps the latest candle once for final-value updates. A market/interval without stored history receives a bounded bootstrap. Each invocation handles one interval and at most five eligible markets, with a maximum concurrency of four, and upserts using the existing `(symbol, interval, timestamp)` key. Authenticated market requests can still refresh an individually selected symbol and interval. Independent serverless instances have separate in-memory caches.
 
-The scheduled response and Vercel logs include total market-refresh duration, market-data refresh duration, candle-refresh duration, and counts of market snapshots and candle rows processed.
+Snapshot and candle routes report their duration and processed-record counts independently. See [the Phase 06 candle batching report](./PHASE_06_CANDLE_BATCHING_REPORT.md) for endpoint parameters, scheduler setup, tests, and current limitations.
 
 ## Endpoints created
 
 - `GET /api/market` — authenticated stored market snapshot and requested candles; validates symbol, interval, and limit.
 - `GET /api/market-summary` — authenticated active-market counts, markets-with-data count, snapshots, and refresh status.
-- `GET /api/market-refresh` — scheduler-independent endpoint protected by `CRON_SECRET`; uses server-side Supabase credentials to refresh ticker snapshots and candle history.
+- `GET /api/market-refresh` — scheduler-independent endpoint protected by `CRON_SECRET`; synchronizes watched markets and refreshes ticker snapshots only.
+- `GET /api/candle-refresh?interval=1m&batch=0` — scheduler-independent endpoint protected by `CRON_SECRET`; incrementally refreshes one bounded market batch for one candle interval.
 
 ## Files changed
 
@@ -57,6 +58,7 @@ The scheduled response and Vercel logs include total market-refresh duration, ma
 - Documentation: `README.md`, `ROADMAP.md`, `docs/API.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/DEPLOYMENT.md`, `docs/TESTING.MD`, `docs/CHANGELOG.md`
 - This completion report: `docs/PHASE_06_COMPLETION_REPORT.md`
 - Incremental candle optimization report: `docs/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md`
+- Candle batching report: `docs/PHASE_06_CANDLE_BATCHING_REPORT.md`
 
 ## Tests and validation
 

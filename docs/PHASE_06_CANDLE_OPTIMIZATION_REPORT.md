@@ -2,14 +2,14 @@
 
 ## Summary
 
-Optimized scheduled market refresh so populated candle histories are updated incrementally instead of repeatedly fetching and upserting up to 500 candles for every enabled market and interval. Candle ingestion remains enabled for all supported intervals, and all writes continue to use the existing `AI_Crypto_Bot_Candles` schema.
+This report documents the incremental candle-refresh work that preceded the subsequent endpoint split. The current design keeps market snapshots separate and runs candle ingestion through `/api/candle-refresh` in bounded batches; see [PHASE_06_CANDLE_BATCHING_REPORT.md](./PHASE_06_CANDLE_BATCHING_REPORT.md) for the authoritative current behavior. Candle writes still use the existing `AI_Crypto_Bot_Candles` schema.
 
 No new tables, migrations, private Bitvavo endpoints, API keys, trading behavior, or Phase 08 functionality were added.
 
 ## Incremental refresh behavior
 
-- The service loads enabled watched markets and validates them against Bitvavo's public tradable EUR catalog.
-- It batch-reads the latest stored timestamp for each supported interval, then retrieves an individual latest timestamp only for a symbol omitted from a non-empty batch response.
+- The candle service loads enabled watched markets and validates them against Bitvavo's public tradable EUR catalog.
+- Each candle invocation selects one interval and one deterministic batch of at most five markets, then reads latest stored timestamps for the selected symbols.
 - A market/interval is skipped when its latest candle has not aged by one full interval.
 - For due intervals, the Bitvavo request starts at the latest stored timestamp. The dynamic request limit is based on the elapsed interval count, includes one overlap for updating the latest candle, and is capped at 500.
 - A market/interval without stored history receives a one-time bootstrap request for up to 500 recent candles.
@@ -18,21 +18,19 @@ No new tables, migrations, private Bitvavo endpoints, API keys, trading behavior
 
 ## Runtime metrics
 
-The successful `/api/market-refresh` response includes:
+The market snapshot endpoint and candle endpoint expose separate metrics. `/api/market-refresh` includes:
 
 - `metrics.marketRefreshDurationMs` — total service refresh time.
 - `metrics.marketDataRefreshDurationMs` — market snapshot refresh time.
-- `metrics.candleRefreshDurationMs` — candle selection and refresh time.
 - `metrics.recordsProcessed.marketData` — snapshot rows successfully submitted for persistence.
-- `metrics.recordsProcessed.candles` — validated candle rows submitted for upsert.
-- `metrics.recordsProcessed.total` — sum of the two record counts.
 
-The endpoint writes these metrics to Vercel function logs on successful completion. Failed requests log total market-refresh duration without logging credentials or raw provider/database details. `candleRefresh` also reports `unchanged` intervals and actual `providerRequests`.
+`/api/candle-refresh` reports `metrics.candleRefreshDurationMs` and `metrics.recordsProcessed.candles`, along with interval, batch, `batchCount`, and `providerRequests`. Each endpoint writes its own metrics to Vercel function logs on successful completion; failures log duration without credentials or raw provider/database details.
 
 ## Files changed
 
 - `lib/market-data.mjs`
 - `api/market-refresh.mjs`
+- `api/candle-refresh.mjs`
 - `tests/market-data.test.mjs`
 - `README.md`
 - `ROADMAP.md`

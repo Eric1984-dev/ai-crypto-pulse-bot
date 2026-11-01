@@ -99,6 +99,7 @@ function validateProject() {
     "api/market.mjs",
     "api/market-summary.mjs",
     "api/market-refresh.mjs",
+    "api/candle-refresh.mjs",
     "api/ai-analysis.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {

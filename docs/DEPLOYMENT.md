@@ -36,18 +36,23 @@ ENABLE_LIVE_TRADING=false
 
 For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` and serves `/api/*` routes. Opening the HTML files through a static-only server does not run the protected-page functions.
 
-The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization, AI analysis, and database writes; `CRON_SECRET` protects `/api/market-refresh` and `/api/ai-analysis`. Keep both secrets out of browser configuration and logs. Bitvavo access uses public endpoints without an API key.
+The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization, AI analysis, and database writes; `CRON_SECRET` protects `/api/market-refresh`, `/api/candle-refresh`, and `/api/ai-analysis`. Keep both secrets out of browser configuration and logs. Bitvavo access uses public endpoints without an API key.
 
 ### External scheduled market refresh
 
-The market refresh function remains available at `/api/market-refresh`, but `vercel.json` does not declare a Vercel Cron schedule. This keeps deployment compatible with Vercel Hobby. The endpoint updates stale ticker snapshots and incrementally refreshes due candles for enabled watched markets. It skips intervals without a completed new candle and fetches only from the latest stored timestamp; empty market/interval histories receive a bounded bootstrap. Monitor `marketRefreshDurationMs`, `candleRefreshDurationMs`, processed-record counts, and `candleRefresh` status in the response or Vercel logs. Configure an external scheduler such as cron-job.org:
+`/api/market-refresh` is snapshot-only and remains available without a Vercel Cron declaration, preserving Vercel Hobby compatibility. Configure an external task such as cron-job.org:
 
-1. Set the task URL to `https://<your-deployment-host>/api/market-refresh`.
-2. Select `GET` and a schedule supported by the scheduler.
-3. Add the HTTP header `Authorization: Bearer <CRON_SECRET>`, using the same secret configured as a server-side Vercel environment variable.
-4. Do not include the secret in the URL, query string, or task name. Confirm successful runs return HTTP `200`.
+1. Use `GET https://<your-deployment-host>/api/market-refresh`.
+2. Add the `Authorization: Bearer <CRON_SECRET>` header using the protected scheduler header settings.
+3. Set a snapshot cadence appropriate to the dashboard freshness target; five minutes is a reasonable starting point.
 
-Vercel Cron can still be used on plans that support the chosen schedule; it is not required by project validation.
+This endpoint synchronizes valid watched markets and refreshes ticker snapshots only. It does not collect candles.
+
+### External scheduled candle refresh
+
+Candle ingestion is isolated at `/api/candle-refresh?interval=<interval>&batch=<index>`. Create scheduled GET requests for each required interval (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`) and each batch index returned in the endpoint's `batchCount`. Each request handles at most five enabled, valid markets for one interval. For example, 102 eligible markets require batches `0` through `20`. Stagger requests where the scheduler allows it to avoid bursts, and choose a cadence that completes the full batch cycle within the desired freshness window.
+
+Use the same protected `Authorization: Bearer <CRON_SECRET>` header. Configure an HTTP timeout of at least 90 seconds and monitor returned `candleRefreshDurationMs`, `recordsProcessed.candles`, `providerRequests`, status, and batch count. Verify actual deployed durations; provider or database outages can still cause partial refreshes. Do not put credentials in the URL or task name.
 
 ### External AI analysis
 

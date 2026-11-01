@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createCandleRefreshHandler } from "../api/candle-refresh.mjs";
 import { createMarketHandler, createMarketSummaryHandler } from "../api/market-handler.mjs";
 import { createMarketRefreshHandler } from "../api/market-refresh.mjs";
 import { createMarketDataService } from "../lib/market-data.mjs";
@@ -427,45 +428,24 @@ test("scheduled refresh requires the cron secret and keeps server credentials ou
   assert.equal(unauthorized.statusCode, 401);
 });
 
-test("scheduled refresh stores all six candle intervals alongside ticker snapshots", async () => {
+test("scheduled market refresh updates ticker snapshots without starting candle ingestion", async () => {
   const { service, writes, providerCalls, database } = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
   });
   const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
 
   assert.equal(result.refreshStatus, "refreshed");
-  assert.deepEqual(result.candleRefresh, {
-    status: "refreshed",
-    markets: 1,
-    intervals: 6,
-    attempted: 6,
-    refreshed: 6,
-    missing: 0,
-    failed: 0,
-    cached: 0,
-    unchanged: 0,
-    providerRequests: 6,
-    skipped: 0,
-    candlesUpserted: 6
-  });
+  assert.equal(result.candleRefresh, undefined);
   assert.equal(result.metrics.recordsProcessed.marketData, 1);
-  assert.equal(result.metrics.recordsProcessed.candles, 6);
-  assert.equal(result.metrics.recordsProcessed.total, 7);
+  assert.equal(result.metrics.recordsProcessed.total, 1);
   assert.ok(result.metrics.marketRefreshDurationMs >= 0);
-  assert.ok(result.metrics.candleRefreshDurationMs >= 0);
-  assert.equal(
-    providerCalls.filter((path) => path.includes("/candles")).length,
-    6
-  );
-  assert.deepEqual(
-    [...new Set(database["AI_Crypto_Bot_Candles"].map(({ interval }) => interval))].sort(),
-    ["1d", "1m", "15m", "1h", "4h", "5m"].sort()
-  );
+  assert.equal(providerCalls.some((path) => path.includes("/candles")), false);
   assert.ok(writes.some(({ table }) => table === "AI_Crypto_Bot_Market_Data"));
-  assert.equal(database["AI_Crypto_Bot_Candles"].length, 6);
+  assert.equal(writes.some(({ table }) => table === "AI_Crypto_Bot_Candles"), false);
+  assert.equal(database["AI_Crypto_Bot_Candles"].length, 0);
 });
 
-test("market refresh API triggers scheduled candle collection", async () => {
+test("market refresh API logs snapshot metrics and does not run candle collection", async () => {
   const harness = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
   });
@@ -494,13 +474,66 @@ test("market refresh API triggers scheduled candle collection", async () => {
   const data = JSON.parse(response.body).data;
 
   assert.equal(response.statusCode, 200);
-  assert.equal(data.candleRefresh.refreshed, 6);
-  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 6);
-  assert.equal(loggedMetrics.candleRefreshDurationMs, data.metrics.candleRefreshDurationMs);
-  assert.equal(loggedMetrics.recordsProcessed.total, 7);
+  assert.equal(data.candleRefresh, undefined);
+  assert.equal(loggedMetrics.marketRefreshDurationMs, data.metrics.marketRefreshDurationMs);
+  assert.equal(loggedMetrics.recordsProcessed.total, 1);
+  assert.equal(harness.providerCalls.some((path) => path.includes("/candles")), false);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 0);
 });
 
-test("scheduled refresh refetches an interval when an earlier request cached a smaller history limit", async () => {
+test("candle refresh requires scheduler authorization and valid bounded request parameters", async () => {
+  let received;
+  const handler = createCandleRefreshHandler({
+    logger: { error() {}, info() {} },
+    env: {
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey,
+      SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+      CRON_SECRET: "test-cron-secret"
+    },
+    service: {
+      async refreshScheduledCandleBatch(options) {
+        received = options;
+        if (options.batch === 1) {
+          const error = new Error("Batch index is outside the active market range.");
+          error.code = "INVALID_CANDLE_REFRESH_REQUEST";
+          throw error;
+        }
+        return { status: "refreshed", metrics: { candleRefreshDurationMs: 3 } };
+      }
+    }
+  });
+  const request = {
+    method: "GET",
+    url: "/api/candle-refresh?interval=1m&batch=0",
+    headers: { authorization: "Bearer test-cron-secret" }
+  };
+  const response = responseCapture();
+  await handler(request, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(received, {
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  assert.doesNotMatch(response.body, /test-cron-secret|test-service-role-key/);
+
+  const unauthorized = responseCapture();
+  await handler({ ...request, headers: {} }, unauthorized);
+  assert.equal(unauthorized.statusCode, 401);
+
+  const invalid = responseCapture();
+  await handler({ ...request, url: "/api/candle-refresh?interval=1m&batch=-1" }, invalid);
+  assert.equal(invalid.statusCode, 400);
+
+  const outOfRange = responseCapture();
+  await handler({ ...request, url: "/api/candle-refresh?interval=1m&batch=1" }, outOfRange);
+  assert.equal(outOfRange.statusCode, 400);
+});
+
+test("scheduled candle refresh refetches a range when an earlier request cached less history", async () => {
   const harness = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
   });
@@ -513,14 +546,19 @@ test("scheduled refresh refetches an interval when an earlier request cached a s
     limit: 1
   });
   harness.clock.value = new Date(fixedNow.getTime() + 2 * 60_000);
-  const scheduled = await harness.service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const scheduled = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(scheduled.candleRefresh.refreshed, 6);
-  assert.equal(harness.providerCalls.filter((path) => path.includes("/candles")).length, 7);
-  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 6);
+  assert.equal(scheduled.refreshed, 1);
+  assert.equal(harness.providerCalls.filter((path) => path.includes("/candles")).length, 2);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 1);
 });
 
-test("scheduled candle refresh uses bounded concurrency and reuses the 60-second cache", async () => {
+test("scheduled candle refresh uses bounded market batches and reuses the 60-second cache", async () => {
   const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
   const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
   const { service, providerCalls, getMaxConcurrentCandleRequests } = createHarness({
@@ -533,142 +571,153 @@ test("scheduled candle refresh uses bounded concurrency and reuses the 60-second
     candleRows: [[fixedNow.getTime() - 10 * 60_000, "100", "120", "90", "110", "25"]],
     providerDelayMs: 2
   });
-  const first = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const first = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
   const candleCalls = providerCalls.filter((path) => path.includes("/candles")).length;
-  const second = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const second = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(first.candleRefresh.markets, 2);
-  assert.equal(first.candleRefresh.attempted, 12);
+  assert.equal(first.markets, 2);
+  assert.equal(first.selectedMarkets, 2);
+  assert.equal(first.batchCount, 1);
+  assert.equal(first.attempted, 2);
   assert.ok(getMaxConcurrentCandleRequests() > 1);
   assert.ok(getMaxConcurrentCandleRequests() <= 4);
-  assert.equal(second.candleRefresh.cached, 4);
-  assert.equal(second.candleRefresh.unchanged, 8);
+  assert.equal(second.cached, 2);
+  assert.equal(second.unchanged, 0);
   assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, candleCalls);
 });
 
-test("scheduled candle refresh requests only the incremental range after each stored latest candle", async () => {
-  const intervalMs = {
-    "1m": 60_000,
-    "5m": 5 * 60_000,
-    "15m": 15 * 60_000,
-    "1h": 60 * 60_000,
-    "4h": 4 * 60 * 60_000,
-    "1d": 24 * 60 * 60_000
-  };
-  const storedCandles = Object.entries(intervalMs).map(([interval, duration]) => {
-    const timestamp = Math.floor(fixedNow.getTime() / duration) * duration - duration * 2;
-    return {
-      symbol: "BTC-EUR",
-      interval,
-      open: 100,
-      high: 120,
-      low: 90,
-      close: 110,
-      volume: 25,
-      timestamp: new Date(timestamp).toISOString()
-    };
-  });
-  const { service, providerCalls, database } = createHarness({
-    candles: storedCandles,
-    candleRows(url) {
-      const interval = url.searchParams.get("interval");
-      const start = Number(url.searchParams.get("start"));
-      return [
-        [start, "100", "120", "90", "111", "25"],
-        [start + intervalMs[interval], "100", "120", "90", "112", "25"]
-      ];
-    }
-  });
-
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
-  const candleRequests = providerCalls
-    .filter((path) => path.includes("/candles"))
-    .map((path) => new URL(path, "https://api.bitvavo.com"));
-
-  assert.equal(candleRequests.length, 6);
-  for (const request of candleRequests) {
-    const interval = request.searchParams.get("interval");
-    const latest = storedCandles.find((candle) => candle.interval === interval);
-    assert.equal(request.searchParams.get("start"), String(Date.parse(latest.timestamp)));
-    assert.equal(request.searchParams.get("limit"), "3");
-  }
-  assert.equal(result.candleRefresh.candlesUpserted, 12);
-  assert.equal(result.metrics.recordsProcessed.candles, 12);
-  assert.equal(database["AI_Crypto_Bot_Candles"].length, 12);
-  assert.equal(
-    database["AI_Crypto_Bot_Candles"].filter(({ close }) => close === 112).length,
-    6
-  );
-});
-
-test("scheduled candle refresh skips intervals with no completed candle", async () => {
-  const intervalMs = {
-    "1m": 60_000,
-    "5m": 5 * 60_000,
-    "15m": 15 * 60_000,
-    "1h": 60 * 60_000,
-    "4h": 4 * 60 * 60_000,
-    "1d": 24 * 60 * 60_000
-  };
-  const candles = Object.entries(intervalMs).map(([interval, duration]) => ({
+test("scheduled candle refresh requests only the incremental range for its requested interval", async () => {
+  const intervalMs = 60_000;
+  const latestTimestamp = Math.floor(fixedNow.getTime() / intervalMs) * intervalMs - intervalMs * 2;
+  const storedCandles = [{
     symbol: "BTC-EUR",
-    interval,
+    interval: "1m",
     open: 100,
     high: 120,
     low: 90,
     close: 110,
     volume: 25,
-    timestamp: new Date(Math.floor(fixedNow.getTime() / duration) * duration).toISOString()
-  }));
-  const { service, providerCalls, writes } = createHarness({ candles });
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+    timestamp: new Date(latestTimestamp).toISOString()
+  }];
+  const { service, providerCalls, database } = createHarness({
+    candles: storedCandles,
+    candleRows(url) {
+      const start = Number(url.searchParams.get("start"));
+      return [
+        [start, "100", "120", "90", "111", "25"],
+        [start + intervalMs, "100", "120", "90", "112", "25"]
+      ];
+    }
+  });
 
-  assert.equal(result.candleRefresh.status, "up-to-date");
-  assert.equal(result.candleRefresh.unchanged, 6);
-  assert.equal(result.candleRefresh.providerRequests, 0);
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleRequests = providerCalls
+    .filter((path) => path.includes("/candles"))
+    .map((path) => new URL(path, "https://api.bitvavo.com"));
+
+  assert.equal(candleRequests.length, 1);
+  assert.equal(candleRequests[0].searchParams.get("interval"), "1m");
+  assert.equal(candleRequests[0].searchParams.get("start"), String(Date.parse(storedCandles[0].timestamp)));
+  assert.equal(candleRequests[0].searchParams.get("limit"), "3");
+  assert.equal(result.candlesUpserted, 2);
+  assert.equal(result.metrics.recordsProcessed.candles, 2);
+  assert.equal(database["AI_Crypto_Bot_Candles"].length, 2);
+  assert.equal(database["AI_Crypto_Bot_Candles"].filter(({ close }) => close === 112).length, 1);
+});
+
+test("scheduled candle refresh skips an interval with no completed candle", async () => {
+  const candles = [{
+    symbol: "BTC-EUR",
+    interval: "1m",
+    open: 100,
+    high: 120,
+    low: 90,
+    close: 110,
+    volume: 25,
+    timestamp: new Date(Math.floor(fixedNow.getTime() / 60_000) * 60_000).toISOString()
+  }];
+  const { service, providerCalls, writes } = createHarness({ candles });
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+
+  assert.equal(result.status, "up-to-date");
+  assert.equal(result.unchanged, 1);
+  assert.equal(result.providerRequests, 0);
   assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 0);
   assert.equal(writes.some(({ table }) => table === "AI_Crypto_Bot_Candles"), false);
 });
 
-test("scheduled candle refresh continues after provider errors and records failures", async () => {
+test("scheduled candle refresh records provider failures without changing stored candle data", async () => {
   const { service, writes, providerCalls } = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
-    failCandleInterval: "5m",
+    failCandleInterval: "1m",
     failCandleIntervalStatus: 404
   });
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(result.candleRefresh.status, "partial");
-  assert.equal(result.candleRefresh.failed, 1);
-  assert.equal(result.candleRefresh.refreshed, 5);
-  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 6);
+  assert.equal(result.status, "partial");
+  assert.equal(result.failed, 1);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 1);
   assert.ok(writes.some(({ table, rows }) =>
     table === "AI_Crypto_Bot_Scanner_Events"
       && rows.some(({ event_type }) => event_type === "INVALID_MARKET")
   ));
 });
 
-test("scheduled candle refresh stops queuing provider requests after a rate limit", async () => {
+test("scheduled candle refresh reports a provider rate limit", async () => {
   const { service, providerCalls } = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
-    failCandleInterval: "5m",
+    failCandleInterval: "1m",
     failCandleIntervalStatus: 429
   });
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(result.candleRefresh.status, "provider-unavailable");
-  assert.ok(result.candleRefresh.failed >= 1);
-  assert.ok(result.candleRefresh.skipped > 0);
-  assert.ok(providerCalls.filter((path) => path.includes("/candles")).length < 6);
+  assert.equal(result.status, "provider-unavailable");
+  assert.ok(result.failed >= 1);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 1);
 });
 
-test("scheduled candle refresh records empty interval responses without failing the whole refresh", async () => {
+test("scheduled candle refresh records empty interval responses without failing the batch", async () => {
   const { service, writes, database } = createHarness({ candleRows: [] });
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(result.candleRefresh.status, "partial");
-  assert.equal(result.candleRefresh.missing, 6);
-  assert.equal(result.candleRefresh.failed, 0);
+  assert.equal(result.status, "partial");
+  assert.equal(result.missing, 1);
+  assert.equal(result.failed, 0);
   assert.equal(database["AI_Crypto_Bot_Candles"].length, 0);
   assert.ok(writes.some(({ table, rows }) =>
     table === "AI_Crypto_Bot_Scanner_Events"
@@ -676,15 +725,50 @@ test("scheduled candle refresh records empty interval responses without failing 
   ));
 });
 
-test("scheduled candle refresh stops additional database writes after storage failure", async () => {
+test("scheduled candle refresh returns a storage failure without claiming successful writes", async () => {
   const { service } = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
     failCandleStorage: true
   });
-  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const result = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
 
-  assert.equal(result.candleRefresh.status, "storage-unavailable");
-  assert.ok(result.candleRefresh.failed >= 1);
-  assert.ok(result.candleRefresh.skipped > 0);
-  assert.ok(result.candleRefresh.attempted < 6);
+  assert.equal(result.status, "storage-unavailable");
+  assert.ok(result.failed >= 1);
+  assert.equal(result.candlesUpserted, 0);
+});
+
+test("scheduled candle refresh processes deterministic bounded batches", async () => {
+  const watched = Array.from({ length: 6 }, (_, index) => ({
+    symbol: `M${index}-EUR`,
+    enabled: true,
+    priority: index + 1
+  }));
+  const catalog = watched.map(({ symbol }) => ({ market: symbol, status: "trading", quote: "EUR" }));
+  const { service, providerCalls } = createHarness({ watched, catalog });
+  const first = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "5m",
+    batch: 0
+  });
+  const second = await service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "5m",
+    batch: 1
+  });
+
+  assert.equal(first.markets, 6);
+  assert.equal(first.batchCount, 2);
+  assert.equal(first.selectedMarkets, 5);
+  assert.equal(first.attempted, 5);
+  assert.equal(second.batch, 1);
+  assert.equal(second.selectedMarkets, 1);
+  assert.equal(second.attempted, 1);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 6);
 });

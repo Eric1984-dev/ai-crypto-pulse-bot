@@ -138,13 +138,24 @@ Provider errors, empty responses, and timeouts preserve and return the most rece
 
 ### GET /api/market-refresh
 
-Scheduled-refresh endpoint callable by an external scheduler such as cron-job.org, or by Vercel Cron on plans that support the desired schedule. It requires `Authorization: Bearer <CRON_SECRET>` and a server-only `SUPABASE_SERVICE_ROLE_KEY`. Configure the scheduler to issue a `GET` request to the deployed `/api/market-refresh` URL and send the authorization header; do not put the secret in the URL or query string. The endpoint validates configured symbols against the live public market catalog, adds only missing valid markets, and refreshes stale ticker snapshots plus candle history for all enabled, valid watched markets across `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. It requests up to 500 recent candles per market/interval, limits candle request concurrency to four, and reuses the 60-second per-instance cache. The response includes a `candleRefresh` summary with refreshed, missing, failed, cached, skipped, and upserted counts. Storage failures stop further queued writes; provider timeouts, rate limits, and service outages stop further queued provider requests. It does not expose either secret.
+A scheduler-protected endpoint for watched-market synchronization and ticker snapshots only. It does not collect candles. It requires `Authorization: Bearer <CRON_SECRET>` and a server-only `SUPABASE_SERVICE_ROLE_KEY`; configure an external scheduler to issue a `GET` request. Do not put the secret in the URL or query string. The service validates configured symbols against Bitvavo's public market catalog, adds only missing valid markets, and refreshes stale ticker snapshots.
 
-Current candle refresh is incremental: the service batch-reads latest stored timestamps by interval, skips intervals with no completed new candle, and requests from the latest stored timestamp with a gap-sized limit capped at 500. It includes one existing candle for safe upsert updates. Empty intervals alone use the 500-candle bootstrap. The response exposes `marketRefreshDurationMs`, `marketDataRefreshDurationMs`, `candleRefreshDurationMs`, and `recordsProcessed` counts; successful metrics are also logged.
+Success includes market snapshot data and `metrics.marketRefreshDurationMs`, `metrics.marketDataRefreshDurationMs`, and `metrics.recordsProcessed.marketData`. Successful metrics are logged. The endpoint does not expose either secret.
 
-Market endpoint responses use `Cache-Control: no-store`; Bitvavo data and market catalog entries are cached in memory for 60 seconds. Serverless instances have independent in-memory caches, so the persisted `captured_at` timestamp also determines database freshness.
+### GET /api/candle-refresh
 
-Errors: unauthenticated/expired session `401`; invalid market query `400`; untracked/disabled market `404`; unsupported method `405`; Supabase storage failure `503`; other request failure `500`. Bitvavo outages are represented as safe fallback data and a non-success `refreshStatus` when persisted data is readable.
+A separate scheduler-protected endpoint that accepts one candle interval and one zero-based market batch per invocation. It requires the same authorization header and server-only Supabase service role as `/api/market-refresh`.
+
+Query parameters:
+
+- `interval`: required `1m`, `5m`, `15m`, `1h`, `4h`, or `1d`.
+- `batch`: required zero-based non-negative integer. Enabled, Bitvavo-valid watched markets are sorted by priority and symbol and split into batches of at most five.
+
+Example: `GET /api/candle-refresh?interval=1m&batch=0`. The response reports active market count, `batch`, `batchSize`, `batchCount`, selected-market count, attempted/refreshed/missing/failed/cached/unchanged/skipped counts, provider requests, and upserted candle count. `metrics.candleRefreshDurationMs` and `metrics.recordsProcessed.candles` are reported separately from snapshot metrics.
+
+The endpoint reads latest stored timestamps for the requested interval, skips markets without a completed new candle, and requests only the incremental range from the latest stored timestamp. Requests are capped at 500 candles, including a bounded bootstrap for markets without history. A four-request concurrency cap, 60-second per-instance cache, and existing `(symbol, interval, timestamp)` upsert key remain in place. Candle OHLCV rows stay compatible with the AI Engine and use only the existing `AI_Crypto_Bot_Candles` table.
+
+Invalid interval/batch input: `400`; missing cron authorization: `401`; missing environment configuration: `503`; upstream/storage failures are reflected in the batch status and scanner-event log. A valid request can return HTTP `200` with a partial or unavailable status, so callers must inspect the response data and metrics.
 
 ## Phase 07 AI analysis
 

@@ -2,18 +2,19 @@
 
 ## Summary
 
-Extended the existing scheduled market refresh so it now refreshes both ticker snapshots and candle history. For each enabled watched market that is currently tradable on Bitvavo, the service fetches candles for `1m`, `5m`, `15m`, `1h`, `4h`, and `1d` from Bitvavo's public candle endpoint and upserts validated OHLCV rows into the existing `AI_Crypto_Bot_Candles` table.
+The original candle-ingestion fix added scheduled collection alongside ticker snapshots. That combined architecture has since been superseded: `/api/market-refresh` is snapshot-only, and `/api/candle-refresh` now owns incremental candle collection in bounded batches. See [PHASE_06_CANDLE_BATCHING_REPORT.md](./PHASE_06_CANDLE_BATCHING_REPORT.md) for the current design.
 
 No new tables, migrations, private Bitvavo endpoints, API keys, or trading functionality were added. Phase 08 was not started.
 
 ## Refresh behavior
 
-- `GET /api/market-refresh` continues to refresh stale `AI_Crypto_Bot_Market_Data` snapshots and now also refreshes scheduled candle intervals.
+- `GET /api/market-refresh` refreshes stale `AI_Crypto_Bot_Market_Data` snapshots only.
+- `GET /api/candle-refresh` handles one of the six supported intervals and at most five enabled, Bitvavo-valid watched markets per invocation.
 - The service reads enabled markets from `AI_Crypto_Bot_Watched_Markets` and filters them against Bitvavo's live tradable EUR market catalog.
 - Initial market/interval history is bootstrapped with up to 500 recent candles. Later scheduled calls batch-read the latest stored timestamp, skip intervals without a completed new candle, and request only the gap with a gap-sized limit capped at 500. The latest stored candle overlaps the range once so mutable final values can be updated. Valid rows are upserted on the existing `(symbol, interval, timestamp)` conflict key.
 - Candle requests are bounded to four concurrent provider calls. Existing eight-second request timeouts and 60-second per-instance caching remain in effect.
 - Cache entries track the requested history limit so a prior small market-page request cannot suppress the scheduled history refresh. Provider/empty-data failures are cached for the existing TTL to avoid request bursts.
-- The response includes a `candleRefresh` summary with market/interval counts, attempted/refreshed/missing/failed/cached/unchanged/provider-request/skipped counts, and upserted candle count. Runtime metrics report market, market-data, and candle durations plus processed record counts, and are included in Vercel success logs.
+- The candle endpoint includes batch/interval counts, attempted/refreshed/missing/failed/cached/unchanged/provider-request/skipped counts, and upserted candle count. Snapshot and candle duration/record metrics are returned and logged separately.
 - Empty or invalid responses create `CANDLE_DATA_MISSING` scanner events. Isolated market errors are recorded and remaining intervals continue. Timeouts, rate limits, provider outages, and database storage failures stop queuing more work and report the skipped counts.
 
 ## Files changed
@@ -21,6 +22,7 @@ No new tables, migrations, private Bitvavo endpoints, API keys, or trading funct
 Implementation and tests:
 
 - `lib/market-data.mjs`
+- `api/candle-refresh.mjs`
 - `tests/market-data.test.mjs`
 
 Documentation:

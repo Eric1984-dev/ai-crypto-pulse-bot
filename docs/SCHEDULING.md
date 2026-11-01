@@ -2,17 +2,27 @@
 
 ## Phase 06 market refresh
 
-The public market refresh function is available at:
+Market snapshots use a lightweight endpoint:
 
 ```text
 GET /api/market-refresh
 ```
 
-The endpoint requires `Authorization: Bearer <CRON_SECRET>` and uses the server-only `SUPABASE_SERVICE_ROLE_KEY`. It can be invoked by an external scheduler such as cron-job.org. Vercel Cron is optional on plans that support the required schedule and is not configured in `vercel.json`, so Vercel Hobby deployments do not depend on it.
+This job only synchronizes watched markets, refreshes stale ticker snapshots, and updates market summaries. It does not request or write candles. It requires `Authorization: Bearer <CRON_SECRET>` and the server-only `SUPABASE_SERVICE_ROLE_KEY`. Invoke it with an external scheduler such as cron-job.org; Vercel Cron is not configured, so Vercel Hobby deployments do not depend on it. A five-minute cadence is a reasonable starting point for snapshots.
 
-Each scheduled call refreshes stale ticker snapshots and evaluates enabled, Bitvavo-valid watched markets across `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. It batch-loads each interval's latest stored timestamps, skips pairs until another candle is due, and requests only the range from the latest timestamp. Requests are bounded by the estimated gap and capped at 500 records; the latest stored candle is included once for final-value updates. A market/interval with no stored history receives a one-time bootstrap request of up to 500 recent candles. Candle requests run with a maximum concurrency of four and reuse the existing 60-second in-memory cache. Upserts use the existing `(symbol, interval, timestamp)` conflict key, so retrying the refresh does not create duplicate candle rows.
+## Phase 06 candle refresh
 
-The response and function logs expose market-refresh duration, candle-refresh duration, and processed-record counts. Configure an external task with the deployed URL, HTTP method `GET`, and the authorization header. Keep the secret in the scheduler's protected header/credential settings; never put it in the URL or query string. A five-minute cadence is a reasonable starting point when the market-data freshness target is 15 minutes; monitor the returned `candleRefresh` counts and adjust for the size of the enabled market universe. Verify successful calls return HTTP `200`, and investigate partial/storage-unavailable candle statuses.
+Candles use a separate endpoint, processing exactly one supported interval and at most five markets per invocation:
+
+```text
+GET /api/candle-refresh?interval=1m&batch=0
+```
+
+`interval` must be one of `1m`, `5m`, `15m`, `1h`, `4h`, or `1d`. `batch` is a zero-based non-negative integer. Enabled, Bitvavo-valid watched markets are ordered by priority and symbol, then partitioned into batches of five. The response includes `batchCount`; schedule every batch index for each desired interval. For example, 102 eligible markets require 21 batches per interval. Stagger tasks where possible to avoid simultaneous provider/database bursts, and set each interval's cadence according to the required candle freshness.
+
+The endpoint uses the same `Authorization: Bearer <CRON_SECRET>` header and server-only Supabase service role as the market refresh. Store the secret in the scheduler's protected header settings; never put it in a URL or query string. Set the scheduler's HTTP timeout to at least 90 seconds and monitor `candleRefreshDurationMs`, `recordsProcessed.candles`, `providerRequests`, `batchCount`, and the returned status. The service keeps incremental latest-timestamp reads, skips intervals with no completed candle, caps incremental/bootstrap requests at 500 candles, uses a maximum concurrency of four, preserves the 60-second cache, and upserts on `(symbol, interval, timestamp)`. `AI_Crypto_Bot_Candles` remains the AI Engine data source.
+
+`/api/market-refresh` reports `marketRefreshDurationMs`, `marketDataRefreshDurationMs`, and market snapshot counts. `/api/candle-refresh` reports candle duration and candle counts independently. Successful HTTP `200` responses may still contain `partial`, `provider-unavailable`, or `storage-unavailable` results; inspect status and failure counts rather than treating HTTP success alone as proof that all data refreshed.
 
 ## Phase 07 AI analysis
 

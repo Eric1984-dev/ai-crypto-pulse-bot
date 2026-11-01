@@ -30,6 +30,7 @@ test("market refresh endpoint remains available without a Vercel Cron configurat
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDirectory, "vercel.json"), "utf8"));
   assert.equal(Object.prototype.hasOwnProperty.call(vercelConfig, "crons"), false);
   assert.equal(fs.statSync(path.join(rootDirectory, "api", "market-refresh.mjs")).isFile(), true);
+  assert.equal(fs.statSync(path.join(rootDirectory, "api", "candle-refresh.mjs")).isFile(), true);
   assert.deepEqual(validateProject(), []);
 });
 
