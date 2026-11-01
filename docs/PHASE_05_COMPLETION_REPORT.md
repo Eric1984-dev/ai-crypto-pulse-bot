@@ -4,7 +4,7 @@
 
 **Phase 05 is implemented. Phase 06 was not started.**
 
-The Agent Brain replaces the placeholder in the existing Agent Status panel. The dashboard layout is otherwise unchanged: the Brain remains below Backend status / Agent Status and before Risk control / Emergency State, and it was not moved above the dashboard summaries.
+The Agent Brain replaced the placeholder in the existing Agent Status panel. A later dashboard refinement expanded Agent Status to a full-width panel and moved Risk control / Emergency State to the bottom of the dashboard, after its summaries.
 
 This completion report records the original Phase 05 delivery. Its visual implementation was refined afterward; the current shell-free, node-defined renderer and latest validation are documented in [PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md](./PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md).
 
@@ -69,7 +69,7 @@ This completion report records the original Phase 05 delivery. Its visual implem
 | Requirement | Result |
 |---|---|
 | Three.js Agent Brain replaces the existing placeholder in place | Implemented |
-| Brain remains between Agent Status and Emergency State in the existing layout | Implemented and tested |
+| Brain remains inside Agent Status; Emergency State is the final dashboard panel | Implemented and tested |
 | Visualization is driven by the current database status | Implemented through authenticated API read and 15-second visible-page polling |
 | All supported statuses and `UNKNOWN` fallback | Implemented and tested |
 | Responsive rendering, hidden-tab pause, and resource cleanup | Implemented and tested |

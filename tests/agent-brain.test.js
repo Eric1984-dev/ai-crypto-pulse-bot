@@ -421,18 +421,42 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   const analysisNeurons = harness.calls.points.filter(({ material }) =>
     material.color.value === 0x9bffc1
   );
+  const traceNeurons = harness.calls.points.find(({ material }) =>
+    material.color.value === 0x83eaff
+  );
+  const traceSignals = harness.calls.points.find(({ material }) =>
+    material.color.value === 0xd8faff
+  );
 
   assert.ok(referenceTrace);
   assert.ok(referenceTrace.renderOrder < 0);
   assert.ok(referenceTrace.geometry.getAttribute("position").count > 180);
+  assert.ok(traceNeurons.geometry.getAttribute("position").count > 100);
+  const traceNeuronPositions = traceNeurons.geometry.getAttribute("position");
+  assert.ok(Math.min(...traceNeuronPositions.array.filter((_, index) => index % 3 === 0)) < -1.2);
+  assert.ok(Math.max(...traceNeuronPositions.array.filter((_, index) => index % 3 === 0)) > 1.1);
+  assert.ok(traceSignals);
+  assert.equal(traceSignals.geometry.drawRange.count, 4);
   assert.equal(analysisNeurons.length, 1);
   assert.equal(analysisNeurons[0].geometry.getAttribute("position").count, 52);
   assert.equal(analysisNeurons[0].visible, false);
 
   assert.equal(brain.setStatus("ANALYZING").status, "ANALYZING");
   assert.equal(analysisNeurons[0].visible, true);
+  assert.equal(traceSignals.geometry.drawRange.count, 20);
+  const initialTracePositions = [...traceSignals.geometry.getAttribute("position").array];
+  const [frameId, animate] = harness.calls.frameCallbacks.entries().next().value;
+  harness.calls.frameCallbacks.delete(frameId);
+  animate(500);
+  assert.notDeepEqual(
+    [...traceSignals.geometry.getAttribute("position").array],
+    initialTracePositions
+  );
   assert.equal(brain.setStatus("ACTIVE").status, "ACTIVE");
   assert.equal(analysisNeurons[0].visible, false);
+  assert.equal(traceSignals.geometry.drawRange.count, 20);
+  brain.setStatus("STOPPED");
+  assert.equal(traceSignals.geometry.drawRange.count, 0);
   brain.dispose();
 });
 

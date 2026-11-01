@@ -46,6 +46,7 @@ Runtime database APIs, market-data ingestion, and trading behavior remain out of
 - [x] KPI cards with accessible explanations and portfolio history chart from actual database snapshots
 - [x] Mobile-first responsive layout and empty/error states
 - [x] Refresh complete dashboard data every 30 seconds and immediately on return to the foreground
+- [x] Use a full-width Agent Status panel with an enlarged brain visualization and move Emergency State / Risk Control to the bottom of the dashboard
 - [x] Authenticated read-only API, tests, and documentation
 
 Status: Completed
@@ -175,10 +176,61 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 
 ---
 
-## Phase 13 - Vercel Deployment
+## Phase 13 - Analytics & Strategy Insights
 
-- Production Setup
-- Environment Validation
+Status:
+Planned
+
+Goal:
+
+Transform collected trading data into actionable insights.
+
+Focus:
+
+- Trade Performance
+- Portfolio Performance
+- AI Decision Quality
+- Strategy Evaluation
+- Risk Analysis
+
+Features:
+
+- Win Rate
+- Loss Rate
+- Average Win
+- Average Loss
+- Profit Factor
+- Drawdown Analysis
+- Best/Worst Trades
+- Confidence Performance Analysis
+- Symbol Performance Analysis
+- Equity Curve
+- Portfolio Growth Metrics
+
+Data Sources:
+
+- AI_Crypto_Bot_Trades
+- AI_Crypto_Bot_Positions
+- AI_Crypto_Bot_AI_Decisions
+- AI_Crypto_Bot_Portfolios
+- AI_Crypto_Bot_Portfolio_Snapshots
+
+Exports Integration:
+
+- Analytics CSV Export
+- Performance Reports
+- Strategy Reports
+
+Dashboard Integration:
+
+Dedicated Analytics page.
+
+Constraints:
+
+- Reuse existing infrastructure.
+- No unnecessary API endpoints.
+- Stay within Vercel Hobby limits.
+- Maintain 12-function maximum.
 
 ---
 

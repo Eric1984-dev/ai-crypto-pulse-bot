@@ -370,7 +370,7 @@
       brain.add(referenceTraceGlow, referenceTraces);
 
       const referenceTraceNodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      referenceTraceNodeGeometry.setFromPoints(referenceTraceLayout.junctions);
+      referenceTraceNodeGeometry.setFromPoints(referenceTraceLayout.neuronPositions);
       const referenceTraceNodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: 0x83eaff,
         size: 0.052,
@@ -387,6 +387,45 @@
       );
       referenceTraceNodes.renderOrder = -1;
       brain.add(referenceTraceNodes);
+
+      const maxTraceSignalCount = referenceTraceLayout.pulseRoutes.length * 2;
+      const traceSignalGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      traceSignalGeometry.setFromPoints(Array.from(
+        { length: maxTraceSignalCount },
+        (_, index) => referenceTraceLayout.pulseRoutes[
+          index % referenceTraceLayout.pulseRoutes.length
+        ].points[0]
+      ));
+      const traceSignalPositionAttribute = traceSignalGeometry.getAttribute("position");
+      traceSignalGeometry.setDrawRange(
+        0,
+        Math.min(config.activityPoints, maxTraceSignalCount)
+      );
+      const traceSignalGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0x23aaff,
+        size: 0.13,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.28,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const traceSignalMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0xd8faff,
+        size: 0.065,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.96,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const traceSignalGlow = new THREE.Points(traceSignalGeometry, traceSignalGlowMaterial);
+      const traceSignals = new THREE.Points(traceSignalGeometry, traceSignalMaterial);
+      traceSignalGlow.renderOrder = 1;
+      traceSignals.renderOrder = 2;
+      brain.add(traceSignalGlow, traceSignals);
 
       const analyzingNeuronIndices = Array.from(
         { length: Math.min(52, nodePositions.length) },
@@ -538,6 +577,14 @@
           elapsed,
           config
           );
+          const traceSignalCount = Math.min(config.activityPoints, maxTraceSignalCount);
+          updateReferenceTraceParticles(
+          traceSignalPositionAttribute,
+          referenceTraceLayout.pulseRoutes,
+          traceSignalCount,
+          elapsed,
+          config.signalSpeed
+          );
           updateVisualIntensity(elapsed, breath);
           renderer.render(scene, camera);
           lastRenderAt = timestamp;
@@ -573,6 +620,8 @@
         connectionMaterial.color.setHex(0xffffff);
         connectionGlowMaterial.color.setHex(0xffffff);
         activityGeometry.setDrawRange(0, config.activityPoints);
+        const traceSignalCount = Math.min(config.activityPoints, maxTraceSignalCount);
+        traceSignalGeometry.setDrawRange(0, traceSignalCount);
         updateNeuralNetwork(
           nodePositionAttribute,
           nodeColorAttribute,
@@ -598,6 +647,13 @@
           analyzingNeuronPositionAttribute,
           animatedNodePositions,
           analyzingNeuronIndices
+        );
+        updateReferenceTraceParticles(
+          traceSignalPositionAttribute,
+          referenceTraceLayout.pulseRoutes,
+          traceSignalCount,
+          0,
+          config.signalSpeed
         );
         updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
         updateEnergyParticles(
@@ -1010,17 +1066,45 @@
   function createReferenceTraceLayout(THREE) {
     const segmentPoints = [];
     const junctions = [];
+    const neuronPositions = [];
+    const pulseRoutes = [];
 
     function addPath(coordinates, z, includeBends = false) {
       const points = coordinates.map(([x, y]) => new THREE.Vector3(x, y, z));
+      const segmentLengths = [];
+      let totalLength = 0;
+      neuronPositions.push(points[0]);
       for (let index = 0; index < points.length - 1; index += 1) {
-        segmentPoints.push(points[index], points[index + 1]);
+        const start = points[index];
+        const end = points[index + 1];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const dz = end.z - start.z;
+        const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const subdivisions = Math.max(1, Math.ceil(length / 0.12));
+        segmentLengths.push(length);
+        totalLength += length;
+        segmentPoints.push(start, end);
+        for (let step = 1; step <= subdivisions; step += 1) {
+          const progress = step / subdivisions;
+          neuronPositions.push(new THREE.Vector3(
+            start.x + dx * progress,
+            start.y + dy * progress,
+            start.z + dz * progress
+          ));
+        }
       }
       junctions.push(points[0]);
       if (includeBends) {
         junctions.push(...points.slice(1, -1));
       }
       junctions.push(points[points.length - 1]);
+      pulseRoutes.push({
+        phase: pulseRoutes.length * 0.137,
+        points,
+        segmentLengths,
+        totalLength
+      });
     }
 
     for (let lane = 0; lane < 3; lane += 1) {
@@ -1049,7 +1133,50 @@
       addPath(path, -0.045, true);
     }
 
-    return { junctions, segmentPoints };
+    return { junctions, neuronPositions, pulseRoutes, segmentPoints };
+  }
+
+  function updateReferenceTraceParticles(
+    positionAttribute,
+    pulseRoutes,
+    count,
+    elapsed,
+    signalSpeed
+  ) {
+    if (!pulseRoutes.length) {
+      return;
+    }
+
+    for (let index = 0; index < count; index += 1) {
+      const routeIndex = index % pulseRoutes.length;
+      const route = pulseRoutes[routeIndex];
+      const routeParticle = Math.floor(index / pulseRoutes.length);
+      const progress = (elapsed * signalSpeed * 0.22
+        + route.phase + routeParticle * 0.5) % 1;
+      let distance = progress * route.totalLength;
+      let segmentIndex = 0;
+      while (
+        segmentIndex < route.segmentLengths.length - 1
+        && distance > route.segmentLengths[segmentIndex]
+      ) {
+        distance -= route.segmentLengths[segmentIndex];
+        segmentIndex += 1;
+      }
+
+      const start = route.points[segmentIndex];
+      const end = route.points[segmentIndex + 1];
+      const segmentLength = route.segmentLengths[segmentIndex];
+      const segmentProgress = segmentLength > 0
+        ? Math.min(1, distance / segmentLength)
+        : 0;
+      positionAttribute.setXYZ(
+        index,
+        start.x + (end.x - start.x) * segmentProgress,
+        start.y + (end.y - start.y) * segmentProgress,
+        start.z + (end.z - start.z) * segmentProgress
+      );
+    }
+    positionAttribute.needsUpdate = true;
   }
 
   function createConnectionLinePoints(nodePositions, connectionPairs) {

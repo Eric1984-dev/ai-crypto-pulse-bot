@@ -469,20 +469,29 @@ test("dashboard omits all scanner content and uses only its watched-market summa
   assert.match(html, /data-portfolio-chart/);
 });
 
-test("Agent Brain replaces the placeholder in the existing Agent Status panel", () => {
+test("Agent Brain uses a full-width panel with Emergency State at the dashboard bottom", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   const statusPanel = html.indexOf('class="dashboard-panel status-panel"');
   const agentStatus = html.indexOf("<h2>Agent Status</h2>", statusPanel);
   const brain = html.indexOf('data-agent-brain-stage', agentStatus);
-  const emergencyState = html.indexOf('class="dashboard-panel emergency-panel"', brain);
+  const portfolioChart = html.indexOf('class="dashboard-panel chart-panel"');
+  const lastDashboardList = html.indexOf('data-dashboard-list="decisions"');
+  const emergencyState = html.indexOf('class="dashboard-panel emergency-panel"');
+  const mainEnd = html.indexOf("</main>");
   const portfolioSummary = html.indexOf('id="summary-heading"');
 
   assert.ok(statusPanel >= 0);
   assert.ok(agentStatus > statusPanel);
-  assert.ok(brain > agentStatus && brain < emergencyState);
+  assert.ok(brain > agentStatus && brain < portfolioChart);
+  assert.ok(lastDashboardList < emergencyState && emergencyState < mainEnd);
   assert.ok(portfolioSummary < statusPanel);
+  assert.match(html, /class="agent-status-monitor"[\s\S]*Live backend signal[\s\S]*status-wave/);
   assert.doesNotMatch(html, /Agent Brain visualization · Phase 05/);
+  assert.match(styles, /\.dashboard-grid-status,\s*\.dashboard-grid-risk\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.agent-brain-stage\s*\{[^}]*height:\s*clamp\(280px,\s*32vw,\s*380px\);/s);
+  assert.match(styles, /@media \(max-width: 559px\)\s*\{[^}]*\.agent-brain-stage\s*\{[^}]*height:\s*230px;/s);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /\.agent-brain\[data-visualization="ready"\].*\.agent-brain-fallback\s*\{\s*display:\s*none\s*!important;/s);
 });
 

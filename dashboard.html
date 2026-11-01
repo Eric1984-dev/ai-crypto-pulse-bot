@@ -188,16 +188,16 @@
               3D visualization unavailable. Agent status remains available above.
             </p>
           </div>
-        </article>
-        <article class="dashboard-panel emergency-panel">
-          <div class="panel-heading">
+          <div class="agent-status-monitor">
             <div>
-              <p class="eyebrow">Risk control</p>
-              <h2>Emergency State</h2>
+              <p class="agent-status-title">Live backend signal</p>
+              <p class="agent-status-description">Agent status refreshes automatically while this dashboard is visible.</p>
             </div>
-            <span class="status-pill" data-dashboard-status="emergency" data-state="unknown">UNKNOWN</span>
+            <div class="agent-status-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
           </div>
-          <p class="card-description">Emergency State is stored separately and does not change Agent Status.</p>
         </article>
       </section>
 
@@ -248,6 +248,19 @@
           </div>
           <ul class="dashboard-list" data-dashboard-list="decisions" hidden></ul>
           <p class="dashboard-empty" data-dashboard-empty="decisions">No AI decisions recorded.</p>
+        </article>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid-risk" aria-label="Risk control">
+        <article class="dashboard-panel emergency-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Risk control</p>
+              <h2>Emergency State</h2>
+            </div>
+            <span class="status-pill" data-dashboard-status="emergency" data-state="unknown">UNKNOWN</span>
+          </div>
+          <p class="card-description">Emergency State is stored separately and does not change Agent Status.</p>
         </article>
       </section>
     </main>

@@ -82,6 +82,8 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Move the Risk control / Emergency State panel to the bottom of the Dashboard, expand Agent Status and its brain canvas to full width, and add an automatically refreshed backend signal strip with status-driven animation
+- Add visible neuron nodes and status-driven traveling cyan signals along the left and right brain traces; the 52 additional green neurons remain exclusive to `ANALYZING`
 - Add a Trade Value breakdown to Trade History and Portfolio trade details: BUY invested amount, fees, and total cost; SELL gross proceeds, fees, net proceeds, and realized P&L
 - Refine the Agent Brain toward the supplied visual reference with blue input waves, right-side circuit traces, and 52 green neuron highlights shown only during `ANALYZING`; status sourcing and agent logic remain unchanged
 - Reuse stored execution price, quantity, fees, and realized P&L with shared EUR presentation formatters; no trading logic, database calculations, API endpoints, or Vercel Functions changed

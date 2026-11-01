@@ -4,7 +4,7 @@
 
 Implemented within Phase 05. Phase 06 was not started. The dashboard layout, Agent Brain placement, Supabase integration, authenticated status polling, and database logic were not changed.
 
-The appearance was later extended at the user's request to better match the supplied reference: blue wave traces enter from the left, circuit paths branch from the right, and 52 green neuron highlights appear only while the existing status is `ANALYZING`. This visual-only follow-up does not alter status mapping, status sourcing, polling, or agent behavior.
+The appearance was later extended at the user's request to better match the supplied reference: blue wave traces enter from the left, circuit paths branch from the right, and status-driven cyan neuron pulses travel along both sets of traces. Fifty-two green neuron highlights appear only while the existing status is `ANALYZING`. The Agent Status panel was then expanded to a full-width row with a larger brain canvas and a status-driven signal animation; Risk control / Emergency State was moved to the bottom of the dashboard. These visual/layout follow-ups do not alter status mapping, status sourcing, polling, or agent behavior.
 
 ## Redesign
 
@@ -24,7 +24,7 @@ Replaced the diffuse neural-cloud layout with a front-facing bilateral brain dra
 
 - Status remains sourced from `AI_Crypto_Bot_Status.status`.
 - Existing authenticated status API and dashboard polling remain unchanged.
-- Dashboard placement and layout remain unchanged.
+- The brain remains in the Agent Status panel; that panel is full-width and Emergency State is the final dashboard panel.
 - Existing 30 FPS cap, desktop/mobile pixel-ratio caps, hidden-tab pause, fallback handling, and resource disposal remain active.
 
 ## Files changed
