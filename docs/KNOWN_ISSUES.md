@@ -4,7 +4,7 @@
 
 - The hosted Supabase migration history, RLS/grants, and Realtime publication state have not been verified in this environment. The Phase 11 publication migration and live Realtime/reconnect smoke tests remain pending.
 - Production authentication, dashboard, scanner, Bitvavo ingestion, AI analysis, paper-trading jobs, and Admin Actions have not been smoke-tested against a deployed Vercel/Supabase environment.
-- Analytics and Analytics Exports still return `503 DASHBOARD_DATA_UNAVAILABLE`. The supplied production log localizes the failure to `AI_Crypto_Bot_AI_Decisions`, query `analytics.ai-decisions`, page 3 (`1000-1499`), HTTP `416/PGRST103`; the Supabase message/details were not captured. Temporary query diagnostics now capture the exact query and error fields, but the precise range rejection and deployed behavior remain unresolved pending redeployment and log review.
+- The Analytics pagination fix treats HTTP `416` on `analytics.ai-decisions` as end-of-results and is covered by local regressions, including the production-reported `1000-1499` range. The production error is not verified as resolved until this change is deployed and Analytics plus Analytics Exports are smoke-tested; the original Supabase message/details remain unavailable.
 - A prior Market Scanner HTTP 503 (`MARKET_DATA_UNAVAILABLE`) was associated with a failing database/PostgREST read, but its original query and production root cause remain unconfirmed. The later-range `416/PGRST103` pagination case has a targeted fix; production errors remain generic.
 - Market snapshot, candle refresh, AI analysis, and paper-trading execution require configured external scheduler jobs. Production scheduler configuration and execution are unverified.
 - Admin Actions require the server-side `ADMIN_USER_IDS` allowlist to be configured and verified.
@@ -15,7 +15,7 @@ See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_R
 
 - Paper trading is simulated only. `ENABLE_LIVE_TRADING=false` is required; no exchange order or private Bitvavo API is used.
 - Strategy optimization, backtesting, and live trading are not implemented.
-- Dashboard and Portfolio require valid Supabase configuration and applied migrations. Financial aggregates are shown as unavailable rather than partial when bounded reads cannot guarantee complete calculations.
+- Dashboard and Portfolio require valid Supabase configuration and applied migrations. Financial aggregates fail closed on invalid or inconsistent reads; Analytics specifically treats an AI-decision HTTP `416` as a terminal range and aggregates only the successful pages received before it.
 - Realtime has polling fallback, but hosted publication delivery has not been verified.
 - Chart.js and Three.js use pinned CDNs. Visualization fallback preserves the surrounding page when a library or WebGL is unavailable; hardware-specific performance varies.
 - Automated mobile/browser tests do not replace physical-device smoke testing.

@@ -458,6 +458,35 @@ test("empty analytics data returns safe empty metrics and valid report rows", as
   assert.equal(getAnalyticsExportRows("analytics-summary", analytics).rows.length, 18);
 });
 
+test("AI decision pagination handles empty, boundary, and large result counts", async () => {
+  for (const count of [0, 1, 723, 999, 1000, 1001, 19380]) {
+    const decisions = Array.from({ length: count }, (_, index) => ({
+      id: `decision-${String(index).padStart(6, "0")}`,
+      symbol: "BTC-EUR",
+      decision: "WAIT",
+      confidence: "72",
+      strategy_name: null,
+      strategy_version: null,
+      created_at: "2026-03-20T10:00:00.000Z"
+    }));
+    const calls = [];
+    const analytics = await loadAnalytics({
+      ...createAnalyticsRows(),
+      AI_Crypto_Bot_AI_Decisions: decisions
+    }, calls, "30d");
+    const ranges = calls
+      .filter((call) => call.table === "AI_Crypto_Bot_AI_Decisions" && call.options.method === "GET")
+      .map((call) => call.options.headers.range);
+
+    assert.equal(analytics.aiPerformance.decisionCount, count);
+    assert.equal(ranges.length, Math.ceil(count / 500));
+    assert.deepEqual(ranges, Array.from(
+      { length: Math.ceil(count / 500) },
+      (_, page) => `${page * 500}-${page * 500 + 499}`
+    ));
+  }
+});
+
 test("large trade histories are paginated in 500-row batches and fully aggregated", async () => {
   const rows = {
     AI_Crypto_Bot_Portfolios: [{
@@ -796,7 +825,7 @@ test("Analytics export failures include query diagnostics only in development", 
   }
 });
 
-test("development diagnostics capture the exact 416 AI-decision page failure", async () => {
+test("AI-decision HTTP 416 ends pagination and ignores later prefetched ranges", async () => {
   const decisions = Array.from({ length: 1501 }, (_, index) => ({
     id: `decision-${String(index).padStart(4, "0")}`,
     symbol: "BTC-EUR",
@@ -806,6 +835,7 @@ test("development diagnostics capture the exact 416 AI-decision page failure", a
     strategy_version: null,
     created_at: "2026-03-20T10:00:00.000Z"
   }));
+  const calls = [];
   const logs = [];
   const handler = createHandler({
     env: {
@@ -815,6 +845,7 @@ test("development diagnostics capture the exact 416 AI-decision page failure", a
     },
     verify: async () => true,
     fetchImpl: createSupabaseFetch({
+      calls,
       rows: { ...createAnalyticsRows(), AI_Crypto_Bot_AI_Decisions: decisions },
       failTable: "AI_Crypto_Bot_AI_Decisions",
       failMethod: "GET",
@@ -834,22 +865,22 @@ test("development diagnostics capture the exact 416 AI-decision page failure", a
     headers: { cookie: `cp_access_token=${accessToken}` }
   }, response);
 
-  const error = JSON.parse(response.body).error;
-  assert.equal(response.statusCode, 503);
-  assert.equal(error.diagnostics.dataset, "AI_Crypto_Bot_AI_Decisions");
-  assert.equal(error.diagnostics.queryName, "analytics.ai-decisions");
-  assert.equal(error.diagnostics.operation, "SELECT");
-  assert.equal(error.diagnostics.page, 3);
-  assert.equal(error.diagnostics.range, "1000-1499");
-  assert.equal(error.diagnostics.responseStatus, 416);
-  assert.equal(error.diagnostics.supabaseCode, "PGRST103");
-  assert.equal(error.diagnostics.supabaseMessage, "Requested range not satisfiable");
-  assert.equal(error.diagnostics.supabaseDetails, "Requested offset 1000 is outside the visible result set.");
-  assert.equal(error.diagnostics.failureCategory, "RANGE_NOT_SATISFIABLE");
-  assert.match(error.diagnostics.query, /GET \/rest\/v1\/AI_Crypto_Bot_AI_Decisions\?/);
-  assert.match(logs[0], /PAGE=3 RANGE=1000-1499/);
-  assert.match(logs[0], /HTTP_STATUS=416 ERROR_CODE=PGRST103/);
-  assert.match(logs[0], /SUPABASE_MESSAGE="Requested range not satisfiable"/);
+  assert.equal(response.statusCode, 200);
+  assert.equal(JSON.parse(response.body).data.aiPerformance.decisionCount, 1000);
+  assert.deepEqual(logs, []);
+  const requestedRanges = calls
+    .filter((call) => call.table === "AI_Crypto_Bot_AI_Decisions" && call.options.method === "GET")
+    .map((call) => call.options.headers.range);
+  assert.deepEqual(requestedRanges, ["0-499", "500-999", "1000-1499", "1500-1999"]);
+
+  const exportCountResponse = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=export-count&type=ai-analytics&period=90d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, exportCountResponse);
+  assert.equal(exportCountResponse.statusCode, 200);
+  assert.ok(Number.isInteger(JSON.parse(exportCountResponse.body).data.recordCount));
 });
 
 test("expired analytics database sessions remain authentication failures", async () => {

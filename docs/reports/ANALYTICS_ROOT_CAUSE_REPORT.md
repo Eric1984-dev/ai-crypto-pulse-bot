@@ -6,6 +6,8 @@ The supplied production log identifies the failing dataset and request: `AI_Cryp
 
 This confirms a range/pagination failure in the AI Decisions read, not a missing table. The supplied log does not contain the Supabase error message or details, so the exact reason the range was rejected remains unknown. Temporary instrumentation now records the exact request query and Supabase error fields. It returns those diagnostics in the response only when `NODE_ENV=development`; production responses stay generic.
 
+Follow-up: the shared Analytics reader now treats HTTP `416` on `analytics.ai-decisions` as end-of-results, retaining successful earlier pages and ignoring later prefetched ranges. See [the pagination fix report](ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution still requires deployment and smoke testing.
+
 ## Confirmed Production Failure
 
 ```text
@@ -49,7 +51,7 @@ The existing `/api/dashboard-data` function now logs:
 
 With `NODE_ENV=development`, the same fields are returned under `error.diagnostics`. In production, the response remains limited to the existing generic error code and message. Logs do not include rows, request headers, access tokens, or the full Supabase response body.
 
-The diagnostics are temporary. After deploying, reproduce the Analytics failure and an Analytics Export failure, then inspect the Vercel function logs for `Analytics query failed`. The `SUPABASE_MESSAGE` and `SUPABASE_DETAILS` fields should distinguish an unavailable offset from other PostgREST range constraints. Do not convert this failure into a successful partial result: Analytics validates source counts and must fail closed rather than report incomplete metrics.
+The diagnostics remain useful for other query failures. After deploying, verify Analytics and Analytics Exports no longer fail on the known 416 range and inspect Vercel logs for any remaining failures. A 416 on the AI-decision page is now an explicit terminal condition; other database errors and incomplete successful pages continue to fail closed.
 
 ## Validation and Scope
 

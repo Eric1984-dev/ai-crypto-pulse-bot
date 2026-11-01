@@ -15,6 +15,7 @@ All notable project changes should be documented here.
 
 ### Fixed
 
+- Analytics AI-decision pagination now treats HTTP `416` as end-of-results, ignores later prefetched ranges, and covers the requested empty, page-boundary, and 19,380-row regressions
 - Phase 13 Analytics now defaults to a 30-day history window and supports 90- and 365-day ranges for historical trades, AI decisions, and snapshots; current positions and account totals remain current-state metrics
 - Bounded Analytics reads with exact RLS-visible counts and up to four concurrent 500-row pages per source, avoiding full all-history decision scans and detecting truncated pages
 - Added temporary Analytics/Analytics Export diagnostics that log the exact failing dataset, request query, response status, and Supabase error fields. Development responses include diagnostics; production responses remain generic.
