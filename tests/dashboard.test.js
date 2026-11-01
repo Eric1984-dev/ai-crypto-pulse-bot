@@ -335,10 +335,14 @@ function createDashboardDocument({ includeAdminActions = false } = {}) {
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"markets\"]",
     "[data-dashboard-list=\"decisions\"]",
+    "[data-dashboard-list=\"scanner-gainers\"]",
+    "[data-dashboard-list=\"scanner-opportunities\"]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"markets\"]",
     "[data-dashboard-empty=\"decisions\"]",
+    "[data-dashboard-empty=\"scanner-gainers\"]",
+    "[data-dashboard-empty=\"scanner-opportunities\"]",
     "[data-portfolio-chart]",
     "[data-dashboard-chart-empty]",
     "[data-dashboard-loading]",
@@ -432,7 +436,20 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     marketSummary: {
       activeMarkets: 1,
       marketsWithData: 1,
-      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }]
+      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }],
+      scanner: {
+        timeframes: {
+          "24h": {
+            topGainers: [{ symbol: "BTC-EUR", changePct: 2.5, price: 100000 }],
+            aiOpportunities: [{
+              symbol: "BTC-EUR",
+              decision: "BUY",
+              confidence: 90,
+              reason: "Momentum is positive."
+            }]
+          }
+        }
+      }
     },
     aiDecisions: { count: 1, items: [{ decision: "HOLD", symbol: "BTC-EUR", confidence: 80, reason: "No action." }] },
     portfolioSnapshots: [
@@ -455,6 +472,14 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.match(
     elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
     /Priority 1.*100\.000,00.*2,5% \(24h\)/
+  );
+  assert.match(
+    elements.get("[data-dashboard-list=\"scanner-gainers\"]")[0].children[0].children[0].textContent,
+    /BTC-EUR.*2,5%/
+  );
+  assert.match(
+    elements.get("[data-dashboard-list=\"scanner-opportunities\"]")[0].children[0].children[1].textContent,
+    /Momentum is positive/
   );
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);

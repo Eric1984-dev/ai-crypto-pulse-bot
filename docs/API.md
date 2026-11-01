@@ -126,6 +126,12 @@ Success response:
 }
 ```
 
+The response also includes `data.scanner`, generated from the same existing endpoint and authenticated database reads. It contains active/fresh-market counts and rankings for `24h`, `7d`, and `30d`; each timeframe has `topGainers`, `topLosers`, `highestVolume`, `strongestMomentum`, and `aiOpportunities` arrays. Each ranking is capped at ten rows. AI opportunities contain `symbol`, `confidence`, `decision`, `reason`, and `created_at`.
+
+The scanner uses enabled rows from `AI_Crypto_Bot_Watched_Markets`, market snapshots from `AI_Crypto_Bot_Market_Data`, daily/hourly OHLCV rows from `AI_Crypto_Bot_Candles`, and stored decisions from `AI_Crypto_Bot_AI_Decisions`. The 24-hour change and estimated EUR turnover use the stored ticker snapshot; 7-day and 30-day change/turnover use daily candles. Momentum uses 6-hour hourly-candle change for `24h`, 3-day daily-candle change for `7d`, and 7-day daily-candle change for `30d`. It selects the latest stored decision per active market inside the selected period and ranks by confidence, then decision priority and recency. Price rankings require a market snapshot no older than 15 minutes; unavailable or invalid input is omitted instead of fabricated. The scanner is read-only and does not create AI decisions or trades.
+
+The scanner page and dashboard preview consume this response; no new API function or database schema is introduced. Browser requests use `cache: "no-store"` and same-origin session credentials.
+
 ### GET /api/market
 
 Returns the stored snapshot and candles for an enabled, tracked market. When configured with the server-only service role, a candle request refreshes the selected interval from Bitvavo and upserts validated OHLCV rows before returning stored results.

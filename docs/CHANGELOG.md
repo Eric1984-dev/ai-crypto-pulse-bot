@@ -8,6 +8,9 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 09 market scanner rankings for gainers, losers, estimated quote volume, momentum, and recent stored AI opportunities across 24h, 7d, and 30d
+- Scanner ranking and API pagination regression tests for empty and large datasets, plus responsive scanner UI and dashboard preview using the existing market-summary endpoint
+- Phase 09 completion report documenting ranking methodology, data sources, function-count verification, and limitations
 - Server-authorized dashboard Admin Actions for on-demand AI analysis and paper trading, using a Supabase user-ID allowlist and preserving existing engine and risk checks
 - Admin authorization and dashboard execution-state tests, a server-only `ADMIN_USER_IDS` environment setting, and the dashboard Admin Actions report
 - Phase 08 transactional paper-trading engine using persisted AI decisions and stored market data only, with service-role-only database execution, unique decision-linked trade records, portfolio valuation, and scheduler metrics
@@ -61,6 +64,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Replace the scanner placeholder with timeframe-filtered rankings refreshed from stored market data; keep the existing `/api/market-summary` endpoint and Vercel function count unchanged
 - Replace the fixed header navigation links with a keyboard-accessible dropdown menu across public and protected pages
 - Refresh complete authenticated dashboard data every 30 seconds while visible and immediately when returning to the foreground; retain no-store requests and coalesce concurrent loads
 - Increase Agent Brain active-neuron halo strength and extend the taller silhouette slightly downward

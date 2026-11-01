@@ -55,6 +55,8 @@ The objects live in the `public` schema. Supabase-managed objects such as `auth.
 - `AI_Crypto_Bot_Scanner_Events`: watched symbol, event type, reason, optional confidence, and creation time.
 - `AI_Crypto_Bot_Emergency_State`: append-only state events with `NORMAL`, `PAUSED`, or `EMERGENCY_STOP`, optional reason, and creation time. The newest event represents the current emergency state; this is independent of Agent Status.
 
+Phase 09 Market Scanner adds no tables, columns, indexes, policies, or migrations. It performs authenticated read-only queries against enabled watched markets, snapshots, daily/hourly candles, and stored AI decisions. Candle and decision reads use bounded PostgREST range pagination so the default response cap does not silently omit later rows; scanner results are derived in memory and are not persisted.
+
 ## Relationships and deletion behavior
 
 - `AI_Crypto_Bot_Profiles.id` references `auth.users.id`; deleting an Auth user cascades to its profile.

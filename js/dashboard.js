@@ -257,6 +257,16 @@
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
       item.reason || "No decision reason recorded."
     ]);
+    const scanner24h = marketSummary && marketSummary.scanner
+      && marketSummary.scanner.timeframes && marketSummary.scanner.timeframes["24h"];
+    renderCollection(documentRef, "scanner-gainers", scanner24h && scanner24h.topGainers, (item) => [
+      `${item.symbol || "—"} · ${formatPercent(item.changePct)}`,
+      `Price ${formatCurrency(item.price)}`
+    ]);
+    renderCollection(documentRef, "scanner-opportunities", scanner24h && scanner24h.aiOpportunities, (item) => [
+      `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
+      item.reason || "No decision reason recorded."
+    ]);
 
     const chart = renderPortfolioChart(
       documentRef,

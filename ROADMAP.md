@@ -123,10 +123,16 @@ Phase 08 gebruikt uitsluitend paper trading; Phase 09 is niet gestart. De code g
 
 ## Phase 09 - Market Scanner
 
-- Top Gainers
-- Top Losers
-- Volume Spikes
-- AI Signals
+- [x] Top Gainers and Top Losers over 24h, 7d, and 30d
+- [x] Highest Volume and Strongest Momentum rankings
+- [x] AI Opportunities from the latest stored decisions, including symbol, confidence, decision, and reason
+- [x] Rank enabled watched markets using stored snapshots and OHLCV candles
+- [x] Reuse `/api/market-summary` and dashboard refresh; add no Vercel Function or database schema
+- [x] Responsive scanner page, dashboard preview, refresh behavior, tests, documentation, and completion report
+
+Status: Completed
+
+Ranking is read-only and uses stored market data and AI decisions. It does not generate decisions or execute trades.
 
 ---
 

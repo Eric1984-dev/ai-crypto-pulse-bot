@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CryptoPulse market scanner placeholder.">
+    <meta name="description" content="Rank active CryptoPulse markets and stored AI opportunities.">
     <title>Market scanner · CryptoPulse</title>
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/scanner.js" defer></script>
   </head>
   <body data-auth-page="protected">
     <header class="site-header">
@@ -34,11 +35,51 @@
       <p data-auth-message role="status" aria-live="polite"></p>
       <p class="eyebrow">Markten</p>
       <h1>Market scanner</h1>
-      <p class="page-description">De scanner wordt later gekoppeld aan de centraal beheerde markten en gevalideerde marktdata.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alleen simulatie; marktdata en scannerfunctionaliteit zijn nog niet actief.</span></div>
-      <section class="placeholder-card" aria-labelledby="scanner-placeholder">
-        <h2 id="scanner-placeholder">Scanner placeholder</h2>
-        <p class="card-description">Er worden geen markten opgehaald of signalen gegenereerd in Phase 01.</p>
+      <p class="page-description">Rangschik actieve EUR-markten en recente AI-beslissingen op basis van opgeslagen marktdata.</p>
+      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>De scanner geeft marktinzichten weer en plaatst geen orders.</span></div>
+      <section class="scanner-panel" aria-labelledby="scanner-heading">
+        <div class="scanner-toolbar">
+          <div>
+            <h2 id="scanner-heading">Market rankings</h2>
+            <p class="card-description">Alleen actieve watched markets met verse snapshots verschijnen in de prijsranglijsten.</p>
+          </div>
+          <button class="secondary-button" data-scanner-refresh type="button">Refresh</button>
+        </div>
+        <div class="scanner-controls">
+          <div class="scanner-timeframes" role="group" aria-label="Selecteer periode">
+            <button type="button" data-scanner-timeframe="24h" aria-pressed="true">24h</button>
+            <button type="button" data-scanner-timeframe="7d" aria-pressed="false">7d</button>
+            <button type="button" data-scanner-timeframe="30d" aria-pressed="false">30d</button>
+          </div>
+          <p data-scanner-status role="status" aria-live="polite">Scannerdata laden…</p>
+        </div>
+        <div class="scanner-rankings">
+          <article class="scanner-ranking">
+            <h3>Top Gainers</h3>
+            <ol data-scanner-list="topGainers" hidden></ol>
+            <p data-scanner-empty="topGainers">Geen gegevens beschikbaar.</p>
+          </article>
+          <article class="scanner-ranking">
+            <h3>Top Losers</h3>
+            <ol data-scanner-list="topLosers" hidden></ol>
+            <p data-scanner-empty="topLosers">Geen gegevens beschikbaar.</p>
+          </article>
+          <article class="scanner-ranking">
+            <h3>Highest Volume</h3>
+            <ol data-scanner-list="highestVolume" hidden></ol>
+            <p data-scanner-empty="highestVolume">Geen gegevens beschikbaar.</p>
+          </article>
+          <article class="scanner-ranking">
+            <h3>Strongest Momentum</h3>
+            <ol data-scanner-list="strongestMomentum" hidden></ol>
+            <p data-scanner-empty="strongestMomentum">Geen gegevens beschikbaar.</p>
+          </article>
+          <article class="scanner-ranking scanner-ranking-wide">
+            <h3>AI Opportunities</h3>
+            <ol data-scanner-list="aiOpportunities" hidden></ol>
+            <p data-scanner-empty="aiOpportunities">Geen recente AI-beslissingen.</p>
+          </article>
+        </div>
       </section>
     </main>
     <footer class="site-footer">

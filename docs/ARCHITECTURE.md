@@ -1,6 +1,6 @@
 # Architecture
 
-## Current Implementation: Phase 08
+## Current Implementation: Phase 09
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies. Phase 07 adds a server-side deterministic analysis engine using the existing Phase 06 market data.
 
@@ -26,6 +26,9 @@ Implemented components:
 - Visibility-aware dashboard polling every 30 seconds, with a foreground refresh and duplicate-load protection
 - Three.js Agent Brain visualization driven by the live database status, with bounded rendering, hidden-tab pause, and explicit resource disposal
 - Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
+- Read-only Market Scanner rankings for active watched markets, using fresh snapshots, stored daily/hourly candles, and latest stored AI decisions
+- 24h/7d/30d gainers, losers, estimated EUR volume, momentum, and AI opportunities; bounded ranking results and range-paginated PostgREST reads
+- Responsive scanner page and dashboard preview using the existing authenticated `/api/market-summary` endpoint; no additional Vercel Function or database migration
 - Non-destructive watched-market validation/synchronization and 60-second in-memory provider caching
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
 - Separate scheduler-protected market-snapshot and bounded candle-refresh endpoints, plus AI analysis; candle work handles one interval and at most five markets per invocation, with external schedulers supported without a Vercel Cron route
@@ -43,7 +46,6 @@ The presentation layer never receives a service-role key. The public anon key an
 The following capabilities are not implemented:
 
 - Realtime functionality
-- Signal-generating Market Scanner
 - Backtesting
 - Strategy Optimization
 - Live Trading
@@ -52,7 +54,7 @@ Current platform status:
 
 PAPER ACTIVE
 
-Phase 08 is complete; Phase 09 has not started. The AI Engine remains analysis-only; the separate paper executor applies the Risk Manager to its stored decisions.
+Phase 09 is complete; Phase 10 has not started. The scanner only ranks stored data; it neither generates AI decisions nor executes trades. The AI Engine remains analysis-only; the separate paper executor applies the Risk Manager to stored decisions.
 
 ---
 

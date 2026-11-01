@@ -196,6 +196,18 @@ npm.cmd run build
 
 These are local embedded-database and mocked HTTP tests. They do not prove a remote Supabase migration was applied, a Vercel deployment succeeded, or cron-job.org has been configured.
 
+## Phase 09 Market Scanner coverage
+
+Scanner unit tests verify 24h/7d/30d gainer and loser ordering, estimated EUR volume, timeframe-specific momentum, latest-decision AI opportunity ranking and required fields, active-market and freshness filtering, empty inputs, and 1,500-market ranking bounds. Market-data service tests exercise Range pagination for both candle history and AI decisions, including markets/decisions beyond the first PostgREST page. UI tests verify the existing no-store market-summary endpoint, malformed/unauthenticated response handling, timeframe selection, safe text rendering, and duplicate-request coalescing. Dashboard tests verify the 24-hour gainer and AI-opportunity preview.
+
+```powershell
+node --test tests/market-scanner.test.mjs tests/market-scanner-ui.test.js tests/market-data.test.mjs tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+These tests use deterministic stored-data fixtures and mocked Supabase requests. They do not verify a live database or deployment. The scanner uses the existing `/api/market-summary` function, so it does not increase Vercel's serverless function count.
+
 ---
 
 ## Regression Testing

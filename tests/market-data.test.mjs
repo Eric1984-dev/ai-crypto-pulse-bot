@@ -37,6 +37,7 @@ function createHarness({
   watched = [watchedMarket],
   marketData = [],
   candles = [],
+  decisions = [],
   catalog = [validMarket],
   tickers = [validTicker],
   candleRows = [],
@@ -56,8 +57,10 @@ function createHarness({
     "AI_Crypto_Bot_Watched_Markets": [...watched],
     "AI_Crypto_Bot_Market_Data": [...marketData],
     "AI_Crypto_Bot_Candles": [...candles],
+    "AI_Crypto_Bot_AI_Decisions": [...decisions],
     "AI_Crypto_Bot_Scanner_Events": []
   };
+  const databaseCalls = [];
   const fetchImpl = async (input, options = {}) => {
     const url = new URL(input);
     if (url.hostname === "api.bitvavo.com") {
@@ -103,6 +106,7 @@ function createHarness({
     if (!database[table]) {
       throw new Error(`Unexpected Supabase table: ${table}`);
     }
+    databaseCalls.push({ table, url, options });
     if (options.method === "POST") {
       const rows = JSON.parse(options.body);
       writes.push({ table, rows });
@@ -142,12 +146,41 @@ function createHarness({
     if (intervalFilter && intervalFilter.startsWith("eq.")) {
       rows = rows.filter((row) => row.interval === intervalFilter.slice(3));
     }
-    if (url.searchParams.get("order") === "timestamp.desc") {
-      rows = [...rows].sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
+    for (const column of ["timestamp", "created_at"]) {
+      const filter = url.searchParams.get(column);
+      if (filter && filter.startsWith("gte.")) {
+        rows = rows.filter((row) => Date.parse(row[column]) >= Date.parse(filter.slice(4)));
+      }
     }
-    const limit = Number(url.searchParams.get("limit"));
-    if (Number.isInteger(limit) && limit >= 0) {
-      rows = rows.slice(0, limit);
+    const order = url.searchParams.get("order");
+    if (order) {
+      const [column, direction] = order.split(".").slice(0, 2);
+      const secondaryOrder = order.split(",")[1];
+      rows = [...rows].sort((left, right) => {
+        const leftValue = left[column];
+        const rightValue = right[column];
+        const comparison = typeof leftValue === "string" && typeof rightValue === "string"
+          ? leftValue.localeCompare(rightValue)
+          : Number(leftValue) - Number(rightValue);
+        const ordered = direction === "desc" ? -comparison : comparison;
+        if (ordered || !secondaryOrder) {
+          return ordered;
+        }
+        const [secondaryColumn, secondaryDirection] = secondaryOrder.split(".");
+        const secondaryComparison = String(left[secondaryColumn] || "")
+          .localeCompare(String(right[secondaryColumn] || ""));
+        return secondaryDirection === "desc" ? -secondaryComparison : secondaryComparison;
+      });
+    }
+    const range = options.headers && options.headers.Range;
+    if (range) {
+      const [from, to] = range.split("-").map(Number);
+      rows = rows.slice(from, to + 1);
+    } else {
+      const limit = Number(url.searchParams.get("limit"));
+      if (Number.isInteger(limit) && limit >= 0) {
+        rows = rows.slice(0, limit);
+      }
     }
     return jsonResponse(rows);
   };
@@ -161,6 +194,7 @@ function createHarness({
     service,
     writes,
     providerCalls,
+    databaseCalls,
     database,
     clock,
     getMaxConcurrentCandleRequests: () => maxConcurrentCandleRequests
@@ -380,7 +414,16 @@ test("market summary endpoint returns active and data-bearing market counts", as
     verify: async () => true,
     service: {
       async getMarketSummary() {
-        return { activeMarkets: 4, marketsWithData: 3, items: [] };
+        return {
+          activeMarkets: 4,
+          marketsWithData: 3,
+          items: [],
+          enabledMarketRows: [{ symbol: "BTC-EUR", enabled: true, priority: 1 }]
+        };
+      },
+      async getMarketScannerSummary({ activeMarkets }) {
+        assert.deepEqual(activeMarkets, [{ symbol: "BTC-EUR", enabled: true, priority: 1 }]);
+        return { timeframes: { "24h": { aiOpportunities: [] } } };
       }
     }
   });
@@ -391,8 +434,82 @@ test("market summary endpoint returns active and data-bearing market counts", as
   assert.deepEqual(JSON.parse(response.body).data, {
     activeMarkets: 4,
     marketsWithData: 3,
-    items: []
+    items: [],
+    scanner: { timeframes: { "24h": { aiOpportunities: [] } } }
   });
+});
+
+test("market scanner pages candle history and includes markets beyond the first database page", async () => {
+  const activeMarkets = [];
+  const marketData = [];
+  const candles = [];
+  for (let marketIndex = 0; marketIndex < 40; marketIndex += 1) {
+    const symbol = `M${String(marketIndex).padStart(3, "0")}-EUR`;
+    activeMarkets.push({ symbol, enabled: true, priority: marketIndex + 1 });
+    marketData.push({
+      symbol,
+      price: marketIndex === 39 ? 200 : 100,
+      volume: 10,
+      daily_change: 0,
+      captured_at: "2026-03-20T11:59:00.000Z"
+    });
+    for (let daysAgo = 33; daysAgo >= 0; daysAgo -= 1) {
+      candles.push({
+        symbol,
+        interval: "1d",
+        close: daysAgo === 30 ? 100 : 100,
+        volume: 1,
+        timestamp: new Date(fixedNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+      });
+    }
+  }
+  const { service, databaseCalls } = createHarness({ candles });
+  const summary = await service.getMarketScannerSummary({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    activeMarkets,
+    marketData
+  });
+
+  const dailyCalls = databaseCalls.filter(({ table, url }) =>
+    table === "AI_Crypto_Bot_Candles" && url.searchParams.get("interval") === "eq.1d"
+  );
+  assert.equal(dailyCalls.length, 2);
+  assert.equal(dailyCalls[0].options.headers.Range, "0-999");
+  assert.equal(dailyCalls[1].options.headers.Range, "1000-1359");
+  assert.equal(summary.timeframes["30d"].topGainers[0].symbol, "M039-EUR");
+});
+
+test("market scanner pages recent decisions when the active market universe exceeds one page", async () => {
+  const activeMarkets = [];
+  const decisions = [];
+  for (let marketIndex = 0; marketIndex < 1200; marketIndex += 1) {
+    const symbol = `M${String(marketIndex).padStart(4, "0")}-EUR`;
+    activeMarkets.push({ symbol, enabled: true, priority: marketIndex + 1 });
+    decisions.push({
+      id: `decision-${marketIndex}`,
+      symbol,
+      decision: "BUY",
+      confidence: 70,
+      reason: "Recent stored decision.",
+      created_at: "2026-03-20T11:59:00.000Z"
+    });
+  }
+  const { service, databaseCalls } = createHarness({ decisions });
+  const summary = await service.getMarketScannerSummary({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    activeMarkets,
+    marketData: []
+  });
+
+  const decisionCalls = databaseCalls.filter(({ table }) => table === "AI_Crypto_Bot_AI_Decisions");
+  assert.equal(decisionCalls.length, 2);
+  assert.equal(decisionCalls[0].options.headers.Range, "0-999");
+  assert.equal(decisionCalls[1].options.headers.Range, "1000-1999");
+  assert.equal(summary.marketsWithDecisions, 1200);
 });
 
 test("scheduled refresh requires the cron secret and keeps server credentials out of responses", async () => {
