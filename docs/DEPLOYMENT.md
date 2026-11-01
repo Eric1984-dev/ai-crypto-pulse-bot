@@ -13,6 +13,10 @@ CryptoPulse AI Agent is designed to run on:
 
 Import the repository into Vercel with the repository root as the project root. The project is framework-free: `vercel.json` sets `outputDirectory` to `.` because the static HTML/CSS/JS files live in the repository root. This overrides a stale Project Settings value such as `public`; no `public/` folder or generated build directory is required. The same config enables clean URLs and orders protected-page routes before the filesystem handler, so root-level static HTML cannot bypass the authentication function.
 
+### iPhone home-screen icon
+
+Every page declares the shared 180×180 Apple Touch Icon and the `CryptoPulse` home-screen title. After the site is deployed over HTTPS, open it in Safari on iPhone, tap **Share**, then **Add to Home Screen**. If an older icon is already installed, remove that shortcut and add it again so iOS fetches the updated icon. This adds a home-screen shortcut; it does not provide offline support.
+
 Run local checks before deployment:
 
 ```powershell

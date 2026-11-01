@@ -21,6 +21,7 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Added a shared 180×180 Apple Touch Icon and CryptoPulse home-screen title across the static pages for iPhone Add to Home Screen.
 - Phase 13 protected Analytics page with trade, AI-decision, strategy, symbol, portfolio-growth, equity-curve, and drawdown insights calculated from existing RLS-scoped tables
 - Four Analytics CSV reports integrated into Exports and the existing authenticated dashboard-data function; paginated source reads, bounded portfolio series, regression coverage, and no new tables or Vercel Functions
 - Protected Exports page for CSV downloads of trades, portfolio snapshots, AI decisions, and positions, with date filters, exact counts, and streamed 500-row pages using the existing authenticated dashboard-data function
