@@ -26,6 +26,35 @@ test("all required placeholder pages exist", () => {
   }
 });
 
+test("all pages use a dropdown for their top navigation", () => {
+  const protectedPages = ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "settings.html"];
+  const accountPages = ["login.html", "register.html", "reset-password.html"];
+
+  for (const page of requiredPages) {
+    const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
+    const nav = html.match(/<nav\b[^>]*class="primary-nav"[\s\S]*?<\/nav>/);
+    assert.ok(nav, `${page} should have a primary navigation`);
+    assert.match(nav[0], /<details class="nav-dropdown">/);
+    assert.match(nav[0], /<summary class="nav-trigger">Menu<\/summary>/);
+    assert.match(nav[0], /<div class="nav-menu">[\s\S]*<\/div>\s*<\/details>/);
+
+    const menu = nav[0].match(/<div class="nav-menu">([\s\S]*?)<\/div>/);
+    assert.ok(menu);
+    if (accountPages.includes(page)) {
+      assert.match(menu[1], /href="\/login\.html"/);
+      assert.match(menu[1], /href="\/register\.html"/);
+    } else {
+      for (const href of ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/settings.html"]) {
+        assert.ok(menu[1].includes(`href="${href}"`), `${page} should retain ${href}`);
+      }
+    }
+
+    if (protectedPages.includes(page)) {
+      assert.match(menu[1], /data-auth-logout/);
+    }
+  }
+});
+
 test("market refresh endpoint remains available without a Vercel Cron configuration", () => {
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDirectory, "vercel.json"), "utf8"));
   assert.equal(Object.prototype.hasOwnProperty.call(vercelConfig, "crons"), false);

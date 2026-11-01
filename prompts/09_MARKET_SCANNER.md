@@ -63,3 +63,7 @@ Tests
 ---
 
 Dashboard integratie verplicht.
+
+No new API endpoints unless absolutely necessary.
+
+Reuse existing dashboard infrastructure.

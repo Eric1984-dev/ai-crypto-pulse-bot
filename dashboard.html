@@ -18,13 +18,18 @@
       <div class="header-inner">
         <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
         <nav class="primary-nav" aria-label="Hoofdnavigatie">
-          <a data-nav-link href="/dashboard.html">Dashboard</a>
-          <a data-nav-link href="/portfolio.html">Portfolio</a>
-          <a data-nav-link href="/scanner.html">Scanner</a>
-          <a data-nav-link href="/history.html">Trade history</a>
-          <a data-nav-link href="/settings.html">Instellingen</a>
-          <span class="account-email" data-user-email></span>
-          <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+          <details class="nav-dropdown">
+            <summary class="nav-trigger">Menu</summary>
+            <div class="nav-menu">
+              <a data-nav-link href="/dashboard.html">Dashboard</a>
+              <a data-nav-link href="/portfolio.html">Portfolio</a>
+              <a data-nav-link href="/scanner.html">Scanner</a>
+              <a data-nav-link href="/history.html">Trade history</a>
+              <a data-nav-link href="/settings.html">Instellingen</a>
+              <span class="account-email" data-user-email></span>
+              <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+            </div>
+          </details>
         </nav>
       </div>
     </header>

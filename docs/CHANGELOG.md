@@ -61,6 +61,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Replace the fixed header navigation links with a keyboard-accessible dropdown menu across public and protected pages
 - Refresh complete authenticated dashboard data every 30 seconds while visible and immediately when returning to the foreground; retain no-store requests and coalesce concurrent loads
 - Increase Agent Brain active-neuron halo strength and extend the taller silhouette slightly downward
 - Remove the visible dashboard title/subtitle and redundant Agent Status descriptions while retaining the paper-mode notice, accessible page heading, and status visualization
