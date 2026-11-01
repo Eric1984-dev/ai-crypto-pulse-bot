@@ -105,10 +105,11 @@
     maxPixelRatio: 1.5,
     mobilePixelRatio: 1.25,
     maxActivityPoints: 48,
+    maxAnalyzingNeurons: 80,
     maxNeuralNodes: 720,
     maxConnections: 2160
   });
-  const brainWidthScale = 0.72;
+  const brainWidthScale = 0.76;
 
   function mapAgentStatus(status) {
     const key = typeof status === "string" ? status.trim().toUpperCase() : "";
@@ -502,30 +503,34 @@
       brain.add(traceSignalGlow, traceSignals);
 
       const analyzingNeuronIndices = Array.from(
-        { length: Math.min(52, nodePositions.length) },
+        { length: Math.min(performanceLimits.maxAnalyzingNeurons, nodePositions.length) },
         (_, index) => (index * 149 + 37) % nodePositions.length
+      );
+      const analyzingNeuronRoutes = createSignalRoutes(
+        connectionPairs,
+        nodePositions.length,
+        analyzingNeuronIndices.length
       );
       const analyzingNeuronGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       analyzingNeuronGeometry.setFromPoints(
         analyzingNeuronIndices.map((index) => nodePositions[index])
       );
-      const analyzingNeuronPositionAttribute = analyzingNeuronGeometry.getAttribute("position");
       const analyzingNeuronGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x39ff91,
-        size: 0.13,
+        color: 0x39ff14,
+        size: 0.17,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.24,
+        opacity: 0.5,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
       }));
       const analyzingNeuronMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x9bffc1,
-        size: 0.058,
+        color: 0x7fff00,
+        size: 0.07,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.94,
+        opacity: 0.96,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
@@ -636,11 +641,17 @@
           animatedNodePositions,
           hotspotIndices
           );
-          updateHotspotPositions(
-          analyzingNeuronPositionAttribute,
-          animatedNodePositions,
-          analyzingNeuronIndices
-          );
+          if (config.status === "ANALYZING") {
+            updateEnergyParticles(
+              analyzingNeuronGeometry,
+              connectionPairs,
+              analyzingNeuronRoutes,
+              animatedNodePositions,
+              analyzingNeuronIndices.length,
+              elapsed,
+              config
+            );
+          }
           updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
           updateEnergyParticles(
           activityGeometry,
@@ -717,11 +728,17 @@
           animatedNodePositions,
           hotspotIndices
         );
-        updateHotspotPositions(
-          analyzingNeuronPositionAttribute,
-          animatedNodePositions,
-          analyzingNeuronIndices
-        );
+        if (config.status === "ANALYZING") {
+          updateEnergyParticles(
+            analyzingNeuronGeometry,
+            connectionPairs,
+            analyzingNeuronRoutes,
+            animatedNodePositions,
+            analyzingNeuronIndices.length,
+            0,
+            config
+          );
+        }
         updateReferenceTraceParticles(
           traceSignalPositionAttribute,
           referenceTraceLayout.pulseRoutes,
@@ -893,7 +910,7 @@
 
     function hemispherePoint(side, localX, y, z) {
       return new THREE.Vector3(
-        side * (0.05 + (localX - 0.05) * brainWidthScale),
+        side * (0.025 + (localX - 0.05) * brainWidthScale),
         y,
         z
       );
@@ -1309,7 +1326,7 @@
     for (let row = 0; row < codeRows; row += 1) {
       const progress = row / (codeRows - 1);
       const y = 0.33 - progress * 0.66;
-      const startX = 0.075 + Math.abs(progress - 0.5) * 0.018;
+      const startX = 0.05 + Math.abs(progress - 0.5) * 0.012;
       const endX = getRightContourX(y) - 0.025;
       const glyphCount = Math.max(0, Math.floor((endX - startX) / 0.045));
       for (let column = 0; column < glyphCount; column += 1) {
@@ -1405,7 +1422,11 @@
     return points;
   }
 
-  function createSignalRoutes(connectionPairs, nodeCount) {
+  function createSignalRoutes(
+    connectionPairs,
+    nodeCount,
+    routeCount = performanceLimits.maxActivityPoints
+  ) {
     const adjacency = Array.from({ length: nodeCount }, () => []);
     connectionPairs.forEach(([start, end], edgeIndex) => {
       adjacency[start].push({ node: end, edgeIndex });
@@ -1413,7 +1434,7 @@
     });
 
     const routes = [];
-    for (let routeIndex = 0; routeIndex < performanceLimits.maxActivityPoints; routeIndex += 1) {
+    for (let routeIndex = 0; routeIndex < routeCount; routeIndex += 1) {
       let currentNode = (routeIndex * 137 + 23) % nodeCount;
       let previousNode = -1;
       const nodeIndices = [currentNode];

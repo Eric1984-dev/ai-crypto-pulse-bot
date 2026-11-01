@@ -402,6 +402,7 @@ test("Agent Brain caps renderer pixel ratio for desktop and mobile performance",
   assert.equal(agentBrain.getPixelRatio(0, false), 1);
   assert.equal(agentBrain.performanceLimits.maxFramesPerSecond, 30);
   assert.equal(agentBrain.performanceLimits.maxActivityPoints, 48);
+  assert.equal(agentBrain.performanceLimits.maxAnalyzingNeurons, 80);
   assert.equal(agentBrain.performanceLimits.maxNeuralNodes, 720);
   assert.equal(agentBrain.performanceLimits.maxConnections, 2160);
 });
@@ -425,7 +426,10 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     material.color.value === 0x8bf2ff
   );
   const analysisNeurons = harness.calls.points.filter(({ material }) =>
-    material.color.value === 0x9bffc1
+    material.color.value === 0x7fff00
+  );
+  const analysisNeuronGlow = harness.calls.points.find(({ material }) =>
+    material.color.value === 0x39ff14
   );
   const traceNeurons = harness.calls.points.find(({ material }) =>
     material.color.value === 0x83eaff
@@ -447,7 +451,7 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   assert.equal(binaryCodeStrokes.renderOrder, 2);
   assert.ok(binaryCode.geometry.getAttribute("position").count > 300);
   const binaryCodePositions = binaryCode.geometry.getAttribute("position");
-  assert.ok(Math.min(...binaryCodePositions.array.filter((_, index) => index % 3 === 0)) > 0.04);
+  assert.ok(Math.min(...binaryCodePositions.array.filter((_, index) => index % 3 === 0)) > 0.02);
   const tracePositions = referenceTrace.geometry.getAttribute("position");
   const brainPositions = harness.calls.points.find(({ material }) => material.size === 0.045)
     .geometry.getAttribute("position");
@@ -509,12 +513,18 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   assert.ok(traceSignals);
   assert.equal(traceSignals.geometry.drawRange.count, 4);
   assert.equal(analysisNeurons.length, 1);
-  assert.equal(analysisNeurons[0].geometry.getAttribute("position").count, 52);
+  assert.equal(analysisNeurons[0].geometry.getAttribute("position").count, 80);
+  assert.equal(analysisNeuronGlow.geometry.getAttribute("position").count, 80);
+  assert.equal(analysisNeuronGlow.material.size, 0.17);
+  assert.equal(analysisNeuronGlow.material.opacity, 0.5);
+  assert.equal(analysisNeuronGlow.visible, false);
   assert.equal(analysisNeurons[0].visible, false);
 
   assert.equal(brain.setStatus("ANALYZING").status, "ANALYZING");
+  assert.equal(analysisNeuronGlow.visible, true);
   assert.equal(analysisNeurons[0].visible, true);
   assert.equal(traceSignals.geometry.drawRange.count, 20);
+  const initialAnalyzingPositions = [...analysisNeurons[0].geometry.getAttribute("position").array];
   const initialTracePositions = [...traceSignals.geometry.getAttribute("position").array];
   const [frameId, animate] = harness.calls.frameCallbacks.entries().next().value;
   harness.calls.frameCallbacks.delete(frameId);
@@ -523,6 +533,11 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     [...traceSignals.geometry.getAttribute("position").array],
     initialTracePositions
   );
+  const movingAnalyzingPositions = [...analysisNeurons[0].geometry.getAttribute("position").array];
+  assert.notDeepEqual(movingAnalyzingPositions, initialAnalyzingPositions);
+  assert.ok(Math.max(...movingAnalyzingPositions.map((value, index) =>
+    Math.abs(value - initialAnalyzingPositions[index])
+  )) > 0.02);
   assert.equal(brain.setStatus("ACTIVE").status, "ACTIVE");
   assert.equal(analysisNeurons[0].visible, false);
   assert.equal(traceSignals.geometry.drawRange.count, 20);
@@ -690,7 +705,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
     minimumNetworkY = Math.min(minimumNetworkY, y);
     maximumNetworkY = Math.max(maximumNetworkY, y);
     networkMaxX = Math.max(networkMaxX, Math.abs(x));
-    if (Math.abs(x) < 0.04 && y > -0.34) {
+    if (Math.abs(x) < 0.018 && y > -0.34) {
       midlineNodeCount += 1;
     }
     if (x < -0.1) {
@@ -733,7 +748,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
     assert.equal(connectionPosition.getY(segmentStart + 1), networkPositions.getY(nextPoint));
   }
   assert.ok(leftContourOuterEdge < -0.45);
-  assert.ok(leftContourInnerEdge < -0.04 && leftContourInnerEdge > -0.06);
+  assert.ok(leftContourInnerEdge < -0.02 && leftContourInnerEdge > -0.03);
   assert.ok(leftContourTop > 0.46);
   assert.ok(leftContourBottom < -0.4);
   const uniqueLineGeometries = [...new Set(harness.calls.lineSegmentGeometries)];

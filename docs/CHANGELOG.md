@@ -27,6 +27,9 @@ All notable project changes should be documented here.
 
 ### Fixed
 
+- Brought the Agent Brain hemispheres closer while retaining the outer silhouette; increased `ANALYZING` highlights from 52 to 104 fluorescent-green neurons that travel neural connections with a brighter additive glow
+- Tuned the status-specific `ANALYZING` effect to 80 moving green neurons with a smaller, softer glow; other Agent Status visuals remain unchanged
+- Added a standalone web app manifest and linked it from every page; internal navigation remains same-window, while iOS browser chrome remains OS-controlled
 - Parallelized and slightly thickened the Agent Brain's right-side circuit tracks, keeping them clear of the top frame without changing status logic
 - Added more pronounced angled elbows and subtle outward fanning to the right-side Agent Brain circuit traces, matching the supplied reference while preserving lane separation and status behavior
 - Matched the Agent Brain more closely to the reference with a narrower, brighter cortical outline and gyri, a cyan binary-glyph field, and a subtle hex-grid backdrop; reattached all left input waves and seven right-side traces to the contour, with stronger upward elbows and regression checks for contact, spacing, and top clearance

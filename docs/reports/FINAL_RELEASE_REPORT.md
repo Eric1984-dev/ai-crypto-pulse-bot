@@ -11,6 +11,13 @@ Two concrete issues were fixed:
 
 Validation passed: `npm.cmd test` (212 tests, 0 failures), `npm.cmd run build`, and a local Chromium viewport sweep of all 12 pages at 320px, 768px, and 1280px. The Vercel function count remains 12. Hosted production behavior, Lighthouse, physical devices, and cross-browser behavior were not verified.
 
+### Follow-up refinements
+
+- Narrowed the Agent Brain's center fissure, kept the outer silhouette bounded, and tuned the status-specific `ANALYZING` overlay to 80 moving green neurons with a softer glow.
+- Added a standalone web manifest and iOS home-screen metadata to every page. Internal page links remain same-window; iOS Safari and in-app browser controls cannot be hidden or dismissed by website code.
+- Follow-up validation passed: `npm.cmd test` (228 tests), `npm.cmd run build`, and the 12-function Vercel limit check.
+- These follow-ups have focused regression coverage. Physical iPhone verification, including launch from the installed home-screen icon, remains open.
+
 ## UX Findings
 
 - The application has a consistent English navigation menu across public and protected pages. All 12 HTML documents declare `lang="en"`.
@@ -32,7 +39,7 @@ Validation passed: `npm.cmd test` (212 tests, 0 failures), `npm.cmd run build`, 
 
 ## Mobile Findings
 
-All 12 HTML pages were rendered in the integrated Chromium browser at 320px, 768px, and 1280px viewport widths. After the minimum-width fix, each page's document width matched its available client width at all tested sizes. The mobile navigation menu also remained inside the 320px viewport.
+All 12 HTML pages were rendered in the integrated Chromium browser at 320px, 768px, and 1280px viewport widths. After the minimum-width fix, each page's document width matched its available client width at all tested sizes. The mobile navigation menu also remained inside the 320px viewport. A standalone web manifest is linked from all pages for home-screen launches. Browser chrome shown when opening the site in Safari or an iOS in-app browser is controlled by iOS and cannot be removed by page code; users must launch the installed home-screen app for standalone display.
 
 This is viewport-based browser testing only. It does not confirm rendering or touch behavior on physical iPhone, Android, or tablet hardware. Safari and Edge were not available for verification.
 
@@ -42,7 +49,7 @@ This is viewport-based browser testing only. It does not confirm rendering or to
 - Scanner rankings are produced through the existing market-summary path and are capped at ten results per ranking; the Dashboard does not issue scanner requests.
 - Analytics uses bounded paginated source reads, 30/90/365-day history ranges, and bounded time-series output. Regression coverage includes 100,001 decisions, 100,001 snapshots, and 10,001 trades. Very large 365-day ranges may still take longer to aggregate.
 - CSV downloads reuse the existing dashboard-data function and stream bounded source pages rather than constructing the full raw export in the browser.
-- Agent Brain rendering is capped at 30 FPS, uses reduced pixel ratios on mobile, and limits its graph to 720 neural nodes, 2,160 connections, and 48 active signal paths. The added static binary glyph and contour geometry is bounded; status-driven neural activity is unchanged.
+- Agent Brain rendering is capped at 30 FPS, uses reduced pixel ratios on mobile, and limits its graph to 720 neural nodes, 2,160 connections, and 48 cyan activity signal paths. The added binary glyph and contour geometry is bounded; a separate 80-point green signal set travels neural connections only during `ANALYZING`. Status-driven agent behavior is unchanged.
 - No production latency, Web Vitals, or Lighthouse measurements were available.
 
 ## Realtime Findings

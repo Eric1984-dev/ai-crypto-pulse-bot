@@ -1,0 +1,18 @@
+{
+  "id": "/dashboard.html",
+  "name": "AI Crypto Bot",
+  "short_name": "AI Crypto Bot",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07130c",
+  "theme_color": "#07130c",
+  "icons": [
+    {
+      "src": "/assets/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -65,7 +65,7 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 - [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards
 - [x] Tests and documentation
-- [x] Shell-free contour with same-color hemispheres, radial neuron glow, reference-inspired blue input waves and right-side circuit traces, and 52 green neuron accents during ANALYZING; status and agent logic unchanged
+- [x] Shell-free contour with same-color hemispheres, radial neuron glow, reference-inspired blue input waves and right-side circuit traces, and 80 moving green neurons during ANALYZING; status and agent logic unchanged
 - [x] Slightly stronger active-neuron glow and a taller silhouette with the lower contour extended downward
 
 Status: Completed (2026-10-31)
@@ -201,6 +201,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
+- [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with a dark-green app icon and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables

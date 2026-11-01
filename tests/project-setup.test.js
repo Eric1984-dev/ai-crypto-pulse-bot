@@ -73,6 +73,23 @@ test("all page brands use the dark-green icon and link to the dashboard", () => 
   assert.equal(fs.statSync(path.join(rootDirectory, "assets", "icons", "apple-touch-icon.png")).isFile(), true);
 });
 
+test("all pages enable standalone home-screen app mode", () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(rootDirectory, "manifest.webmanifest"),
+    "utf8"
+  ));
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.start_url, "/dashboard.html");
+  assert.ok(manifest.icons.some(({ src }) => src === "/assets/icons/apple-touch-icon.png"));
+
+  for (const page of requiredPages) {
+    const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
+    assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest">/);
+    assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
+    assert.doesNotMatch(html, /<a\b[^>]*data-nav-link[^>]*target="_blank"/);
+  }
+});
+
 test("global page layout does not force horizontal overflow on narrow screens", () => {
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   assert.doesNotMatch(styles, /body\s*\{[^}]*min-width:\s*320px/s);
