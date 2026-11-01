@@ -8,6 +8,9 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Removed the dashboard Market Scanner preview and the “Database history” / “Supabase snapshots” labels; scanner rankings remain on the dedicated Scanner page
+- Phase 11 Supabase Realtime subscriptions for dashboard, portfolio, trade history, and scanner, with debounced refreshes through existing APIs, reconnect/offline handling, polling fallback, cleanup, and no new Vercel Functions
+- Supabase Realtime publication migration and regression tests for table selection, event coalescing, reconnects, offline recovery, multiple tabs, visibility, and cleanup
 - Shared `Europe/Brussels` timestamp formatting across dashboard, AI decision and agent logs, paper-trading and portfolio activity, scanner, and trade history; UTC storage and API values remain unchanged
 - Accessible, keyboard-operable explanations for all 12 dashboard portfolio KPIs, with responsive popovers and outside-click dismissal
 - Phase 10 trade history with authenticated server-side search, action/time filters, allowlisted sorting, stable 25-row pagination, and actual stored-trade statistics

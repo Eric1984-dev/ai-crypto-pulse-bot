@@ -84,8 +84,13 @@
     const retryButton = documentRef.querySelector("[data-portfolio-retry]");
     let activeLoad = null;
     let intervalId = null;
+    let disposed = false;
+    let realtimeCleanup = null;
 
     const refresh = () => {
+      if (disposed) {
+        return Promise.resolve();
+      }
       if (activeLoad) {
         return activeLoad;
       }
@@ -144,8 +149,28 @@
         intervalId = null;
       }
     };
+    const startRealtime = () => {
+      if (disposed || realtimeCleanup) {
+        return;
+      }
+      const realtime = windowRef.CryptoPulseRealtime;
+      if (realtime && typeof realtime.startPageRealtime === "function") {
+        realtimeCleanup = realtime.startPageRealtime({
+          documentRef,
+          onUpdate: refresh,
+          surface: "portfolio",
+          windowRef
+        });
+      }
+    };
     const cleanup = () => {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
       stopPolling();
+      realtimeCleanup?.();
+      realtimeCleanup = null;
       documentRef.removeEventListener("visibilitychange", onVisibilityChange);
       if (retryButton) {
         retryButton.removeEventListener("click", refresh);
@@ -160,6 +185,12 @@
     }
     void refresh();
     startPolling();
+    const authReady = windowRef.CryptoPulseAuthReady;
+    if (authReady && typeof authReady.then === "function") {
+      authReady.then(startRealtime, () => {});
+    } else {
+      startRealtime();
+    }
     return cleanup;
   }
 

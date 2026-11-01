@@ -9,6 +9,7 @@
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/realtime.js" defer></script>
     <script src="/js/formatters.js" defer></script>
     <script src="/js/portfolio.js" defer></script>
   </head>
@@ -42,6 +43,7 @@
       <p class="eyebrow">Portfolio</p>
       <h1>Paper portfolio</h1>
       <p class="page-description">Waarden, posities en trades zijn gebaseerd op opgeslagen AI-beslissingen en marktgegevens.</p>
+      <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
       <p data-portfolio-loading role="status" aria-live="polite">Portfolio laden…</p>
       <div class="dashboard-error" data-portfolio-error role="alert" hidden></div>
       <button class="dashboard-retry" data-portfolio-retry type="button" hidden>Opnieuw proberen</button>

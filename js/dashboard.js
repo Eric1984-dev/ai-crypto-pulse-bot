@@ -260,17 +260,6 @@
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
       `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
     ]);
-    const scanner24h = marketSummary && marketSummary.scanner
-      && marketSummary.scanner.timeframes && marketSummary.scanner.timeframes["24h"];
-    renderCollection(documentRef, "scanner-gainers", scanner24h && scanner24h.topGainers, (item) => [
-      `${item.symbol || "—"} · ${formatPercent(item.changePct)}`,
-      `Price ${formatCurrency(item.price)}`
-    ]);
-    renderCollection(documentRef, "scanner-opportunities", scanner24h && scanner24h.aiOpportunities, (item) => [
-      `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
-      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
-    ]);
-
     const chart = renderPortfolioChart(
       documentRef,
       view.portfolioSnapshots || [],
@@ -559,6 +548,7 @@
     let adminActionsAuthorized = false;
     let adminActionInProgress = false;
     let disposed = false;
+    let realtimeCleanup = null;
     const loading = documentRef.querySelector("[data-dashboard-loading]");
     const errorBanner = documentRef.querySelector("[data-dashboard-error]");
     const retryButton = documentRef.querySelector("[data-dashboard-retry]");
@@ -952,6 +942,21 @@
       }
     }
 
+    function startRealtime() {
+      if (disposed || realtimeCleanup) {
+        return;
+      }
+      const realtime = windowRef.CryptoPulseRealtime;
+      if (realtime && typeof realtime.startPageRealtime === "function") {
+        realtimeCleanup = realtime.startPageRealtime({
+          documentRef,
+          onUpdate: refreshDashboardOnForeground,
+          surface: "dashboard",
+          windowRef
+        });
+      }
+    }
+
     function onVisibilityChange() {
       if (documentRef.visibilityState === "hidden") {
         stopDashboardPolling();
@@ -989,6 +994,8 @@
       foregroundRefreshPending = false;
       stopDashboardPolling();
       stopStatusPolling();
+      realtimeCleanup?.();
+      realtimeCleanup = null;
       if (typeof documentRef.removeEventListener === "function") {
         documentRef.removeEventListener("visibilitychange", onVisibilityChange);
       }
@@ -1023,6 +1030,7 @@
           await loadAdminActions();
           startDashboardPolling();
           startStatusPolling();
+          startRealtime();
         }
         return undefined;
       });

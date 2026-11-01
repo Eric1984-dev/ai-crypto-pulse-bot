@@ -22,6 +22,10 @@ const paperTradingMigration = migrationSql.find((sql) =>
 const tradeHistoryMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Trade_History_Stats"')
 );
+const realtimePublicationMigration = migrationSql.find((sql) =>
+  sql.includes("ALTER PUBLICATION supabase_realtime")
+);
+const realtimeSurfaceSubscriptions = require("../js/realtime.js").surfaceSubscriptions;
 
 async function createDatabase() {
   const { PGlite } = await import("@electric-sql/pglite");
@@ -80,6 +84,25 @@ async function getInitialPortfolioForUser(database, userId) {
   );
   return portfolio.rows[0].id;
 }
+
+test("Realtime publication includes the tables required by authenticated UI surfaces", () => {
+  assert.ok(realtimePublicationMigration);
+  assert.match(realtimePublicationMigration, /pg_catalog\.pg_publication/);
+  assert.match(realtimePublicationMigration, /pg_catalog\.pg_publication_tables/);
+  assert.match(realtimePublicationMigration, /RAISE EXCEPTION/);
+
+  const requiredRealtimeTables = [...new Set(
+    Object.values(realtimeSurfaceSubscriptions)
+      .flat()
+      .map((subscription) => subscription.table)
+  )].sort();
+  const configuredRealtimeTables = [...new Set(
+    [...realtimePublicationMigration.matchAll(/'(AI_Crypto_Bot_[A-Za-z0-9_]+)'/g)]
+      .map((match) => match[1])
+  )].sort();
+  assert.deepEqual(configuredRealtimeTables, requiredRealtimeTables);
+  assert.equal(new Set(requiredRealtimeTables).size, requiredRealtimeTables.length);
+});
 
 async function setMarketPrice(database, symbol, price) {
   await database.query(

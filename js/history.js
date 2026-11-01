@@ -170,6 +170,7 @@
     let refreshPending = false;
     let intervalId = null;
     let disposed = false;
+    let realtimeCleanup = null;
 
     function currentFilters() {
       return {
@@ -271,6 +272,21 @@
       }
     }
 
+    function startRealtime() {
+      if (disposed || realtimeCleanup) {
+        return;
+      }
+      const realtime = windowRef.CryptoPulseRealtime;
+      if (realtime && typeof realtime.startPageRealtime === "function") {
+        realtimeCleanup = realtime.startPageRealtime({
+          documentRef,
+          onUpdate: refresh,
+          surface: "history",
+          windowRef
+        });
+      }
+    }
+
     function onVisibilityChange() {
       if (documentRef.visibilityState === "visible") {
         void refresh();
@@ -283,6 +299,8 @@
     function cleanup() {
       disposed = true;
       stopPolling();
+      realtimeCleanup?.();
+      realtimeCleanup = null;
       documentRef.removeEventListener?.("visibilitychange", onVisibilityChange);
       form?.removeEventListener("submit", onSubmit);
       previousButton?.removeEventListener("click", onPrevious);
@@ -305,6 +323,12 @@
     windowRef.addEventListener?.("pagehide", cleanup, { once: true });
     void refresh();
     startPolling();
+    const authReady = windowRef.CryptoPulseAuthReady;
+    if (authReady && typeof authReady.then === "function") {
+      authReady.then(startRealtime, () => {});
+    } else {
+      startRealtime();
+    }
     return cleanup;
   }
 

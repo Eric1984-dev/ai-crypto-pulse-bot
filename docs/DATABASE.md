@@ -59,6 +59,8 @@ Phase 09 Market Scanner adds no tables, columns, indexes, policies, or migration
 
 Phase 10 Trade History adds no tables or columns. It pages stored trade rows through the existing authenticated dashboard API and relies on the existing `AI_Crypto_Bot_Trades` portfolio ownership policy. Its new stable `AI_Crypto_Bot_Trade_History_Stats()` SQL function is `SECURITY INVOKER`, reads only `SELL` rows visible under RLS, and computes all-time closed/winning/losing counts, average positive/negative realized P&L, and best/worst realized P&L in the database. `PUBLIC` and `anon` cannot execute it; `authenticated` can. The function avoids transferring the full history to the server or browser just to calculate statistics.
 
+Phase 11 adds no tables, columns, policies, or Vercel Functions. Its versioned migration adds the existing status, emergency-state, portfolio, position, trade, snapshot, decision, watched-market, market-data, and candle tables to the existing `supabase_realtime` publication. The migration fails if that Supabase-managed publication is absent and skips tables already included, making it safe to apply to projects with preconfigured publication membership. Existing table grants and RLS continue to govern which authenticated user's changes are visible. The browser ignores change payloads and refreshes through the existing authenticated APIs.
+
 ## Relationships and deletion behavior
 
 - `AI_Crypto_Bot_Profiles.id` references `auth.users.id`; deleting an Auth user cascades to its profile.

@@ -234,6 +234,20 @@ npm.cmd run build
 
 ---
 
+## Phase 11 Supabase Realtime coverage
+
+Realtime-manager tests verify per-surface table selection, filtered scanner candle subscriptions, event-burst coalescing, reconnect status and catch-up refreshes, offline/online recovery, hidden-page pause and foreground refresh, multiple independent tabs, duplicate-subscription prevention, and channel/listener/timer cleanup. Database migration tests verify that the publication migration contains exactly the union of tables required by the UI surfaces and fails if the managed publication is missing. Existing UI tests continue to cover the authenticated refresh APIs and polling behavior.
+
+```powershell
+node --test tests/realtime.test.js tests/database-migrations.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+These local tests use fake Supabase channels and PGlite for database behavior; they do not prove that the migration has been applied to a hosted Supabase project or that its live Realtime service is reachable. Apply the migration and smoke-test updates, reconnects, and offline recovery against the target deployment before marking Phase 11 production-complete.
+
+---
+
 ## Regression Testing
 
 Every completed phase must be followed by regression testing.

@@ -335,14 +335,10 @@ function createDashboardDocument({ includeAdminActions = false } = {}) {
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"markets\"]",
     "[data-dashboard-list=\"decisions\"]",
-    "[data-dashboard-list=\"scanner-gainers\"]",
-    "[data-dashboard-list=\"scanner-opportunities\"]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"markets\"]",
     "[data-dashboard-empty=\"decisions\"]",
-    "[data-dashboard-empty=\"scanner-gainers\"]",
-    "[data-dashboard-empty=\"scanner-opportunities\"]",
     "[data-portfolio-chart]",
     "[data-dashboard-chart-empty]",
     "[data-dashboard-loading]",
@@ -437,21 +433,7 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     marketSummary: {
       activeMarkets: 1,
       marketsWithData: 1,
-      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }],
-      scanner: {
-        timeframes: {
-          "24h": {
-            topGainers: [{ symbol: "BTC-EUR", changePct: 2.5, price: 100000 }],
-            aiOpportunities: [{
-              symbol: "BTC-EUR",
-              decision: "BUY",
-              confidence: 90,
-              reason: "Momentum is positive.",
-              created_at: generatedAt.toISOString()
-            }]
-          }
-        }
-      }
+      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }]
     },
     aiDecisions: {
       count: 1,
@@ -496,17 +478,20 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
     /Priority 1.*100\.000,00.*2,5% \(24h\)/
   );
-  assert.match(
-    elements.get("[data-dashboard-list=\"scanner-gainers\"]")[0].children[0].children[0].textContent,
-    /BTC-EUR.*2,5%/
-  );
-  assert.match(
-    elements.get("[data-dashboard-list=\"scanner-opportunities\"]")[0].children[0].children[1].textContent,
-    /Recorded .*13:00 · Momentum is positive/
-  );
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
+});
+
+test("dashboard omits scanner preview and database-source labels", () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  const script = fs.readFileSync(path.join(rootDirectory, "js", "dashboard.js"), "utf8");
+
+  assert.doesNotMatch(html, /Market Scanner|Database history|Supabase snapshots|scanner-preview/i);
+  assert.doesNotMatch(script, /scanner-gainers|scanner-opportunities/);
+  assert.match(html, /href="\/scanner\.html"/);
+  assert.match(html, /Portfolio history/);
+  assert.match(html, /data-portfolio-chart/);
 });
 
 test("Agent Brain replaces the placeholder in the existing Agent Status panel", () => {

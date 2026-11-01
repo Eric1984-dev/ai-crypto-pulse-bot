@@ -298,6 +298,12 @@ Required server configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SE
 
 Errors: unsupported method `405`; invalid action `400`; missing/expired Supabase session `401`; authenticated non-admin `403`; missing allowlist or Supabase configuration `503`; AI/database action failure `503`. Responses use `Cache-Control: no-store`. This endpoint exposes no market-refresh or candle-refresh action.
 
+## Phase 11 Supabase Realtime
+
+Realtime updates are delivered directly by Supabase Realtime using the existing authenticated Supabase JS client; there is no application Realtime endpoint and no new Vercel Function. Dashboard, portfolio, history, and scanner subscriptions only listen to the tables needed by each view. Change payloads are not rendered or forwarded; a debounced notification triggers the corresponding existing authenticated API request, which preserves the current session-cookie verification and RLS behavior. Existing polling continues during disconnection and provides a fallback.
+
+The client reconnects Realtime channels automatically. Browser offline/online and visibility events update the connection status and trigger a catch-up refresh. Each browser tab has its own channel and removes its subscription and event listeners when its page is disposed. The publication membership migration is documented in [DATABASE.md](./DATABASE.md). Production Supabase migration and reconnect smoke tests are deployment checks; they are not represented as locally verified.
+
 ## Planned application endpoints
 
-Market Scanner, strategy optimization, backtesting, realtime, and live-trading endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.
+Strategy optimization, backtesting, and live-trading endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

@@ -136,6 +136,7 @@
     let inFlightRequest = null;
     let pollingTimer = null;
     let disposed = false;
+    let realtimeCleanup = null;
 
     function setStatus(message, state) {
       if (status) {
@@ -209,6 +210,21 @@
       }
     }
 
+    function startRealtime() {
+      if (disposed || realtimeCleanup) {
+        return;
+      }
+      const realtime = windowRef.CryptoPulseRealtime;
+      if (realtime && typeof realtime.startPageRealtime === "function") {
+        realtimeCleanup = realtime.startPageRealtime({
+          documentRef,
+          onUpdate: load,
+          surface: "scanner",
+          windowRef
+        });
+      }
+    }
+
     function onVisibilityChange() {
       if (documentRef.visibilityState === "hidden") {
         stopPolling();
@@ -224,6 +240,8 @@
       }
       disposed = true;
       stopPolling();
+      realtimeCleanup?.();
+      realtimeCleanup = null;
       documentRef.removeEventListener?.("visibilitychange", onVisibilityChange);
       windowRef.removeEventListener?.("pagehide", onPageHide);
       windowRef.removeEventListener?.("pageshow", onPageShow);
@@ -271,6 +289,7 @@
           && !documentRef.documentElement.classList.contains("auth-pending")) {
           void load();
           startPolling();
+          startRealtime();
         }
       });
     }

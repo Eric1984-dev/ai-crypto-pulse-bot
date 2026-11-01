@@ -113,6 +113,7 @@
     const config = await response.json();
     const sdk = await import(sdkUrl);
     const client = window.CryptoPulseAuth.createSupabaseClient(sdk.createClient, config);
+    window.CryptoPulseSupabaseClient = client;
     const auth = window.CryptoPulseAuth.createAuthService(client);
 
     auth.onAuthStateChange((event, session) => {

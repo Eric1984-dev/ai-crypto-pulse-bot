@@ -466,6 +466,18 @@ a:focus-visible {
   font-size: 12px;
 }
 
+.realtime-status {
+  margin: 10px 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.realtime-status[hidden] {
+  display: none;
+}
+
 .dashboard-section,
 .dashboard-grid,
 .chart-panel {
@@ -1194,8 +1206,7 @@ a:focus-visible {
   background: rgb(11 16 15 / 55%);
 }
 
-.scanner-ranking h3,
-.scanner-preview-grid h3 {
+.scanner-ranking h3 {
   margin: 0;
   color: #e8f1ec;
   font-size: 14px;
@@ -1225,16 +1236,6 @@ a:focus-visible {
 
 .scanner-ranking-wide {
   grid-column: 1 / -1;
-}
-
-.scanner-preview {
-  margin-top: 20px;
-}
-
-.scanner-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 22px;
 }
 
 .text-link {

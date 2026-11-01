@@ -127,8 +127,8 @@ Phase 08 gebruikt uitsluitend paper trading; Phase 09 is niet gestart. De code g
 - [x] Highest Volume and Strongest Momentum rankings
 - [x] AI Opportunities from the latest stored decisions, including symbol, confidence, decision, and reason
 - [x] Rank enabled watched markets using stored snapshots and OHLCV candles
-- [x] Reuse `/api/market-summary` and dashboard refresh; add no Vercel Function or database schema
-- [x] Responsive scanner page, dashboard preview, refresh behavior, tests, documentation, and completion report
+- [x] Reuse `/api/market-summary` for scanner rankings and dashboard tracked-market details; add no Vercel Function or database schema
+- [x] Dedicated responsive scanner page, refresh behavior, tests, documentation, and completion report
 - [x] Production-safe market-summary storage failure logs identify query, table, operation, page/range, HTTP status, Supabase code, and failure category without changing the public response
 - [x] Treat PostgREST `416/PGRST103` on a subsequent generated scanner page as end-of-pagination while preserving fetched rows
 
@@ -153,8 +153,14 @@ Status: Completed
 
 ## Phase 11 - Realtime
 
-- Supabase Realtime
-- Live Dashboard Updates
+- [x] Reuse the authenticated Supabase client for dashboard, portfolio, trade-history, and scanner subscriptions
+- [x] Refresh through existing authenticated APIs; retain polling fallback and add no Vercel Functions
+- [x] Configure only required tables in the Supabase Realtime publication
+- [x] Handle reconnects, offline/online transitions, tab visibility, multiple tabs, and subscription cleanup
+- [x] Add regression tests and update API, database, architecture, testing, README, changelog, and completion-report documentation
+- [ ] Apply and verify the publication migration in the production Supabase project; smoke-test reconnect and offline recovery
+
+Status: Implementation complete; production validation pending. Phase 12 has not started.
 
 ---
 

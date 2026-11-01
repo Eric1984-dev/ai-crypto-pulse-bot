@@ -9,6 +9,7 @@
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
+    <script src="/js/realtime.js" defer></script>
     <script src="/js/formatters.js" defer></script>
     <script src="/js/history.js" defer></script>
   </head>
@@ -38,6 +39,7 @@
       <h1>Trade History</h1>
       <p class="page-description">Doorzoek en analyseer opgeslagen paper-trade-uitvoeringen. Alle gegevens zijn simulaties; er worden geen echte orders geplaatst.</p>
       <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alle bedragen en uitvoeringen zijn gesimuleerd.</span></div>
+      <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
       <p data-history-loading role="status" aria-live="polite">Trade history laden…</p>
       <div class="dashboard-error" data-history-error role="alert" hidden></div>
       <button class="dashboard-retry" data-history-retry type="button" hidden>Opnieuw proberen</button>
