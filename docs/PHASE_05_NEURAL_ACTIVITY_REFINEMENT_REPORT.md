@@ -39,3 +39,10 @@ The bilateral brain silhouette, dashboard position, Supabase status integration,
 ## Scope
 
 Only the Agent Brain's neural activity and density within existing limits changed. Dashboard layout, database/API behavior, authentication, and status polling were not changed. No Phase 06 functionality was implemented.
+
+## Follow-up visual adjustment
+
+- Increased the size and intensity of the additive neuron glow and strengthened the radial halo on active hotspot neurons.
+- Increased vertical scale to 1.22 and reduced the upward offset, extending the lower contour while retaining the existing dashboard placement and responsive scaling.
+- Added regression assertions for active-state glow levels and the transformed lower boundary. Node, connection, particle, frame-rate, and pixel-ratio caps remain unchanged.
+- Focused Agent Brain tests: 7 passed; full test suite: 103 passed; `npm.cmd run build` passed project and database validation.

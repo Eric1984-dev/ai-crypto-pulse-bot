@@ -232,7 +232,7 @@
       const animatedNodePositions = new Float32Array(nodePositions.length * 3);
       const nodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
         color: config.color,
-        size: 0.1,
+        size: 0.12,
         sizeAttenuation: true,
         vertexColors: true,
         transparent: true,
@@ -277,7 +277,7 @@
         uniforms: {
           uColor: { value: new THREE.Color(config.color) },
           uOpacity: { value: 0.32 },
-          uSize: { value: 16 * pixelRatio }
+          uSize: { value: 18 * pixelRatio }
         },
         vertexShader: `
           attribute vec3 color;
@@ -348,9 +348,9 @@
         connectionMaterial.opacity = 0.3;
         connectionGlowMaterial.opacity = 0.035 + visibleStrength * 0.05;
         nodeMaterial.opacity = 0.96;
-        nodeGlowMaterial.opacity = 0.1 + visibleStrength * 0.12 + idleBreath * 0.02;
+        nodeGlowMaterial.opacity = 0.12 + visibleStrength * 0.15 + idleBreath * 0.02;
         hotspotMaterial.opacity = 0.92;
-        hotspotGlowMaterial.uniforms.uOpacity.value = 0.12 + visibleStrength * 0.34;
+        hotspotGlowMaterial.uniforms.uOpacity.value = 0.15 + visibleStrength * 0.42;
         activityMaterial.opacity = 0.92;
         activityGlowMaterial.opacity = 0.07 + visibleStrength * 0.14;
       }
@@ -363,8 +363,8 @@
         const height = Math.max(1, container.clientHeight || 200);
         camera.aspect = width / height;
         const responsiveScale = Math.min(1.18, 1 + Math.max(0, (camera.aspect - 1.5) * 0.08));
-        brain.scale.set(responsiveScale * 1.08, responsiveScale * 1.16, responsiveScale);
-        brain.position.y = responsiveScale * 0.55 * 0.16;
+        brain.scale.set(responsiveScale * 1.08, responsiveScale * 1.22, responsiveScale);
+        brain.position.y = responsiveScale * 0.55 * 0.13;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
         renderStatic();
@@ -1146,7 +1146,7 @@
 
   function updateHotspotColors(colorAttribute, neuronActivity, hotspotIndices) {
     for (let index = 0; index < hotspotIndices.length; index += 1) {
-      const intensity = Math.max(0, (neuronActivity[hotspotIndices[index]] - 0.035) * 1.35);
+      const intensity = Math.max(0, (neuronActivity[hotspotIndices[index]] - 0.035) * 1.5);
       colorAttribute.setXYZ(index, intensity, intensity, intensity);
     }
     colorAttribute.needsUpdate = true;

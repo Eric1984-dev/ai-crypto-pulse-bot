@@ -415,6 +415,7 @@ test("Agent Brain drives independent neuron and traveling signal activity withou
   });
   const lineMaterial = harness.calls.materialInstances.find((material) => material.vertexColors);
   const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
+  const nodeGlowMaterial = harness.calls.points.find(({ material }) => material.size === 0.12).material;
   const nodeMaterial = neuralNodes.material;
   const hotspotMaterial = harness.calls.points.find(({ material }) => material.size === 0.085).material;
   const nodeColors = neuralNodes.geometry.getAttribute("color");
@@ -428,9 +429,14 @@ test("Agent Brain drives independent neuron and traveling signal activity withou
   const activeHotspotValues = [...hotspotColors.array];
   const activeConnectionValues = [...harness.calls.lineSegmentGeometries[0]
     .getAttribute("color").array];
+  const hotspotGlowMaterial = harness.calls.materialInstances.find((material) =>
+    material.uniforms && material.uniforms.uOpacity
+  );
   assert.ok(new Set(activeNodeValues).size > 10);
   brain.setStatus("ANALYZING");
   assert.equal(lineMaterial.opacity, 0.3);
+  assert.ok(nodeGlowMaterial.opacity > 0.24);
+  assert.ok(hotspotGlowMaterial.uniforms.uOpacity.value > 0.55);
   const analyzingNodeValues = [...nodeColors.array];
   const analyzingHotspotValues = [...hotspotColors.array];
   const analyzingConnectionValues = [...harness.calls.lineSegmentGeometries[0]
@@ -698,9 +704,16 @@ test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", 
   const brainGroup = harness.calls.brainGroups[0];
   const initialScale = { ...brainGroup.scale };
   const initialPositionY = brainGroup.position.y;
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x > 1.06);
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x < 1.08);
-  assert.ok(initialPositionY > 0.08 && initialPositionY < 0.1);
+  assert.ok(brainGroup.scale.y / brainGroup.scale.x > 1.12);
+  assert.ok(brainGroup.scale.y / brainGroup.scale.x < 1.15);
+  assert.ok(initialPositionY > 0.06 && initialPositionY < 0.08);
+  const nodePositions = harness.calls.points.find(({ material }) => material.size === 0.045)
+    .geometry.getAttribute("position");
+  let minimumNodeY = Infinity;
+  for (let index = 0; index < nodePositions.count; index += 1) {
+    minimumNodeY = Math.min(minimumNodeY, nodePositions.getY(index));
+  }
+  assert.ok(minimumNodeY * brainGroup.scale.y + initialPositionY < -0.58);
 
   const [frameId, firstFrame] = harness.calls.frameCallbacks.entries().next().value;
   harness.calls.frameCallbacks.delete(frameId);
