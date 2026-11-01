@@ -53,6 +53,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Remove the visible dashboard title/subtitle and redundant Agent Status descriptions while retaining the paper-mode notice, accessible page heading, and status visualization
 - Replace the diffuse node-cloud layout with a front-facing bilateral cortical contour, pronounced center fissure, curved gyri, branching neural paths, and radial neuron halos; both hemispheres share one status color
 - Remove the external circuit traces from either side of the Agent Brain while keeping the neural contour and activity unchanged
 - Remove every brain surface mesh, translucent shell, inner volume, and separate fissure line; define the bilateral silhouette solely with status-colored nodes, local connections, bright hotspots, and traveling energy particles

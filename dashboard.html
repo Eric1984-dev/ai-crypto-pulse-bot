@@ -29,20 +29,14 @@
       </div>
     </header>
     <main class="page-shell dashboard-shell">
+      <h1 class="visually-hidden">Dashboard</h1>
       <p data-auth-message role="status" aria-live="polite"></p>
-      <div class="dashboard-heading">
-        <div>
-          <p class="eyebrow">Paper portfolio</p>
-          <h1>Dashboard</h1>
-          <p class="page-description">Je agent, portefeuille en recente activiteit uit Supabase.</p>
-        </div>
-        <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite">Databasegegevens laden…</span>
-      </div>
       <div class="mode-banner">
         <span class="mode-dot" aria-hidden="true"></span>
         <strong>PAPER ACTIVE</strong>
         <span>Alle bedragen zijn gesimuleerd. Dit dashboard plaatst geen orders.</span>
       </div>
+      <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite" hidden>Databasegegevens laden…</span>
       <div class="dashboard-error" data-dashboard-error role="alert" hidden></div>
       <button class="dashboard-retry" data-dashboard-retry type="button" hidden>Opnieuw proberen</button>
 
@@ -107,14 +101,12 @@
             </div>
             <span class="status-pill" data-dashboard-status="agent" data-state="unknown">UNKNOWN</span>
           </div>
-          <p class="card-description">Status wordt gelezen uit AI_Crypto_Bot_Status.</p>
           <div class="agent-brain" data-agent-brain data-state="unknown">
             <div class="agent-brain-stage" data-agent-brain-stage role="img" aria-label="3D Agent Brain; status UNKNOWN"></div>
             <p class="agent-brain-fallback" data-agent-brain-fallback role="status" hidden>
               3D visualization unavailable. Agent status remains available above.
             </p>
           </div>
-          <p class="agent-brain-caption">Visualisatie van de actuele status uit AI_Crypto_Bot_Status.</p>
         </article>
         <article class="dashboard-panel emergency-panel">
           <div class="panel-heading">
