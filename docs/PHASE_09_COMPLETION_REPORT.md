@@ -9,7 +9,7 @@ Phase 09 is implemented and validated. No Phase 10 functionality was started.
 - The scanner reads enabled EUR markets from `AI_Crypto_Bot_Watched_Markets`, ticker snapshots from `AI_Crypto_Bot_Market_Data`, OHLCV history from `AI_Crypto_Bot_Candles`, and stored AI decisions from `AI_Crypto_Bot_AI_Decisions`.
 - Server-side ranking is implemented in `lib/market-scanner.mjs` and wired into `lib/market-data.mjs`.
 - The existing authenticated `GET /api/market-summary` endpoint now includes the scanner summary. No API route or database object was added.
-- `scanner.html` uses the existing session guard and `js/scanner.js`; dashboard previews use the existing market-summary refresh and dashboard refresh lifecycle.
+- `scanner.html` uses the existing session guard and `js/scanner.js`. The Dashboard preview described in the original Phase 09 implementation was later removed; the current Dashboard does not request scanner rankings or display scanner content.
 - All browser reads use same-origin credentials and `no-store`. The scanner is read-only and neither generates AI decisions nor places trades.
 
 ## Scanner calculations and ranking
@@ -27,7 +27,7 @@ Price rankings require a valid market snapshot no older than 15 minutes. Missing
 
 - The scanner page provides 24h, 7d, and 30d controls for Top Gainers, Top Losers, Highest Volume, Strongest Momentum, and AI Opportunities.
 - It refreshes every 30 seconds while visible, refreshes when returning to the foreground, prevents duplicate in-flight requests, and shows loading, error, and empty states.
-- The dashboard displays 24-hour top gainers and AI opportunities from its existing refreshed market-summary data.
+- The Dashboard displays tracked-market symbols and priorities only. All five scanner rankings remain on the dedicated Scanner page.
 - User-facing values are inserted as text, not HTML.
 
 ## Database and API changes
@@ -75,6 +75,7 @@ Price rankings require a valid market snapshot no older than 15 minutes. Missing
 - Quote-volume values are estimates derived from stored base volume and price, not exchange-reported EUR turnover.
 - Decision retrieval is capped at 5,000 recent rows. In exceptionally high decision-volume periods, older decisions may be outside the fetched window.
 - Automated validation used fixtures and mocked Supabase requests. No live Supabase smoke test or Vercel deployment was performed.
+- Follow-up: dashboard scanner requests and preview markup were removed during UI language standardization. The current behavior is covered by dashboard regression tests and is documented in the Phase 12 validation report.
 
 ## Acceptance criteria
 

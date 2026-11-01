@@ -1,35 +1,20 @@
 # Known Issues
 
-Dit document bevat gekende beperkingen en openstaande problemen.
+## Open Production Validation
 
----
+- The hosted Supabase migration history, RLS/grants, and Realtime publication state have not been verified in this environment. The Phase 11 publication migration and live Realtime/reconnect smoke tests remain pending.
+- Production authentication, dashboard, scanner, Bitvavo ingestion, AI analysis, paper-trading jobs, and Admin Actions have not been smoke-tested against a deployed Vercel/Supabase environment.
+- A prior Market Scanner HTTP 503 (`MARKET_DATA_UNAVAILABLE`) was associated with a failing database/PostgREST read, but its original query and production root cause remain unconfirmed. The later-range `416/PGRST103` pagination case has a targeted fix; production errors remain generic.
+- Market snapshot, candle refresh, AI analysis, and paper-trading execution require configured external scheduler jobs. Production scheduler configuration and execution are unverified.
+- Admin Actions require the server-side `ADMIN_USER_IDS` allowlist to be configured and verified.
 
-## Open Issues
-
-No known blocking implementation issues.
+See [the Phase 12 system validation report](../PHASE_12_SYSTEM_VALIDATION_REPORT.md) for status classification, evidence, and recommended follow-up.
 
 ## Scope Limitations
 
-The dashboard and portfolio are database-backed. Scanner, history, and settings remain placeholders. Signal-generating scanner logic, strategy optimization, backtesting, realtime functionality, and live trading are not implemented. Paper-trading requires the Phase 08 migration and an external scheduler configured to invoke AI analysis before paper execution.
-
-Dashboard and portfolio requests require valid Supabase configuration and applied migrations. Realized/unrealized P&L summaries are shown as unavailable when their bounded source queries exceed supported limits rather than returning partial sums. Live Supabase, deployed Vercel, external scheduler, and physical mobile-device smoke testing must be performed separately. Chart.js and Three.js are loaded from pinned CDNs. If either library is unavailable, its visualization falls back to a visible unavailable state while database status and other data remain available.
-
----
-
-## Template
-
-### Issue
-
-Beschrijving:
-
-Impact:
-
-Workaround:
-
-Status:
-
-Open | In Progress | Resolved
-
-Date:
-
-YYYY-MM-DD
+- Paper trading is simulated only. `ENABLE_LIVE_TRADING=false` is required; no exchange order or private Bitvavo API is used.
+- Strategy optimization, backtesting, and live trading are not implemented.
+- Dashboard and Portfolio require valid Supabase configuration and applied migrations. Financial aggregates are shown as unavailable rather than partial when bounded reads cannot guarantee complete calculations.
+- Realtime has polling fallback, but hosted publication delivery has not been verified.
+- Chart.js and Three.js use pinned CDNs. Visualization fallback preserves the surrounding page when a library or WebGL is unavailable; hardware-specific performance varies.
+- Automated mobile/browser tests do not replace physical-device smoke testing.

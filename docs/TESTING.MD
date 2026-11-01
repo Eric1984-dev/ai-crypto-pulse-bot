@@ -203,7 +203,7 @@ These are local embedded-database and mocked HTTP tests. They do not prove a rem
 
 ## Phase 09 Market Scanner coverage
 
-Scanner unit tests verify 24h/7d/30d gainer and loser ordering, estimated EUR volume, timeframe-specific momentum, latest-decision AI opportunity ranking and required fields, active-market and freshness filtering, empty inputs, and 1,500-market ranking bounds. Market-data service tests exercise Range pagination for both candle history and AI decisions, including markets/decisions beyond the first PostgREST page. UI tests verify the existing no-store market-summary endpoint, malformed/unauthenticated response handling, timeframe selection, safe text rendering, and duplicate-request coalescing. Dashboard tests verify the 24-hour gainer and AI-opportunity preview.
+Scanner unit tests verify 24h/7d/30d gainer and loser ordering, estimated EUR volume, timeframe-specific momentum, latest-decision AI opportunity ranking and required fields, active-market and freshness filtering, empty inputs, and 1,500-market ranking bounds. Market-data service tests exercise Range pagination for both candle history and AI decisions, including markets/decisions beyond the first PostgREST page. UI tests verify the existing no-store market-summary endpoint, malformed/unauthenticated response handling, timeframe selection, safe text rendering, and duplicate-request coalescing. Dashboard tests verify that scanner ranking markup and requests are absent while the watched-market list remains; the five rankings are displayed only on the dedicated Scanner page.
 
 ```powershell
 node --test tests/market-scanner.test.mjs tests/market-scanner-ui.test.js tests/market-data.test.mjs tests/dashboard.test.js
@@ -248,6 +248,35 @@ npm.cmd run build
 ```
 
 These local tests use fake Supabase channels and PGlite for database behavior; they do not prove that the migration has been applied to a hosted Supabase project or that its live Realtime service is reachable. Apply the migration and smoke-test updates, reconnects, and offline recovery against the target deployment before marking Phase 11 production-complete.
+
+---
+
+## Phase 12 System Validation
+
+The full validation review covers Authentication, Database, Bitvavo, Market Scanner, AI Engine, Agent Brain, Paper Trading, Realtime, and Dashboard. It combines implementation inspection, existing unit/API/UI tests, PGlite migration and transaction tests, static/database build validation, and review of recorded production findings.
+
+```powershell
+npm.cmd test
+npm.cmd run build
+```
+
+In this validation run, `npm.cmd test` passed 169 tests with 0 failures, and `npm.cmd run build` passed static project validation plus migration validation for 16 prefixed tables, RLS coverage, and initial seed consistency. The `api/` directory contains 12 function files.
+
+Automated tests use fakes, fixtures, mocked HTTP/PostgREST responses, or local PGlite where documented above. They do not prove live Supabase Auth/database/Realtime behavior, a Vercel deployment, Bitvavo availability, or external scheduler configuration. The hosted Realtime publication migration and production smoke tests remain pending. See [the Phase 12 system validation report](../PHASE_12_SYSTEM_VALIDATION_REPORT.md) for per-component ratings, production findings, risks, and recommendations. Phase 13 has not started.
+
+---
+
+## Exports module coverage
+
+Export-service tests cover all four datasets and CSV headers, row mapping, EUR amounts, date cutoffs, empty datasets, formula-safe CSV escaping, and a 1,201-row trade export spanning three 500-row Supabase pages. Route tests verify that count and streamed-download modes use the existing authenticated `/api/dashboard-data` function. UI tests cover type/period selection, count and empty states, failure messages, protected English page/navigation, and same-origin download URLs.
+
+```powershell
+node --test tests/exports.test.mjs tests/exports-ui.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+Supabase requests are mocked; these checks do not prove remote RLS configuration, production streaming behavior, or a Vercel deployment. The export path adds no API function or database migration.
 
 ---
 

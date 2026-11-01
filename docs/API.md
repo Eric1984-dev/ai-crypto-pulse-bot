@@ -78,7 +78,7 @@ Success response:
 
 Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configuration, unavailable Supabase, or invalid database responses: `503`. The endpoint sets `Cache-Control: no-store`; it returns no provider credentials or raw database errors.
 
-The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. The separate market-summary request is refreshed with it. Both browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
+The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. Watched-market symbols and priorities are included in this response. The dashboard does not request scanner rankings; the dedicated Scanner page uses `/api/market-summary`. Browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
 
 ### Trade History view
 
@@ -128,7 +128,25 @@ Success response:
 
 Statistics are all-time and intentionally independent of the current list filters/page. The `AI_Crypto_Bot_Trade_History_Stats()` stable `SECURITY INVOKER` RPC aggregates only the caller's RLS-visible stored SELL executions: profitable/losing counts use realized P&L above/below zero, averages include only positive or negative values respectively, and best/worst use the maximum/minimum realized P&L. Breakeven SELLs count as closed but neither winning nor losing. BUY rows show no realized P&L because their stored zero is not a realized result. Every persisted trade is shown with status `Uitgevoerd · paper`; the trades table has no separate status column.
 
-The page uses the existing 30-second visible-tab refresh cadence, with same-origin credentials and `no-store` requests. An empty result is a successful empty page, not an API error. Invalid view/filter values return `400`; unauthenticated sessions return `401`; missing permissions, migration, configuration, or database availability fail closed with the existing generic `503` dashboard response.
+The page uses the existing 30-second visible-tab refresh cadence, with same-origin credentials and `no-store` requests. An empty result is a successful empty page, not an API error. Invalid view/filter values return `400`; unauthenticated sessions return `401`; missing permissions, migration, configuration, or database availability fail closed with the existing generic `503` dashboard response. Every persisted trade is shown with status `Executed · Paper Trade`; the trades table has no separate status column.
+
+### CSV Exports view
+
+The protected Exports page reuses the authenticated `GET /api/dashboard-data` function; it adds no endpoint or Vercel Function. Both views require a verified session and use the caller's JWT and existing RLS policies:
+
+- `view=export-count&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` returns `{ "data": { "count": 123 } }` using an exact, RLS-filtered count.
+- `view=export&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` streams a CSV response. Data is read from Supabase in stable, 500-row Range pages and is written incrementally; it is not accumulated as a full dataset in application memory.
+
+The date filters use rolling UTC cutoffs. The CSV is UTF-8 with a BOM, CRLF line endings, a header row, standard quoting, and spreadsheet-formula neutralization for untrusted text.
+
+Export columns:
+
+- **Trades** (`AI_Crypto_Bot_Trades`): Date, Symbol, Action, Entry Price, Quantity, Invested Amount, Fees, Gross Value, Net Value, Realized PnL, Status. Gross Value is execution price × quantity. BUY Invested Amount equals gross value and Net Value includes fees; SELL Net Value subtracts fees and Realized PnL comes from the stored trade. BUY realized PnL and SELL invested amount are blank. Status is `Executed · Paper Trade`.
+- **Portfolio snapshots** (`AI_Crypto_Bot_Portfolio_Snapshots`): Timestamp, Portfolio Value, Available Balance, Open Positions, Total PnL, Daily PnL. Total PnL uses the stored portfolio starting balance; Daily PnL aggregates stored realized SELL PnL by portfolio and UTC day, consistent with the dashboard.
+- **AI decisions** (`AI_Crypto_Bot_AI_Decisions`): Timestamp, Symbol, Decision, Confidence, Market Strength, Reason. Market Strength is read from the stored `indicators.marketStrength` value.
+- **Positions** (`AI_Crypto_Bot_Positions`): Open Date, Symbol, Entry Price, Current Price, Position Value, Unrealized PnL, Status. Position Value uses the stored current price × amount.
+
+The export view returns `400` for invalid export types or periods and `401` for missing or expired sessions. Configuration, permission, and database failures use the existing generic `503` response. Once streaming starts, a later storage failure terminates the stream rather than returning a success-shaped partial file. Responses are `no-store` and contain no provider credentials or raw database errors.
 
 ## Phase 05 Agent Status endpoint
 
@@ -182,7 +200,7 @@ The response also includes `data.scanner`, generated from the same existing endp
 
 The scanner uses enabled rows from `AI_Crypto_Bot_Watched_Markets`, market snapshots from `AI_Crypto_Bot_Market_Data`, daily/hourly OHLCV rows from `AI_Crypto_Bot_Candles`, and stored decisions from `AI_Crypto_Bot_AI_Decisions`. The 24-hour change and estimated EUR turnover use the stored ticker snapshot; 7-day and 30-day change/turnover use daily candles. Momentum uses 6-hour hourly-candle change for `24h`, 3-day daily-candle change for `7d`, and 7-day daily-candle change for `30d`. It selects the latest stored decision per active market inside the selected period and ranks by confidence, then decision priority and recency. Price rankings require a market snapshot no older than 15 minutes; unavailable or invalid input is omitted instead of fabricated. The scanner is read-only and does not create AI decisions or trades.
 
-The scanner page and dashboard preview consume this response; no new API function or database schema is introduced. Browser requests use `cache: "no-store"` and same-origin session credentials.
+Only the dedicated Scanner page consumes the scanner rankings in this response. The Dashboard neither requests this endpoint nor displays scanner rankings; it obtains its watched-market summary from `/api/dashboard-data`. No new API function or database schema is introduced. Browser requests use `cache: "no-store"` and same-origin session credentials.
 
 When a market-summary database read fails and `NODE_ENV` is exactly `development`, the error response additionally includes `error.diagnostics` with a safe query name, failure category, HTTP status, and allowlisted Supabase error code. This field is omitted in production; raw database messages, request URLs, and credentials are never returned. Empty or stale rows are not classified as query failures.
 

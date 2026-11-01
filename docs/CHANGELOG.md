@@ -6,8 +6,16 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Validation
+
+- Completed the Phase 12 system audit and generated `PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
+- Recorded a 50% production-readiness score (WARNING), the six known production findings, and the hosted Supabase, Realtime, provider, and external-scheduler checks still outstanding; verified the API function count remains 12
+- Corrected stale Dashboard/scanner documentation and Known Issues status to match current behavior and implementation
+
 ### Added
 
+- Protected Exports page for CSV downloads of trades, portfolio snapshots, AI decisions, and positions, with date filters, exact counts, and streamed 500-row pages using the existing authenticated dashboard-data function
+- CSV export tests for all datasets, date filters, empty and large result sets, formula-safe content, API streaming, and UI loading/empty/error/download states; no new API function or schema migration
 - Removed the dashboard Market Scanner preview and the “Database history” / “Supabase snapshots” labels; scanner rankings remain on the dedicated Scanner page
 - Moved Admin Actions from the dashboard to a separate protected Admin page, reusing server-side allowlist authorization and the existing action API
 - Phase 11 Supabase Realtime subscriptions for dashboard, portfolio, trade history, and scanner, with debounced refreshes through existing APIs, reconnect/offline handling, polling fallback, cleanup, and no new Vercel Functions
@@ -19,7 +27,7 @@ All notable project changes should be documented here.
 - Production-safe market-summary storage failure logs now include query, table, operation, page/range, HTTP status, Supabase code, and failure category without logging credentials, request data, or response bodies
 - Temporary development-only market-summary read diagnostics identify the failed query and classify RLS/permission, schema, malformed-response, network, and database failures; production error responses remain generic
 - Phase 09 market scanner rankings for gainers, losers, estimated quote volume, momentum, and recent stored AI opportunities across 24h, 7d, and 30d
-- Scanner ranking and API pagination regression tests for empty and large datasets, plus responsive scanner UI and dashboard preview using the existing market-summary endpoint
+- Scanner ranking and API pagination regression tests for empty and large datasets, plus responsive scanner UI using the existing market-summary endpoint
 - Phase 09 completion report documenting ranking methodology, data sources, function-count verification, and limitations
 - Server-authorized Admin Actions for on-demand AI analysis and paper trading, using a Supabase user-ID allowlist and preserving existing engine and risk checks
 - Admin authorization and execution-state tests, a server-only `ADMIN_USER_IDS` environment setting, and the Admin Actions report

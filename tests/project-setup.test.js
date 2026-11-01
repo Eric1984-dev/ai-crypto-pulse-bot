@@ -27,7 +27,7 @@ test("all required placeholder pages exist", () => {
 });
 
 test("all pages use a dropdown for their top navigation", () => {
-  const protectedPages = ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "settings.html", "admin.html"];
+  const protectedPages = ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "exports.html", "settings.html", "admin.html"];
   const accountPages = ["login.html", "register.html", "reset-password.html"];
 
   for (const page of requiredPages) {
@@ -44,7 +44,7 @@ test("all pages use a dropdown for their top navigation", () => {
       assert.match(menu[1], /href="\/login\.html"/);
       assert.match(menu[1], /href="\/register\.html"/);
     } else {
-      const expectedLinks = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/settings.html"];
+      const expectedLinks = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/exports.html", "/settings.html"];
       if (protectedPages.includes(page)) {
         expectedLinks.push("/admin.html");
       }

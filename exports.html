@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Export CryptoPulse paper-trading and portfolio data as CSV.">
+    <title>Exports · CryptoPulse</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+    <script src="/js/exports.js" defer></script>
+  </head>
+  <body data-auth-page="protected">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <details class="nav-dropdown">
+            <summary class="nav-trigger">Menu</summary>
+            <div class="nav-menu">
+              <a data-nav-link href="/dashboard.html">Dashboard</a>
+              <a data-nav-link href="/portfolio.html">Portfolio</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/exports.html">Exports</a>
+              <a data-nav-link href="/settings.html">Settings</a>
+              <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
+              <span class="account-email" data-user-email></span>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
+            </div>
+          </details>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell" data-exports-page>
+      <p data-auth-message role="status" aria-live="polite"></p>
+      <p class="eyebrow">Data</p>
+      <h1>Exports</h1>
+      <p class="page-description">Download account-scoped trading and portfolio records as CSV for analysis in spreadsheets, BI tools, Python, and backtesting workflows. Timestamps are UTC.</p>
+      <div class="mode-banner">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <strong>PAPER ACTIVE</strong>
+        <span>Exports contain simulated paper-trading data only.</span>
+      </div>
+      <p class="dashboard-error" data-exports-error role="alert" hidden></p>
+      <div class="export-grid">
+        <section class="dashboard-panel export-card" data-export-card="trades" aria-labelledby="export-trades-heading">
+          <p class="eyebrow">Execution history</p>
+          <h2 id="export-trades-heading">Trade Exports</h2>
+          <p class="card-description">Execution prices, fees, gross and net values, and realized P&amp;L.</p>
+          <label class="export-filter">
+            Date range
+            <select data-export-period>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="all">All Data</option>
+            </select>
+          </label>
+          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="dashboard-panel export-card" data-export-card="portfolio" aria-labelledby="export-portfolio-heading">
+          <p class="eyebrow">Portfolio history</p>
+          <h2 id="export-portfolio-heading">Portfolio Exports</h2>
+          <p class="card-description">Stored portfolio snapshots with derived total P&amp;L and daily realized P&amp;L.</p>
+          <label class="export-filter">
+            Date range
+            <select data-export-period>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="all">All Data</option>
+            </select>
+          </label>
+          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="dashboard-panel export-card" data-export-card="decisions" aria-labelledby="export-decisions-heading">
+          <p class="eyebrow">Agent activity</p>
+          <h2 id="export-decisions-heading">AI Decision Exports</h2>
+          <p class="card-description">Recorded decisions, confidence, market-strength score, and reason.</p>
+          <label class="export-filter">
+            Date range
+            <select data-export-period>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="all">All Data</option>
+            </select>
+          </label>
+          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="dashboard-panel export-card" data-export-card="positions" aria-labelledby="export-positions-heading">
+          <p class="eyebrow">Position history</p>
+          <h2 id="export-positions-heading">Position Exports</h2>
+          <p class="card-description">Open and closed positions with stored entry/current prices and unrealized P&amp;L.</p>
+          <label class="export-filter">
+            Date range
+            <select data-export-period>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="all">All Data</option>
+            </select>
+          </label>
+          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>CryptoPulse · Paper Trading</span>
+        <span>© <span data-current-year></span> CryptoPulse</span>
+      </div>
+    </footer>
+  </body>
+</html>

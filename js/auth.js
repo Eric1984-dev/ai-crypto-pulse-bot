@@ -4,6 +4,7 @@
     "/portfolio.html",
     "/scanner.html",
     "/history.html",
+    "/exports.html",
     "/settings.html",
     "/admin.html"
   ]);

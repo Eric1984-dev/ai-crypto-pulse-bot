@@ -2,12 +2,12 @@
 
 ## Summary
 
-The authenticated dashboard now refreshes all dashboard data every 30 seconds while visible and immediately when returning to the foreground. Existing API endpoints and `no-store` behavior are preserved. Phase 08 was not started.
+The authenticated dashboard refreshes database-backed dashboard data every 30 seconds while visible and immediately when returning to the foreground. The tracked-market summary is included in `/api/dashboard-data`; the Dashboard does not request scanner rankings or `/api/market-summary`. Existing API endpoints and `no-store` behavior are preserved.
 
 ## Refresh behavior
 
-- After authentication initialization and the initial data load, a 30-second timer refreshes `/api/dashboard-data` and `/api/market-summary`.
-- This refresh includes portfolio summaries, positions, recent trades, watched-market data, recent AI decisions, portfolio snapshots, emergency state, and agent status.
+- After authentication initialization and the initial data load, a 30-second timer refreshes `/api/dashboard-data`.
+- This refresh includes portfolio summaries, positions, recent trades, tracked-market symbols and priorities, recent AI decisions, portfolio snapshots, and emergency state.
 - The existing Agent Status-only endpoint continues to poll every 15 seconds. Its request is skipped while a full dashboard-data request is in progress.
 - Both polling timers stop when the page becomes hidden and restart when it becomes visible. Returning to the foreground triggers an immediate full refresh.
 - Concurrent full dashboard loads are guarded. If the page returns to the foreground while a full load is already running, one follow-up refresh is coalesced and runs after that load finishes.
@@ -31,3 +31,5 @@ The authenticated dashboard now refreshes all dashboard data every 30 seconds wh
 | `npm.cmd run build` | Passed: static project validation and database migration validation (16 prefixed tables, RLS coverage, initial seed consistency) |
 
 The tests use mocked API responses. No live Supabase or deployed-dashboard smoke test was performed.
+
+The former dashboard Market Scanner preview and its market-summary request were subsequently removed. The dedicated Scanner page remains the only UI location for scanner rankings.

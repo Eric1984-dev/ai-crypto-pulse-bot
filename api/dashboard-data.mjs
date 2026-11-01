@@ -1,4 +1,10 @@
 import authSession from "../lib/auth-session.js";
+import {
+  createExportsService,
+  ExportDataError,
+  ExportRequestError,
+  ExportSessionError
+} from "../lib/exports.mjs";
 
 const {
   clearSessionCookie,
@@ -40,6 +46,7 @@ export function createHandler({
   verify = (token, config) => verifyAccessToken(token, config, fetchImpl),
   now = () => new Date()
 } = {}) {
+  const exportsService = createExportsService({ fetchImpl });
   return async function handler(req, res) {
     setResponseHeaders(res);
     if (req.method !== "GET") {
@@ -89,11 +96,63 @@ export function createHandler({
         return;
       }
 
+      if (request.view === "export-count") {
+        const recordCount = await exportsService.getRecordCount({
+          config,
+          accessToken,
+          exportType: request.params.get("type"),
+          period: request.params.get("period") || "all",
+          now: now()
+        });
+        sendJson(res, 200, {
+          data: {
+            exportType: request.params.get("type"),
+            period: request.params.get("period") || "all",
+            recordCount
+          }
+        });
+        return;
+      }
+
+      if (request.view === "export") {
+        await exportsService.streamCsv({
+          config,
+          accessToken,
+          exportType: request.params.get("type"),
+          period: request.params.get("period") || "all",
+          now: now(),
+          response: res
+        });
+        return;
+      }
+
       const data = request.view === "trade-history"
         ? await loadTradeHistory({ config, accessToken, fetchImpl, now, params: request.params })
         : await loadDashboardData({ config, accessToken, fetchImpl, now });
       sendJson(res, 200, { data });
     } catch (error) {
+      if (res.headersSent) {
+        console.error("CSV export stream failed.", error instanceof Error ? error.name : "Unknown error");
+        res.destroy?.();
+        return;
+      }
+      res.removeHeader?.("Content-Disposition");
+
+      if (error instanceof ExportRequestError) {
+        sendJson(res, 400, {
+          error: { code: "INVALID_EXPORT_QUERY", message: "The export type or date filter is invalid." }
+        });
+        return;
+      }
+
+      if (error instanceof ExportSessionError) {
+        clearCookie(res, env);
+        sendJson(res, 401, {
+          error: { code: "INVALID_SESSION", message: "Your session is invalid or expired." }
+        });
+        return;
+      }
+
       if (error instanceof InvalidTradeHistoryRequestError) {
         sendJson(res, 400, {
           error: { code: "INVALID_TRADE_HISTORY_QUERY", message: "The trade history filters are invalid." }
@@ -109,7 +168,7 @@ export function createHandler({
         return;
       }
 
-      if (error instanceof DashboardDataError || error instanceof TypeError) {
+      if (error instanceof DashboardDataError || error instanceof ExportDataError || error instanceof TypeError) {
         sendJson(res, 503, {
           error: { code: "DASHBOARD_DATA_UNAVAILABLE", message: "Dashboard data is temporarily unavailable." }
         });
@@ -132,7 +191,8 @@ function readDashboardRequest(req) {
     return null;
   }
   const views = url.searchParams.getAll("view");
-  if (views.length > 1 || (views.length === 1 && views[0] !== "trade-history")) {
+  const supportedViews = new Set(["trade-history", "export-count", "export"]);
+  if (views.length > 1 || (views.length === 1 && !supportedViews.has(views[0]))) {
     return null;
   }
   return {

@@ -9,7 +9,7 @@ const {
   verifyAccessToken
 } = authSession;
 
-const protectedPages = new Set(["dashboard", "portfolio", "scanner", "history", "settings", "admin"]);
+const protectedPages = new Set(["dashboard", "portfolio", "scanner", "history", "exports", "settings", "admin"]);
 
 export function createHandler({
   env = process.env,

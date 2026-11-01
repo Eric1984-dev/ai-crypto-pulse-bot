@@ -20,28 +20,29 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard en portfolio lezen echte, door RLS afgeschermde databasegegevens. De portfolio toont beschikbaar saldo, totale/gerealiseerde/ongerealiseerde/dagelijkse P&L, win rate, posities en recente trades; waarden blijven onbeschikbaar als een begrensde query geen volledige berekening ondersteunt.
 - Phase 10 vervangt de history-placeholder door een geauthenticeerd, filterbaar en server-side gepagineerd overzicht van opgeslagen paper-trades. Zoeken, actie/periodefilters en sortering werken op de server; statistieken worden met een SECURITY INVOKER-RPC over alle zichtbare opgeslagen SELL-uitvoeringen berekend. Trade History en Portfolio tonen BUY-kosten en SELL-opbrengsten uit bestaande uitvoeringsvelden; dit wijzigt geen database- of paper-tradingberekeningen.
 - Phase 11 gebruikt een gedeelde client-side Supabase Realtime-manager voor dashboard, portfolio, trade history en scanner. Tabelupdates triggeren bestaande geauthenticeerde API-refreshes; polling blijft de fallback, en er zijn geen Vercel Functions of endpoints toegevoegd.
+- De beschermde Exports-pagina downloadt Trades, Portfolio Snapshots, AI Decisions en Positions als gefilterde CSV-bestanden. Exacte recordaantallen en gestreamde pagina's gebruiken de bestaande geauthenticeerde `/api/dashboard-data`-function; de API-functiontelling blijft 12 en er zijn geen databasewijzigingen.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met ongeveer 13% extra hoogte ten opzichte van de breedteschaal, een iets lager doorlopende onderkant, een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. Alle 720 neuronen pulseren onafhankelijk; actieve neuronen krijgen een sterkere lokale glow en maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Inactieve verbindingen blijven gedimd en lichten alleen op wanneer een signaal passeert. De visualisatie heeft geen volume, shell, fog, mesh of externe circuitsporen. Beide hersenhelften delen dezelfde statuskleur.
 - De scanner gebruikt bestaande opgeslagen marktdata en AI-beslissingen, maar voert geen AI-analyse of trades uit. Settings blijft een placeholder; strategieoptimalisatie, backtesting en live trading zijn niet geïmplementeerd. De AI Engine blijft analysis-only; paper-trades worden uitsluitend door de afzonderlijke Phase 08 risk-managed executor aangemaakt.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard. De paper-tradingcode gebruikt geen private Bitvavo-endpoints, exchange-accountgegevens of echte orders.
-- Phase 11 code, geautomatiseerde tests en documentatie zijn geïmplementeerd. Productievalidatie van de Supabase-publicatiemigratie en live reconnects is nog vereist; Phase 12 is niet gestart.
+- Phase 11 code en lokale validatie zijn afgerond; verificatie van de hosted Supabase-publicatiemigratie en live reconnects blijft open. De Phase 12-systeemvalidatie is uitgevoerd: 169 tests en de statische/database-build slaagden, met een productie-readinessscore van 50% (WARNING). Phase 13 is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, export-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
-js/         Browsercode, Supabase Auth- en Realtime-services, dashboard-, scanner- en trade-history-rendering en Three.js Agent Brain
-lib/        Server-side sessie-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
+js/         Browsercode, Supabase Auth- en Realtime-services, dashboard-, scanner-, exports- en trade-history-rendering en Three.js Agent Brain
+lib/        Server-side sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
 tests/      Node.js unit- en routetests
 ```
 
-Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`. Beschermde pagina's: `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html` en `settings.html`. De Supabase anon key wordt vanuit serveromgeving beschikbaar gemaakt voor de browser; gebruik nooit een service-role key.
+Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`. Beschermde pagina's: `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html`, `exports.html` en `settings.html`. De Supabase anon key wordt vanuit serveromgeving beschikbaar gemaakt voor de browser; gebruik nooit een service-role key.
 
 ## Configuratie en checks
 
@@ -95,4 +96,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 09 completion report](./docs/PHASE_09_COMPLETION_REPORT.md)
 - [Phase 10 completion report](./docs/PHASE_10_COMPLETION_REPORT.md)
 - [Phase 11 completion report](./docs/PHASE_11_COMPLETION_REPORT.md)
+- [Exports module report](./EXPORTS_MODULE_REPORT.md)
 - [Phase 07 candle query fix report](./docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
