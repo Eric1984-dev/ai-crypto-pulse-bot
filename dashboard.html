@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="CryptoPulse paper portfolio and agent status dashboard.">
-    <meta name="apple-mobile-web-app-title" content="CryptoPulse">
+    <meta name="apple-mobile-web-app-title" content="AI Crypto Bot">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Dashboard · CryptoPulse</title>
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -22,7 +22,7 @@
   <body data-auth-page="protected">
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <a class="brand" data-nav-link href="/dashboard.html"><img class="brand-mark" src="/assets/icons/apple-touch-icon.png" alt="" aria-hidden="true"> AI Crypto Bot</a>
         <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
@@ -124,6 +124,10 @@
             </dt>
             <dd data-dashboard-value="winRate">—</dd>
           </div>
+        </dl>
+        <details class="dashboard-extra-metrics">
+          <summary>Show additional metrics</summary>
+          <dl class="dashboard-metrics">
           <div class="metric-card">
             <dt>
               <span class="metric-label">Open Positions</span>
@@ -174,7 +178,8 @@
             </dt>
             <dd data-dashboard-value="trackedMarkets">—</dd>
           </div>
-        </dl>
+          </dl>
+        </details>
       </section>
 
       <section class="dashboard-grid dashboard-grid-status" aria-label="Agent status">

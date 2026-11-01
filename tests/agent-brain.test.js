@@ -418,6 +418,9 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   const referenceTrace = harness.calls.lineSegments.find(({ material }) =>
     material.color.value === 0x4bcfff
   );
+  const referenceTraceStroke = harness.calls.meshes.find(({ material }) =>
+    material.color.value === 0x168fff
+  );
   const analysisNeurons = harness.calls.points.filter(({ material }) =>
     material.color.value === 0x9bffc1
   );
@@ -429,8 +432,23 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   );
 
   assert.ok(referenceTrace);
+  assert.ok(referenceTraceStroke);
   assert.ok(referenceTrace.renderOrder < 0);
   assert.ok(referenceTrace.geometry.getAttribute("position").count > 180);
+  assert.equal(referenceTraceStroke.geometry.getAttribute("position").count, 126);
+  assert.equal(referenceTraceStroke.renderOrder, -3);
+  const tracePositions = referenceTrace.geometry.getAttribute("position");
+  const circuitStart = 3 * 28 * 2;
+  const circuitLaneBounds = Array.from({ length: 7 }, (_, lane) => {
+    const values = Array.from({ length: 6 }, (_, point) =>
+      tracePositions.getY(circuitStart + lane * 6 + point)
+    );
+    return { minimum: Math.min(...values), maximum: Math.max(...values) };
+  });
+  assert.ok(circuitLaneBounds[0].maximum < 0.42);
+  for (let lane = 0; lane < circuitLaneBounds.length - 1; lane += 1) {
+    assert.ok(circuitLaneBounds[lane + 1].maximum < circuitLaneBounds[lane].minimum);
+  }
   assert.ok(traceNeurons.geometry.getAttribute("position").count > 100);
   const traceNeuronPositions = traceNeurons.geometry.getAttribute("position");
   assert.ok(Math.min(...traceNeuronPositions.array.filter((_, index) => index % 3 === 0)) < -1.2);
@@ -598,7 +616,8 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.deepEqual(harness.calls.sphereGeometryArgs, []);
   assert.equal(harness.calls.surfaceGeometries.length, 0);
   assert.equal(harness.calls.computedNormals, 0);
-  assert.equal(harness.calls.meshes.length, 0);
+  assert.equal(harness.calls.meshes.length, 1);
+  assert.ok(harness.calls.meshes[0].geometry.getAttribute("position").count > 0);
   const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
   assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
   const networkPositions = neuralNodes.geometry.getAttribute("position");

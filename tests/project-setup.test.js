@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 const {
   requiredDirectories,
   requiredPages,
@@ -57,6 +58,92 @@ test("all pages use a dropdown for their top navigation", () => {
       assert.match(menu[1], /data-auth-logout/);
     }
   }
+});
+
+test("all page brands use the dark-green icon and link to the dashboard", () => {
+  for (const page of requiredPages) {
+    const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
+    const brand = html.match(/<a class="brand"[\s\S]*?<\/a>/);
+    assert.ok(brand, `${page} should render the shared brand`);
+    assert.match(brand[0], /href="\/dashboard\.html"/);
+    assert.match(brand[0], /<img class="brand-mark" src="\/assets\/icons\/apple-touch-icon\.png" alt="" aria-hidden="true"> AI Crypto Bot/);
+    assert.doesNotMatch(brand[0], />C<\/span>/);
+    assert.match(html, /<meta name="apple-mobile-web-app-title" content="AI Crypto Bot">/);
+  }
+  assert.equal(fs.statSync(path.join(rootDirectory, "assets", "icons", "apple-touch-icon.png")).isFile(), true);
+});
+
+test("internal navigation resets to the top on mobile destination loads", () => {
+  const source = fs.readFileSync(path.join(rootDirectory, "js", "main.js"), "utf8");
+  const storage = new Map();
+  const linkListeners = {};
+  const dashboardLink = {
+    pathname: "/history.html",
+    target: "",
+    addEventListener(name, callback) {
+      linkListeners[name] = callback;
+    },
+    setAttribute() {}
+  };
+  const dashboardWindow = {
+    location: { pathname: "/dashboard.html" },
+    sessionStorage: {
+      setItem(key, value) { storage.set(key, value); },
+      getItem(key) { return storage.get(key) || null; },
+      removeItem(key) { storage.delete(key); }
+    },
+    addEventListener() {},
+    requestAnimationFrame(callback) { callback(); },
+    scrollTo() {}
+  };
+  const createDocument = (links) => ({
+    querySelectorAll() { return links; },
+    querySelector() { return null; }
+  });
+  vm.runInNewContext(source, {
+    window: dashboardWindow,
+    document: createDocument([dashboardLink])
+  });
+  linkListeners.click({
+    defaultPrevented: false,
+    button: 0,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false
+  });
+  assert.equal(storage.get("cryptopulse:navigation-target"), "/history.html");
+
+  const windowListeners = {};
+  const scrollCalls = [];
+  const historyWindow = {
+    location: { pathname: "/history.html" },
+    sessionStorage: dashboardWindow.sessionStorage,
+    addEventListener(name, callback) {
+      windowListeners[name] = callback;
+    },
+    requestAnimationFrame(callback) { callback(); },
+    scrollTo(...position) { scrollCalls.push(position); }
+  };
+  vm.runInNewContext(source, {
+    window: historyWindow,
+    document: createDocument([])
+  });
+  windowListeners.pageshow();
+
+  assert.deepEqual(scrollCalls, [[0, 0]]);
+  assert.equal(storage.has("cryptopulse:navigation-target"), false);
+});
+
+test("trade history filters start collapsed and the table supports vertical scrolling", () => {
+  const historyHtml = fs.readFileSync(path.join(rootDirectory, "history.html"), "utf8");
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+
+  assert.match(historyHtml, /<details class="history-filter-disclosure">\s*<summary class="history-filter-toggle">Search and filters<\/summary>/);
+  assert.doesNotMatch(historyHtml, /<details class="history-filter-disclosure" open>/);
+  assert.match(historyHtml, /<form class="history-filters" data-history-filters>/);
+  assert.match(styles, /\.history-table-wrap\s*\{[^}]*max-height:\s*min\(60vh,\s*640px\)[^}]*overflow:\s*auto/s);
+  assert.match(styles, /\.history-table thead th\s*\{[^}]*position:\s*sticky/s);
 });
 
 test("market refresh endpoint remains available without a Vercel Cron configuration", () => {

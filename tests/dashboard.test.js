@@ -538,6 +538,18 @@ test("dashboard KPI information is accessible, English-only, and covers all port
   assert.doesNotMatch(html, /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i);
 });
 
+test("dashboard collapses portfolio metrics after Win Rate by default", () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  const winRateIndex = html.indexOf('data-dashboard-value="winRate"');
+  const additionalMetricsIndex = html.indexOf('<details class="dashboard-extra-metrics">');
+
+  assert.ok(winRateIndex >= 0);
+  assert.ok(additionalMetricsIndex > winRateIndex);
+  assert.match(html, /<details class="dashboard-extra-metrics">\s*<summary>Show additional metrics<\/summary>/);
+  assert.doesNotMatch(html, /<details class="dashboard-extra-metrics" open>/);
+  assert.match(html, /<details class="dashboard-extra-metrics">[\s\S]*data-dashboard-value="openPositions"/);
+});
+
 test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {
   function createInfoElement(controlId = null) {
     return {

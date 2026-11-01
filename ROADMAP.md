@@ -191,15 +191,21 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 - [x] Validate 100,001 AI decisions, 100,001 snapshots, and 10,001 trades without loading full source histories into browser memory
 - [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Status: The AI-decision 416 pagination fix and requested boundary regressions are implemented. The supplied production log identifies page 3 (`1000-1499`) and `PGRST103`; that range now terminates the stream rather than failing Analytics or Analytics Exports. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 has not started.
+Status: The AI-decision 416 pagination fix and requested boundary regressions are implemented. The supplied production log identifies page 3 (`1000-1499`) and `PGRST103`; that range now terminates the stream rather than failing Analytics or Analytics Exports. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 UI polish is in progress.
 
 ---
 
 ## Phase 14 - Final Polish
 
-- UX
-- Performance
-- Accessibility
+- [x] Keep right-side Agent Brain circuit lines parallel, below the top frame, and visibly thicker without changing status behavior
+- [x] Collapse dashboard summary metrics after Win Rate by default
+- [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
+- [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
+- [x] Replace the C brand mark with a dark-green app icon and make the AI Crypto Bot brand link to Dashboard on every page
+- [ ] Complete the full Lighthouse and production release checklist
+- [ ] Verify on physical iPhone, Android, and desktop devices
+
+Status: The requested interface refinements are implemented locally and validated with 210 passing tests and a successful build. Phase 14 remains in progress pending the full release checklist and physical-device verification.
 
 ---
 

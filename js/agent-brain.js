@@ -342,6 +342,25 @@
       const referenceTraceLayout = createReferenceTraceLayout(THREE);
       const referenceTraceGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       referenceTraceGeometry.setFromPoints(referenceTraceLayout.segmentPoints);
+      const referenceTraceStrokeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      referenceTraceStrokeGeometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(referenceTraceLayout.circuitStrokePositions, 3)
+      );
+      const referenceTraceStrokeMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
+        color: 0x168fff,
+        transparent: true,
+        opacity: 0.38,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      }));
+      const referenceTraceStroke = new THREE.Mesh(
+        referenceTraceStrokeGeometry,
+        referenceTraceStrokeMaterial
+      );
+      referenceTraceStroke.renderOrder = -3;
       const referenceTraceGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
         color: 0x168fff,
         transparent: true,
@@ -367,7 +386,7 @@
       );
       referenceTraceGlow.renderOrder = -2;
       referenceTraces.renderOrder = -1;
-      brain.add(referenceTraceGlow, referenceTraces);
+      brain.add(referenceTraceStroke, referenceTraceGlow, referenceTraces);
 
       const referenceTraceNodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       referenceTraceNodeGeometry.setFromPoints(referenceTraceLayout.neuronPositions);
@@ -1068,6 +1087,7 @@
     const junctions = [];
     const neuronPositions = [];
     const pulseRoutes = [];
+    const circuitStrokePositions = [];
 
     function addPath(coordinates, z, includeBends = false) {
       const points = coordinates.map(([x, y]) => new THREE.Vector3(x, y, z));
@@ -1085,6 +1105,23 @@
         segmentLengths.push(length);
         totalLength += length;
         segmentPoints.push(start, end);
+        if (includeBends) {
+          const halfWidth = 0.006;
+          const normalX = -(end.y - start.y) / length * halfWidth;
+          const normalY = (end.x - start.x) / length * halfWidth;
+          const startPlus = [start.x + normalX, start.y + normalY, z - 0.002];
+          const startMinus = [start.x - normalX, start.y - normalY, z - 0.002];
+          const endPlus = [end.x + normalX, end.y + normalY, z - 0.002];
+          const endMinus = [end.x - normalX, end.y - normalY, z - 0.002];
+          circuitStrokePositions.push(
+            ...startPlus,
+            ...startMinus,
+            ...endMinus,
+            ...startPlus,
+            ...endMinus,
+            ...endPlus
+          );
+        }
         for (let step = 1; step <= subdivisions; step += 1) {
           const progress = step / subdivisions;
           neuronPositions.push(new THREE.Vector3(
@@ -1120,20 +1157,21 @@
       addPath(coordinates, -0.055);
     }
 
-    const circuitPaths = [
-      [[0.48, 0.37], [0.72, 0.37], [0.88, 0.5], [1.2, 0.5]],
-      [[0.56, 0.23], [0.78, 0.23], [0.94, 0.37], [1.2, 0.37]],
-      [[0.64, 0.06], [1.2, 0.06]],
-      [[0.62, -0.12], [0.82, -0.12], [0.98, -0.28], [1.2, -0.28]],
-      [[0.48, -0.34], [0.7, -0.34], [0.88, -0.5], [1.2, -0.5]],
-      [[0.68, 0.34], [0.82, 0.48], [1.02, 0.48], [1.18, 0.54]],
-      [[0.7, -0.31], [0.86, -0.47], [1.04, -0.47], [1.18, -0.54]]
-    ];
+    const circuitPaths = Array.from({ length: 7 }, (_, lane) => {
+      const y = 0.34 - lane * 0.12;
+      return [[0.48, y], [0.68, y], [0.8, y + 0.04], [1.16, y + 0.04]];
+    });
     for (const path of circuitPaths) {
       addPath(path, -0.045, true);
     }
 
-    return { junctions, neuronPositions, pulseRoutes, segmentPoints };
+    return {
+      circuitStrokePositions: new Float32Array(circuitStrokePositions),
+      junctions,
+      neuronPositions,
+      pulseRoutes,
+      segmentPoints
+    };
   }
 
   function updateReferenceTraceParticles(

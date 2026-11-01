@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Review and filter executed CryptoPulse paper trades.">
-    <meta name="apple-mobile-web-app-title" content="CryptoPulse">
+    <meta name="apple-mobile-web-app-title" content="AI Crypto Bot">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Trade History · CryptoPulse</title>
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -20,7 +20,7 @@
   <body data-auth-page="protected">
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <a class="brand" data-nav-link href="/dashboard.html"><img class="brand-mark" src="/assets/icons/apple-touch-icon.png" alt="" aria-hidden="true"> AI Crypto Bot</a>
         <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
@@ -74,47 +74,50 @@
           <div><p class="eyebrow">Execution</p><h2 id="trade-history-heading">Paper Trades</h2></div>
           <span class="count-pill"><span data-history-value="totalCount">0</span> trades</span>
         </div>
-        <form class="history-filters" data-history-filters>
-          <label>
-            Search market
-            <input data-history-search name="search" type="search" maxlength="32" pattern="[A-Za-z0-9._-]{0,32}" title="Use a market-symbol prefix, such as BTC.">
-          </label>
-          <label>
-            Action
-            <select data-history-side name="side">
-              <option value="all">All actions</option>
-              <option value="buy">BUY</option>
-              <option value="sell">SELL</option>
-            </select>
-          </label>
-          <label>
-            Period
-            <select data-history-period name="period">
-              <option value="all">All time</option>
-              <option value="24h">24 hours</option>
-              <option value="7d">7 days</option>
-              <option value="30d">30 days</option>
-            </select>
-          </label>
-          <label>
-            Sort
-            <select data-history-sort name="sort">
-              <option value="newest">Date · newest</option>
-              <option value="oldest">Date · oldest</option>
-              <option value="market">Market · A–Z</option>
-              <option value="action">Action · A–Z</option>
-              <option value="price-high">Price · high to low</option>
-              <option value="price-low">Price · low to high</option>
-              <option value="quantity-high">Quantity · high to low</option>
-              <option value="quantity-low">Quantity · low to high</option>
-              <option value="fees-high">Fees · high to low</option>
-              <option value="fees-low">Fees · low to high</option>
-              <option value="pnl-high">P&amp;L · high to low</option>
-              <option value="pnl-low">P&amp;L · low to high</option>
-            </select>
-          </label>
-          <button class="history-search-button" type="submit">Search</button>
-        </form>
+        <details class="history-filter-disclosure">
+          <summary class="history-filter-toggle">Search and filters</summary>
+          <form class="history-filters" data-history-filters>
+            <label>
+              Search market
+              <input data-history-search name="search" type="search" maxlength="32" pattern="[A-Za-z0-9._-]{0,32}" title="Use a market-symbol prefix, such as BTC.">
+            </label>
+            <label>
+              Action
+              <select data-history-side name="side">
+                <option value="all">All actions</option>
+                <option value="buy">BUY</option>
+                <option value="sell">SELL</option>
+              </select>
+            </label>
+            <label>
+              Period
+              <select data-history-period name="period">
+                <option value="all">All time</option>
+                <option value="24h">24 hours</option>
+                <option value="7d">7 days</option>
+                <option value="30d">30 days</option>
+              </select>
+            </label>
+            <label>
+              Sort
+              <select data-history-sort name="sort">
+                <option value="newest">Date · newest</option>
+                <option value="oldest">Date · oldest</option>
+                <option value="market">Market · A–Z</option>
+                <option value="action">Action · A–Z</option>
+                <option value="price-high">Price · high to low</option>
+                <option value="price-low">Price · low to high</option>
+                <option value="quantity-high">Quantity · high to low</option>
+                <option value="quantity-low">Quantity · low to high</option>
+                <option value="fees-high">Fees · high to low</option>
+                <option value="fees-low">Fees · low to high</option>
+                <option value="pnl-high">P&amp;L · high to low</option>
+                <option value="pnl-low">P&amp;L · low to high</option>
+              </select>
+            </label>
+            <button class="history-search-button" type="submit">Search</button>
+          </form>
+        </details>
 
         <p class="history-result-count"><span data-history-value="totalCount">0</span> matching trades</p>
         <p class="dashboard-empty" data-history-empty hidden>No paper trades match these filters.</p>

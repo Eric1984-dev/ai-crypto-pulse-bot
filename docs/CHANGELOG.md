@@ -11,10 +11,14 @@ All notable project changes should be documented here.
 - Completed the Phase 12 system audit and generated `reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
 - Recorded a 50% production-readiness score (WARNING), the six known production findings, and the hosted Supabase, Realtime, provider, and external-scheduler checks still outstanding; verified the API function count remains 12
 - Corrected stale Dashboard/scanner documentation and Known Issues status to match current behavior and implementation
+- Phase 14 UI polish passed the focused 48-test suite and full 210-test suite; static/database build validation passed and the API remains at 12 functions. Physical device and Lighthouse checks remain open.
 - Analytics production-loading follow-up passed all 202 automated tests and static/database build validation; hosted Supabase/Vercel behavior remains unverified
 
 ### Fixed
 
+- Parallelized and slightly thickened the Agent Brain's right-side circuit tracks, keeping them clear of the top frame without changing status logic
+- Collapsed dashboard metrics after Win Rate and Trade History search/filter controls by default; added a bounded scroll area with a sticky header to the trade table
+- Reset internal navigation destinations to the top on mobile, while leaving browser back/forward restoration intact
 - Analytics AI-decision pagination now treats HTTP `416` as end-of-results, ignores later prefetched ranges, and covers the requested empty, page-boundary, and 19,380-row regressions
 - Phase 13 Analytics now defaults to a 30-day history window and supports 90- and 365-day ranges for historical trades, AI decisions, and snapshots; current positions and account totals remain current-state metrics
 - Bounded Analytics reads with exact RLS-visible counts and up to four concurrent 500-row pages per source, avoiding full all-history decision scans and detecting truncated pages
@@ -23,7 +27,7 @@ All notable project changes should be documented here.
 
 ### Added
 
-- Added a shared 180×180 Apple Touch Icon and CryptoPulse home-screen title across the static pages for iPhone Add to Home Screen.
+- Added a dark-green 180×180 Apple Touch Icon and the AI Crypto Bot brand mark across all pages; every brand link opens Dashboard.
 - Phase 13 protected Analytics page with trade, AI-decision, strategy, symbol, portfolio-growth, equity-curve, and drawdown insights calculated from existing RLS-scoped tables
 - Four Analytics CSV reports integrated into Exports and the existing authenticated dashboard-data function; paginated source reads, bounded portfolio series, regression coverage, and no new tables or Vercel Functions
 - Protected Exports page for CSV downloads of trades, portfolio snapshots, AI decisions, and positions, with date filters, exact counts, and streamed 500-row pages using the existing authenticated dashboard-data function
