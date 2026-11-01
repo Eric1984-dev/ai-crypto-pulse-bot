@@ -15,6 +15,8 @@ Phase 10 is implemented and locally validated. No Phase 11 functionality was sta
 
 The history page displays stored execution date, market, BUY/SELL action, price, quantity, fees, realized P&L, and status. Because the trade table has no status column and rows are recorded only for executed paper trades, the status is shown as `Uitgevoerd · paper`. BUY rows show P&L as unavailable because their stored zero is not realized P&L.
 
+Price rendering is shared by the dashboard, portfolio, and trade-history views: values below €1 allow up to five fractional digits, while values at or above €1 keep two. This is display-only; fees, P&L, totals, and calculations retain their existing behavior.
+
 Filters include a case-normalized market-symbol prefix, action, and rolling 24-hour/7-day/30-day or all-time period. Sorting is allowlisted for date, market, action, price, quantity, fees, and realized P&L. Invalid filter values are rejected before database access.
 
 ## Statistics
@@ -43,9 +45,15 @@ The dashboard retains its existing recent-trades summary and now links directly 
 - `css/styles.css`
 - `dashboard.html`
 - `history.html`
+- `js/dashboard.js`
+- `js/formatters.js`
 - `js/history.js`
+- `js/portfolio.js`
 - `supabase/migrations/20261102120000_trade_history_stats.sql`
 - `tests/database-migrations.test.js`
+- `tests/dashboard.test.js`
+- `tests/portfolio.test.js`
+- `tests/price-formatting.test.js`
 - `tests/trade-history.test.js`
 - `README.md`
 - `ROADMAP.md`
@@ -69,3 +77,11 @@ The `api/` directory contains **12** `.mjs` Function files, matching the Vercel 
 ## Outstanding Items
 
 The new SQL migration was validated in PGlite but has not been applied to a remote Supabase project. Apply the reviewed migration with the project's normal migration procedure before deploying the updated application. No live Supabase or Vercel deployment was performed or claimed.
+
+## Price Formatting Follow-up
+
+A shared presentation formatter now displays prices below €1 with up to five decimal places and prices at or above €1 with two decimals across dashboard positions/trades, portfolio positions/trades, and Trade History. Fees, P&L, and portfolio totals retain their existing two-decimal formatting; no calculations changed.
+
+- Focused dashboard, portfolio, trade-history, and price-formatting tests: **30 passed, 0 failed**.
+- `npm.cmd run build`: **passed**.
+- The complete test suite was not rerun for this presentation-only follow-up.

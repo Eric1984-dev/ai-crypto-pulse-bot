@@ -65,8 +65,8 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
       items: [{
         symbol: "<img src=x>",
         amount: 0.01,
-        entry_price: 100,
-        current_price: 105,
+        entry_price: 0.00453954,
+        current_price: 0.05671234,
         unrealized_pnl: 0.05
       }]
     },
@@ -76,7 +76,7 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
         side: "SELL",
         symbol: "BTC-EUR",
         quantity: 0.01,
-        price: 105,
+        price: 0.98123456,
         fees: 0.25,
         realized_pnl: 4.5
       }]
@@ -87,6 +87,14 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
   assert.match(elements.get("[data-portfolio-value=\"realizedPnl\"]").textContent, /50,00/);
   assert.equal(elements.get("[data-portfolio-value=\"openPositions\"]").textContent, "1");
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].textContent, "<img src=x> · 0,01 units");
+  assert.match(
+    elements.get("[data-portfolio-list=\"positions\"]").children[0].children[1].textContent,
+    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?0,05/
+  );
+  assert.match(
+    elements.get("[data-portfolio-list=\"trades\"]").children[0].children[1].textContent,
+    /€\s?0,98123 · Fee €\s?0,25 · P&L €\s?4,50/
+  );
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").hidden, false);
   assert.equal(elements.get("[data-portfolio-empty=\"trades\"]").hidden, true);
 });

@@ -1,12 +1,15 @@
 (function attachPortfolio(root, createApi) {
-  const api = createApi();
+  const formatters = typeof module !== "undefined" && module.exports
+    ? require("./formatters.js")
+    : root.CryptoPulseFormatters;
+  const api = createApi(formatters);
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     api.startPortfolio({ windowRef: window, documentRef: document });
   }
-})(globalThis, function createPortfolioApi() {
+})(globalThis, function createPortfolioApi(formatters) {
   const refreshIntervalMs = 30000;
   const currencyFormat = new Intl.NumberFormat("nl-NL", {
     style: "currency",
@@ -59,11 +62,11 @@
 
     renderCollection(documentRef, "positions", data.openPositions.items, (item) => [
       `${item.symbol || "—"} · ${formatNumber(item.amount)} units`,
-      `Entry ${formatCurrency(item.entry_price)} · Current ${formatCurrency(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
+      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
     ]);
     renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatNumber(item.quantity)} units`,
-      `${formatCurrency(item.price)} · Fee ${formatCurrency(item.fees)} · P&L ${formatCurrency(item.realized_pnl)}`
+      `${formatters.formatPrice(item.price)} · Fee ${formatCurrency(item.fees)} · P&L ${formatCurrency(item.realized_pnl)}`
     ]);
   }
 

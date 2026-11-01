@@ -1,12 +1,15 @@
 (function attachTradeHistory(root, createApi) {
-  const api = createApi();
+  const formatters = typeof module !== "undefined" && module.exports
+    ? require("./formatters.js")
+    : root.CryptoPulseFormatters;
+  const api = createApi(formatters);
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     api.startTradeHistory({ windowRef: window, documentRef: document });
   }
-})(globalThis, function createTradeHistoryApi() {
+})(globalThis, function createTradeHistoryApi(formatters) {
   const pageSize = 25;
   const refreshIntervalMs = 30000;
   const currencyFormat = new Intl.NumberFormat("nl-NL", {
@@ -134,7 +137,7 @@
       formatDate(trade.created_at),
       trade.symbol,
       trade.side,
-      formatCurrency(trade.price),
+      formatters.formatPrice(trade.price),
       formatNumber(trade.quantity),
       formatCurrency(trade.fees),
       trade.side === "SELL" ? formatCurrency(trade.realized_pnl) : "—",

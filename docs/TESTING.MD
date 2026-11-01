@@ -210,7 +210,7 @@ These tests use deterministic stored-data fixtures and mocked Supabase requests.
 
 ## Phase 10 Trade History coverage
 
-Trade-history API/UI tests cover symbol search, action and rolling-period filters, sorting, stable server-side pagination, clamping after history shrinks, empty results, million-row count behavior with a single bounded page, response validation, text-safe rendering, BUY realized-P&L handling, and the dashboard link. The PGlite migration test verifies the SQL aggregate calculations for profitable, losing, breakeven, and BUY rows, confirms user-scoped RLS results, and denies RPC execution to `anon`.
+Trade-history API/UI tests cover symbol search, action and rolling-period filters, sorting, stable server-side pagination, clamping after history shrinks, empty results, million-row count behavior with a single bounded page, response validation, text-safe rendering, BUY realized-P&L handling, and the dashboard link. Price-formatting tests verify the supplied sub-€1 examples round to five decimal places, prices at/above €1 retain two decimals, and the shared formatter is used by dashboard, portfolio, and trade-history renderers. The PGlite migration test verifies the SQL aggregate calculations for profitable, losing, breakeven, and BUY rows, confirms user-scoped RLS results, and denies RPC execution to `anon`.
 
 ```powershell
 node --test tests/trade-history.test.js tests/database-migrations.test.js

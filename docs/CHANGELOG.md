@@ -68,6 +68,7 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Format EUR prices below €1 with up to five decimal places in position and trade views; prices from €1 use two decimals, while fees, P&L, and portfolio totals retain existing formatting
 - Replace the history placeholder with an auto-refreshing, responsive paper-trade ledger; BUY rows show unrealized P&L as unavailable, while all-time statistics use stored SELL realized P&L
 - Replace the scanner placeholder with timeframe-filtered rankings refreshed from stored market data; keep the existing `/api/market-summary` endpoint and Vercel function count unchanged
 - Replace the fixed header navigation links with a keyboard-accessible dropdown menu across public and protected pages

@@ -304,8 +304,11 @@ test("trade history renders all required fields as text and treats buys as unrea
     totalCount: 26,
     totalPages: 2,
     items: [
-      createTradeRow({ symbol: "<img src=x>" }),
-      createTradeRow({ id: "trade-2", side: "BUY", realized_pnl: "0" })
+      createTradeRow({ symbol: "<img src=x>", price: "0.00453954" }),
+      createTradeRow({ id: "trade-2", side: "BUY", price: "0.05671234", realized_pnl: "0" }),
+      createTradeRow({ id: "trade-3", price: "0.98123456" }),
+      createTradeRow({ id: "trade-4", price: "12.3456" }),
+      createTradeRow({ id: "trade-5", price: "69421.22" })
     ],
     stats: {
       closedTrades: 1,
@@ -320,8 +323,13 @@ test("trade history renders all required fields as text and treats buys as unrea
 
   assert.equal(table.hidden, false);
   assert.equal(empty.hidden, true);
-  assert.equal(rows.children.length, 2);
+  assert.equal(rows.children.length, 5);
   assert.equal(rows.children[0].children[1].textContent, "<img src=x>");
+  assert.match(rows.children[0].children[3].textContent, /0,00454$/);
+  assert.match(rows.children[1].children[3].textContent, /0,05671$/);
+  assert.match(rows.children[2].children[3].textContent, /0,98123$/);
+  assert.match(rows.children[3].children[3].textContent, /12,35$/);
+  assert.match(rows.children[4].children[3].textContent, /69\.421,22$/);
   assert.equal(rows.children[0].children[7].textContent, "Uitgevoerd · paper");
   assert.equal(rows.children[1].children[6].textContent, "—");
   assert.equal(previous.disabled, false);

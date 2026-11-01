@@ -426,12 +426,12 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
       items: [{
         symbol: "<img src=x>",
         amount: 0.01,
-        entry_price: 90000,
-        current_price: 100000,
+        entry_price: 0.00453954,
+        current_price: 0.05671234,
         unrealized_pnl: 100
       }]
     },
-    recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 100000, created_at: generatedAt }] },
+    recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 0.98123456, created_at: generatedAt }] },
     watchedMarkets: { count: 1, items: [{ symbol: "BTC-EUR", priority: 1 }] },
     marketSummary: {
       activeMarkets: 1,
@@ -467,6 +467,14 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0,01 units");
+  assert.match(
+    elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
+    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?100,00/
+  );
+  assert.match(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].textContent,
+    /€\s?0,98123/
+  );
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
   assert.match(

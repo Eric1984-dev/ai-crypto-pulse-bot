@@ -1,12 +1,15 @@
 (function attachDashboard(root, createApi) {
-  const api = createApi();
+  const formatters = typeof module !== "undefined" && module.exports
+    ? require("./formatters.js")
+    : root.CryptoPulseFormatters;
+  const api = createApi(formatters);
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     api.startDashboard({ windowRef: window, documentRef: document });
   }
-})(globalThis, function createDashboardApi() {
+})(globalThis, function createDashboardApi(formatters) {
   const numberFormat = new Intl.NumberFormat("nl-NL");
   const currencyFormat = new Intl.NumberFormat("nl-NL", {
     style: "currency",
@@ -243,11 +246,11 @@
 
     renderCollection(documentRef, "positions", openPositions.items, (item) => [
       `${item.symbol || "—"} · ${formatQuantity(item.amount)} units`,
-      `Entry ${formatCurrency(item.entry_price)} · Current ${formatCurrency(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
+      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)}`
     ]);
     renderCollection(documentRef, "trades", recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatQuantity(item.quantity)} units`,
-      `${formatCurrency(item.price)} · ${formatDate(item.created_at)}`
+      `${formatters.formatPrice(item.price)} · ${formatDate(item.created_at)}`
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
