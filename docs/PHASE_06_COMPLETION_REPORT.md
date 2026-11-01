@@ -51,7 +51,7 @@ Snapshot and candle routes report their duration and processed-record counts ind
 ## Files changed
 
 - Market configuration/service: `config/markets.js`, `lib/market-data.mjs`
-- API routes: `api/market-handler.mjs`, `api/market.mjs`, `api/market-summary.mjs`, `api/market-refresh.mjs`
+- Shared market handler: `lib/market-handler.mjs`; API routes: `api/market.mjs`, `api/market-summary.mjs`, `api/market-refresh.mjs`
 - Dashboard: `dashboard.html`, `js/dashboard.js`
 - Vercel/environment and validation: `vercel.json`, `.env.example`, `scripts/validate-project.js`, `scripts/validate-database.js`
 - Tests: `tests/market-data.test.mjs`, `tests/dashboard.test.js`, `tests/database-migrations.test.js`

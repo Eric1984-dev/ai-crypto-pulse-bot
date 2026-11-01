@@ -1,4 +1,4 @@
-import { createMarketSummaryHandler } from "./market-handler.mjs";
+import { createMarketSummaryHandler } from "../lib/market-handler.mjs";
 
 export { createMarketSummaryHandler };
 export default createMarketSummaryHandler();

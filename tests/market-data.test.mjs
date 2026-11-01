@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createCandleRefreshHandler } from "../api/candle-refresh.mjs";
-import { createMarketHandler, createMarketSummaryHandler } from "../api/market-handler.mjs";
+import { createMarketHandler, createMarketSummaryHandler } from "../lib/market-handler.mjs";
 import { createMarketRefreshHandler } from "../api/market-refresh.mjs";
 import { createMarketDataService } from "../lib/market-data.mjs";
 

@@ -1,4 +1,4 @@
-import { createMarketHandler } from "./market-handler.mjs";
+import { createMarketHandler } from "../lib/market-handler.mjs";
 
 export { createMarketHandler };
 export default createMarketHandler();
