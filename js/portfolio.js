@@ -11,12 +11,12 @@
   }
 })(globalThis, function createPortfolioApi(formatters) {
   const refreshIntervalMs = 30000;
-  const currencyFormat = new Intl.NumberFormat("nl-NL", {
+  const currencyFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 2
   });
-  const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 8 });
+  const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
 
   async function requestPortfolioData(fetchImpl) {
     const response = await fetchImpl("/api/dashboard-data", {
@@ -114,7 +114,7 @@
             return;
           }
           if (errorMessage) {
-            errorMessage.textContent = "Portfoliogegevens konden niet worden geladen. De laatst bekende waarden blijven staan.";
+            errorMessage.textContent = "Portfolio data could not be loaded. The last known values are still shown.";
             errorMessage.hidden = false;
           }
           if (retryButton) {

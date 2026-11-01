@@ -195,7 +195,7 @@
           ? ` (${result.data.status})`
           : "";
         if (status) {
-          status.textContent = `Success${resultStatus}`;
+          status.textContent = `Completed${resultStatus}`;
           status.dataset.state = "success";
         }
         if (duration) {
@@ -218,7 +218,7 @@
           }
         }
         if (status) {
-          status.textContent = `Failure: ${error.message}`;
+          status.textContent = `Failed: ${error.message}`;
           status.dataset.state = "error";
         }
         const reportedDuration = error && error.metrics

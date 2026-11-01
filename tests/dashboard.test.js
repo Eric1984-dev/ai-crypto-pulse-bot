@@ -327,7 +327,6 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"aiDecisions\"]",
     "[data-dashboard-value=\"paperTrades\"]",
     "[data-dashboard-value=\"trackedMarkets\"]",
-    "[data-dashboard-value=\"marketsWithData\"]",
     "[data-dashboard-value=\"portfolioCount\"]",
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
@@ -412,11 +411,6 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     },
     recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 0.98123456, created_at: generatedAt }] },
     watchedMarkets: { count: 1, items: [{ symbol: "BTC-EUR", priority: 1 }] },
-    marketSummary: {
-      activeMarkets: 1,
-      marketsWithData: 1,
-      items: [{ symbol: "BTC-EUR", price: 100000, daily_change: 2.5 }]
-    },
     aiDecisions: {
       count: 1,
       items: [{
@@ -435,20 +429,19 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
 
   dashboard.renderDashboard(data, dashboardDocument, FakeChart);
 
-  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1\.100/);
+  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1,100/);
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
-  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
-  assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0,01 units");
+  assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0.01 units");
   assert.match(
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
-    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?100,00 · Opened .*11:00/
+    /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?100\.00 · Opened .*11:00/
   );
   assert.match(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].textContent,
-    /€\s?0,98123.*13:00/
+    /€\s?0\.98123.*13:00/
   );
   assert.match(
     elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,
@@ -458,19 +451,19 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
   assert.match(
     elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
-    /Priority 1.*100\.000,00.*2,5% \(24h\)/
+    /^Priority 1$/
   );
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
 });
 
-test("dashboard omits scanner preview and database-source labels", () => {
+test("dashboard omits all scanner content and uses only its watched-market summary", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const script = fs.readFileSync(path.join(rootDirectory, "js", "dashboard.js"), "utf8");
 
-  assert.doesNotMatch(html, /Market Scanner|Database history|Supabase snapshots|scanner-preview/i);
-  assert.doesNotMatch(script, /scanner-gainers|scanner-opportunities/);
+  assert.doesNotMatch(html, /Top Gainers|Top Losers|Highest Volume|Strongest Momentum|AI Opportunities|scanner-preview/i);
+  assert.doesNotMatch(script, /market-summary|scanner-gainers|scanner-opportunities/i);
   assert.match(html, /href="\/scanner\.html"/);
   assert.match(html, /Portfolio history/);
   assert.match(html, /data-portfolio-chart/);
@@ -500,7 +493,7 @@ test("dashboard renders safe empty states without inventing portfolio history", 
 
   assert.equal(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, "—");
-  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "Unavailable");
+  assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "0");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "UNKNOWN");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, true);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, false);
@@ -522,8 +515,7 @@ test("dashboard KPI information is accessible, English-only, and covers all port
     ["available-balance", "Available Balance"],
     ["ai-decisions", "AI Decisions"],
     ["paper-trades", "Paper Trades"],
-    ["tracked-markets", "Tracked Markets"],
-    ["markets-with-data", "Markets with Data"]
+    ["tracked-markets", "Tracked Markets"]
   ];
 
   assert.match(html, /<html lang="en"/);
@@ -534,10 +526,7 @@ test("dashboard KPI information is accessible, English-only, and covers all port
     assert.match(html, new RegExp(`aria-describedby="kpi-info-${id}"`));
     assert.match(html, new RegExp(`id="kpi-info-${id}" role="tooltip" hidden`));
   }
-  assert.doesNotMatch(
-    html,
-    /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i
-  );
+  assert.doesNotMatch(html, /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i);
 });
 
 test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {
@@ -655,7 +644,7 @@ test("chart rendering failures do not hide already-rendered dashboard values", (
 
   dashboard.renderDashboard(data, dashboardDocument, BrokenChart);
 
-  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1\.200/);
+  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1,200/);
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, true);
   assert.equal(elements.get("[data-dashboard-chart-empty]")[0].hidden, false);
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /chart is currently unavailable/);
@@ -681,18 +670,6 @@ test("dashboard requests same-origin API data and validates error responses", as
   assert.equal(statusRequest.options.credentials, "same-origin");
   assert.equal(statusRequest.options.cache, "no-store");
 
-  let marketSummaryRequest;
-  const expectedMarketSummary = {
-    data: { activeMarkets: 12, marketsWithData: 10, items: [{ symbol: "BTC-EUR" }] }
-  };
-  assert.deepEqual(await dashboard.requestMarketSummary(async (url, options) => {
-    marketSummaryRequest = { url, options };
-    return { ok: true, status: 200, json: async () => expectedMarketSummary };
-  }), expectedMarketSummary.data);
-  assert.equal(marketSummaryRequest.url, "/api/market-summary");
-  assert.equal(marketSummaryRequest.options.credentials, "same-origin");
-  assert.equal(marketSummaryRequest.options.cache, "no-store");
-
   await assert.rejects(
     () => dashboard.requestDashboardData(async () => ({ ok: false, status: 401 })),
     (error) => error.status === 401
@@ -704,10 +681,6 @@ test("dashboard requests same-origin API data and validates error responses", as
   await assert.rejects(
     () => dashboard.requestAgentStatus(async () => ({ ok: false, status: 503 })),
     /status is unavailable/
-  );
-  await assert.rejects(
-    () => dashboard.requestMarketSummary(async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
-    /response is invalid/
   );
 });
 
@@ -738,7 +711,7 @@ test("dashboard waits for authentication and offers retry after a load error", a
   assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
 });
 
-test("dashboard loads active-market counts and prices from the authenticated market summary API", async () => {
+test("dashboard displays tracked markets without requesting scanner data", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const dashboardData = dashboard.emptyDashboardData();
   dashboardData.watchedMarkets = {
@@ -757,19 +730,6 @@ test("dashboard loads active-market counts and prices from the authenticated mar
       if (url === "/api/dashboard-data") {
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
-      if (url === "/api/market-summary") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            data: {
-              activeMarkets: 7,
-              marketsWithData: 6,
-              items: [{ symbol: "BTC-EUR", price: 50000, daily_change: 1.25 }]
-            }
-          })
-        };
-      }
       if (url === "/api/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: null } }) };
       }
@@ -786,12 +746,8 @@ test("dashboard loads active-market counts and prices from the authenticated mar
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "7");
-  assert.equal(elements.get("[data-dashboard-value=\"marketsWithData\"]")[0].textContent, "6");
-  assert.match(
-    elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
-    /Priority 1.*50\.000,00.*1,25% \(24h\)/
-  );
+  assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "1");
+  assert.equal(elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent, "Priority 1");
   controller.dispose();
 });
 
@@ -837,15 +793,6 @@ test("dashboard refreshes all data periodically and when returning to the foregr
         }
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
-      if (url === "/api/market-summary") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            data: { activeMarkets: 3, marketsWithData: 2, items: [] }
-          })
-        };
-      }
       if (url === "/api/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
       }
@@ -867,14 +814,14 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   await flushDashboardLoad();
 
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 1);
-  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 1);
+  assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.deepEqual([...intervals.values()].map(({ delay }) => delay).sort(), [15000, 30000]);
   const dashboardInterval = [...intervals.values()].find(({ delay }) => delay === 30000);
 
   dashboardData.aiDecisions.count = 2;
   await dashboardInterval.callback();
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 2);
-  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 2);
+  assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "2");
 
   holdNextDashboardRequest = true;
@@ -898,7 +845,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   await Promise.all([heldRefresh, duplicateRefresh]);
   await flushDashboardLoad();
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 4);
-  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 4);
+  assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "4");
 
   dashboardDocument.visibilityState = "hidden";
@@ -913,7 +860,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   dashboardDocument.listeners.visibilitychange();
   await flushDashboardLoad();
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 5);
-  assert.equal(requests.filter((url) => url === "/api/market-summary").length, 5);
+  assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
   assert.equal(intervals.size, 2);
 

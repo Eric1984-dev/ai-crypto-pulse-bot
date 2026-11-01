@@ -12,12 +12,12 @@
 })(globalThis, function createTradeHistoryApi(formatters) {
   const pageSize = 25;
   const refreshIntervalMs = 30000;
-  const currencyFormat = new Intl.NumberFormat("nl-NL", {
+  const currencyFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 2
   });
-  const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 8 });
+  const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
   function buildTradeHistoryUrl({
     page = 1,
     search = "",
@@ -136,7 +136,7 @@
       formatNumber(trade.quantity),
       formatCurrency(trade.fees),
       trade.side === "SELL" ? formatCurrency(trade.realized_pnl) : "—",
-      "Uitgevoerd · paper"
+      "Executed · paper"
     ];
     for (const value of values) {
       const cell = documentRef.createElement("td");

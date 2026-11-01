@@ -171,7 +171,7 @@ test("recovers after a Realtime connection error and reports state", () => {
   environment.flushTimers();
   client.channels[0].setStatus("CHANNEL_ERROR");
   assert.equal(environment.statusElement.dataset.state, "reconnecting");
-  assert.match(environment.statusElement.textContent, /Automatisch vernieuwen blijft actief/);
+  assert.match(environment.statusElement.textContent, /Automatic refresh remains active/);
   client.channels[0].setStatus("SUBSCRIBED");
   environment.flushTimers();
 

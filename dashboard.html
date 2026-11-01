@@ -26,12 +26,12 @@
             <div class="nav-menu">
               <a data-nav-link href="/dashboard.html">Dashboard</a>
               <a data-nav-link href="/portfolio.html">Portfolio</a>
-              <a data-nav-link href="/scanner.html">Scanner</a>
-              <a data-nav-link href="/history.html">Trade history</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/history.html">Trade History</a>
               <a data-nav-link href="/settings.html">Settings</a>
               <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
               <span class="account-email" data-user-email></span>
-              <button class="nav-action" data-auth-logout type="button">Log out</button>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
             </div>
           </details>
         </nav>
@@ -169,16 +169,6 @@
             </dt>
             <dd data-dashboard-value="trackedMarkets">—</dd>
           </div>
-          <div class="metric-card">
-            <dt>
-              <span class="metric-label">Markets with Data</span>
-              <button class="kpi-info-trigger" data-dashboard-kpi-info type="button" aria-label="Explain Markets with Data" aria-controls="kpi-info-markets-with-data" aria-describedby="kpi-info-markets-with-data" aria-expanded="false">
-                <span aria-hidden="true">ⓘ</span>
-              </button>
-              <span class="kpi-info-popover" id="kpi-info-markets-with-data" role="tooltip" hidden>The number of tracked markets with usable market data available.</span>
-            </dt>
-            <dd data-dashboard-value="marketsWithData">—</dd>
-          </div>
         </dl>
       </section>
 
@@ -222,7 +212,7 @@
         </div>
       </section>
 
-      <section class="dashboard-grid dashboard-grid-lists" aria-label="Database summaries">
+      <section class="dashboard-grid dashboard-grid-lists" aria-label="Portfolio and agent summaries">
         <article class="dashboard-panel">
           <div class="panel-heading">
             <div><p class="eyebrow">Portfolio</p><h2>Open Positions</h2></div>

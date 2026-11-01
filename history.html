@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl" class="auth-pending">
+<html lang="en" class="auth-pending">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,18 +18,18 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
-        <nav class="primary-nav" aria-label="Hoofdnavigatie">
+        <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
               <a data-nav-link href="/dashboard.html">Dashboard</a>
               <a data-nav-link href="/portfolio.html">Portfolio</a>
-              <a data-nav-link href="/scanner.html">Scanner</a>
-              <a data-nav-link href="/history.html">Trade history</a>
-              <a data-nav-link href="/settings.html">Instellingen</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/settings.html">Settings</a>
               <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
               <span class="account-email" data-user-email></span>
-              <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
             </div>
           </details>
         </nav>
@@ -37,22 +37,22 @@
     </header>
     <main class="page-shell" data-history-page>
       <p data-auth-message role="status" aria-live="polite"></p>
-      <p class="eyebrow">Activiteit</p>
+      <p class="eyebrow">Activity</p>
       <h1>Trade History</h1>
-      <p class="page-description">Doorzoek en analyseer opgeslagen paper-trade-uitvoeringen. Alle gegevens zijn simulaties; er worden geen echte orders geplaatst.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>Alle bedragen en uitvoeringen zijn gesimuleerd.</span></div>
+      <p class="page-description">Search and review stored paper-trade executions. All data is simulated; no real orders are placed.</p>
+      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>All balances and executions are simulated.</span></div>
       <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
-      <p data-history-loading role="status" aria-live="polite">Trade history laden…</p>
+      <p data-history-loading role="status" aria-live="polite">Loading trade history…</p>
       <div class="dashboard-error" data-history-error role="alert" hidden></div>
-      <button class="dashboard-retry" data-history-retry type="button" hidden>Opnieuw proberen</button>
+      <button class="dashboard-retry" data-history-retry type="button" hidden>Try again</button>
 
       <section class="dashboard-section" aria-labelledby="trade-history-statistics">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Alle opgeslagen SELL-uitvoeringen</p>
+            <p class="eyebrow">All Stored SELL Executions</p>
             <h2 id="trade-history-statistics">Trade Statistics</h2>
           </div>
-          <span class="dashboard-muted">All-time · onafhankelijk van filters</span>
+          <span class="dashboard-muted">All time · independent of filters</span>
         </div>
         <dl class="dashboard-metrics history-statistics">
           <div class="metric-card"><dt>Winning Trades</dt><dd data-history-value="winningTrades">—</dd></div>
@@ -66,7 +66,7 @@
 
       <section class="dashboard-panel history-panel" aria-labelledby="trade-history-heading">
         <div class="panel-heading history-heading">
-          <div><p class="eyebrow">Uitvoering</p><h2 id="trade-history-heading">Paper Trades</h2></div>
+          <div><p class="eyebrow">Executions</p><h2 id="trade-history-heading">Paper Trades</h2></div>
           <span class="count-pill"><span data-history-value="totalCount">0</span> trades</span>
         </div>
         <form class="history-filters" data-history-filters>
@@ -115,7 +115,7 @@
         <p class="dashboard-empty" data-history-empty hidden>No paper trades match these filters.</p>
         <div class="history-table-wrap">
           <table class="history-table" data-history-table hidden>
-            <caption class="visually-hidden">Stored paper trade executions</caption>
+            <caption class="visually-hidden">Stored paper-trade executions</caption>
             <thead>
               <tr>
                 <th scope="col">Date</th>
@@ -139,7 +139,7 @@
       </section>
     </main>
     <footer class="site-footer">
-      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>Geen echte orders.</p></div>
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>
     </footer>
   </body>
 </html>

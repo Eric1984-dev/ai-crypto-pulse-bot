@@ -273,14 +273,14 @@ test("Admin actions show progress, prevent duplicates, and report results", asyn
 
   resolveFirstAction();
   await flushPromises();
-  assert.equal(page.status.textContent, "Success (ACTIVE)");
+  assert.equal(page.status.textContent, "Completed (ACTIVE)");
   assert.equal(page.duration.textContent, "84 ms");
   assert.match(page.summary.textContent, /"decisionsStored": 2/);
   assert.ok(page.buttons.every((button) => !button.disabled));
 
   page.buttons[1].dispatch("click");
   await flushPromises();
-  assert.match(page.status.textContent, /^Failure:/);
+  assert.match(page.status.textContent, /^Failed:/);
   assert.equal(page.duration.textContent, "17 ms");
   assert.match(page.summary.textContent, /AI_ANALYSIS_UNAVAILABLE/);
   cleanup();

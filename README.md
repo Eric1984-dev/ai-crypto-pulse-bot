@@ -7,9 +7,11 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Accountacties worden afgehandeld door Supabase Authentication; sessies blijven bestaan via de Supabase JS client.
 - Dashboard, portfolio, scanner, trade history, instellingen en de Admin-pagina zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
-- Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API. De volledige dashboarddata wordt na authenticatie en daarna iedere 30 seconden ververst; bij terugkeer naar de voorgrond volgt direct een refresh. Verzoeken blijven `no-store`.
+- Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, watched-market- en AI-beslissingsgegevens via een read-only Vercel API. De volledige dashboarddata wordt na authenticatie en daarna iedere 30 seconden ververst; bij terugkeer naar de voorgrond volgt direct een refresh. Verzoeken blijven `no-store`.
 - Database- en API-timestamps blijven UTC; Dashboard, AI Decision/Agent Log, Paper Trading, Portfolio, Scanner en Trade History formatteren zichtbare tijden naar `Europe/Brussels`, inclusief automatische zomer-/wintertijd.
-- De dashboardinterface is Engelstalig en elke portfolio-KPI heeft een toegankelijke uitleg die met muis, aanraking of toetsenbord te openen is.
+- Alle gebruikersgerichte interfacecopy is Engelstalig, inclusief accountflows, navigatie, lege toestanden, statusmeldingen en foutmeldingen. Getallen en bedragen gebruiken `en-GB`-notatie; zichtbare tijden blijven `Europe/Brussels`.
+- Het dashboard toont alleen de watched-marketlijst met prioriteiten. Scanner-ranglijsten, prijzen en scannerdata staan uitsluitend op de afzonderlijke Market Scanner-pagina.
+- Elke portfolio-KPI heeft een toegankelijke uitleg die met muis, aanraking of toetsenbord te openen is.
 - De afzonderlijke beschermde Admin-pagina toont Admin Actions en de Admin-menulink uitsluitend aan geverifieerde Supabase-gebruikers die in de server-side `ADMIN_USER_IDS`-allowlist staan. Beheerders kunnen AI-analyse en paper trading direct uitvoeren; bestaande engine-, papiermodus- en risicocontroles blijven van kracht.
 - Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie en haalt publieke Bitvavo-tickers en candles op. `/api/market-refresh` vernieuwt alleen marktsnapshots; `/api/candle-refresh` verwerkt candles afzonderlijk, incrementeel, per interval en in batches van maximaal vijf markten. Beide processen schrijven uitsluitend naar bestaande tabellen en rapporteren runtimeduur en verwerkte records.
 - Phase 07 analyseert echte markt snapshots en candledata met EMA, RSI, MACD, momentum, volume en volatiliteit. De AI Engine leest elk candle-interval afzonderlijk zodat een globale PostgREST-responslimiet geen intervallen uitsluit. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; ontbrekende of verouderde input levert veilige `WAIT`- of lagere-confidence `HOLD`-beslissingen op.
@@ -88,6 +90,7 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
 - [Phase 07 completion report](./docs/PHASE_07_COMPLETION_REPORT.md)
 - [Dashboard Admin Actions report](./docs/DASHBOARD_ADMIN_ACTIONS_REPORT.md)
+- [UI language standardization report](./UI_LANGUAGE_STANDARDIZATION_REPORT.md)
 - [Phase 08 completion report](./docs/PHASE_08_COMPLETION_REPORT.md)
 - [Phase 09 completion report](./docs/PHASE_09_COMPLETION_REPORT.md)
 - [Phase 10 completion report](./docs/PHASE_10_COMPLETION_REPORT.md)

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl" class="auth-pending">
+<html lang="en" class="auth-pending">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,18 +18,18 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
-        <nav class="primary-nav" aria-label="Hoofdnavigatie">
+        <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
               <a data-nav-link href="/dashboard.html">Dashboard</a>
               <a data-nav-link href="/portfolio.html">Portfolio</a>
-              <a data-nav-link href="/scanner.html">Scanner</a>
-              <a data-nav-link href="/history.html">Trade history</a>
-              <a data-nav-link href="/settings.html">Instellingen</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/settings.html">Settings</a>
               <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
               <span class="account-email" data-user-email></span>
-              <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
             </div>
           </details>
         </nav>
@@ -37,58 +37,58 @@
     </header>
     <main class="page-shell">
       <p data-auth-message role="status" aria-live="polite"></p>
-      <p class="eyebrow">Markten</p>
-      <h1>Market scanner</h1>
-      <p class="page-description">Rangschik actieve EUR-markten en recente AI-beslissingen op basis van opgeslagen marktdata.</p>
-      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>De scanner geeft marktinzichten weer en plaatst geen orders.</span></div>
+      <p class="eyebrow">Markets</p>
+      <h1>Market Scanner</h1>
+      <p class="page-description">Rank active EUR markets and recent AI decisions using stored market data.</p>
+      <div class="mode-banner"><span class="mode-dot" aria-hidden="true"></span><strong>PAPER ACTIVE</strong><span>The scanner provides market insights and does not place orders.</span></div>
       <section class="scanner-panel" aria-labelledby="scanner-heading">
         <div class="scanner-toolbar">
           <div>
-            <h2 id="scanner-heading">Market rankings</h2>
-            <p class="card-description">Alleen actieve watched markets met verse snapshots verschijnen in de prijsranglijsten.</p>
+            <h2 id="scanner-heading">Market Rankings</h2>
+            <p class="card-description">Only active watched markets with fresh snapshots appear in the price rankings.</p>
           </div>
           <button class="secondary-button" data-scanner-refresh type="button">Refresh</button>
         </div>
         <div class="scanner-controls">
-          <div class="scanner-timeframes" role="group" aria-label="Selecteer periode">
+          <div class="scanner-timeframes" role="group" aria-label="Select timeframe">
             <button type="button" data-scanner-timeframe="24h" aria-pressed="true">24h</button>
             <button type="button" data-scanner-timeframe="7d" aria-pressed="false">7d</button>
             <button type="button" data-scanner-timeframe="30d" aria-pressed="false">30d</button>
           </div>
-          <p data-scanner-status role="status" aria-live="polite">Scannerdata laden…</p>
+          <p data-scanner-status role="status" aria-live="polite">Loading scanner data…</p>
         </div>
         <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
         <div class="scanner-rankings">
           <article class="scanner-ranking">
             <h3>Top Gainers</h3>
             <ol data-scanner-list="topGainers" hidden></ol>
-            <p data-scanner-empty="topGainers">Geen gegevens beschikbaar.</p>
+            <p data-scanner-empty="topGainers">No data available.</p>
           </article>
           <article class="scanner-ranking">
             <h3>Top Losers</h3>
             <ol data-scanner-list="topLosers" hidden></ol>
-            <p data-scanner-empty="topLosers">Geen gegevens beschikbaar.</p>
+            <p data-scanner-empty="topLosers">No data available.</p>
           </article>
           <article class="scanner-ranking">
             <h3>Highest Volume</h3>
             <ol data-scanner-list="highestVolume" hidden></ol>
-            <p data-scanner-empty="highestVolume">Geen gegevens beschikbaar.</p>
+            <p data-scanner-empty="highestVolume">No data available.</p>
           </article>
           <article class="scanner-ranking">
             <h3>Strongest Momentum</h3>
             <ol data-scanner-list="strongestMomentum" hidden></ol>
-            <p data-scanner-empty="strongestMomentum">Geen gegevens beschikbaar.</p>
+            <p data-scanner-empty="strongestMomentum">No data available.</p>
           </article>
           <article class="scanner-ranking scanner-ranking-wide">
             <h3>AI Opportunities</h3>
             <ol data-scanner-list="aiOpportunities" hidden></ol>
-            <p data-scanner-empty="aiOpportunities">Geen recente AI-beslissingen.</p>
+            <p data-scanner-empty="aiOpportunities">No recent AI decisions.</p>
           </article>
         </div>
       </section>
     </main>
     <footer class="site-footer">
-      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>Geen echte orders.</p></div>
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>
     </footer>
   </body>
 </html>

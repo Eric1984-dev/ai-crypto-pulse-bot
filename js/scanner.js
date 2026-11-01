@@ -12,8 +12,8 @@
 })(globalThis, function createMarketScannerApi(formatters) {
   const timeframes = ["24h", "7d", "30d"];
   const rankings = ["topGainers", "topLosers", "highestVolume", "strongestMomentum", "aiOpportunities"];
-  const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 2 });
-  const currencyFormat = new Intl.NumberFormat("nl-NL", {
+  const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
+  const currencyFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 2

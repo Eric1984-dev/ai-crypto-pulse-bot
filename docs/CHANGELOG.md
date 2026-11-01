@@ -74,6 +74,9 @@ All notable project changes should be documented here.
 
 ### Changed
 
+- Standardize all user-facing interface copy, accessibility labels, authentication feedback, loading and error states, and financial number formatting in English
+- Keep the dashboard limited to portfolio and agent summaries; show watched-market symbols and priorities without scanner rankings, prices, or scanner-data requests
+- Standardize protected and public navigation labels, paper-trading descriptions, and trade-execution terminology across all pages
 - Convert all static dashboard interface copy to English
 - Format EUR prices below €1 with up to five decimal places in position and trade views; prices from €1 use two decimals, while fees, P&L, and portfolio totals retain existing formatting
 - Replace the history placeholder with an auto-refreshing, responsive paper-trade ledger; BUY rows show unrealized P&L as unavailable, while all-time statistics use stored SELL realized P&L
@@ -110,4 +113,7 @@ Each completed phase should add:
 ### Changed
 ### Fixed
 ### Removed
+
+- Remove dashboard Market Scanner data requests and market-data ranking details; the dedicated Scanner page remains the only location for all five scanner rankings
+
 ### Security

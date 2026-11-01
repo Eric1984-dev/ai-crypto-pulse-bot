@@ -85,17 +85,17 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
     }
   }, documentRef);
 
-  assert.match(elements.get("[data-portfolio-value=\"portfolioValue\"]").textContent, /10\.100/);
-  assert.match(elements.get("[data-portfolio-value=\"realizedPnl\"]").textContent, /50,00/);
+  assert.match(elements.get("[data-portfolio-value=\"portfolioValue\"]").textContent, /10,100/);
+  assert.match(elements.get("[data-portfolio-value=\"realizedPnl\"]").textContent, /50\.00/);
   assert.equal(elements.get("[data-portfolio-value=\"openPositions\"]").textContent, "1");
-  assert.equal(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].textContent, "<img src=x> · 0,01 units");
+  assert.equal(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].textContent, "<img src=x> · 0.01 units");
   assert.match(
     elements.get("[data-portfolio-list=\"positions\"]").children[0].children[1].textContent,
-    /Entry €\s?0,00454 · Current €\s?0,05671 · P&L €\s?0,05 · Opened .*11:00/
+    /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?0\.05 · Opened .*11:00/
   );
   assert.match(
     elements.get("[data-portfolio-list=\"trades\"]").children[0].children[1].textContent,
-    /€\s?0,98123 · Fee €\s?0,25 · P&L €\s?4,50 · Executed .*12:00/
+    /€\s?0\.98123 · Fee €\s?0\.25 · P&L €\s?4\.50 · Executed .*12:00/
   );
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").hidden, false);
   assert.equal(elements.get("[data-portfolio-empty=\"trades\"]").hidden, true);

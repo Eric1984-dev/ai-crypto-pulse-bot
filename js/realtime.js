@@ -118,19 +118,14 @@
 
     function renderStatus(listener, nextState) {
       const element = listener.documentRef.querySelector("[data-realtime-status]");
-      const isDashboard = surface === "dashboard";
       if (element) {
         element.dataset.state = nextState;
         element.hidden = nextState === "connected";
         element.textContent = nextState === "offline"
-          ? isDashboard
-            ? "You are offline. Live updates will resume when the connection returns."
-            : "Je bent offline. Live updates worden hervat zodra de verbinding terug is."
+          ? "You are offline. Live updates will resume when the connection returns."
           : nextState === "connected"
             ? ""
-            : isDashboard
-              ? "Live updates are reconnecting. Automatic refresh remains active."
-              : "Live updates worden hersteld. Automatisch vernieuwen blijft actief.";
+            : "Live updates are reconnecting. Automatic refresh remains active.";
       }
       if (typeof listener.onStatus === "function") {
         try {

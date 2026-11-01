@@ -7,30 +7,30 @@
     root.CryptoPulseFormatters = api;
   }
 })(globalThis, function createFormatters() {
-  const standardPriceFormat = new Intl.NumberFormat("nl-NL", {
+  const standardPriceFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
-  const subEuroPriceFormat = new Intl.NumberFormat("nl-NL", {
+  const subEuroPriceFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 5
   });
   const timestampFormats = {
-    short: new Intl.DateTimeFormat("nl-NL", {
+    short: new Intl.DateTimeFormat("en-GB", {
       dateStyle: "short",
       timeStyle: "short",
       timeZone: "Europe/Brussels"
     }),
-    medium: new Intl.DateTimeFormat("nl-NL", {
+    medium: new Intl.DateTimeFormat("en-GB", {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: "Europe/Brussels"
     }),
-    time: new Intl.DateTimeFormat("nl-NL", {
+    time: new Intl.DateTimeFormat("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: "Europe/Brussels"

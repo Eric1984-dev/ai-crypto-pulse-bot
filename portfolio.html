@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl" class="auth-pending">
+<html lang="en" class="auth-pending">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,18 +18,18 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
-        <nav class="primary-nav" aria-label="Hoofdnavigatie">
+        <nav class="primary-nav" aria-label="Primary navigation">
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
               <a data-nav-link href="/dashboard.html">Dashboard</a>
               <a data-nav-link href="/portfolio.html">Portfolio</a>
-              <a data-nav-link href="/scanner.html">Scanner</a>
-              <a data-nav-link href="/history.html">Trade history</a>
-              <a data-nav-link href="/settings.html">Instellingen</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/settings.html">Settings</a>
               <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
               <span class="account-email" data-user-email></span>
-              <button class="nav-action" data-auth-logout type="button">Uitloggen</button>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
             </div>
           </details>
         </nav>
@@ -40,21 +40,21 @@
       <div class="mode-banner">
         <span class="mode-dot" aria-hidden="true"></span>
         <strong>PAPER ACTIVE</strong>
-        <span>Alle bedragen zijn gesimuleerd. Dit systeem plaatst geen echte orders.</span>
+        <span>All amounts are simulated. This system does not place real orders.</span>
       </div>
       <p class="eyebrow">Portfolio</p>
-      <h1>Paper portfolio</h1>
-      <p class="page-description">Waarden, posities en trades zijn gebaseerd op opgeslagen AI-beslissingen en marktgegevens.</p>
+      <h1>Paper Portfolio</h1>
+      <p class="page-description">Values, positions, and trades are based on stored AI decisions and market data.</p>
       <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
-      <p data-portfolio-loading role="status" aria-live="polite">Portfolio laden…</p>
+      <p data-portfolio-loading role="status" aria-live="polite">Loading portfolio…</p>
       <div class="dashboard-error" data-portfolio-error role="alert" hidden></div>
-      <button class="dashboard-retry" data-portfolio-retry type="button" hidden>Opnieuw proberen</button>
+      <button class="dashboard-retry" data-portfolio-retry type="button" hidden>Try again</button>
 
       <section class="dashboard-section" aria-labelledby="portfolio-summary-heading">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Gesimuleerd saldo</p>
-            <h2 id="portfolio-summary-heading">Portfolio summary</h2>
+            <p class="eyebrow">Simulated Balance</p>
+            <h2 id="portfolio-summary-heading">Portfolio Summary</h2>
           </div>
           <span class="dashboard-muted"><span data-portfolio-value="count">—</span> portfolios</span>
         </div>
@@ -93,7 +93,7 @@
       <section class="dashboard-grid dashboard-grid-lists" aria-label="Paper portfolio activity">
         <article class="dashboard-panel">
           <div class="panel-heading">
-            <div><p class="eyebrow">Actief</p><h2>Open Positions</h2></div>
+            <div><p class="eyebrow">Active</p><h2>Open Positions</h2></div>
             <span class="count-pill" data-portfolio-value="openPositions">0</span>
           </div>
           <ul class="dashboard-list" data-portfolio-list="positions" hidden></ul>
@@ -101,7 +101,7 @@
         </article>
         <article class="dashboard-panel">
           <div class="panel-heading">
-            <div><p class="eyebrow">Uitvoering</p><h2>Recent Paper Trades</h2></div>
+            <div><p class="eyebrow">Executions</p><h2>Recent Paper Trades</h2></div>
             <span class="count-pill" data-portfolio-value="paperTrades">0</span>
           </div>
           <ul class="dashboard-list" data-portfolio-list="trades" hidden></ul>
@@ -110,7 +110,7 @@
       </section>
     </main>
     <footer class="site-footer">
-      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>Geen echte orders.</p></div>
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>
     </footer>
   </body>
 </html>

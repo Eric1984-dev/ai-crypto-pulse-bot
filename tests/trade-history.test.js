@@ -326,12 +326,12 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.equal(rows.children.length, 5);
   assert.match(rows.children[0].children[0].textContent, /12:00/);
   assert.equal(rows.children[0].children[1].textContent, "<img src=x>");
-  assert.match(rows.children[0].children[3].textContent, /0,00454$/);
-  assert.match(rows.children[1].children[3].textContent, /0,05671$/);
-  assert.match(rows.children[2].children[3].textContent, /0,98123$/);
-  assert.match(rows.children[3].children[3].textContent, /12,35$/);
-  assert.match(rows.children[4].children[3].textContent, /69\.421,22$/);
-  assert.equal(rows.children[0].children[7].textContent, "Uitgevoerd · paper");
+  assert.match(rows.children[0].children[3].textContent, /0\.00454$/);
+  assert.match(rows.children[1].children[3].textContent, /0\.05671$/);
+  assert.match(rows.children[2].children[3].textContent, /0\.98123$/);
+  assert.match(rows.children[3].children[3].textContent, /12\.35$/);
+  assert.match(rows.children[4].children[3].textContent, /69,421\.22$/);
+  assert.equal(rows.children[0].children[7].textContent, "Executed · paper");
   assert.equal(rows.children[1].children[6].textContent, "—");
   assert.equal(previous.disabled, false);
   assert.equal(next.disabled, true);

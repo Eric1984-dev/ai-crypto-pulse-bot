@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="nl" class="auth-pending">
+<html lang="en" class="auth-pending">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Create a CryptoPulse AI Agent account.">
-    <title>Registreren · CryptoPulse</title>
+    <title>Create Account · CryptoPulse</title>
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
@@ -18,8 +18,8 @@
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
-              <a data-nav-link href="/login.html">Inloggen</a>
-              <a data-nav-link href="/register.html">Account aanmaken</a>
+              <a data-nav-link href="/login.html">Sign In</a>
+              <a data-nav-link href="/register.html">Create Account</a>
             </div>
           </details>
         </nav>
@@ -27,25 +27,25 @@
     </header>
     <main class="page-shell">
       <p class="eyebrow">Account</p>
-      <h1>Maak je account aan.</h1>
-      <p class="page-description">Supabase Authentication beheert je account en e-mailbevestiging.</p>
+      <h1>Create your account.</h1>
+      <p class="page-description">Supabase Authentication manages your account and email confirmation.</p>
       <section class="auth-card" aria-labelledby="register-heading">
-        <h2 id="register-heading">Registreren</h2>
+        <h2 id="register-heading">Create Account</h2>
         <form id="register-form" method="post">
-          <label for="register-email">E-mailadres</label>
+          <label for="register-email">Email address</label>
           <input id="register-email" name="email" type="email" autocomplete="email" required>
-          <label for="register-password">Wachtwoord</label>
+          <label for="register-password">Password</label>
           <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
-          <label for="register-confirm-password">Herhaal wachtwoord</label>
+          <label for="register-confirm-password">Confirm password</label>
           <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required>
-          <button class="button-link" type="submit">Account aanmaken</button>
+          <button class="button-link" type="submit">Create Account</button>
         </form>
         <p data-auth-message role="status" aria-live="polite"></p>
-        <div class="auth-links"><a href="/login.html">Al een account? Inloggen</a></div>
+        <div class="auth-links"><a href="/login.html">Already have an account? Sign in</a></div>
       </section>
     </main>
     <footer class="site-footer">
-      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>PAPER ACTIVE · geen echte orders.</p></div>
+      <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>PAPER ACTIVE · no real orders.</p></div>
     </footer>
   </body>
 </html>
