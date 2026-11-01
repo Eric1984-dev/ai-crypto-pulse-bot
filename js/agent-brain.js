@@ -108,7 +108,7 @@
     maxNeuralNodes: 720,
     maxConnections: 2160
   });
-  const brainWidthScale = 0.86;
+  const brainWidthScale = 0.72;
 
   function mapAgentStatus(status) {
     const key = typeof status === "string" ? status.trim().toUpperCase() : "";
@@ -342,7 +342,9 @@
 
       const referenceTraceLayout = createReferenceTraceLayout(
         THREE,
-        neuralLayout.rightContourPath
+        neuralLayout.leftContourPath,
+        neuralLayout.rightContourPath,
+        neuralLayout.corticalPaths
       );
       const referenceTraceGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       referenceTraceGeometry.setFromPoints(referenceTraceLayout.segmentPoints);
@@ -352,9 +354,9 @@
         new THREE.BufferAttribute(referenceTraceLayout.circuitStrokePositions, 3)
       );
       const referenceTraceStrokeMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
-        color: 0x168fff,
+        color: 0x159fe8,
         transparent: true,
-        opacity: 0.38,
+        opacity: 0.7,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false,
@@ -366,17 +368,17 @@
       );
       referenceTraceStroke.renderOrder = -3;
       const referenceTraceGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0x168fff,
+        color: 0x36bfff,
         transparent: true,
-        opacity: 0.16,
+        opacity: 0.28,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
       }));
       const referenceTraceMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0x4bcfff,
+        color: 0x7ae8ff,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.94,
         depthTest: false,
         depthWrite: false
       }));
@@ -388,8 +390,8 @@
         referenceTraceGeometry,
         referenceTraceMaterial
       );
-      referenceTraceGlow.renderOrder = -2;
-      referenceTraces.renderOrder = -1;
+      referenceTraceGlow.renderOrder = 0;
+      referenceTraces.renderOrder = 1;
       brain.add(referenceTraceStroke, referenceTraceGlow, referenceTraces);
 
       const referenceTraceNodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
@@ -410,6 +412,55 @@
       );
       referenceTraceNodes.renderOrder = -1;
       brain.add(referenceTraceNodes);
+
+      const binaryCodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      binaryCodeGeometry.setFromPoints(referenceTraceLayout.binaryCodePositions);
+      const binaryCodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0x28bfff,
+        size: 0.05,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.14,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const binaryCodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
+        color: 0xa6f4ff,
+        size: 0.022,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+        depthWrite: false
+      }));
+      const binaryCodeStrokeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
+      binaryCodeStrokeGeometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(
+          new Float32Array(referenceTraceLayout.binaryCodeStrokePositions),
+          3
+        )
+      );
+      const binaryCodeStrokeMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
+        color: 0x8bf2ff,
+        transparent: true,
+        opacity: 0.82,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      }));
+      const binaryCodeStrokes = new THREE.Mesh(
+        binaryCodeStrokeGeometry,
+        binaryCodeStrokeMaterial
+      );
+      binaryCodeStrokes.renderOrder = 2;
+      brain.add(
+        new THREE.Points(binaryCodeGeometry, binaryCodeGlowMaterial),
+        new THREE.Points(binaryCodeGeometry, binaryCodeMaterial),
+        binaryCodeStrokes
+      );
 
       const maxTraceSignalCount = referenceTraceLayout.pulseRoutes.length * 2;
       const traceSignalGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
@@ -1071,16 +1122,32 @@
       throw new Error("Agent Brain neural layout exceeds its performance limits.");
     }
 
+    function getContourPath(side) {
+      const hemisphere = hemispherePaths.find((item) => item.side === side);
+      return hemisphere.contour
+        .slice(0, 58)
+        .map((index) => nodePositions[index]);
+    }
+
     return {
       connectionPairs,
       connectionWeights,
       hotspotIndices,
       nodePositions,
-      rightContourPath: hemispherePaths
-        .find(({ side }) => side === 1)
-        .contour
-        .slice(0, 58)
-        .map((index) => nodePositions[index])
+      corticalPaths: hemispherePaths.flatMap((hemisphere) => [
+        {
+          points: hemisphere.contour.map((index) => nodePositions[index]),
+          closed: true
+        },
+        ...(hemisphere.side === -1
+          ? hemisphere.gyri.map((path) => ({
+            points: path.map((index) => nodePositions[index]),
+            closed: false
+          }))
+          : [])
+      ]),
+      leftContourPath: getContourPath(-1),
+      rightContourPath: getContourPath(1)
     };
   }
 
@@ -1095,12 +1162,37 @@
     return points;
   }
 
-  function createReferenceTraceLayout(THREE, rightContourPath) {
+  function createReferenceTraceLayout(THREE, leftContourPath, rightContourPath, corticalPaths) {
     const segmentPoints = [];
     const junctions = [];
     const neuronPositions = [];
     const pulseRoutes = [];
     const circuitStrokePositions = [];
+    const binaryCodePositions = [];
+    const binaryCodeStrokePositions = [];
+
+    function addStrokeSegment(start, end, halfWidth, target = circuitStrokePositions) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.hypot(dx, dy);
+      if (length === 0) {
+        return;
+      }
+      const normalX = -dy / length * halfWidth;
+      const normalY = dx / length * halfWidth;
+      const startPlus = [start.x + normalX, start.y + normalY, start.z - 0.002];
+      const startMinus = [start.x - normalX, start.y - normalY, start.z - 0.002];
+      const endPlus = [end.x + normalX, end.y + normalY, end.z - 0.002];
+      const endMinus = [end.x - normalX, end.y - normalY, end.z - 0.002];
+      target.push(
+        ...startPlus,
+        ...startMinus,
+        ...endMinus,
+        ...startPlus,
+        ...endMinus,
+        ...endPlus
+      );
+    }
 
     function addPath(coordinates, z, includeBends = false) {
       const points = coordinates.map(([x, y]) => new THREE.Vector3(x, y, z));
@@ -1119,21 +1211,7 @@
         totalLength += length;
         segmentPoints.push(start, end);
         if (includeBends) {
-          const halfWidth = 0.006;
-          const normalX = -(end.y - start.y) / length * halfWidth;
-          const normalY = (end.x - start.x) / length * halfWidth;
-          const startPlus = [start.x + normalX, start.y + normalY, z - 0.002];
-          const startMinus = [start.x - normalX, start.y - normalY, z - 0.002];
-          const endPlus = [end.x + normalX, end.y + normalY, z - 0.002];
-          const endMinus = [end.x - normalX, end.y - normalY, z - 0.002];
-          circuitStrokePositions.push(
-            ...startPlus,
-            ...startMinus,
-            ...endMinus,
-            ...startPlus,
-            ...endMinus,
-            ...endPlus
-          );
+          addStrokeSegment(start, end, 0.006);
         }
         for (let step = 1; step <= subdivisions; step += 1) {
           const progress = step / subdivisions;
@@ -1157,29 +1235,35 @@
       });
     }
 
-    for (let lane = 0; lane < 3; lane += 1) {
-      const centerY = (lane - 1) * 0.14;
-      const coordinates = [];
-      for (let index = 0; index <= 28; index += 1) {
-        const progress = index / 28;
-        coordinates.push([
-          -1.24 + progress * 0.66,
-          centerY + Math.sin(progress * Math.PI * 4 + lane * 0.72) * 0.052
-        ]);
-      }
-      addPath(coordinates, -0.055);
-    }
-
-    function getRightContourX(y) {
-      for (let index = 1; index < rightContourPath.length; index += 1) {
-        const start = rightContourPath[index - 1];
-        const end = rightContourPath[index];
+    function getContourXAtY(contourPath, y) {
+      for (let index = 1; index < contourPath.length; index += 1) {
+        const start = contourPath[index - 1];
+        const end = contourPath[index];
         if (start.y >= y && end.y <= y) {
           const progress = (start.y - y) / (start.y - end.y);
           return start.x + (end.x - start.x) * progress;
         }
       }
-      throw new Error("Agent Brain circuit track does not intersect the neural contour.");
+      throw new Error("Agent Brain trace does not intersect the neural contour.");
+    }
+
+    for (let lane = 0; lane < 3; lane += 1) {
+      const centerY = (lane - 1) * 0.14;
+      const endY = centerY + Math.sin(lane * 0.72) * 0.052;
+      const endX = getContourXAtY(leftContourPath, endY) + 0.01;
+      const coordinates = [];
+      for (let index = 0; index <= 28; index += 1) {
+        const progress = index / 28;
+        coordinates.push([
+          -1.24 + progress * (endX + 1.24),
+          centerY + Math.sin(progress * Math.PI * 4 + lane * 0.72) * 0.052
+        ]);
+      }
+      addPath(coordinates, -0.055, true);
+    }
+
+    function getRightContourX(y) {
+      return getContourXAtY(rightContourPath, y);
     }
 
     const circuitPaths = Array.from({ length: 7 }, (_, lane) => {
@@ -1193,7 +1277,75 @@
       addPath(path, -0.045, true);
     }
 
+    for (const path of corticalPaths) {
+      for (let index = 0; index < path.points.length - 1; index += 1) {
+        segmentPoints.push(path.points[index], path.points[index + 1]);
+        addStrokeSegment(path.points[index], path.points[index + 1], path.closed ? 0.009 : 0.007);
+      }
+      if (path.closed) {
+        segmentPoints.push(path.points[path.points.length - 1], path.points[0]);
+        addStrokeSegment(path.points[path.points.length - 1], path.points[0], 0.009);
+      }
+    }
+
+    const digitSegments = {
+      0: [
+        [[-0.012, -0.018], [0.012, -0.018]],
+        [[0.012, -0.018], [0.016, -0.01]],
+        [[0.016, -0.01], [0.016, 0.01]],
+        [[0.016, 0.01], [0.012, 0.018]],
+        [[0.012, 0.018], [-0.012, 0.018]],
+        [[-0.012, 0.018], [-0.016, 0.01]],
+        [[-0.016, 0.01], [-0.016, -0.01]],
+        [[-0.016, -0.01], [-0.012, -0.018]]
+      ],
+      1: [
+        [[-0.008, 0.008], [0.004, 0.018]],
+        [[0.004, 0.018], [0.004, -0.018]],
+        [[-0.009, -0.018], [0.014, -0.018]]
+      ]
+    };
+    const codeRows = 12;
+    for (let row = 0; row < codeRows; row += 1) {
+      const progress = row / (codeRows - 1);
+      const y = 0.33 - progress * 0.66;
+      const startX = 0.075 + Math.abs(progress - 0.5) * 0.018;
+      const endX = getRightContourX(y) - 0.025;
+      const glyphCount = Math.max(0, Math.floor((endX - startX) / 0.045));
+      for (let column = 0; column < glyphCount; column += 1) {
+        const digit = (row * 7 + column * 3 + Math.floor(Math.sin(row + column) * 4)) & 1;
+        const centerX = startX + column * 0.045
+          + Math.sin(row * 0.48 + column * 0.31) * 0.007;
+        const centerY = y + Math.sin(column * 0.55 + row * 0.2) * 0.016;
+        const rotation = Math.sin(row * 0.48 + column * 0.31) * 0.42;
+        const cosine = Math.cos(rotation);
+        const sine = Math.sin(rotation);
+        function transformGlyphPoint([x, y]) {
+          return new THREE.Vector3(
+            centerX + x * cosine - y * sine,
+            centerY + x * sine + y * cosine,
+            0.2
+          );
+        }
+        for (const [start, end] of digitSegments[digit]) {
+          const strokeStart = transformGlyphPoint(start);
+          const strokeEnd = transformGlyphPoint(end);
+          addStrokeSegment(strokeStart, strokeEnd, 0.002, binaryCodeStrokePositions);
+          for (let step = 0; step <= 2; step += 1) {
+            const amount = step / 2;
+            binaryCodePositions.push(new THREE.Vector3(
+              strokeStart.x + (strokeEnd.x - strokeStart.x) * amount,
+              strokeStart.y + (strokeEnd.y - strokeStart.y) * amount,
+              strokeStart.z + (strokeEnd.z - strokeStart.z) * amount
+            ));
+          }
+        }
+      }
+    }
+
     return {
+      binaryCodePositions,
+      binaryCodeStrokePositions,
       circuitStrokePositions: new Float32Array(circuitStrokePositions),
       junctions,
       neuronPositions,

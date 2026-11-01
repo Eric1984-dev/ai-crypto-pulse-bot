@@ -416,10 +416,13 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     initialStatus: "IDLE"
   });
   const referenceTrace = harness.calls.lineSegments.find(({ material }) =>
-    material.color.value === 0x4bcfff
+    material.color.value === 0x7ae8ff
   );
   const referenceTraceStroke = harness.calls.meshes.find(({ material }) =>
-    material.color.value === 0x168fff
+    material.color.value === 0x159fe8
+  );
+  const binaryCodeStrokes = harness.calls.meshes.find(({ material }) =>
+    material.color.value === 0x8bf2ff
   );
   const analysisNeurons = harness.calls.points.filter(({ material }) =>
     material.color.value === 0x9bffc1
@@ -430,14 +433,24 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
   const traceSignals = harness.calls.points.find(({ material }) =>
     material.color.value === 0xd8faff
   );
+  const binaryCode = harness.calls.points.find(({ material }) =>
+    material.color.value === 0xa6f4ff
+  );
 
   assert.ok(referenceTrace);
   assert.ok(referenceTraceStroke);
-  assert.ok(referenceTrace.renderOrder < 0);
-  assert.ok(referenceTrace.geometry.getAttribute("position").count > 180);
-  assert.equal(referenceTraceStroke.geometry.getAttribute("position").count, 126);
+  assert.ok(referenceTrace.renderOrder > 0);
+  assert.ok(referenceTrace.geometry.getAttribute("position").count > 800);
+  assert.ok(referenceTraceStroke.geometry.getAttribute("position").count > 2500);
   assert.equal(referenceTraceStroke.renderOrder, -3);
+  assert.ok(binaryCodeStrokes.geometry.getAttribute("position").count > 600);
+  assert.equal(binaryCodeStrokes.renderOrder, 2);
+  assert.ok(binaryCode.geometry.getAttribute("position").count > 300);
+  const binaryCodePositions = binaryCode.geometry.getAttribute("position");
+  assert.ok(Math.min(...binaryCodePositions.array.filter((_, index) => index % 3 === 0)) > 0.04);
   const tracePositions = referenceTrace.geometry.getAttribute("position");
+  const brainPositions = harness.calls.points.find(({ material }) => material.size === 0.045)
+    .geometry.getAttribute("position");
   const circuitStart = 3 * 28 * 2;
   const circuitLaneBounds = Array.from({ length: 7 }, (_, lane) => {
     const values = Array.from({ length: 6 }, (_, point) =>
@@ -453,15 +466,13 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     const bendY = tracePositions.getY(laneStart + 3);
     assert.ok(bendY - horizontalY > 0.1);
     const startX = tracePositions.getX(laneStart);
-    const contourPositions = harness.calls.points.find(({ material }) => material.size === 0.045)
-      .geometry.getAttribute("position");
     let nearestContourDistance = Infinity;
     let nearestContourX = 0;
     for (let index = rightContourStart; index < rightContourStart + 58; index += 1) {
-      const distance = Math.abs(contourPositions.getY(index) - horizontalY);
+      const distance = Math.abs(brainPositions.getY(index) - horizontalY);
       if (distance < nearestContourDistance) {
         nearestContourDistance = distance;
-        nearestContourX = contourPositions.getX(index);
+        nearestContourX = brainPositions.getX(index);
       }
     }
     assert.ok(Math.abs(startX - nearestContourX) < 0.04, JSON.stringify({
@@ -471,6 +482,22 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
       nearestContourDistance
     }));
     assert.ok(startX < nearestContourX + 0.005);
+  }
+  for (let lane = 0; lane < 3; lane += 1) {
+    const laneEnd = lane * 28 * 2 + 55;
+    const endY = tracePositions.getY(laneEnd);
+    const endX = tracePositions.getX(laneEnd);
+    let nearestContourDistance = Infinity;
+    let nearestContourX = 0;
+    for (let index = 0; index < 58; index += 1) {
+      const distance = Math.abs(brainPositions.getY(index) - endY);
+      if (distance < nearestContourDistance) {
+        nearestContourDistance = distance;
+        nearestContourX = brainPositions.getX(index);
+      }
+    }
+    assert.ok(Math.abs(endX - nearestContourX) < 0.04);
+    assert.ok(endX > nearestContourX - 0.005);
   }
   for (let lane = 0; lane < circuitLaneBounds.length - 1; lane += 1) {
     assert.ok(circuitLaneBounds[lane + 1].maximum < circuitLaneBounds[lane].minimum);
@@ -642,7 +669,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.deepEqual(harness.calls.sphereGeometryArgs, []);
   assert.equal(harness.calls.surfaceGeometries.length, 0);
   assert.equal(harness.calls.computedNormals, 0);
-  assert.equal(harness.calls.meshes.length, 1);
+  assert.equal(harness.calls.meshes.length, 2);
   assert.ok(harness.calls.meshes[0].geometry.getAttribute("position").count > 0);
   const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
   assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
@@ -672,15 +699,15 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
       rightHemisphereNodes += 1;
     }
   }
-  assert.ok(minimumNetworkX < -0.5);
-  assert.ok(maximumNetworkX > 0.5);
+  assert.ok(minimumNetworkX < -0.45);
+  assert.ok(maximumNetworkX > 0.45);
   assert.ok(minimumNetworkY < -0.54);
   assert.ok(minimumNetworkY > -0.56);
   assert.ok(maximumNetworkY > 0.4);
   assert.equal(midlineNodeCount, 0);
   assert.ok(Math.min(leftHemisphereNodes, rightHemisphereNodes) > 250);
-  assert.ok(networkMaxX > 0.5);
-  assert.ok(networkMaxX < 0.61);
+  assert.ok(networkMaxX > 0.45);
+  assert.ok(networkMaxX < 0.53);
   const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
   assert.ok(connectionPosition.count > 1000);
   assert.equal(
@@ -705,7 +732,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
     assert.equal(connectionPosition.getX(segmentStart + 1), networkPositions.getX(nextPoint));
     assert.equal(connectionPosition.getY(segmentStart + 1), networkPositions.getY(nextPoint));
   }
-  assert.ok(leftContourOuterEdge < -0.5);
+  assert.ok(leftContourOuterEdge < -0.45);
   assert.ok(leftContourInnerEdge < -0.04 && leftContourInnerEdge > -0.06);
   assert.ok(leftContourTop > 0.46);
   assert.ok(leftContourBottom < -0.4);

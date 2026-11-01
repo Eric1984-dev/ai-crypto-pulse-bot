@@ -29,7 +29,7 @@ All notable project changes should be documented here.
 
 - Parallelized and slightly thickened the Agent Brain's right-side circuit tracks, keeping them clear of the top frame without changing status logic
 - Added more pronounced angled elbows and subtle outward fanning to the right-side Agent Brain circuit traces, matching the supplied reference while preserving lane separation and status behavior
-- Narrowed the Agent Brain contour and reattached all seven right-side traces to its edge; each lane now climbs on a pronounced upward diagonal before continuing horizontally, with regression checks for contact, spacing, and top clearance
+- Matched the Agent Brain more closely to the reference with a narrower, brighter cortical outline and gyri, a cyan binary-glyph field, and a subtle hex-grid backdrop; reattached all left input waves and seven right-side traces to the contour, with stronger upward elbows and regression checks for contact, spacing, and top clearance
 - Removed the fixed 320px minimum body width after the narrow-screen browser audit exposed horizontal overflow at 320px; all audited pages now fit the tested viewports
 - Added accessible captions and explicit `scope="col"` semantics to all seven Analytics tables, with a regression test
 - Collapsed dashboard metrics after Win Rate and Trade History search/filter controls by default; added a bounded scroll area with a sticky header to the trade table

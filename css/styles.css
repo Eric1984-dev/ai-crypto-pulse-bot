@@ -768,7 +768,11 @@ a:focus-visible {
   width: 100%;
   height: clamp(280px, 32vw, 380px);
   overflow: hidden;
-  background: #05090f;
+  background-color: #07111a;
+  background-image:
+    radial-gradient(ellipse at center, rgb(15 58 82 / 22%), transparent 72%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='56' viewBox='0 0 64 56'%3E%3Cpath d='M16 1h32l15 27-15 27H16L1 28z' fill='none' stroke='%23265b78' stroke-opacity='.18'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 64px 56px;
 }
 
 .agent-status-monitor {
