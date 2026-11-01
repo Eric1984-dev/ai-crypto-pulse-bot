@@ -130,6 +130,7 @@ Phase 08 gebruikt uitsluitend paper trading; Phase 09 is niet gestart. De code g
 - [x] Reuse `/api/market-summary` and dashboard refresh; add no Vercel Function or database schema
 - [x] Responsive scanner page, dashboard preview, refresh behavior, tests, documentation, and completion report
 - [x] Production-safe market-summary storage failure logs identify query, table, operation, page/range, HTTP status, Supabase code, and failure category without changing the public response
+- [x] Treat PostgREST `416/PGRST103` on a subsequent generated scanner page as end-of-pagination while preserving fetched rows
 
 Status: Completed
 

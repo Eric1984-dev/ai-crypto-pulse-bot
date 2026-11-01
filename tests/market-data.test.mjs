@@ -595,6 +595,121 @@ test("summary endpoint logs safe storage context and keeps production responses 
   assert.doesNotMatch(loggedMessages.join(" "), /internal database details|token=do-not-log|user-jwt/);
 });
 
+test("market scanner completes a single-page daily candle result", async () => {
+  const candles = Array.from({ length: 20 }, (_, daysAgo) => ({
+    symbol: "BTC-EUR",
+    interval: "1d",
+    close: 100 + daysAgo,
+    volume: 1,
+    timestamp: new Date(fixedNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+  }));
+  const { service, databaseCalls } = createHarness({ candles });
+  const summary = await service.getMarketScannerSummary({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    activeMarkets: [watchedMarket],
+    marketData: []
+  });
+
+  const dailyCalls = databaseCalls.filter(({ table, url }) =>
+    table === "AI_Crypto_Bot_Candles" && url.searchParams.get("interval") === "eq.1d"
+  );
+  assert.equal(dailyCalls.length, 1);
+  assert.equal(dailyCalls[0].options.headers.Range, "0-33");
+  assert.equal(summary.activeMarkets, 1);
+});
+
+test("market scanner treats PGRST103 on a later candle page as end-of-pagination", async () => {
+  const activeMarkets = [];
+  const candles = [];
+  const marketData = [];
+  for (let marketIndex = 0; marketIndex < 40; marketIndex += 1) {
+    const symbol = `M${String(marketIndex).padStart(3, "0")}-EUR`;
+    activeMarkets.push({ symbol, enabled: true, priority: marketIndex + 1 });
+    marketData.push({
+      symbol,
+      price: 100,
+      volume: 1,
+      daily_change: marketIndex,
+      captured_at: "2026-03-20T11:59:30.000Z"
+    });
+    for (let daysAgo = 0; daysAgo < 25; daysAgo += 1) {
+      candles.push({
+        symbol,
+        interval: "1d",
+        close: 100,
+        volume: 1,
+        timestamp: new Date(fixedNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+      });
+    }
+  }
+  const { service, databaseCalls } = createHarness({
+    watched: activeMarkets,
+    candles,
+    failRead({ table, url, options }) {
+      if (table === "AI_Crypto_Bot_Candles"
+        && url.searchParams.get("interval") === "eq.1d"
+        && options.headers.Range === "1000-1359") {
+        return { status: 416, body: { code: "PGRST103" } };
+      }
+      return null;
+    }
+  });
+
+  const summary = await service.getMarketScannerSummary({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    activeMarkets,
+    marketData
+  });
+  const dailyCalls = databaseCalls.filter(({ table, url }) =>
+    table === "AI_Crypto_Bot_Candles" && url.searchParams.get("interval") === "eq.1d"
+  );
+
+  assert.equal(dailyCalls.length, 2);
+  assert.equal(dailyCalls[1].options.headers.Range, "1000-1359");
+  assert.equal(summary.marketsWithFreshData, 40);
+  assert.equal(summary.timeframes["24h"].topGainers[0].symbol, "M039-EUR");
+});
+
+test("market scanner stops after an incomplete final daily candle page", async () => {
+  const activeMarkets = [];
+  const candles = [];
+  for (let marketIndex = 0; marketIndex < 40; marketIndex += 1) {
+    const symbol = `M${String(marketIndex).padStart(3, "0")}-EUR`;
+    activeMarkets.push({ symbol, enabled: true, priority: marketIndex + 1 });
+  }
+  for (let index = 0; index < 1100; index += 1) {
+    const marketIndex = index % activeMarkets.length;
+    const daysAgo = Math.floor(index / activeMarkets.length);
+    candles.push({
+      symbol: activeMarkets[marketIndex].symbol,
+      interval: "1d",
+      close: 100,
+      volume: 1,
+      timestamp: new Date(fixedNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+    });
+  }
+  const { service, databaseCalls } = createHarness({ watched: activeMarkets, candles });
+  const summary = await service.getMarketScannerSummary({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    activeMarkets,
+    marketData: []
+  });
+  const dailyCalls = databaseCalls.filter(({ table, url }) =>
+    table === "AI_Crypto_Bot_Candles" && url.searchParams.get("interval") === "eq.1d"
+  );
+
+  assert.equal(dailyCalls.length, 2);
+  assert.equal(dailyCalls[0].options.headers.Range, "0-999");
+  assert.equal(dailyCalls[1].options.headers.Range, "1000-1359");
+  assert.equal(summary.activeMarkets, 40);
+});
+
 test("market scanner pages candle history and includes markets beyond the first database page", async () => {
   const activeMarkets = [];
   const marketData = [];

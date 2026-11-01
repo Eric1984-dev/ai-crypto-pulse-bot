@@ -82,6 +82,7 @@ All notable project changes should be documented here.
 
 ### Fixed
 
+- Treat PostgREST `416/PGRST103` on a generated subsequent scanner page as an empty end-of-pagination page instead of failing the market summary
 - Keep the Agent Brain fallback hidden whenever its renderer is available, clear stale failed initialization state, and retry after transient renderer failures
 - Prevent anonymous auth pages from sending an empty session to `/api/auth-session` by unwrapping Supabase `getSession()` results and checking for an access token before cookie synchronization
 - Bind logout controls during auth initialization on protected pages so logout signs out, clears the server cookie, and redirects to login
