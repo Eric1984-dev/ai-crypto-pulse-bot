@@ -1,8 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
 import authSession from "../lib/auth-session.js";
+import cronAuth from "../lib/cron-auth.js";
 import { createMarketDataService } from "../lib/market-data.mjs";
 
 const { getPublicConfig } = authSession;
+const { isAuthorizedCron } = cronAuth;
 const marketDataService = createMarketDataService();
 
 export function createMarketRefreshHandler({
@@ -52,14 +53,6 @@ export function createMarketRefreshHandler({
       });
     }
   };
-}
-
-function isAuthorizedCron(authorization, secret) {
-  const provided = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  const expectedBuffer = Buffer.from(secret);
-  const providedBuffer = Buffer.from(provided);
-  return providedBuffer.length === expectedBuffer.length
-    && timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function setResponseHeaders(res) {

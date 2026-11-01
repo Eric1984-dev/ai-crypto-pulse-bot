@@ -1,8 +1,8 @@
 # Database Design
 
-## Phase 03 schema and Phase 06 market-data status
+## Phase 03 schema and Phase 07 runtime usage
 
-Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. Phase 06 consumes the existing market tables for public data ingestion; it adds no tables or migrations. Neither phase adds database access to the browser or implements trading, AI, or signal-scanner behavior.
+Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. Phase 06 consumes the existing market tables for public data ingestion; Phase 07 reads those existing tables and writes analysis decisions/status without adding tables or migrations. Neither phase adds database access to the browser or implements trading.
 
 The application is installed in an existing Supabase database. The migrations create only the prefixed CryptoPulse objects and reference Supabase's managed `auth.users` table. They deliberately do not use `IF NOT EXISTS`: a conflicting object must stop the migration for review instead of hiding a schema mismatch.
 
@@ -73,6 +73,8 @@ The server-side caller must reuse the same idempotency UUID when retrying a trad
 The migration backfills profiles for existing Auth users and installs prefixed triggers to create profiles at signup and synchronize email changes. Profile identity always comes from `auth.users.id`; the browser cannot create or change profile identity records directly. Email is nullable to remain compatible with Supabase identities that do not have an email address.
 
 Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. The Phase 04 dashboard API and Phase 05 Agent Status API separately verify the access token and preserve the caller's JWT when querying through PostgREST, allowing RLS to remain authoritative. Phase 06 market APIs likewise verify the session and use the caller JWT for RLS reads. The scheduled refresh and server-side writes use `SUPABASE_SERVICE_ROLE_KEY`, which must remain server-only.
+
+Phase 07's scheduler-protected AI analysis service reads enabled watched markets, stored market snapshots, candles, and the current agent status using the server-side service role. It inserts only generated rows into `AI_Crypto_Bot_AI_Decisions` and updates the singleton `AI_Crypto_Bot_Status` row, including `updated_at`. It does not write market data, candles, portfolios, positions, trades, or other tables. No migration or RLS policy change was required.
 
 ## Row Level Security and grants
 

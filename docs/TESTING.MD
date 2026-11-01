@@ -66,6 +66,18 @@ npm.cmd run build
 
 `npm run build` additionally validates the market endpoints, shared market-data service, and server-only environment template without requiring a Vercel Cron configuration. Project tests verify that `/api/market-refresh` remains available when Vercel Cron is absent. Automated tests use controlled fixtures and do not claim live-provider or deployment success. A live Bitvavo/Supabase smoke test requires deployment environment variables and a configured Supabase project.
 
+## Phase 07 AI engine validation
+
+AI engine tests use deterministic candle/snapshot fixtures and a mocked PostgREST boundary. They cover bullish/bearish/neutral decisions; EMA, RSI, MACD, momentum, volume, and volatility indicators; confidence bounds and reduced confidence for partial inputs; missing/stale market data; invalid candle handling; database decision inserts and status PATCH updates; STOPPED and empty-market behavior; database failures; scheduler authorization/configuration; and generic endpoint failures. Existing dashboard tests verify persisted decisions remain present in the authenticated dashboard response and are rendered as recent decisions.
+
+```powershell
+node --test tests/ai-engine.test.mjs tests/dashboard.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+The AI engine reads only persisted market snapshots/candles and writes only AI decisions and agent status. The tests do not call live Supabase, Bitvavo, or an external scheduler. No trading, order execution, portfolio mutation, or paper-trading behavior is implemented or tested in this phase.
+
 ---
 
 # Testing Types

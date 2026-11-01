@@ -87,11 +87,15 @@ Status: Completed
 
 ## Phase 07 - AI Engine
 
-- RSI
-- EMA
-- MACD
-- Momentum
-- Volume Analysis
+- [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
+- [x] Confidence-weighted BUY, SELL, HOLD, and WAIT decisions from real watched-market snapshots and candles
+- [x] Persist decisions and status transitions through existing `AI_Crypto_Bot_*` tables only
+- [x] Graceful handling for missing, stale, partial, and invalid market data
+- [x] Scheduler-authenticated analysis API, dashboard visibility, tests, documentation, and completion report
+
+Status: Completed
+
+The AI Engine is analysis-only. It does not create trades, mutate portfolios, or start Phase 08 paper trading.
 
 ---
 

@@ -1,6 +1,6 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie en Phase 06 publieke Bitvavo-marktdata.
+CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie, Phase 06 publieke Bitvavo-marktdata en Phase 07 de deterministische AI Engine.
 
 ## Huidige status
 
@@ -9,21 +9,22 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API.
 - Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie, haalt publieke Bitvavo-tickers en candles op, slaat gegevens op in de bestaande markt-, candle- en scanner-eventtabellen en toont actieve markten en markten met data op het dashboard.
+- Phase 07 analyseert echte markt snapshots en candledata met EMA, RSI, MACD, momentum, volume en volatiliteit. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; ontbrekende of verouderde input levert veilige `WAIT`- of lagere-confidence `HOLD`-beslissingen op.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met iets hogere hersenhelften (circa 16%), een duidelijke middenspleet en gebogen, vertakkende corticale paden vormt het brein uit neuronen, verbindingen, hotspots en bewegende energie. Alle 720 neuronen pulseren onafhankelijk; maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Inactieve verbindingen blijven gedimd en lichten alleen op wanneer een signaal passeert. De visualisatie heeft geen volume, shell, fog, mesh of externe circuitsporen. Beide hersenhelften delen dezelfde statuskleur.
-- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; AI Engine, autonome trading, paper-trade-uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd.
+- Portfolio-, scanner-, history- en settings-pagina's blijven placeholders. De marktdata-ingestie is geen signalenscanner; paper-trade-uitvoering, scannerlogica en realtime-functionaliteit zijn niet geïmplementeerd. De AI Engine genereert uitsluitend analysebeslissingen en voert geen trades uit.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard; Phase 06 gebruikt geen private Bitvavo-endpoints, accountgegevens of orders.
-- Phase 06 (publieke Bitvavo-marktdata) is voltooid; Phase 07 is niet gestart.
+- Phase 07 (deterministische AI Engine) is voltooid; Phase 08 is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard- en marktdata-APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, marktdata- en AI-analyse-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
 js/         Browsercode, Supabase Auth-service, dashboard rendering en Three.js Agent Brain
-lib/        Server-side sessie- en marktdata-services
+lib/        Server-side sessie-, marktdata- en AI Engine-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
@@ -46,13 +47,13 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth- en marktdata-endpoints, beschermde rewrites, database-table/RLS-contract en behoud van de initiële marktseeds; het vereist geen schedulerconfiguratie in Vercel. `npm.cmd test` bevat ook dashboard-, marktdata-, API-, foutafhandelings-, database- en authenticatietests.
+`npm.cmd run build` valideert de pagina's, lokale verwijzingen, auth-, marktdata- en AI-endpoints, beschermde rewrites, database-table/RLS-contract en behoud van de initiële marktseeds; het vereist geen schedulerconfiguratie in Vercel. `npm.cmd test` bevat ook indicator-, confidence-, besluitlogica-, AI API-, dashboard-, marktdata-, database- en authenticatietests.
 
 Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
 
 ## Deployen
 
-Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `/api/market-refresh` aanroepen. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
+Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `/api/market-refresh` en `POST /api/ai-analysis` aanroepen met de `CRON_SECRET`-autorisatieheader. Zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
 
 ## Documentatie
 
@@ -74,3 +75,4 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 05 Neural Activity Refinement Report](./docs/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md)
 - [Phase 06 completion report](./docs/PHASE_06_COMPLETION_REPORT.md)
 - [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
+- [Phase 07 completion report](./docs/PHASE_07_COMPLETION_REPORT.md)

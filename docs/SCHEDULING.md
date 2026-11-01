@@ -12,8 +12,18 @@ The endpoint requires `Authorization: Bearer <CRON_SECRET>` and uses the server-
 
 Configure an external task with the deployed URL, HTTP method `GET`, and the authorization header. Keep the secret in the scheduler's protected header/credential settings; never put it in the URL or query string. Choose a frequency supported by the scheduler and verify successful calls return HTTP `200`.
 
+## Phase 07 AI analysis
+
+The analysis endpoint is available at:
+
+```text
+POST /api/ai-analysis
+```
+
+It requires `Authorization: Bearer <CRON_SECRET>` and the Supabase server environment (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`). Configure an external scheduler using the deployed URL and `POST`; do not place the secret in the URL or query string. There is no Vercel Cron declaration, so the endpoint remains compatible with Vercel Hobby.
+
+The endpoint skips runs when the existing agent status is `STOPPED` or `ANALYZING`, and stores decisions only in the existing AI decision table. It does not execute trades or modify portfolios. Scheduler cadence is an operator choice; monitor HTTP responses and `AI_Crypto_Bot_Status` after configuring it.
+
 ## Future scheduled work
 
-Market scanning, AI analysis, portfolio refresh, strategy evaluation, and market ranking are not implemented. Future scheduled jobs must be idempotent, retry-safe, and duplicate-safe. Duplicate executions may never create duplicate trades or strategy changes.
-
-Vercel Cron Jobs, external schedulers, and scheduled functions are possible execution providers; the application endpoint should remain scheduler-independent.
+Market scanning, portfolio refresh, strategy evaluation, and market ranking remain unimplemented. Future scheduled jobs must be idempotent, retry-safe, and duplicate-safe. Duplicate executions may never create duplicate trades or strategy changes. Vercel Cron Jobs, external schedulers, and scheduled functions are possible execution providers; the application endpoint should remain scheduler-independent.

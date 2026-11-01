@@ -8,6 +8,9 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Phase 07 deterministic AI analysis service and scheduler-protected endpoint, using existing market/candle/decision/status tables only
+- Confidence-scored BUY/SELL/HOLD/WAIT decisions, missing-data fallbacks, status transitions, and regression tests
+- Phase 07 API, architecture, database, scheduling, testing, README, roadmap, and completion documentation
 - Phase 06 deployment fix: allow external schedulers for market refresh on Vercel Hobby without a Vercel Cron declaration
 - Phase 06 public Bitvavo market catalog, ticker, and candle service backed by existing market tables
 - Authenticated market and market-summary APIs, non-destructive watched-market sync, scanner-event logging, and scheduled refresh endpoint

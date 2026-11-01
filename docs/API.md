@@ -144,6 +144,31 @@ Market endpoint responses use `Cache-Control: no-store`; Bitvavo data and market
 
 Errors: unauthenticated/expired session `401`; invalid market query `400`; untracked/disabled market `404`; unsupported method `405`; Supabase storage failure `503`; other request failure `500`. Bitvavo outages are represented as safe fallback data and a non-success `refreshStatus` when persisted data is readable.
 
+## Phase 07 AI analysis
+
+### POST /api/ai-analysis
+
+Runs deterministic analysis over enabled rows in `AI_Crypto_Bot_Watched_Markets`, using only persisted `AI_Crypto_Bot_Market_Data` snapshots and `AI_Crypto_Bot_Candles`. It stores one decision per analyzed market in `AI_Crypto_Bot_AI_Decisions` and updates the existing singleton `AI_Crypto_Bot_Status`. It uses EMA, RSI, MACD, momentum, volume, and volatility indicators. The existing dashboard reads and renders the stored decisions.
+
+This server-to-server endpoint requires `Authorization: Bearer <CRON_SECRET>` and `POST`; the request has no body. A configured `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY` are also required. No service-role key or raw database error is returned. An external scheduler may invoke the endpoint; no Vercel Cron schedule is required.
+
+Success response:
+
+```json
+{
+  "data": {
+    "status": "ACTIVE",
+    "analyzedMarkets": 1,
+    "decisionsStored": 1,
+    "waitingDecisions": 0
+  }
+}
+```
+
+An existing `STOPPED` or `ANALYZING` status returns a successful skipped result without writing decisions. Empty market universes return `IDLE`. Missing/stale snapshots or insufficient candles produce safe low-confidence `WAIT` or `HOLD` decisions rather than fabricated data.
+
+Errors: unsupported method `405`; missing cron secret `503` (`CRON_NOT_CONFIGURED`); invalid scheduler authorization `401` (`CRON_AUTH_REQUIRED`); missing Supabase/service-role configuration `503` (`AI_ENGINE_NOT_CONFIGURED`); database/analysis failures `503` (`AI_ANALYSIS_UNAVAILABLE`). Responses use `Cache-Control: no-store`.
+
 ## Planned application endpoints
 
-AI, trading, paper-trading execution, strategy optimization, backtesting, and realtime endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.
+Risk-managed trading, paper-trading execution, strategy optimization, backtesting, and realtime endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

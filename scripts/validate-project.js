@@ -98,7 +98,8 @@ function validateProject() {
     "api/agent-status.mjs",
     "api/market.mjs",
     "api/market-summary.mjs",
-    "api/market-refresh.mjs"
+    "api/market-refresh.mjs",
+    "api/ai-analysis.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
       errors.push(`Missing required API endpoint: ${endpoint}`);
@@ -110,6 +111,12 @@ function validateProject() {
   }
   if (!fs.existsSync(path.join(rootDirectory, "lib", "market-data.mjs"))) {
     errors.push("Missing shared market-data service: lib/market-data.mjs");
+  }
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "ai-engine.mjs"))) {
+    errors.push("Missing shared AI engine service: lib/ai-engine.mjs");
+  }
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "cron-auth.js"))) {
+    errors.push("Missing shared scheduler authorization helper: lib/cron-auth.js");
   }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];

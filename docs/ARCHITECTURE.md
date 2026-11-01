@@ -1,8 +1,8 @@
 # Architecture
 
-## Current Implementation: Phase 06
+## Current Implementation: Phase 07
 
-The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies.
+The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies. Phase 07 adds a server-side deterministic analysis engine using the existing Phase 06 market data.
 
 Implemented components:
 
@@ -27,16 +27,17 @@ Implemented components:
 - Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
 - Non-destructive watched-market validation/synchronization and 60-second in-memory provider caching
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
-- Five-minute scheduled market refresh and dashboard counts for active markets and markets with stored data
+- Scheduler-protected market refresh and AI analysis endpoints; external schedulers are supported without requiring a Vercel Cron route
+- Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
+- Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
 
 The presentation layer never receives a service-role key. The public anon key and URL are read from server environment variables and provided to the browser for Supabase Auth. Protected HTML is returned only after the Vercel function validates the session with Supabase Auth.
 
 The following capabilities are not implemented:
 
 - Realtime functionality
-- AI Engine
 - Signal-generating Market Scanner
-- Paper Trading
+- Paper-trade execution
 - Backtesting
 - Strategy Optimization
 - Live Trading
@@ -295,19 +296,17 @@ Historical market data is shared across:
 
 ---
 
-# AI Decision Flow
+# Phase 07 AI Decision Flow
 
-Market Data
+Watched Markets
 ↓
-Indicators
+Stored Market Snapshots and Candles
 ↓
-AI Engine
+Deterministic Indicators and Confidence Model
 ↓
-Decision Generation
+AI_Crypto_Bot_AI_Decisions
 ↓
-Risk Manager
-↓
-Paper Trading Engine
+Existing Dashboard Recent AI Decisions
 
 Every AI decision must be recorded in:
 
@@ -322,6 +321,8 @@ Stored data:
 - Strategy
 - Reason
 - Decision
+
+Phase 07 ends at decision persistence and dashboard display. Risk management and paper-trade execution remain future functionality; this engine never writes portfolio, position, or trade records.
 
 ---
 
