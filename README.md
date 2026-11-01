@@ -8,6 +8,7 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard, portfolio, scanner, trade history en instellingen zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema bestaat uit 16 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, markt- en beslissingsgegevens via een read-only Vercel API. De volledige dashboarddata wordt na authenticatie en daarna iedere 30 seconden ververst; bij terugkeer naar de voorgrond volgt direct een refresh. Verzoeken blijven `no-store`.
+- Het dashboard toont Admin Actions uitsluitend aan geverifieerde Supabase-gebruikers die in de server-side `ADMIN_USER_IDS`-allowlist staan. Beheerders kunnen AI-analyse en paper trading direct uitvoeren; bestaande engine-, papiermodus- en risicocontroles blijven van kracht.
 - Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie en haalt publieke Bitvavo-tickers en candles op. `/api/market-refresh` vernieuwt alleen marktsnapshots; `/api/candle-refresh` verwerkt candles afzonderlijk, incrementeel, per interval en in batches van maximaal vijf markten. Beide processen schrijven uitsluitend naar bestaande tabellen en rapporteren runtimeduur en verwerkte records.
 - Phase 07 analyseert echte markt snapshots en candledata met EMA, RSI, MACD, momentum, volume en volatiliteit. De AI Engine leest elk candle-interval afzonderlijk zodat een globale PostgREST-responslimiet geen intervallen uitsluit. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; ontbrekende of verouderde input levert veilige `WAIT`- of lagere-confidence `HOLD`-beslissingen op.
 - Phase 08 voert uitsluitend de nieuwste, opgeslagen AI-beslissingen uit tegen verse, opgeslagen marktprijzen. Een server-only Supabase RPC serialiseert runs en voert risicocontroles, paper buys/sells, kosten, positiewaardering, portfolio-snapshots en trade-idempotency transactioneel uit. Een nieuw profiel krijgt een gesimuleerd startportfolio van €10.000; er worden geen trades verzonnen of echte orders geplaatst.
@@ -21,12 +22,12 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, marktdata-, AI-analyse- en paper-trading-APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
 js/         Browsercode, Supabase Auth-service, dashboard rendering en Three.js Agent Brain
-lib/        Server-side sessie-, marktdata-, AI Engine- en paper-trading-services
+lib/        Server-side sessie-, admin-autorisatie-, marktdata-, AI Engine- en paper-trading-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
@@ -40,7 +41,7 @@ Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`
 - Node.js 18 of hoger voor tests en validatie.
 - De database-integratietests voeren de Supabase migrations uit in PGlite; er zijn geen Supabase-credentials nodig.
 - Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
-- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` en `CRON_SECRET` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. De service-role sleutel en cron secret zijn uitsluitend server-side; geef `CRON_SECRET` aan een externe scheduler mee als `Authorization: Bearer <CRON_SECRET>`.
+- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` en `ADMIN_USER_IDS` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. `ADMIN_USER_IDS` bevat een komma-gescheiden lijst van Supabase Auth-gebruikers-UUID's. De service-role sleutel, cron secret en allowlist blijven server-side; geef `CRON_SECRET` alleen aan een externe scheduler mee als `Authorization: Bearer <CRON_SECRET>`.
 - Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
 - Supabase JS, Chart.js en Three.js worden via vastgepinde CDN-modules geladen; Three.js wordt alleen voor de Agent Brain geladen. PGlite is alleen een development dependency voor database tests.
 
@@ -81,5 +82,6 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 06 candle batching report](./docs/PHASE_06_CANDLE_BATCHING_REPORT.md)
 - [Phase 06 deployment fix report](./docs/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
 - [Phase 07 completion report](./docs/PHASE_07_COMPLETION_REPORT.md)
+- [Dashboard Admin Actions report](./docs/DASHBOARD_ADMIN_ACTIONS_REPORT.md)
 - [Phase 08 completion report](./docs/PHASE_08_COMPLETION_REPORT.md)
 - [Phase 07 candle query fix report](./docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)

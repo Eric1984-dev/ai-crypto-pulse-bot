@@ -208,6 +208,34 @@ Success response includes `data.status` (`COMPLETED` or `SKIPPED`), portfolio/de
 
 The authenticated `GET /api/dashboard-data` response includes real realized and unrealized P&L summaries when the corresponding bounded history/position reads are complete. If a query exceeds its supported page size, the affected aggregate is `null`, not an incomplete sum.
 
+## Dashboard Admin Actions
+
+### GET /api/admin-actions
+
+Verifies the current HttpOnly Supabase session against Supabase Auth and checks the verified user ID against the server-only `ADMIN_USER_IDS` environment variable. The allowlist is a comma-separated list of Supabase Auth user UUIDs. An authorized administrator receives `{ "data": { "isAdmin": true } }`; ordinary authenticated users receive `403`, and missing/expired sessions receive `401`. The dashboard keeps the Admin Actions section hidden unless this check succeeds.
+
+### POST /api/admin-actions
+
+Runs one of the existing server-side services on demand. The request uses the existing same-origin Supabase session cookie; the browser never receives or sends `CRON_SECRET` or `SUPABASE_SERVICE_ROLE_KEY`.
+
+Request body:
+
+```json
+{ "action": "ai-analysis" }
+```
+
+or:
+
+```json
+{ "action": "paper-trading" }
+```
+
+The response contains the underlying service result in `data` and `metrics.executionDurationMs`. AI analysis still observes Agent Status and its normal in-progress/STOPPED behavior. Paper trading still requires `ENABLE_LIVE_TRADING=false` and invokes the same database RPC and risk controls as the scheduled endpoint; it does not bypass decision freshness, confidence, cooldown, position, drawdown, emergency-stop, or idempotency checks. The action result can report a successful request that was skipped by those existing safeguards; inspect `data.status`.
+
+Required server configuration: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `ADMIN_USER_IDS`; paper-trading actions also require `ENABLE_LIVE_TRADING=false`. The cron secret remains server-side and is not used by dashboard JavaScript.
+
+Errors: unsupported method `405`; invalid action `400`; missing/expired Supabase session `401`; authenticated non-admin `403`; missing allowlist or Supabase configuration `503`; AI/database action failure `503`. Responses use `Cache-Control: no-store`. This endpoint exposes no market-refresh or candle-refresh action.
+
 ## Planned application endpoints
 
 Market Scanner, strategy optimization, backtesting, realtime, and live-trading endpoints are not implemented. No endpoint may place real orders. Every future endpoint must document authentication, rate limiting, request/response formats, and error responses.

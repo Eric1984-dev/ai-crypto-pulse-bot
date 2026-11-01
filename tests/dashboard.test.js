@@ -314,7 +314,7 @@ function createElement() {
   };
 }
 
-function createDashboardDocument() {
+function createDashboardDocument({ includeAdminActions = false } = {}) {
   const selectors = [
     "[data-dashboard-value=\"portfolioValue\"]",
     "[data-dashboard-value=\"totalPnl\"]",
@@ -348,7 +348,25 @@ function createDashboardDocument() {
     "[data-agent-brain-stage]",
     "[data-agent-brain-fallback]"
   ];
+  if (includeAdminActions) {
+    selectors.push(
+      "[data-admin-actions]",
+      "[data-admin-action-output]",
+      "[data-admin-action-status]",
+      "[data-admin-action-duration]",
+      "[data-admin-action-summary]"
+    );
+  }
   const elements = new Map(selectors.map((selector) => [selector, [createElement()]]));
+  if (includeAdminActions) {
+    const analysisButton = createElement();
+    analysisButton.dataset.adminAction = "ai-analysis";
+    const paperButton = createElement();
+    paperButton.dataset.adminAction = "paper-trading";
+    elements.set("[data-admin-action]", [analysisButton, paperButton]);
+    elements.get("[data-admin-actions]")[0].hidden = true;
+    elements.get("[data-admin-action-output]")[0].hidden = true;
+  }
   elements.set("[data-dashboard-value=\"openPositions\"]", [createElement(), createElement()]);
   elements.set("[data-dashboard-value=\"paperTrades\"]", [createElement(), createElement()]);
   elements.set("[data-dashboard-value=\"trackedMarkets\"]", [createElement(), createElement()]);
@@ -998,5 +1016,130 @@ test("dashboard keeps fallback hidden when a successful renderer survives a stat
   assert.equal(elements.get("[data-agent-brain-fallback]")[0].hidden, true);
   assert.equal(elements.get("[data-agent-brain]")[0].dataset.visualization, "ready");
   assert.equal(disposeCalls, 0);
+  controller.dispose();
+});
+
+test("admin action requests use the authenticated session and validate execution summaries", async () => {
+  const calls = [];
+  const result = await dashboard.requestAdminAction("ai-analysis", async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: { status: "ACTIVE", analyzedMarkets: 2 },
+        metrics: { executionDurationMs: 42 }
+      })
+    };
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/api/admin-actions");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.cache, "no-store");
+  assert.equal(calls[0].options.credentials, "same-origin");
+  assert.equal(calls[0].options.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { action: "ai-analysis" });
+  assert.deepEqual(result.data, { status: "ACTIVE", analyzedMarkets: 2 });
+  assert.equal(result.metrics.executionDurationMs, 42);
+});
+
+test("admin dashboard controls load only for admins, show action states, and prevent duplicate clicks", async () => {
+  const { dashboardDocument, elements } = createDashboardDocument({ includeAdminActions: true });
+  const dashboardData = dashboard.emptyDashboardData();
+  const actionCalls = [];
+  let resolveFirstAction;
+  let actionCount = 0;
+  const fetchImpl = async (url, options = {}) => {
+    if (url === "/api/dashboard-data") {
+      return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
+    }
+    if (url === "/api/market-summary") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { activeMarkets: 0, marketsWithData: 0, items: [] } })
+      };
+    }
+    if (url === "/api/admin-actions" && options.method === "GET") {
+      return { ok: true, status: 200, json: async () => ({ data: { isAdmin: true } }) };
+    }
+    if (url === "/api/admin-actions" && options.method === "POST") {
+      actionCount += 1;
+      actionCalls.push(JSON.parse(options.body));
+      if (actionCount === 1) {
+        return new Promise((resolve) => {
+          resolveFirstAction = () => resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: { status: "ACTIVE", analyzedMarkets: 2, decisionsStored: 2 },
+              metrics: { executionDurationMs: 84 }
+            })
+          });
+        });
+      }
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: { code: "AI_ANALYSIS_UNAVAILABLE", message: "AI analysis failed." },
+          metrics: { executionDurationMs: 17 }
+        })
+      };
+    }
+    if (url === "/api/agent-status") {
+      return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
+    }
+    throw new Error(`Unexpected dashboard request: ${url}`);
+  };
+  const controller = dashboard.startDashboard({
+    windowRef: {
+      CryptoPulseAuthReady: Promise.resolve(),
+      CryptoPulseAgentBrain: {
+        createAgentBrain: () => ({ available: true, setStatus() {}, dispose() {} })
+      },
+      location: { replace() {} },
+      console: { warn() {}, error() {} },
+      setInterval: () => 1,
+      clearInterval() {}
+    },
+    documentRef: dashboardDocument,
+    fetchImpl,
+    ChartConstructor: null,
+    loadThree: async () => ({ scene: true })
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const section = elements.get("[data-admin-actions]")[0];
+  const buttons = elements.get("[data-admin-action]");
+  const status = elements.get("[data-admin-action-status]")[0];
+  const duration = elements.get("[data-admin-action-duration]")[0];
+  const summary = elements.get("[data-admin-action-summary]")[0];
+  assert.equal(section.hidden, false);
+
+  buttons[0].listeners.click();
+  assert.equal(buttons[0].disabled, true);
+  assert.equal(buttons[1].disabled, true);
+  assert.equal(status.textContent, "Running…");
+  buttons[0].listeners.click();
+  assert.equal(actionCount, 1);
+  assert.deepEqual(actionCalls, [{ action: "ai-analysis" }]);
+
+  resolveFirstAction();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(status.textContent, "Success (ACTIVE)");
+  assert.equal(duration.textContent, "84 ms");
+  assert.match(summary.textContent, /"decisionsStored": 2/);
+  assert.equal(buttons[0].disabled, false);
+  assert.equal(buttons[1].disabled, false);
+
+  buttons[1].listeners.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(status.textContent, /^Failure:/);
+  assert.equal(duration.textContent, "17 ms");
+  assert.match(summary.textContent, /AI_ANALYSIS_UNAVAILABLE/);
   controller.dispose();
 });

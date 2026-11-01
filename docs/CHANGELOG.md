@@ -8,6 +8,8 @@ All notable project changes should be documented here.
 
 ### Added
 
+- Server-authorized dashboard Admin Actions for on-demand AI analysis and paper trading, using a Supabase user-ID allowlist and preserving existing engine and risk checks
+- Admin authorization and dashboard execution-state tests, a server-only `ADMIN_USER_IDS` environment setting, and the dashboard Admin Actions report
 - Phase 08 transactional paper-trading engine using persisted AI decisions and stored market data only, with service-role-only database execution, unique decision-linked trade records, portfolio valuation, and scheduler metrics
 - Per-profile €10,000 simulated starting portfolios, paper positions/trades/snapshots, 0.25% fees, 0.10% adverse slippage, and database-enforced position, confidence, cooldown, funds, drawdown, and emergency-stop rules
 - Authenticated portfolio summary page and dashboard realized/unrealized P&L values sourced from bounded, RLS-protected database reads

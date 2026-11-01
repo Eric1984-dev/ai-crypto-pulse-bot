@@ -692,6 +692,80 @@ a:focus-visible {
   opacity: 0.65;
 }
 
+.dashboard-admin-actions[hidden],
+.admin-action-output[hidden] {
+  display: none;
+}
+
+.admin-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-action-button {
+  min-height: 44px;
+  padding: 0 15px;
+  border: 1px solid #47795a;
+  border-radius: 8px;
+  background: #193d2b;
+  color: #dcebe1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admin-action-button:hover:not(:disabled) {
+  background: #24543a;
+}
+
+.admin-action-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.admin-action-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.admin-action-output {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-action-status {
+  margin: 0 0 8px;
+  color: #dcebe1;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admin-action-status[data-state="error"] {
+  color: #ffaaa1;
+}
+
+.admin-action-status[data-state="success"] {
+  color: var(--accent);
+}
+
+.admin-action-summary {
+  max-height: 260px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0c1310;
+  color: #dcebe1;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 @media (min-width: 560px) {
   .dashboard-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));

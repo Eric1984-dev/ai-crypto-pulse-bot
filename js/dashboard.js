@@ -128,6 +128,80 @@
     return result.data.status;
   }
 
+  async function requestAdminStatus(fetchImpl) {
+    const response = await fetchImpl("/api/admin-actions", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) {
+      const error = new Error("Authentication is required.");
+      error.status = 401;
+      throw error;
+    }
+    if (response.status === 403) {
+      return false;
+    }
+    if (!response.ok) {
+      throw new Error("Administrator access could not be verified.");
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("Administrator access response is invalid.");
+    }
+    if (!result || !result.data || result.data.isAdmin !== true) {
+      throw new Error("Administrator access response is invalid.");
+    }
+    return true;
+  }
+
+  async function requestAdminAction(action, fetchImpl) {
+    if (action !== "ai-analysis" && action !== "paper-trading") {
+      throw new Error("Choose a supported admin action.");
+    }
+
+    const response = await fetchImpl("/api/admin-actions", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action })
+    });
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      const error = new Error("Admin action response is invalid.");
+      error.status = response.status;
+      throw error;
+    }
+    if (!response.ok) {
+      const error = new Error(
+        result && result.error && typeof result.error.message === "string"
+          ? result.error.message
+          : "Admin action failed."
+      );
+      error.status = response.status;
+      error.response = result.error || null;
+      error.metrics = result.metrics || null;
+      throw error;
+    }
+    if (!result || !result.data || typeof result.data !== "object"
+      || !result.metrics || !Number.isFinite(result.metrics.executionDurationMs)
+      || result.metrics.executionDurationMs < 0) {
+      throw new Error("Admin action response is invalid.");
+    }
+    return result;
+  }
+
   function renderDashboard(data, documentRef, ChartConstructor, previousChart = null) {
     const view = data || emptyDashboardData();
     const portfolio = view.portfolio || emptyDashboardData().portfolio;
@@ -411,6 +485,8 @@
     let brain = null;
     let brainInitialization = null;
     let currentAgentStatus = null;
+    let adminActionsAuthorized = false;
+    let adminActionInProgress = false;
     let disposed = false;
     const loading = documentRef.querySelector("[data-dashboard-loading]");
     const errorBanner = documentRef.querySelector("[data-dashboard-error]");
@@ -418,6 +494,14 @@
     const brainElement = documentRef.querySelector("[data-agent-brain]");
     const brainStage = documentRef.querySelector("[data-agent-brain-stage]");
     const brainFallback = documentRef.querySelector("[data-agent-brain-fallback]");
+    const adminActionsSection = documentRef.querySelector("[data-admin-actions]");
+    const adminActionButtons = adminActionsSection
+      ? Array.from(documentRef.querySelectorAll("[data-admin-action]"))
+      : [];
+    const adminActionOutput = documentRef.querySelector("[data-admin-action-output]");
+    const adminActionStatus = documentRef.querySelector("[data-admin-action-status]");
+    const adminActionDuration = documentRef.querySelector("[data-admin-action-duration]");
+    const adminActionSummary = documentRef.querySelector("[data-admin-action-summary]");
 
     async function load() {
       if (requestInProgress || disposed || documentRef.visibilityState === "hidden") {
@@ -651,6 +735,102 @@
       }
     }
 
+    async function loadAdminActions() {
+      if (!adminActionsSection || disposed) {
+        return;
+      }
+      try {
+        adminActionsAuthorized = await requestAdminStatus(fetchImpl);
+        adminActionsSection.hidden = !adminActionsAuthorized;
+      } catch (error) {
+        adminActionsAuthorized = false;
+        adminActionsSection.hidden = true;
+        if (error && error.status === 401) {
+          windowRef.location.replace("/login.html?next=%2Fdashboard.html");
+          return;
+        }
+        if (windowRef.console && typeof windowRef.console.warn === "function") {
+          windowRef.console.warn("Admin action access could not be verified.", error);
+        }
+      }
+    }
+
+    async function runAdminAction(action) {
+      if (!adminActionsAuthorized || adminActionInProgress || disposed) {
+        return;
+      }
+
+      adminActionInProgress = true;
+      for (const button of adminActionButtons) {
+        button.disabled = true;
+      }
+      const startedAt = performance.now();
+      if (adminActionOutput) {
+        adminActionOutput.hidden = false;
+      }
+      if (adminActionStatus) {
+        adminActionStatus.textContent = "Running…";
+        adminActionStatus.dataset.state = "running";
+      }
+      if (adminActionDuration) {
+        adminActionDuration.textContent = "—";
+      }
+      if (adminActionSummary) {
+        adminActionSummary.textContent = "";
+      }
+
+      try {
+        const result = await requestAdminAction(action, fetchImpl);
+        if (disposed) {
+          return;
+        }
+        const resultStatus = typeof result.data.status === "string"
+          ? ` (${result.data.status})`
+          : "";
+        if (adminActionStatus) {
+          adminActionStatus.textContent = `Success${resultStatus}`;
+          adminActionStatus.dataset.state = "success";
+        }
+        if (adminActionDuration) {
+          adminActionDuration.textContent = `${result.metrics.executionDurationMs} ms`;
+        }
+        if (adminActionSummary) {
+          adminActionSummary.textContent = JSON.stringify(result.data, null, 2);
+        }
+        refreshDashboardOnForeground();
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+        if (error && error.status === 401) {
+          windowRef.location.replace("/login.html?next=%2Fdashboard.html");
+        }
+        if (adminActionStatus) {
+          adminActionStatus.textContent = `Failure: ${error.message}`;
+          adminActionStatus.dataset.state = "error";
+        }
+        const duration = error && error.metrics
+          && Number.isFinite(error.metrics.executionDurationMs)
+          ? error.metrics.executionDurationMs
+          : Math.max(0, Math.round(performance.now() - startedAt));
+        if (adminActionDuration) {
+          adminActionDuration.textContent = `${duration} ms`;
+        }
+        if (adminActionSummary) {
+          adminActionSummary.textContent = JSON.stringify(
+            error && error.response ? error.response : { message: error.message },
+            null,
+            2
+          );
+        }
+      } finally {
+        adminActionInProgress = false;
+        for (const button of adminActionButtons) {
+          button.disabled = false;
+        }
+      }
+    }
+
     function startDashboardPolling() {
       if (dashboardPollingTimer !== null || disposed
         || documentRef.visibilityState === "hidden"
@@ -754,6 +934,11 @@
     }
 
     retryButton?.addEventListener("click", load);
+    for (const button of adminActionButtons) {
+      button.addEventListener("click", () => {
+        void runAdminAction(button.dataset.adminAction);
+      });
+    }
     documentRef.addEventListener?.("visibilitychange", onVisibilityChange);
     windowRef.addEventListener?.("pagehide", onPageHide);
     windowRef.addEventListener?.("pageshow", onPageShow);
@@ -763,6 +948,7 @@
         if (documentRef.body.dataset.authPage === "protected"
           && !documentRef.documentElement.classList.contains("auth-pending")) {
           await load();
+          await loadAdminActions();
           startDashboardPolling();
           startStatusPolling();
         }
@@ -775,6 +961,8 @@
   return {
     createPortfolioChartConfig,
     emptyDashboardData,
+    requestAdminAction,
+    requestAdminStatus,
     requestAgentStatus,
     requestMarketSummary,
     renderDashboard,

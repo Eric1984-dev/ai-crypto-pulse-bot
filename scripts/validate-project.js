@@ -83,7 +83,7 @@ function validateProject() {
         errors.push(`The environment template must declare ${variable}.`);
       }
     }
-    for (const variable of ["SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET"]) {
+    for (const variable of ["SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET", "ADMIN_USER_IDS"]) {
       if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
         errors.push(`The environment template must declare ${variable}.`);
       }
@@ -101,7 +101,8 @@ function validateProject() {
     "api/market-refresh.mjs",
     "api/candle-refresh.mjs",
     "api/ai-analysis.mjs",
-    "api/paper-trading.mjs"
+    "api/paper-trading.mjs",
+    "api/admin-actions.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
       errors.push(`Missing required API endpoint: ${endpoint}`);
@@ -122,6 +123,9 @@ function validateProject() {
   }
   if (!fs.existsSync(path.join(rootDirectory, "lib", "paper-trading.mjs"))) {
     errors.push("Missing server-side paper-trading service: lib/paper-trading.mjs");
+  }
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "admin-auth.js"))) {
+    errors.push("Missing server-side administrator authorization helper: lib/admin-auth.js");
   }
 
   const protectedPages = ["dashboard", "portfolio", "scanner", "history", "settings"];

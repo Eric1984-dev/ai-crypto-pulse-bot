@@ -142,6 +142,24 @@
         </div>
       </section>
 
+      <section class="dashboard-panel dashboard-admin-actions" data-admin-actions aria-labelledby="admin-actions-heading" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Administrator</p>
+            <h2 id="admin-actions-heading">Admin Actions</h2>
+          </div>
+        </div>
+        <div class="admin-action-buttons">
+          <button class="admin-action-button" data-admin-action="ai-analysis" type="button">Execute AI Analysis</button>
+          <button class="admin-action-button" data-admin-action="paper-trading" type="button">Execute Paper Trading</button>
+        </div>
+        <div class="admin-action-output" data-admin-action-output role="region" aria-live="polite" hidden>
+          <p class="admin-action-status" data-admin-action-status role="status"></p>
+          <p class="dashboard-muted">Execution duration: <span data-admin-action-duration>—</span></p>
+          <pre class="admin-action-summary" data-admin-action-summary></pre>
+        </div>
+      </section>
+
       <section class="dashboard-grid dashboard-grid-lists" aria-label="Database summaries">
         <article class="dashboard-panel">
           <div class="panel-heading">
