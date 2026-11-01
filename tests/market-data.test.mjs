@@ -453,14 +453,26 @@ test("scanner read diagnostics identify permission failures, schema failures, an
       query: "AI_Crypto_Bot_Candles",
       matches: ({ url }) => url.searchParams.get("interval") === "eq.1d",
       failure: { status: 403, body: { code: "42501" } },
-      expected: { queryName: "scanner.daily-candles", failureKind: "RLS_OR_PERMISSION", httpStatus: 403 }
+      expected: {
+        queryName: "scanner.daily-candles",
+        tableName: "AI_Crypto_Bot_Candles",
+        operationName: "SELECT",
+        failureKind: "RLS_OR_PERMISSION",
+        httpStatus: 403
+      }
     },
     {
       name: "schema mismatch",
       query: "AI_Crypto_Bot_AI_Decisions",
       matches: () => true,
       failure: { status: 404, body: { code: "PGRST205" } },
-      expected: { queryName: "scanner.ai-decisions", failureKind: "SCHEMA_MISMATCH", httpStatus: 404 }
+      expected: {
+        queryName: "scanner.ai-decisions",
+        tableName: "AI_Crypto_Bot_AI_Decisions",
+        operationName: "SELECT",
+        failureKind: "SCHEMA_MISMATCH",
+        httpStatus: 404
+      }
     },
     {
       name: "malformed successful response",
@@ -473,7 +485,13 @@ test("scanner read diagnostics identify permission failures, schema failures, an
           json: async () => ({ data: [] })
         }
       },
-      expected: { queryName: "scanner.hourly-candles", failureKind: "MALFORMED_RESPONSE", httpStatus: 200 }
+      expected: {
+        queryName: "scanner.hourly-candles",
+        tableName: "AI_Crypto_Bot_Candles",
+        operationName: "SELECT",
+        failureKind: "MALFORMED_RESPONSE",
+        httpStatus: 200
+      }
     }
   ];
 
@@ -498,6 +516,8 @@ test("scanner read diagnostics identify permission failures, schema failures, an
         assert.equal(error.code, "STORAGE_UNAVAILABLE", entry.name);
         assert.deepEqual({
           queryName: error.queryName,
+          tableName: error.tableName,
+          operationName: error.operationName,
           failureKind: error.failureKind,
           httpStatus: error.httpStatus
         }, entry.expected, entry.name);
@@ -507,10 +527,12 @@ test("scanner read diagnostics identify permission failures, schema failures, an
   }
 });
 
-test("summary endpoint includes diagnostics only in development responses", async () => {
-  const storageError = Object.assign(new Error("internal database details"), {
+test("summary endpoint logs safe storage context and keeps production responses unchanged", async () => {
+  const storageError = Object.assign(new Error("internal database details token=do-not-log"), {
     code: "STORAGE_UNAVAILABLE",
     queryName: "scanner.daily-candles",
+    tableName: "AI_Crypto_Bot_Candles",
+    operationName: "SELECT",
     failureKind: "RLS_OR_PERMISSION",
     httpStatus: 403,
     databaseCode: "42501"
@@ -524,11 +546,12 @@ test("summary endpoint includes diagnostics only in development responses", asyn
     SUPABASE_URL: config.supabaseUrl,
     SUPABASE_ANON_KEY: config.supabaseAnonKey
   };
+  const loggedMessages = [];
   const createHandler = (nodeEnv) => createMarketSummaryHandler({
     env: { ...options, NODE_ENV: nodeEnv },
     verify: async () => true,
     service,
-    logger: { error() {} }
+    logger: { error(message) { loggedMessages.push(message); } }
   });
   const development = responseCapture();
   await createHandler("development")(authenticatedRequest("/api/market-summary"), development);
@@ -551,6 +574,10 @@ test("summary endpoint includes diagnostics only in development responses", asyn
       message: "Stored market data is temporarily unavailable."
     }
   });
+  assert.match(loggedMessages[1], /FAILED_QUERY=scanner\.daily-candles/);
+  assert.match(loggedMessages[1], /TABLE=AI_Crypto_Bot_Candles/);
+  assert.match(loggedMessages[1], /OPERATION=SELECT/);
+  assert.doesNotMatch(loggedMessages.join(" "), /internal database details|token=do-not-log|user-jwt/);
 });
 
 test("market scanner pages candle history and includes markets beyond the first database page", async () => {
