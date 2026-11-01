@@ -40,7 +40,7 @@ The anon key is designed for browser use and is returned by `/api/auth-config`; 
 
 ### External scheduled market refresh
 
-The market refresh function remains available at `/api/market-refresh`, but `vercel.json` does not declare a Vercel Cron schedule. This keeps deployment compatible with Vercel Hobby. Configure an external scheduler such as cron-job.org:
+The market refresh function remains available at `/api/market-refresh`, but `vercel.json` does not declare a Vercel Cron schedule. This keeps deployment compatible with Vercel Hobby. The endpoint updates stale ticker snapshots and scheduled candles for enabled watched markets. Configure an external scheduler such as cron-job.org:
 
 1. Set the task URL to `https://<your-deployment-host>/api/market-refresh`.
 2. Select `GET` and a schedule supported by the scheduler.

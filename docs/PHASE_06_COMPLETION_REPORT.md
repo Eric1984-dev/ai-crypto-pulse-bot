@@ -2,7 +2,7 @@
 
 ## Status
 
-**Completed.** Phase 06 implements public Bitvavo market data only. Phase 07 has not been started.
+**Completed.** Phase 06 implements public Bitvavo market data only. Phase 07 was not started during its original completion; it has since been completed separately.
 
 ## Implementation summary
 
@@ -10,6 +10,7 @@
 - Added authenticated market and market-summary APIs, plus a server-side market refresh endpoint callable by an external scheduler.
 - Validated configured markets before synchronization. Only missing valid markets are inserted; existing watched-market settings are preserved, and invalid configured markets are logged rather than inserted.
 - Added 60-second in-memory caching for Bitvavo market catalog, tickers, and requested candle intervals.
+- Extended the scheduled refresh follow-up to refresh stale ticker snapshots and all six supported candle intervals for enabled, Bitvavo-valid watched markets, with bounded concurrency and idempotent upserts.
 - Added safe fallback to stored market snapshots and candles when the public provider is empty, rate-limited, timed out, or unavailable.
 - Integrated active-market and markets-with-data counts into the dashboard and added stored price / 24-hour change details to watched markets.
 
@@ -36,13 +37,13 @@ No `Agent_*` tables or database migrations were added. Authenticated reads prese
 
 ## Caching and refresh behavior
 
-Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary refreshes. An external scheduler can invoke the refresh endpoint at its configured interval to update ticker snapshots; candle data is fetched and upserted when an authenticated market request asks for a symbol and interval. Independent serverless instances have separate in-memory caches.
+Provider responses are cached in memory for 60 seconds. Persisted snapshot timestamps are also used to avoid unnecessary ticker refreshes. An external scheduler can invoke the refresh endpoint to update ticker snapshots and fetch up to 500 recent candles per enabled, valid market and supported interval. Candle requests run with a maximum concurrency of four and use the existing `(symbol, interval, timestamp)` upsert key. Authenticated market requests can still refresh an individually selected symbol and interval. Independent serverless instances have separate in-memory caches.
 
 ## Endpoints created
 
 - `GET /api/market` — authenticated stored market snapshot and requested candles; validates symbol, interval, and limit.
 - `GET /api/market-summary` — authenticated active-market counts, markets-with-data count, snapshots, and refresh status.
-- `GET /api/market-refresh` — scheduler-independent endpoint protected by `CRON_SECRET`; uses server-side Supabase credentials.
+- `GET /api/market-refresh` — scheduler-independent endpoint protected by `CRON_SECRET`; uses server-side Supabase credentials to refresh ticker snapshots and candle history.
 
 ## Files changed
 
@@ -64,10 +65,10 @@ Provider responses are cached in memory for 60 seconds. Persisted snapshot times
 ## Known limitations
 
 - In-memory caches are per serverless instance; database `captured_at` freshness provides cross-instance protection for ticker snapshots.
-- Scheduled refresh updates ticker snapshots; historical candle updates are request-driven rather than periodically backfilled.
+- Scheduled candle refresh fetches the latest 500 records per market/interval; deeper history requires repeated scheduled upserts over time or a separate backfill process.
 - Scheduled refresh requires `SUPABASE_SERVICE_ROLE_KEY` and a strong `CRON_SECRET` in server-side Vercel environment configuration, plus a configured external scheduler or supported Vercel Cron plan.
 - No signal generation, scanning decisions, AI, trading, backtesting, or live trading is included.
 
-## Phase 07 readiness
+## Phase 07 data readiness
 
-Market catalog validation, ticker snapshots, requested candle intervals, and scanner-event persistence are available through the existing database schema and documented APIs. This establishes a market-data foundation for later work. Phase 07 remains out of scope and has not been implemented.
+Market catalog validation, ticker snapshots, scheduled candle collection across supported intervals, and scanner-event persistence are available through the existing database schema and documented APIs. Phase 07 later consumed this market-data foundation; this follow-up does not implement Phase 08 or trading.

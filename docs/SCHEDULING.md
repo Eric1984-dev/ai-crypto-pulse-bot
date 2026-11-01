@@ -10,7 +10,9 @@ GET /api/market-refresh
 
 The endpoint requires `Authorization: Bearer <CRON_SECRET>` and uses the server-only `SUPABASE_SERVICE_ROLE_KEY`. It can be invoked by an external scheduler such as cron-job.org. Vercel Cron is optional on plans that support the required schedule and is not configured in `vercel.json`, so Vercel Hobby deployments do not depend on it.
 
-Configure an external task with the deployed URL, HTTP method `GET`, and the authorization header. Keep the secret in the scheduler's protected header/credential settings; never put it in the URL or query string. Choose a frequency supported by the scheduler and verify successful calls return HTTP `200`.
+Each scheduled call refreshes stale ticker snapshots and requests up to 500 recent candles for every enabled, Bitvavo-valid watched market across `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. Candle requests run with a maximum concurrency of four and reuse the existing 60-second in-memory cache. Upserts use the existing `(symbol, interval, timestamp)` conflict key, so retrying the refresh does not create duplicate candle rows.
+
+Configure an external task with the deployed URL, HTTP method `GET`, and the authorization header. Keep the secret in the scheduler's protected header/credential settings; never put it in the URL or query string. A five-minute cadence is a reasonable starting point when the market-data freshness target is 15 minutes; monitor the returned `candleRefresh` counts and adjust for the size of the enabled market universe. Verify successful calls return HTTP `200`, and investigate partial/storage-unavailable candle statuses.
 
 ## Phase 07 AI analysis
 

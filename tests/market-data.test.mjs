@@ -40,11 +40,17 @@ function createHarness({
   tickers = [validTicker],
   candleRows = [],
   providerError = null,
-  failMarketDataWrite = false
+  failMarketDataWrite = false,
+  failCandleInterval = null,
+  failCandleIntervalStatus = 503,
+  failCandleStorage = false,
+  providerDelayMs = 0
 } = {}) {
   const writes = [];
   const providerCalls = [];
   const clock = { value: fixedNow };
+  let activeCandleRequests = 0;
+  let maxConcurrentCandleRequests = 0;
   const database = {
     "AI_Crypto_Bot_Watched_Markets": [...watched],
     "AI_Crypto_Bot_Market_Data": [...marketData],
@@ -68,10 +74,26 @@ function createHarness({
         return jsonResponse(tickers);
       }
       if (url.pathname.endsWith("/candles")) {
+        activeCandleRequests += 1;
+        maxConcurrentCandleRequests = Math.max(maxConcurrentCandleRequests, activeCandleRequests);
         if (providerError && (!providerError.path || url.pathname === providerError.path)) {
+          activeCandleRequests -= 1;
+          if (providerError.status) {
+            return jsonResponse({}, providerError.status);
+          }
           throw providerError.error;
         }
-        return jsonResponse(candleRows);
+        try {
+          if (providerDelayMs) {
+            await new Promise((resolve) => setTimeout(resolve, providerDelayMs));
+          }
+          if (failCandleInterval === url.searchParams.get("interval")) {
+            return jsonResponse({}, failCandleIntervalStatus);
+          }
+          return jsonResponse(candleRows);
+        } finally {
+          activeCandleRequests -= 1;
+        }
       }
       throw new Error(`Unexpected Bitvavo URL: ${url.pathname}`);
     }
@@ -84,6 +106,9 @@ function createHarness({
       const rows = JSON.parse(options.body);
       writes.push({ table, rows });
       if (table === "AI_Crypto_Bot_Market_Data" && failMarketDataWrite) {
+        return jsonResponse({}, 500);
+      }
+      if (table === "AI_Crypto_Bot_Candles" && failCandleStorage) {
         return jsonResponse({}, 500);
       }
       for (const row of rows) {
@@ -124,7 +149,14 @@ function createHarness({
     logger: { error() {} },
     markets: configured
   });
-  return { service, writes, providerCalls, database, clock };
+  return {
+    service,
+    writes,
+    providerCalls,
+    database,
+    clock,
+    getMaxConcurrentCandleRequests: () => maxConcurrentCandleRequests
+  };
 }
 
 function jsonResponse(body, status = 200) {
@@ -386,4 +418,165 @@ test("scheduled refresh requires the cron secret and keeps server credentials ou
   const unauthorized = responseCapture();
   await handler({ ...request, headers: {} }, unauthorized);
   assert.equal(unauthorized.statusCode, 401);
+});
+
+test("scheduled refresh stores all six candle intervals alongside ticker snapshots", async () => {
+  const { service, writes, providerCalls, database } = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
+  });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.refreshStatus, "refreshed");
+  assert.deepEqual(result.candleRefresh, {
+    status: "refreshed",
+    markets: 1,
+    intervals: 6,
+    attempted: 6,
+    refreshed: 6,
+    missing: 0,
+    failed: 0,
+    cached: 0,
+    skipped: 0,
+    candlesUpserted: 6
+  });
+  assert.equal(
+    providerCalls.filter((path) => path.includes("/candles")).length,
+    6
+  );
+  assert.deepEqual(
+    [...new Set(database["AI_Crypto_Bot_Candles"].map(({ interval }) => interval))].sort(),
+    ["1d", "1m", "15m", "1h", "4h", "5m"].sort()
+  );
+  assert.ok(writes.some(({ table }) => table === "AI_Crypto_Bot_Market_Data"));
+  assert.equal(database["AI_Crypto_Bot_Candles"].length, 6);
+});
+
+test("market refresh API triggers scheduled candle collection", async () => {
+  const harness = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
+  });
+  const handler = createMarketRefreshHandler({
+    env: {
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey,
+      SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+      CRON_SECRET: "test-cron-secret"
+    },
+    service: harness.service,
+    logger: { error() {} }
+  });
+  const response = responseCapture();
+  await handler({
+    method: "GET",
+    url: "/api/market-refresh",
+    headers: { authorization: `Bearer ${"test-cron-secret"}` }
+  }, response);
+  const data = JSON.parse(response.body).data;
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(data.candleRefresh.refreshed, 6);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 6);
+});
+
+test("scheduled refresh refetches an interval when an earlier request cached a smaller history limit", async () => {
+  const harness = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
+  });
+  await harness.service.getMarket({
+    config,
+    accessToken: "user-jwt",
+    serviceRoleKey,
+    symbol: "BTC-EUR",
+    interval: "1m",
+    limit: 1
+  });
+  const scheduled = await harness.service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(scheduled.candleRefresh.refreshed, 6);
+  assert.equal(harness.providerCalls.filter((path) => path.includes("/candles")).length, 7);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 6);
+});
+
+test("scheduled candle refresh uses bounded concurrency and reuses the 60-second cache", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const { service, providerCalls, getMaxConcurrentCandleRequests } = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    tickers: [
+      validTicker,
+      { ...validTicker, market: "ETH-EUR", open: "50", last: "55", high: "60", low: "45" }
+    ],
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    providerDelayMs: 2
+  });
+  const first = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+  const candleCalls = providerCalls.filter((path) => path.includes("/candles")).length;
+  const second = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(first.candleRefresh.markets, 2);
+  assert.equal(first.candleRefresh.attempted, 12);
+  assert.ok(getMaxConcurrentCandleRequests() > 1);
+  assert.ok(getMaxConcurrentCandleRequests() <= 4);
+  assert.equal(second.candleRefresh.cached, 12);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, candleCalls);
+});
+
+test("scheduled candle refresh continues after provider errors and records failures", async () => {
+  const { service, writes, providerCalls } = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    failCandleInterval: "5m",
+    failCandleIntervalStatus: 404
+  });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.candleRefresh.status, "partial");
+  assert.equal(result.candleRefresh.failed, 1);
+  assert.equal(result.candleRefresh.refreshed, 5);
+  assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, 6);
+  assert.ok(writes.some(({ table, rows }) =>
+    table === "AI_Crypto_Bot_Scanner_Events"
+      && rows.some(({ event_type }) => event_type === "INVALID_MARKET")
+  ));
+});
+
+test("scheduled candle refresh stops queuing provider requests after a rate limit", async () => {
+  const { service, providerCalls } = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    failCandleInterval: "5m",
+    failCandleIntervalStatus: 429
+  });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.candleRefresh.status, "provider-unavailable");
+  assert.ok(result.candleRefresh.failed >= 1);
+  assert.ok(result.candleRefresh.skipped > 0);
+  assert.ok(providerCalls.filter((path) => path.includes("/candles")).length < 6);
+});
+
+test("scheduled candle refresh records empty interval responses without failing the whole refresh", async () => {
+  const { service, writes, database } = createHarness({ candleRows: [] });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.candleRefresh.status, "partial");
+  assert.equal(result.candleRefresh.missing, 6);
+  assert.equal(result.candleRefresh.failed, 0);
+  assert.equal(database["AI_Crypto_Bot_Candles"].length, 0);
+  assert.ok(writes.some(({ table, rows }) =>
+    table === "AI_Crypto_Bot_Scanner_Events"
+      && rows.some(({ event_type }) => event_type === "CANDLE_DATA_MISSING")
+  ));
+});
+
+test("scheduled candle refresh stops additional database writes after storage failure", async () => {
+  const { service } = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    failCandleStorage: true
+  });
+  const result = await service.refreshScheduledMarkets({ config, serviceRoleKey });
+
+  assert.equal(result.candleRefresh.status, "storage-unavailable");
+  assert.ok(result.candleRefresh.failed >= 1);
+  assert.ok(result.candleRefresh.skipped > 0);
+  assert.ok(result.candleRefresh.attempted < 6);
 });

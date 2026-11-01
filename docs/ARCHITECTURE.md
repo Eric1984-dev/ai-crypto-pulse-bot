@@ -27,7 +27,7 @@ Implemented components:
 - Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
 - Non-destructive watched-market validation/synchronization and 60-second in-memory provider caching
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
-- Scheduler-protected market refresh and AI analysis endpoints; external schedulers are supported without requiring a Vercel Cron route
+- Scheduler-protected market refresh (ticker snapshots and six OHLCV intervals) and AI analysis endpoints; external schedulers are supported without requiring a Vercel Cron route
 - Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
 - Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
 
