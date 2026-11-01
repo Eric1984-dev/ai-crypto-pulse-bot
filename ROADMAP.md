@@ -197,7 +197,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 
 ## Phase 14 - Final Polish
 
-- [x] Keep right-side Agent Brain circuit traces separated, below the top frame, and visibly thicker, with clearer angled elbows matching the reference image; preserve status behavior
+- [x] Keep right-side Agent Brain circuit traces separated, below the top frame, and visibly thicker; narrow the brain and attach the traces to its contour with pronounced upward elbows and extended horizontal runs; preserve status behavior
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration

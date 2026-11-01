@@ -445,12 +445,33 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     );
     return { minimum: Math.min(...values), maximum: Math.max(...values) };
   });
-  assert.ok(circuitLaneBounds[0].maximum < 0.42);
-  const topLaneBend = tracePositions.getY(circuitStart + 3) - tracePositions.getY(circuitStart);
-  const bottomLaneStart = circuitStart + 6 * 6;
-  const bottomLaneBend = tracePositions.getY(bottomLaneStart + 3) - tracePositions.getY(bottomLaneStart);
-  assert.ok(topLaneBend > 0.06);
-  assert.ok(bottomLaneBend < -0.04);
+  assert.ok(circuitLaneBounds[0].maximum < 0.47);
+  const rightContourStart = 80 + 6 * 28 + 10 * 8;
+  for (let lane = 0; lane < circuitLaneBounds.length; lane += 1) {
+    const laneStart = circuitStart + lane * 6;
+    const horizontalY = tracePositions.getY(laneStart);
+    const bendY = tracePositions.getY(laneStart + 3);
+    assert.ok(bendY - horizontalY > 0.1);
+    const startX = tracePositions.getX(laneStart);
+    const contourPositions = harness.calls.points.find(({ material }) => material.size === 0.045)
+      .geometry.getAttribute("position");
+    let nearestContourDistance = Infinity;
+    let nearestContourX = 0;
+    for (let index = rightContourStart; index < rightContourStart + 58; index += 1) {
+      const distance = Math.abs(contourPositions.getY(index) - horizontalY);
+      if (distance < nearestContourDistance) {
+        nearestContourDistance = distance;
+        nearestContourX = contourPositions.getX(index);
+      }
+    }
+    assert.ok(Math.abs(startX - nearestContourX) < 0.04, JSON.stringify({
+      lane,
+      startX,
+      nearestContourX,
+      nearestContourDistance
+    }));
+    assert.ok(startX < nearestContourX + 0.005);
+  }
   for (let lane = 0; lane < circuitLaneBounds.length - 1; lane += 1) {
     assert.ok(circuitLaneBounds[lane + 1].maximum < circuitLaneBounds[lane].minimum);
   }
@@ -659,6 +680,7 @@ test("Agent Brain initializes a low-power renderer and pauses/resumes animation 
   assert.equal(midlineNodeCount, 0);
   assert.ok(Math.min(leftHemisphereNodes, rightHemisphereNodes) > 250);
   assert.ok(networkMaxX > 0.5);
+  assert.ok(networkMaxX < 0.61);
   const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
   assert.ok(connectionPosition.count > 1000);
   assert.equal(

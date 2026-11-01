@@ -108,6 +108,7 @@
     maxNeuralNodes: 720,
     maxConnections: 2160
   });
+  const brainWidthScale = 0.86;
 
   function mapAgentStatus(status) {
     const key = typeof status === "string" ? status.trim().toUpperCase() : "";
@@ -339,7 +340,10 @@
       brain.add(new THREE.Points(activityGeometry, activityGlowMaterial));
       brain.add(new THREE.Points(activityGeometry, activityMaterial));
 
-      const referenceTraceLayout = createReferenceTraceLayout(THREE);
+      const referenceTraceLayout = createReferenceTraceLayout(
+        THREE,
+        neuralLayout.rightContourPath
+      );
       const referenceTraceGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
       referenceTraceGeometry.setFromPoints(referenceTraceLayout.segmentPoints);
       const referenceTraceStrokeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
@@ -837,7 +841,11 @@
     }
 
     function hemispherePoint(side, localX, y, z) {
-      return new THREE.Vector3(side * localX, y, z);
+      return new THREE.Vector3(
+        side * (0.05 + (localX - 0.05) * brainWidthScale),
+        y,
+        z
+      );
     }
 
     function createOuterContour(side) {
@@ -1067,7 +1075,12 @@
       connectionPairs,
       connectionWeights,
       hotspotIndices,
-      nodePositions
+      nodePositions,
+      rightContourPath: hemispherePaths
+        .find(({ side }) => side === 1)
+        .contour
+        .slice(0, 58)
+        .map((index) => nodePositions[index])
     };
   }
 
@@ -1082,7 +1095,7 @@
     return points;
   }
 
-  function createReferenceTraceLayout(THREE) {
+  function createReferenceTraceLayout(THREE, rightContourPath) {
     const segmentPoints = [];
     const junctions = [];
     const neuronPositions = [];
@@ -1157,10 +1170,24 @@
       addPath(coordinates, -0.055);
     }
 
+    function getRightContourX(y) {
+      for (let index = 1; index < rightContourPath.length; index += 1) {
+        const start = rightContourPath[index - 1];
+        const end = rightContourPath[index];
+        if (start.y >= y && end.y <= y) {
+          const progress = (start.y - y) / (start.y - end.y);
+          return start.x + (end.x - start.x) * progress;
+        }
+      }
+      throw new Error("Agent Brain circuit track does not intersect the neural contour.");
+    }
+
     const circuitPaths = Array.from({ length: 7 }, (_, lane) => {
       const y = 0.34 - lane * 0.12;
-      const bend = 0.01 + (3 - lane) * 0.02;
-      return [[0.48, y], [0.68, y], [0.8, y + bend], [1.16, y + bend]];
+      const startX = getRightContourX(y) - 0.01;
+      const bendX = startX + 0.29;
+      const bendY = y + 0.115;
+      return [[startX, y], [startX + 0.16, y], [bendX, bendY], [1.16, bendY]];
     });
     for (const path of circuitPaths) {
       addPath(path, -0.045, true);
