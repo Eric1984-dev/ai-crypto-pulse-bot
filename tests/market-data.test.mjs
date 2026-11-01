@@ -457,6 +457,8 @@ test("scanner read diagnostics identify permission failures, schema failures, an
         queryName: "scanner.daily-candles",
         tableName: "AI_Crypto_Bot_Candles",
         operationName: "SELECT",
+        pageNumber: 1,
+        paginationRange: "0-33",
         failureKind: "RLS_OR_PERMISSION",
         httpStatus: 403
       }
@@ -470,6 +472,8 @@ test("scanner read diagnostics identify permission failures, schema failures, an
         queryName: "scanner.ai-decisions",
         tableName: "AI_Crypto_Bot_AI_Decisions",
         operationName: "SELECT",
+        pageNumber: 1,
+        paginationRange: "0-999",
         failureKind: "SCHEMA_MISMATCH",
         httpStatus: 404
       }
@@ -489,6 +493,8 @@ test("scanner read diagnostics identify permission failures, schema failures, an
         queryName: "scanner.hourly-candles",
         tableName: "AI_Crypto_Bot_Candles",
         operationName: "SELECT",
+        pageNumber: 1,
+        paginationRange: "0-11",
         failureKind: "MALFORMED_RESPONSE",
         httpStatus: 200
       }
@@ -518,6 +524,8 @@ test("scanner read diagnostics identify permission failures, schema failures, an
           queryName: error.queryName,
           tableName: error.tableName,
           operationName: error.operationName,
+          pageNumber: error.pageNumber,
+          paginationRange: error.paginationRange,
           failureKind: error.failureKind,
           httpStatus: error.httpStatus
         }, entry.expected, entry.name);
@@ -533,6 +541,8 @@ test("summary endpoint logs safe storage context and keeps production responses 
     queryName: "scanner.daily-candles",
     tableName: "AI_Crypto_Bot_Candles",
     operationName: "SELECT",
+    pageNumber: 2,
+    paginationRange: "1000-1999",
     failureKind: "RLS_OR_PERMISSION",
     httpStatus: 403,
     databaseCode: "42501"
@@ -577,6 +587,11 @@ test("summary endpoint logs safe storage context and keeps production responses 
   assert.match(loggedMessages[1], /FAILED_QUERY=scanner\.daily-candles/);
   assert.match(loggedMessages[1], /TABLE=AI_Crypto_Bot_Candles/);
   assert.match(loggedMessages[1], /OPERATION=SELECT/);
+  assert.match(loggedMessages[1], /PAGE=2/);
+  assert.match(loggedMessages[1], /RANGE=1000-1999/);
+  assert.match(loggedMessages[1], /HTTP_STATUS=403/);
+  assert.match(loggedMessages[1], /ERROR_CODE=42501/);
+  assert.match(loggedMessages[1], /FAILURE_CATEGORY=RLS_OR_PERMISSION/);
   assert.doesNotMatch(loggedMessages.join(" "), /internal database details|token=do-not-log|user-jwt/);
 });
 

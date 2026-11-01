@@ -134,7 +134,7 @@ The scanner page and dashboard preview consume this response; no new API functio
 
 When a market-summary database read fails and `NODE_ENV` is exactly `development`, the error response additionally includes `error.diagnostics` with a safe query name, failure category, HTTP status, and allowlisted Supabase error code. This field is omitted in production; raw database messages, request URLs, and credentials are never returned. Empty or stale rows are not classified as query failures.
 
-When a market-summary storage operation fails, server logs include `FAILED_QUERY`, `TABLE`, and `OPERATION` labels (for example, `FAILED_QUERY=scanner.daily-candles TABLE=AI_Crypto_Bot_Candles OPERATION=SELECT`). These labels come from internal query metadata; tokens, secrets, request data, and raw database errors are not logged. The public production error response remains unchanged.
+When a market-summary storage operation fails, server logs include the query/table/operation, page number and range, HTTP status, allowlisted Supabase error code, and failure category. Example: `FAILED_QUERY=scanner.daily-candles TABLE=AI_Crypto_Bot_Candles OPERATION=SELECT PAGE=2 RANGE=1000-1999 HTTP_STATUS=403 ERROR_CODE=42501 FAILURE_CATEGORY=RLS_OR_PERMISSION`. Missing values are logged as `unknown` or `none`. These values are bounded internal metadata; tokens, secrets, user data, request URLs, and response bodies are not logged. The public production error response remains unchanged.
 
 ### GET /api/market
 

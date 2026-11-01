@@ -8,7 +8,7 @@ All notable project changes should be documented here.
 
 ### Added
 
-- Production-safe market-summary storage failure logs now include query, table, and operation labels without logging credentials, request data, or raw database errors
+- Production-safe market-summary storage failure logs now include query, table, operation, page/range, HTTP status, Supabase code, and failure category without logging credentials, request data, or response bodies
 - Temporary development-only market-summary read diagnostics identify the failed query and classify RLS/permission, schema, malformed-response, network, and database failures; production error responses remain generic
 - Phase 09 market scanner rankings for gainers, losers, estimated quote volume, momentum, and recent stored AI opportunities across 24h, 7d, and 30d
 - Scanner ranking and API pagination regression tests for empty and large datasets, plus responsive scanner UI and dashboard preview using the existing market-summary endpoint
