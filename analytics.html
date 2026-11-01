@@ -96,7 +96,8 @@
             <div class="panel-heading"><div><p class="eyebrow">Market Results</p><h2>Best and Worst Markets</h2></div></div>
             <div class="history-table-wrap">
               <table class="history-table analytics-table">
-                <thead><tr><th>Market</th><th>Closed Trades</th><th>Win Rate</th><th>Realized P&amp;L</th></tr></thead>
+                <caption class="visually-hidden">Closed-trade performance by market</caption>
+                <thead><tr><th scope="col">Market</th><th scope="col">Closed Trades</th><th scope="col">Win Rate</th><th scope="col">Realized P&amp;L</th></tr></thead>
                 <tbody data-analytics-symbols></tbody>
               </table>
             </div>
@@ -120,7 +121,8 @@
             <div class="panel-heading"><div><p class="eyebrow">Confidence</p><h2>Confidence Ranges</h2></div></div>
             <div class="history-table-wrap">
               <table class="history-table analytics-table">
-                <thead><tr><th>Range</th><th>Decisions</th><th>Scored</th><th>Win Rate</th><th>Average P&amp;L</th><th>Net P&amp;L</th></tr></thead>
+                <caption class="visually-hidden">AI decision outcomes by confidence range</caption>
+                <thead><tr><th scope="col">Range</th><th scope="col">Decisions</th><th scope="col">Scored</th><th scope="col">Win Rate</th><th scope="col">Average P&amp;L</th><th scope="col">Net P&amp;L</th></tr></thead>
                 <tbody data-analytics-confidence></tbody>
               </table>
             </div>
@@ -130,7 +132,8 @@
             <div class="panel-heading"><div><p class="eyebrow">Action Results</p><h2>BUY, SELL, and HOLD Effectiveness</h2></div></div>
             <div class="history-table-wrap">
               <table class="history-table analytics-table">
-                <thead><tr><th>Action</th><th>Decisions</th><th>Scored</th><th>Unscored</th><th>Win Rate</th><th>Net P&amp;L</th></tr></thead>
+                <caption class="visually-hidden">AI decision outcomes by action</caption>
+                <thead><tr><th scope="col">Action</th><th scope="col">Decisions</th><th scope="col">Scored</th><th scope="col">Unscored</th><th scope="col">Win Rate</th><th scope="col">Net P&amp;L</th></tr></thead>
                 <tbody data-analytics-actions></tbody>
               </table>
             </div>
@@ -139,7 +142,8 @@
             <div class="panel-heading"><div><p class="eyebrow">Strategy Evaluation</p><h2>Strategy Performance</h2></div></div>
             <div class="history-table-wrap">
               <table class="history-table analytics-table">
-                <thead><tr><th>Strategy</th><th>Decisions</th><th>Scored</th><th>Win Rate</th><th>Net P&amp;L</th></tr></thead>
+                <caption class="visually-hidden">AI decision outcomes by strategy</caption>
+                <thead><tr><th scope="col">Strategy</th><th scope="col">Decisions</th><th scope="col">Scored</th><th scope="col">Win Rate</th><th scope="col">Net P&amp;L</th></tr></thead>
                 <tbody data-analytics-strategies></tbody>
               </table>
             </div>
@@ -176,21 +180,21 @@
           <article class="dashboard-panel">
             <div class="panel-heading"><div><p class="eyebrow">Daily Performance</p><h2>Recent Days</h2></div></div>
             <div class="history-table-wrap">
-              <table class="history-table analytics-table"><thead><tr><th>Date (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="daily"></tbody></table>
+              <table class="history-table analytics-table"><caption class="visually-hidden">Daily portfolio performance</caption><thead><tr><th scope="col">Date (UTC)</th><th scope="col">Period P&amp;L</th><th scope="col">Portfolio Value</th></tr></thead><tbody data-analytics-period="daily"></tbody></table>
             </div>
             <p class="dashboard-empty" data-analytics-period-empty="daily" hidden>No daily snapshots are available.</p>
           </article>
           <article class="dashboard-panel">
             <div class="panel-heading"><div><p class="eyebrow">Weekly Performance</p><h2>Recent Weeks</h2></div></div>
             <div class="history-table-wrap">
-              <table class="history-table analytics-table"><thead><tr><th>Week Starting (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="weekly"></tbody></table>
+              <table class="history-table analytics-table"><caption class="visually-hidden">Weekly portfolio performance</caption><thead><tr><th scope="col">Week Starting (UTC)</th><th scope="col">Period P&amp;L</th><th scope="col">Portfolio Value</th></tr></thead><tbody data-analytics-period="weekly"></tbody></table>
             </div>
             <p class="dashboard-empty" data-analytics-period-empty="weekly" hidden>No weekly snapshots are available.</p>
           </article>
           <article class="dashboard-panel">
             <div class="panel-heading"><div><p class="eyebrow">Monthly Performance</p><h2>Recent Months</h2></div></div>
             <div class="history-table-wrap">
-              <table class="history-table analytics-table"><thead><tr><th>Month (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="monthly"></tbody></table>
+              <table class="history-table analytics-table"><caption class="visually-hidden">Monthly portfolio performance</caption><thead><tr><th scope="col">Month (UTC)</th><th scope="col">Period P&amp;L</th><th scope="col">Portfolio Value</th></tr></thead><tbody data-analytics-period="monthly"></tbody></table>
             </div>
             <p class="dashboard-empty" data-analytics-period-empty="monthly" hidden>No monthly snapshots are available.</p>
           </article>

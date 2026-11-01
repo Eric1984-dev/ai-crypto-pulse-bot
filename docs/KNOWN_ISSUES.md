@@ -2,6 +2,7 @@
 
 ## Open Production Validation
 
+- Phase 14 local Chromium checks cover all 12 pages at 320px, 768px, and 1280px and pass without horizontal overflow. Physical iPhone/Android/desktop rendering, Chrome/Edge/Safari coverage, Lighthouse, and hosted production smoke checks remain unverified.
 - The hosted Supabase migration history, RLS/grants, and Realtime publication state have not been verified in this environment. The Phase 11 publication migration and live Realtime/reconnect smoke tests remain pending.
 - Production authentication, dashboard, scanner, Bitvavo ingestion, AI analysis, paper-trading jobs, and Admin Actions have not been smoke-tested against a deployed Vercel/Supabase environment.
 - The Analytics pagination fix treats HTTP `416` on `analytics.ai-decisions` as end-of-results and is covered by local regressions, including the production-reported `1000-1499` range. The production error is not verified as resolved until this change is deployed and Analytics plus Analytics Exports are smoke-tested; the original Supabase message/details remain unavailable.

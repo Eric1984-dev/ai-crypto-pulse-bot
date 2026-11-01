@@ -294,15 +294,17 @@ The original Phase 13 validation run passed 196 tests. After the production-load
 
 ## Phase 14 targeted UX coverage
 
-Agent Brain visual tests assert seven vertically ordered right-side circuit tracks, a maximum path height below the frame, and the added ribbon geometry that makes the strokes visibly thicker. Dashboard tests verify that the summary metrics after Win Rate are collapsed by default. Project setup tests cover the dark-green brand icon on every page, Dashboard links, and scroll-to-top behavior after internal navigation. Trade History UI checks verify collapsed search/filter controls and a bounded scroll area with a sticky table header. These automated tests do not replace physical-device checks.
+Agent Brain visual tests assert seven vertically ordered right-side circuit tracks, a maximum path height below the frame, and the added ribbon geometry that makes the strokes visibly thicker. Dashboard tests verify that the summary metrics after Win Rate are collapsed by default. Project setup tests cover the dark-green brand icon on every page, Dashboard links, scroll-to-top behavior after internal navigation, and the absence of a fixed global minimum width that would cause narrow-screen overflow. Trade History UI checks verify collapsed search/filter controls and a bounded scroll area with a sticky table header. Analytics UI tests verify every report table has an accessible caption and explicit column-header scopes.
 
 ```powershell
-node --test tests/agent-brain.test.js tests/dashboard.test.js tests/project-setup.test.js tests/trade-history.test.js
+node --test tests/agent-brain.test.js tests/analytics-ui.test.js tests/dashboard.test.js tests/project-setup.test.js tests/trade-history.test.js
 npm.cmd test
 npm.cmd run build
 ```
 
-In the latest validation, the focused suite passed 48 tests, `npm.cmd test` passed 210 tests with 0 failures, and `npm.cmd run build` passed static project and database migration validation. The API directory remains at 12 deployable `.mjs` functions. Physical iPhone, Android, desktop, Lighthouse, and production checks remain outstanding.
+In the final-polish audit, `npm.cmd test` passed 212 tests with 0 failures, and `npm.cmd run build` passed static project and database migration validation. A local Chromium viewport sweep covered all 12 pages at 320px, 768px, and 1280px; no horizontal overflow remained after the layout fix. The mobile navigation menu also fit within the 320px viewport. The API directory remains at 12 deployable `.mjs` functions.
+
+The browser sweep used a local static server with authentication scripts blocked; it validates rendered layout, not authenticated API behavior or live data. These checks do not replace physical iPhone/Android/desktop tests, Chrome/Edge/Safari coverage, Lighthouse, hosted Realtime checks, or production smoke tests.
 
 ---
 

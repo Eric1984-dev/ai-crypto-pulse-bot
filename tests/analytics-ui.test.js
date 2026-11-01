@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const analytics = require("../js/analytics.js");
 
@@ -179,4 +181,17 @@ test("analytics range changes request only the selected supported period", async
     "/api/dashboard-data?view=analytics&period=30d",
     "/api/dashboard-data?view=analytics&period=90d"
   ]);
+});
+
+test("analytics tables have accessible captions and scoped column headers", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "analytics.html"), "utf8");
+  const tables = [...html.matchAll(/<table\b[^>]*>[\s\S]*?<\/table>/g)];
+
+  assert.equal(tables.length, 7);
+  for (const [table] of tables) {
+    assert.match(table, /<caption class="visually-hidden">[^<]+<\/caption>/);
+    const headers = [...table.matchAll(/<th\b[^>]*>/g)];
+    assert.ok(headers.length > 0);
+    assert.ok(headers.every(([header]) => /\bscope="col"/.test(header)));
+  }
 });

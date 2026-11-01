@@ -73,6 +73,11 @@ test("all page brands use the dark-green icon and link to the dashboard", () => 
   assert.equal(fs.statSync(path.join(rootDirectory, "assets", "icons", "apple-touch-icon.png")).isFile(), true);
 });
 
+test("global page layout does not force horizontal overflow on narrow screens", () => {
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+  assert.doesNotMatch(styles, /body\s*\{[^}]*min-width:\s*320px/s);
+});
+
 test("internal navigation resets to the top on mobile destination loads", () => {
   const source = fs.readFileSync(path.join(rootDirectory, "js", "main.js"), "utf8");
   const storage = new Map();

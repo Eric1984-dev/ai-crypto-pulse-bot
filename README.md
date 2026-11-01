@@ -1,6 +1,6 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie, Phase 06 publieke Bitvavo-marktdata, Phase 07 de deterministische AI Engine, Phase 08 de risk-managed paper-trading-engine, Phase 09 de read-only Market Scanner, Phase 10 de Trade History en Phase 11 realtime updates via Supabase.
+CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Phase 02 levert Supabase Authentication, Phase 03 het PostgreSQL-schema met Row Level Security, Phase 04 een database-gestuurd dashboard, Phase 05 de Three.js Agent Brain visualisatie, Phase 06 publieke Bitvavo-marktdata, Phase 07 de deterministische AI Engine, Phase 08 de risk-managed paper-trading-engine, Phase 09 de read-only Market Scanner, Phase 10 de Trade History, Phase 11 realtime updates via Supabase, Phase 13 Analytics en Phase 14 Final Polish.
 
 ## Huidige status
 
@@ -26,6 +26,7 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard-summary toont de eerste zes portfolio-KPI's standaard en klapt de overige metrics in; Trade History start met ingeklapte zoekfilters en een eigen scrollbare tabel.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met ongeveer 13% extra hoogte ten opzichte van de breedteschaal, een duidelijke middenspleet, gebogen corticale paden, neuronen, hotspots en bewegende energie vormt het brein. Subtiele blauwe golfbanen links en zeven parallelle, iets dikkere circuitsporen rechts blijven onder de bovenrand; langs beide kanten zijn extra neuronen en statusgestuurde bewegende lichtsignalen zichtbaar. Tijdens `ANALYZING` lichten 52 extra neuronen groen op; de bestaande statusbron, statusmapping en agentlogica blijven ongewijzigd. Alle 720 basisneuronen pulseren onafhankelijk en maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Agent Status gebruikt een grotere, volledige dashboardrij met een statusgestuurde animatie; Emergency State/Risk Control staat onderaan het dashboard.
 - Interne mobiele navigatie brengt de doelpagina na laden terug naar boven; browser-terugnavigatie behoudt de bestaande positie.
+- Phase 14 final-polish-audit: all 12 pages passed Chromium viewport checks at 320px, 768px, and 1280px after removing a fixed body width that caused narrow-screen overflow. Analytics tables now have accessible captions and scoped column headers. Local test/build validation passes; physical-device, Lighthouse, browser-matrix, and hosted-production checks remain pending. See [the final release report](./docs/reports/FINAL_RELEASE_REPORT.md).
 - De scanner gebruikt bestaande opgeslagen marktdata en AI-beslissingen, maar voert geen AI-analyse of trades uit. Settings blijft een placeholder; strategieoptimalisatie, backtesting en live trading zijn niet geïmplementeerd. De AI Engine blijft analysis-only; paper-trades worden uitsluitend door de afzonderlijke Phase 08 risk-managed executor aangemaakt.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard. De paper-tradingcode gebruikt geen private Bitvavo-endpoints, exchange-accountgegevens of echte orders.
@@ -105,3 +106,4 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 13 Analytics production fix report](./docs/reports/PHASE_13_ANALYTICS_PRODUCTION_FIX_REPORT.md)
 - [Analytics pagination fix report](./docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md)
 - [Phase 07 candle query fix report](./docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
+- [Final release report](./docs/reports/FINAL_RELEASE_REPORT.md)

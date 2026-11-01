@@ -11,12 +11,14 @@ All notable project changes should be documented here.
 - Completed the Phase 12 system audit and generated `reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
 - Recorded a 50% production-readiness score (WARNING), the six known production findings, and the hosted Supabase, Realtime, provider, and external-scheduler checks still outstanding; verified the API function count remains 12
 - Corrected stale Dashboard/scanner documentation and Known Issues status to match current behavior and implementation
-- Phase 14 UI polish passed the focused 48-test suite and full 210-test suite; static/database build validation passed and the API remains at 12 functions. Physical device and Lighthouse checks remain open.
+- Phase 14 final-polish audit passed 212 tests and static/database build validation. All 12 pages were checked in Chromium at 320px, 768px, and 1280px with no remaining horizontal overflow; Lighthouse, supported-browser, physical-device, and production checks remain open. The API remains at 12 functions.
 - Analytics production-loading follow-up passed all 202 automated tests and static/database build validation; hosted Supabase/Vercel behavior remains unverified
 
 ### Fixed
 
 - Parallelized and slightly thickened the Agent Brain's right-side circuit tracks, keeping them clear of the top frame without changing status logic
+- Removed the fixed 320px minimum body width after the narrow-screen browser audit exposed horizontal overflow at 320px; all audited pages now fit the tested viewports
+- Added accessible captions and explicit `scope="col"` semantics to all seven Analytics tables, with a regression test
 - Collapsed dashboard metrics after Win Rate and Trade History search/filter controls by default; added a bounded scroll area with a sticky header to the trade table
 - Reset internal navigation destinations to the top on mobile, while leaving browser back/forward restoration intact
 - Analytics AI-decision pagination now treats HTTP `416` as end-of-results, ignores later prefetched ranges, and covers the requested empty, page-boundary, and 19,380-row regressions

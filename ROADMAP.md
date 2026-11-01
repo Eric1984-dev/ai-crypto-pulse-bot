@@ -202,10 +202,12 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Replace the C brand mark with a dark-green app icon and make the AI Crypto Bot brand link to Dashboard on every page
+- [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
+- [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist
-- [ ] Verify on physical iPhone, Android, and desktop devices
+- [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 
-Status: The requested interface refinements are implemented locally and validated with 210 passing tests and a successful build. Phase 14 remains in progress pending the full release checklist and physical-device verification.
+Status: Local interface refinements, responsive viewport checks, accessibility fixes, 212 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 has not started.
 
 ---
 
