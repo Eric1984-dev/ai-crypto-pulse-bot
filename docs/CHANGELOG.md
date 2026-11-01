@@ -17,6 +17,7 @@ All notable project changes should be documented here.
 ### Fixed
 
 - Parallelized and slightly thickened the Agent Brain's right-side circuit tracks, keeping them clear of the top frame without changing status logic
+- Added more pronounced angled elbows and subtle outward fanning to the right-side Agent Brain circuit traces, matching the supplied reference while preserving lane separation and status behavior
 - Removed the fixed 320px minimum body width after the narrow-screen browser audit exposed horizontal overflow at 320px; all audited pages now fit the tested viewports
 - Added accessible captions and explicit `scope="col"` semantics to all seven Analytics tables, with a regression test
 - Collapsed dashboard metrics after Win Rate and Trade History search/filter controls by default; added a bounded scroll area with a sticky header to the trade table

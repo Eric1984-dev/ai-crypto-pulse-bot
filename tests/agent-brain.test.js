@@ -446,6 +446,11 @@ test("Agent Brain adds reference-inspired traces and green neurons only while an
     return { minimum: Math.min(...values), maximum: Math.max(...values) };
   });
   assert.ok(circuitLaneBounds[0].maximum < 0.42);
+  const topLaneBend = tracePositions.getY(circuitStart + 3) - tracePositions.getY(circuitStart);
+  const bottomLaneStart = circuitStart + 6 * 6;
+  const bottomLaneBend = tracePositions.getY(bottomLaneStart + 3) - tracePositions.getY(bottomLaneStart);
+  assert.ok(topLaneBend > 0.06);
+  assert.ok(bottomLaneBend < -0.04);
   for (let lane = 0; lane < circuitLaneBounds.length - 1; lane += 1) {
     assert.ok(circuitLaneBounds[lane + 1].maximum < circuitLaneBounds[lane].minimum);
   }

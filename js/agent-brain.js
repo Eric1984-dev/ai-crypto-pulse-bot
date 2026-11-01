@@ -1159,7 +1159,8 @@
 
     const circuitPaths = Array.from({ length: 7 }, (_, lane) => {
       const y = 0.34 - lane * 0.12;
-      return [[0.48, y], [0.68, y], [0.8, y + 0.04], [1.16, y + 0.04]];
+      const bend = 0.01 + (3 - lane) * 0.02;
+      return [[0.48, y], [0.68, y], [0.8, y + bend], [1.16, y + bend]];
     });
     for (const path of circuitPaths) {
       addPath(path, -0.045, true);

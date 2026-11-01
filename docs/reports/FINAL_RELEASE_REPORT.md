@@ -19,6 +19,7 @@ Validation passed: `npm.cmd test` (212 tests, 0 failures), `npm.cmd run build`, 
 - Dashboard summary metrics after Win Rate and Trade History filters start collapsed. Trade History uses a bounded scrolling table with a sticky header and pagination.
 - Empty, loading, retry, and error states are present across data-driven pages; API calls use the existing authenticated routes.
 - The narrow-screen overflow found during review is fixed. No trading behavior or calculations changed.
+- Right-side Agent Brain circuit traces have pronounced angled elbows like the supplied reference; geometry regression checks preserve separation and top-frame clearance.
 
 ## Accessibility Findings
 
@@ -42,6 +43,7 @@ This is viewport-based browser testing only. It does not confirm rendering or to
 - Analytics uses bounded paginated source reads, 30/90/365-day history ranges, and bounded time-series output. Regression coverage includes 100,001 decisions, 100,001 snapshots, and 10,001 trades. Very large 365-day ranges may still take longer to aggregate.
 - CSV downloads reuse the existing dashboard-data function and stream bounded source pages rather than constructing the full raw export in the browser.
 - Agent Brain rendering is capped at 30 FPS, uses reduced pixel ratios on mobile, and limits its graph to 720 neural nodes, 2,160 connections, and 48 active signal paths.
+- Right-side circuit traces remain separated, use thicker ribbon geometry, and now include angled elbows without changing status-driven activity.
 - No production latency, Web Vitals, or Lighthouse measurements were available.
 
 ## Realtime Findings
@@ -103,7 +105,9 @@ This is a provisional release-gate score, not a production telemetry metric: 50%
 ## Files Changed
 
 - `analytics.html`
+- `js/agent-brain.js`
 - `css/styles.css`
+- `tests/agent-brain.test.js`
 - `tests/analytics-ui.test.js`
 - `tests/project-setup.test.js`
 - `README.md`
