@@ -3,6 +3,7 @@
     "/dashboard.html",
     "/portfolio.html",
     "/scanner.html",
+    "/analytics.html",
     "/history.html",
     "/exports.html",
     "/settings.html",

@@ -61,6 +61,8 @@ Phase 10 Trade History adds no tables or columns. It pages stored trade rows thr
 
 Phase 11 adds no tables, columns, policies, or Vercel Functions. Its versioned migration adds the existing status, emergency-state, portfolio, position, trade, snapshot, decision, watched-market, market-data, and candle tables to the existing `supabase_realtime` publication. The migration fails if that Supabase-managed publication is absent and skips tables already included, making it safe to apply to projects with preconfigured publication membership. Existing table grants and RLS continue to govern which authenticated user's changes are visible. The browser ignores change payloads and refreshes through the existing authenticated APIs.
 
+Phase 13 Analytics adds no tables, columns, indexes, policies, RPCs, migrations, or Vercel Functions. It reads `AI_Crypto_Bot_Trades`, `AI_Crypto_Bot_Positions`, `AI_Crypto_Bot_AI_Decisions`, `AI_Crypto_Bot_Portfolios`, and `AI_Crypto_Bot_Portfolio_Snapshots` through the existing authenticated dashboard-data function with the caller's JWT; all source reads remain subject to the existing RLS policies. Analytics aggregates are derived at request time and are not stored as duplicate history.
+
 ## Relationships and deletion behavior
 
 - `AI_Crypto_Bot_Profiles.id` references `auth.users.id`; deleting an Auth user cascades to its profile.

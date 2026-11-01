@@ -1468,6 +1468,63 @@ a:focus-visible {
   color: var(--accent);
 }
 
+.analytics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.analytics-toolbar p {
+  margin: 0;
+}
+
+.analytics-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.analytics-chart-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+}
+
+.analytics-period-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.analytics-table-grid {
+  gap: 14px;
+}
+
+.analytics-table {
+  min-width: 580px;
+}
+
+.analytics-insight {
+  padding: 14px 16px;
+  border: 1px solid #47795a;
+  border-radius: 10px;
+  background: #14221a;
+  color: #e6eee9;
+}
+
+.analytics-insight strong {
+  color: var(--accent);
+}
+
+.analytics-data-quality {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #8a653d;
+  border-radius: 10px;
+  background: rgb(138 101 61 / 14%);
+  color: #f0c992;
+}
+
 .export-card .dashboard-empty {
   margin: 0;
 }

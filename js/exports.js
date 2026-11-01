@@ -4,10 +4,17 @@
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
+    window.CryptoPulseExports = api;
     api.startExports({ windowRef: window, documentRef: document });
   }
 })(globalThis, function createExportsApi() {
   const supportedPeriods = new Set(["24h", "7d", "30d", "all"]);
+  const analyticsExportTypes = new Set([
+    "analytics-summary",
+    "trade-analytics",
+    "portfolio-analytics",
+    "ai-analytics"
+  ]);
   const countFormat = new Intl.NumberFormat("en-GB");
 
   function buildExportUrl(type, period, view = "export-count") {
@@ -49,6 +56,38 @@
     return data.recordCount;
   }
 
+  async function requestAnalyticsExportCounts(fetchImpl) {
+    const response = await fetchImpl("/api/dashboard-data?view=analytics", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) {
+      const error = new Error("Authentication is required.");
+      error.status = 401;
+      throw error;
+    }
+    if (!response.ok) {
+      throw new Error("Analytics export counts are unavailable.");
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("The analytics export count response is invalid.");
+    }
+    const counts = result && result.data && result.data.exportCounts;
+    if (!counts || typeof counts !== "object"
+      || [...analyticsExportTypes].some((type) =>
+        !Number.isSafeInteger(counts[type]) || counts[type] < 0
+      )) {
+      throw new Error("The analytics export count response is invalid.");
+    }
+    return counts;
+  }
+
   function startExports({
     windowRef = window,
     documentRef = document,
@@ -59,7 +98,12 @@
     }
 
     const cleanupCallbacks = [];
-    for (const card of documentRef.querySelectorAll("[data-export-card]")) {
+    const cards = [...documentRef.querySelectorAll("[data-export-card]")];
+    const analyticsCountsRequest = cards.some((card) =>
+      analyticsExportTypes.has(card.dataset.exportCard)
+    ) ? requestAnalyticsExportCounts(fetchImpl) : null;
+
+    for (const card of cards) {
       const type = card.dataset.exportCard;
       const periodSelect = card.querySelector("[data-export-period]");
       const countElement = card.querySelector("[data-export-count]");
@@ -100,13 +144,18 @@
         setStatus("");
 
         try {
-          const count = await requestExportCount(fetchImpl, type, period);
+          const count = analyticsExportTypes.has(type)
+            ? (await analyticsCountsRequest)[type]
+            : await requestExportCount(fetchImpl, type, period);
           if (disposed || currentRequest !== requestNumber) {
             return;
           }
           recordCount = count;
           if (countElement) {
-            countElement.textContent = `${countFormat.format(count)} ${count === 1 ? "record" : "records"} available`;
+            const noun = analyticsExportTypes.has(type)
+              ? (count === 1 ? "report row" : "report rows")
+              : (count === 1 ? "record" : "records");
+            countElement.textContent = `${countFormat.format(count)} ${noun} available`;
           }
           if (emptyState) {
             emptyState.hidden = count > 0;
@@ -173,5 +222,10 @@
     };
   }
 
-  return { buildExportUrl, requestExportCount, startExports };
+  return {
+    buildExportUrl,
+    requestAnalyticsExportCounts,
+    requestExportCount,
+    startExports
+  };
 });

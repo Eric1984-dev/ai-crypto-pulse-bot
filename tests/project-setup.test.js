@@ -27,7 +27,7 @@ test("all required placeholder pages exist", () => {
 });
 
 test("all pages use a dropdown for their top navigation", () => {
-  const protectedPages = ["dashboard.html", "portfolio.html", "scanner.html", "history.html", "exports.html", "settings.html", "admin.html"];
+  const protectedPages = ["dashboard.html", "portfolio.html", "scanner.html", "analytics.html", "history.html", "exports.html", "settings.html", "admin.html"];
   const accountPages = ["login.html", "register.html", "reset-password.html"];
 
   for (const page of requiredPages) {
@@ -44,7 +44,7 @@ test("all pages use a dropdown for their top navigation", () => {
       assert.match(menu[1], /href="\/login\.html"/);
       assert.match(menu[1], /href="\/register\.html"/);
     } else {
-      const expectedLinks = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/history.html", "/exports.html", "/settings.html"];
+      const expectedLinks = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/analytics.html", "/history.html", "/exports.html", "/settings.html"];
       if (protectedPages.includes(page)) {
         expectedLinks.push("/admin.html");
       }
@@ -65,6 +65,14 @@ test("market refresh endpoint remains available without a Vercel Cron configurat
   assert.equal(fs.statSync(path.join(rootDirectory, "api", "market-refresh.mjs")).isFile(), true);
   assert.equal(fs.statSync(path.join(rootDirectory, "api", "candle-refresh.mjs")).isFile(), true);
   assert.deepEqual(validateProject(), []);
+});
+
+test("Vercel serverless function count remains at the 12-function limit", () => {
+  const apiDirectory = path.join(rootDirectory, "api");
+  const functionCount = fs.readdirSync(apiDirectory)
+    .filter((name) => /\.(?:mjs|js)$/.test(name))
+    .length;
+  assert.equal(functionCount, 12);
 });
 
 test("protected trading pages disclose paper-only mode and initialize the auth guard", () => {

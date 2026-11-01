@@ -43,8 +43,25 @@ function createExportCard(type) {
   };
 }
 
-function createExportsDocument(card) {
+function createAnalyticsExportCard(type) {
+  const nodes = {
+    "[data-export-count]": createControl(),
+    "[data-export-empty]": createControl(),
+    "[data-export-download]": createControl(),
+    "[data-export-status]": createControl()
+  };
+  return {
+    dataset: { exportCard: type },
+    querySelector(selector) {
+      return nodes[selector] || null;
+    },
+    nodes
+  };
+}
+
+function createExportsDocument(cards) {
   const appended = [];
+  const cardList = Array.isArray(cards) ? cards : [cards];
   return {
     body: {
       append(element) {
@@ -56,7 +73,7 @@ function createExportsDocument(card) {
       return selector === "[data-exports-page]" ? {} : null;
     },
     querySelectorAll(selector) {
-      return selector === "[data-export-card]" ? [card] : [];
+      return selector === "[data-export-card]" ? cardList : [];
     },
     createElement(tagName) {
       return {
@@ -124,6 +141,45 @@ test("export page displays counts, empty states, download status, and failures",
   assert.equal(card.nodes["[data-export-download]"].disabled, true);
   assert.equal(card.nodes["[data-export-status]"].dataset.state, "error");
   assert.ok(requests.some((url) => url.includes("period=7d")));
+  cleanup();
+});
+
+test("analytics export cards share one analytics request and download all-history CSV", async () => {
+  const types = ["analytics-summary", "trade-analytics", "portfolio-analytics", "ai-analytics"];
+  const cards = types.map(createAnalyticsExportCard);
+  const documentRef = createExportsDocument(cards);
+  const requests = [];
+  const windowRef = {
+    fetch: async (url) => {
+      requests.push(url);
+      return {
+        status: 200,
+        ok: true,
+        async json() {
+          return {
+            data: {
+              exportCounts: Object.fromEntries(types.map((type) => [type, 3]))
+            }
+          };
+        }
+      };
+    },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+
+  const cleanup = exportsPage.startExports({ windowRef, documentRef });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics").length, 1);
+  for (const card of cards) {
+    assert.equal(card.nodes["[data-export-count]"].textContent, "3 report rows available");
+    assert.equal(card.nodes["[data-export-download]"].disabled, false);
+  }
+  await cards[0].nodes["[data-export-download]"].trigger("click");
+  assert.equal(
+    documentRef.appended[0].href,
+    "/api/dashboard-data?view=export&type=analytics-summary&period=all"
+  );
   cleanup();
 });
 

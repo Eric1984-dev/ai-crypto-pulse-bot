@@ -280,6 +280,20 @@ Supabase requests are mocked; these checks do not prove remote RLS configuration
 
 ---
 
+## Phase 13 Analytics validation
+
+Analytics tests cover SELL-based win/loss and breakeven handling, signed average loss, realized/unrealized/total P&L, profit factor, paired-trade hold time, confidence-range boundaries including 100, BUY/SELL/HOLD attribution, strategy and symbol grouping, portfolio growth and daily/weekly/monthly performance, snapshot drawdown, empty data, and 1,201 trades paginated across 500-row reads. Export tests validate all four Analytics CSV types, row counts, headers, report content, and reuse of the authenticated dashboard-data route. UI tests verify loading/empty/error states, rendered metrics, and that four Analytics export cards share one analytics count request.
+
+```powershell
+node --test tests/analytics.test.mjs tests/analytics-ui.test.js tests/exports.test.mjs tests/exports-ui.test.js tests/project-setup.test.js tests/auth.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+In the Phase 13 validation run, the complete `npm.cmd test` suite passed 196 tests with 0 failures. `npm.cmd run build` passed static project validation and database migration validation (16 prefixed tables, RLS coverage, and initial seed consistency). The API directory contains exactly 12 function files. Tests use mocked Supabase/PostgREST responses; they do not prove hosted database correctness, production-scale latency, or Vercel deployment behavior. Analytics export reports process all retained history and can become slow for very large accounts despite bounded-page reads and bounded browser series. See [the Phase 13 Analytics report](../PHASE_13_ANALYTICS_REPORT.md) for calculation methodology and limitations. Phase 14 has not started.
+
+---
+
 ## Regression Testing
 
 Every completed phase must be followed by regression testing.

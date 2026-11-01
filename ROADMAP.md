@@ -178,59 +178,15 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 
 ## Phase 13 - Analytics & Strategy Insights
 
-Status:
-Planned
+- [x] Add a protected Analytics page, separate from Dashboard, Scanner, Portfolio, and Trade History
+- [x] Calculate trade win/loss rates, averages, profit factor, realized/unrealized/total P&L, drawdown, best/worst trades, hold time, and open/closed positions from existing tables
+- [x] Attribute stored AI decision outcomes by confidence range, action, strategy, and symbol, with unscored decisions identified
+- [x] Display portfolio growth, equity curve, daily/weekly/monthly performance, and drawdown history
+- [x] Add Analytics Summary, Trade Analytics, Portfolio Analytics, and AI Analytics CSV exports to the existing Exports page and authenticated dashboard-data function
+- [x] Paginate existing data reads, bound rendered time series, and test empty and large datasets
+- [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Goal:
-
-Transform collected trading data into actionable insights.
-
-Focus:
-
-- Trade Performance
-- Portfolio Performance
-- AI Decision Quality
-- Strategy Evaluation
-- Risk Analysis
-
-Features:
-
-- Win Rate
-- Loss Rate
-- Average Win
-- Average Loss
-- Profit Factor
-- Drawdown Analysis
-- Best/Worst Trades
-- Confidence Performance Analysis
-- Symbol Performance Analysis
-- Equity Curve
-- Portfolio Growth Metrics
-
-Data Sources:
-
-- AI_Crypto_Bot_Trades
-- AI_Crypto_Bot_Positions
-- AI_Crypto_Bot_AI_Decisions
-- AI_Crypto_Bot_Portfolios
-- AI_Crypto_Bot_Portfolio_Snapshots
-
-Exports Integration:
-
-- Analytics CSV Export
-- Performance Reports
-- Strategy Reports
-
-Dashboard Integration:
-
-Dedicated Analytics page.
-
-Constraints:
-
-- Reuse existing infrastructure.
-- No unnecessary API endpoints.
-- Stay within Vercel Hobby limits.
-- Maintain 12-function maximum.
+Status: Implementation and local validation complete. No new database objects or Vercel Functions were added. Hosted production behavior remains unverified; Phase 14 has not started.
 
 ---
 

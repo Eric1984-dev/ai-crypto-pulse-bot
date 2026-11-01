@@ -8,6 +8,7 @@ const requiredPages = [
   "dashboard.html",
   "portfolio.html",
   "scanner.html",
+  "analytics.html",
   "history.html",
   "exports.html",
   "admin.html",
@@ -130,7 +131,7 @@ function validateProject() {
     errors.push("Missing server-side administrator authorization helper: lib/admin-auth.js");
   }
 
-  const protectedPages = ["dashboard", "portfolio", "scanner", "history", "exports", "settings", "admin"];
+  const protectedPages = ["dashboard", "portfolio", "scanner", "analytics", "history", "exports", "settings", "admin"];
   for (const page of protectedPages) {
     for (const source of [`^/${page}$`, `^/${page}\\.html$`]) {
       const hasRoute = (vercelConfig?.routes || []).some((route) =>

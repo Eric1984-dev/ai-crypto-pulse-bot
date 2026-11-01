@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Review paper-trading performance, AI decision outcomes, and portfolio growth.">
+    <title>Analytics · CryptoPulse</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+    <script src="/js/formatters.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="/js/analytics.js" defer></script>
+  </head>
+  <body data-auth-page="protected">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/index.html"><span class="brand-mark" aria-hidden="true">C</span> CryptoPulse</a>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <details class="nav-dropdown">
+            <summary class="nav-trigger">Menu</summary>
+            <div class="nav-menu">
+              <a data-nav-link href="/dashboard.html">Dashboard</a>
+              <a data-nav-link href="/portfolio.html">Portfolio</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/analytics.html">Analytics</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/exports.html">Exports</a>
+              <a data-nav-link href="/settings.html">Settings</a>
+              <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
+              <span class="account-email" data-user-email></span>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
+            </div>
+          </details>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell" data-analytics-page>
+      <p data-auth-message role="status" aria-live="polite"></p>
+      <p class="eyebrow">Performance</p>
+      <h1>Analytics &amp; Strategy Insights</h1>
+      <p class="page-description">Evaluate realized trade outcomes, AI decision quality, and portfolio performance using stored paper-trading data. Metrics are account-scoped and use all retained history.</p>
+      <div class="mode-banner">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <strong>PAPER ACTIVE</strong>
+        <span>Analytics report simulated activity only and do not place orders.</span>
+      </div>
+      <div class="analytics-toolbar">
+        <p class="dashboard-muted" data-analytics-updated role="status" aria-live="polite"></p>
+        <a class="history-search-button" href="/exports.html#analytics-exports">Export Analytics CSVs</a>
+      </div>
+      <p class="dashboard-updated" data-analytics-loading role="status" aria-live="polite">Loading analytics…</p>
+      <p class="dashboard-error" data-analytics-error role="alert" hidden></p>
+      <button class="dashboard-retry" data-analytics-retry type="button" hidden>Try again</button>
+
+      <section class="dashboard-section" aria-labelledby="analytics-trade-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Trade Performance</p>
+            <h2 id="analytics-trade-heading">Trading results</h2>
+          </div>
+          <span class="dashboard-muted"><span data-analytics-value="closedTrades">—</span> closed trades</span>
+        </div>
+        <dl class="dashboard-metrics analytics-metrics">
+          <div class="metric-card"><dt>Win Rate</dt><dd data-analytics-value="winRate">—</dd></div>
+          <div class="metric-card"><dt>Loss Rate</dt><dd data-analytics-value="lossRate">—</dd></div>
+          <div class="metric-card"><dt>Average Win</dt><dd data-analytics-value="averageWin">—</dd></div>
+          <div class="metric-card"><dt>Average Loss</dt><dd data-analytics-value="averageLoss">—</dd></div>
+          <div class="metric-card"><dt>Profit Factor</dt><dd data-analytics-value="profitFactor">—</dd></div>
+          <div class="metric-card"><dt>Realized P&amp;L</dt><dd data-analytics-value="realizedPnl">—</dd></div>
+          <div class="metric-card"><dt>Unrealized P&amp;L</dt><dd data-analytics-value="unrealizedPnl">—</dd></div>
+          <div class="metric-card"><dt>Total P&amp;L</dt><dd data-analytics-value="totalPnl">—</dd></div>
+          <div class="metric-card"><dt>Best Trade</dt><dd data-analytics-value="bestTrade">—</dd></div>
+          <div class="metric-card"><dt>Worst Trade</dt><dd data-analytics-value="worstTrade">—</dd></div>
+          <div class="metric-card"><dt>Largest Winner</dt><dd data-analytics-value="largestWinner">—</dd></div>
+          <div class="metric-card"><dt>Largest Loser</dt><dd data-analytics-value="largestLoser">—</dd></div>
+          <div class="metric-card"><dt>Average Hold Time</dt><dd data-analytics-value="averageHoldTime">—</dd></div>
+          <div class="metric-card"><dt>Open Positions</dt><dd data-analytics-value="openPositions">—</dd></div>
+          <div class="metric-card"><dt>Closed Positions</dt><dd data-analytics-value="closedPositions">—</dd></div>
+        </dl>
+        <div class="dashboard-grid analytics-table-grid">
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Market Results</p><h2>Best and Worst Markets</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table">
+                <thead><tr><th>Market</th><th>Closed Trades</th><th>Win Rate</th><th>Realized P&amp;L</th></tr></thead>
+                <tbody data-analytics-symbols></tbody>
+              </table>
+            </div>
+            <p class="dashboard-empty" data-analytics-symbols-empty hidden>No closed trades are available for market ranking.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="analytics-ai-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AI Decision Quality</p>
+            <h2 id="analytics-ai-heading">Decision outcomes</h2>
+          </div>
+          <span class="dashboard-muted"><span data-analytics-value="decisionCount">—</span> recorded decisions</span>
+        </div>
+        <p class="analytics-insight">Best confidence range by average outcome P&amp;L: <strong data-analytics-best-confidence>—</strong>. Worst confidence range: <strong data-analytics-worst-confidence>—</strong>.</p>
+        <p class="card-description">BUY outcomes are linked to the realized result of their paired SELL. SELL outcomes use their stored realized P&amp;L. HOLD outcomes use the later realized result while a position was open, or current unrealized P&amp;L when it remains open. Decisions without a linked position outcome are unscored.</p>
+        <div class="dashboard-grid analytics-table-grid">
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Confidence</p><h2>Confidence Ranges</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table">
+                <thead><tr><th>Range</th><th>Decisions</th><th>Scored</th><th>Win Rate</th><th>Average P&amp;L</th><th>Net P&amp;L</th></tr></thead>
+                <tbody data-analytics-confidence></tbody>
+              </table>
+            </div>
+            <p class="dashboard-muted">Ranges are [70, 75), [75, 80), [80, 85), and [85, 100]. Decisions below 70 are not included in these groups: <span data-analytics-below-70>—</span>.</p>
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Action Results</p><h2>BUY, SELL, and HOLD Effectiveness</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table">
+                <thead><tr><th>Action</th><th>Decisions</th><th>Scored</th><th>Unscored</th><th>Win Rate</th><th>Net P&amp;L</th></tr></thead>
+                <tbody data-analytics-actions></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Strategy Evaluation</p><h2>Strategy Performance</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table">
+                <thead><tr><th>Strategy</th><th>Decisions</th><th>Scored</th><th>Win Rate</th><th>Net P&amp;L</th></tr></thead>
+                <tbody data-analytics-strategies></tbody>
+              </table>
+            </div>
+            <p class="dashboard-empty" data-analytics-strategies-empty hidden>No versioned strategy decisions are available.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="analytics-portfolio-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Portfolio Performance</p>
+            <h2 id="analytics-portfolio-heading">Growth and drawdown</h2>
+          </div>
+          <span class="dashboard-muted"><span data-analytics-value="portfolioGrowth">—</span> portfolio growth</span>
+        </div>
+        <div class="dashboard-grid analytics-chart-grid">
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Equity Curve</p><h2>Portfolio Value</h2></div></div>
+            <div class="chart-frame">
+              <canvas data-analytics-chart="equity" aria-label="Daily portfolio equity curve" role="img" hidden></canvas>
+              <p class="dashboard-empty" data-analytics-chart-empty="equity">Portfolio history will appear after the first snapshot.</p>
+            </div>
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Drawdown History</p><h2>Daily Drawdown</h2></div></div>
+            <div class="chart-frame">
+              <canvas data-analytics-chart="drawdown" aria-label="Daily portfolio drawdown history" role="img" hidden></canvas>
+              <p class="dashboard-empty" data-analytics-chart-empty="drawdown">Drawdown history will appear after the first snapshot.</p>
+            </div>
+          </article>
+        </div>
+        <div class="dashboard-grid analytics-period-grid">
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Daily Performance</p><h2>Recent Days</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table"><thead><tr><th>Date (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="daily"></tbody></table>
+            </div>
+            <p class="dashboard-empty" data-analytics-period-empty="daily" hidden>No daily snapshots are available.</p>
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Weekly Performance</p><h2>Recent Weeks</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table"><thead><tr><th>Week Starting (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="weekly"></tbody></table>
+            </div>
+            <p class="dashboard-empty" data-analytics-period-empty="weekly" hidden>No weekly snapshots are available.</p>
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Monthly Performance</p><h2>Recent Months</h2></div></div>
+            <div class="history-table-wrap">
+              <table class="history-table analytics-table"><thead><tr><th>Month (UTC)</th><th>Period P&amp;L</th><th>Portfolio Value</th></tr></thead><tbody data-analytics-period="monthly"></tbody></table>
+            </div>
+            <p class="dashboard-empty" data-analytics-period-empty="monthly" hidden>No monthly snapshots are available.</p>
+          </article>
+        </div>
+      </section>
+
+      <p class="analytics-data-quality" data-analytics-data-quality hidden></p>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>CryptoPulse · Paper Trading</span>
+        <span>© <span data-current-year></span> CryptoPulse</span>
+      </div>
+    </footer>
+  </body>
+</html>

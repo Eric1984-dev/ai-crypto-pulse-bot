@@ -5,6 +5,15 @@ import {
   ExportRequestError,
   ExportSessionError
 } from "../lib/exports.mjs";
+import {
+  AnalyticsDataError,
+  createAnalyticsService
+} from "../lib/analytics.mjs";
+import {
+  createAnalyticsExportsService,
+  getAnalyticsExportCounts,
+  isAnalyticsExportType
+} from "../lib/analytics-exports.mjs";
 
 const {
   clearSessionCookie,
@@ -47,6 +56,8 @@ export function createHandler({
   now = () => new Date()
 } = {}) {
   const exportsService = createExportsService({ fetchImpl });
+  const analyticsService = createAnalyticsService({ fetchImpl });
+  const analyticsExportsService = createAnalyticsExportsService({ analyticsService });
   return async function handler(req, res) {
     setResponseHeaders(res);
     if (req.method !== "GET") {
@@ -97,17 +108,20 @@ export function createHandler({
       }
 
       if (request.view === "export-count") {
-        const recordCount = await exportsService.getRecordCount({
+        const exportType = request.params.get("type");
+        const period = request.params.get("period") || "all";
+        const service = isAnalyticsExportType(exportType) ? analyticsExportsService : exportsService;
+        const recordCount = await service.getRecordCount({
           config,
           accessToken,
-          exportType: request.params.get("type"),
-          period: request.params.get("period") || "all",
+          exportType,
+          period,
           now: now()
         });
         sendJson(res, 200, {
           data: {
-            exportType: request.params.get("type"),
-            period: request.params.get("period") || "all",
+            exportType,
+            period,
             recordCount
           }
         });
@@ -115,10 +129,12 @@ export function createHandler({
       }
 
       if (request.view === "export") {
-        await exportsService.streamCsv({
+        const exportType = request.params.get("type");
+        const service = isAnalyticsExportType(exportType) ? analyticsExportsService : exportsService;
+        await service.streamCsv({
           config,
           accessToken,
-          exportType: request.params.get("type"),
+          exportType,
           period: request.params.get("period") || "all",
           now: now(),
           response: res
@@ -126,9 +142,15 @@ export function createHandler({
         return;
       }
 
-      const data = request.view === "trade-history"
-        ? await loadTradeHistory({ config, accessToken, fetchImpl, now, params: request.params })
-        : await loadDashboardData({ config, accessToken, fetchImpl, now });
+      let data;
+      if (request.view === "trade-history") {
+        data = await loadTradeHistory({ config, accessToken, fetchImpl, now, params: request.params });
+      } else if (request.view === "analytics") {
+        data = await analyticsService.load({ config, accessToken, now: now() });
+        data.exportCounts = getAnalyticsExportCounts(data);
+      } else {
+        data = await loadDashboardData({ config, accessToken, fetchImpl, now });
+      }
       sendJson(res, 200, { data });
     } catch (error) {
       if (res.headersSent) {
@@ -168,7 +190,10 @@ export function createHandler({
         return;
       }
 
-      if (error instanceof DashboardDataError || error instanceof ExportDataError || error instanceof TypeError) {
+      if (error instanceof DashboardDataError
+        || error instanceof AnalyticsDataError
+        || error instanceof ExportDataError
+        || error instanceof TypeError) {
         sendJson(res, 503, {
           error: { code: "DASHBOARD_DATA_UNAVAILABLE", message: "Dashboard data is temporarily unavailable." }
         });
@@ -191,7 +216,7 @@ function readDashboardRequest(req) {
     return null;
   }
   const views = url.searchParams.getAll("view");
-  const supportedViews = new Set(["trade-history", "export-count", "export"]);
+  const supportedViews = new Set(["trade-history", "analytics", "export-count", "export"]);
   if (views.length > 1 || (views.length === 1 && !supportedViews.has(views[0]))) {
     return null;
   }

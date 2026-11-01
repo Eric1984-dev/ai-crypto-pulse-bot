@@ -29,7 +29,7 @@ Clears the server-side route-guard cookie. Success: `204 No Content`.
 
 ### Protected page routes
 
-Vercel rewrites `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html`, and `settings.html` to `/api/protected-page`. The function verifies the HttpOnly cookie with Supabase Auth before returning the page. Unauthenticated or invalid sessions receive a `302` redirect to `/login.html` with a safe internal `next` path. Supabase Auth unavailability fails closed with `503`.
+Vercel rewrites `dashboard.html`, `analytics.html`, `portfolio.html`, `scanner.html`, `history.html`, and `settings.html` to `/api/protected-page`. The function verifies the HttpOnly cookie with Supabase Auth before returning the page. Unauthenticated or invalid sessions receive a `302` redirect to `/login.html` with a safe internal `next` path. Supabase Auth unavailability fails closed with `503`.
 
 Registration, login, logout, password-reset email, and password updates use the Supabase JS Auth SDK directly. No application database, market, trading, or scanner API is implemented in Phase 02.
 
@@ -130,12 +130,37 @@ Statistics are all-time and intentionally independent of the current list filter
 
 The page uses the existing 30-second visible-tab refresh cadence, with same-origin credentials and `no-store` requests. An empty result is a successful empty page, not an API error. Invalid view/filter values return `400`; unauthenticated sessions return `401`; missing permissions, migration, configuration, or database availability fail closed with the existing generic `503` dashboard response. Every persisted trade is shown with status `Executed · Paper Trade`; the trades table has no separate status column.
 
+### Analytics view
+
+The protected `analytics.html` page uses `GET /api/dashboard-data?view=analytics`; this is a view on the existing authenticated Vercel Function, not a new function or endpoint. The handler verifies the same HttpOnly session and reads with the caller's JWT and anon key, so existing Supabase RLS policies remain in force. It reads portfolios, positions, trades, AI decisions, and portfolio snapshots only; it creates no records.
+
+The response contains:
+
+- `tradePerformance`: closed/winning/losing/breakeven trade counts; win/loss rates; average win/loss; profit factor; realized, unrealized, and total P&L; best/worst trade and largest winner/loser; average hold time; open/closed position counts; and per-symbol performance.
+- `aiPerformance`: confidence buckets (`70–75`, `75–80`, `80–85`, `85+`), BUY/SELL/HOLD/WAIT action results, strategy and symbol results, best/worst scored confidence ranges, and decision/scored/unscored counts.
+- `portfolio`: current value and growth, maximum drawdown, equity curve, drawdown history, and daily, weekly, and monthly performance.
+- `dataQuality`: unmatched or unpaired trade/decision counts.
+- `exportCounts`: report-row counts for the four Analytics CSV types.
+
+Historical tables are read in stable pages of at most 500 rows. Trade and decision streams are merged by market and timestamp; only bounded aggregates and series are returned to the browser. The UI series are capped at 365 daily, 260 weekly, and 120 monthly points. Maximum drawdown is calculated across the full stored snapshot history.
+
+Calculation and attribution semantics:
+
+- Win/loss rates divide winning/losing SELL trades by all SELL trades; breakeven SELL trades remain in the denominator but count as neither wins nor losses. Average loss remains signed. Profit factor is gross realized gains divided by the absolute gross realized losses, and is unavailable when there are no realized losses.
+- Realized P&L sums stored SELL `realized_pnl`; unrealized P&L sums stored `unrealized_pnl` for OPEN positions. Total P&L is the sum of current portfolio values less combined starting balances.
+- Hold time is inferred from paired BUY/SELL trade timestamps. It is unavailable when no pairs exist.
+- Confidence buckets are non-overlapping: `70 <= confidence < 75`, `75 <= confidence < 80`, `80 <= confidence < 85`, and `85 <= confidence <= 100`. Values below 70 are reported separately.
+- BUY outcomes use a paired subsequent SELL result; SELL outcomes use their stored realized P&L. HOLD is scored only when an open position exists, using its subsequent realized result or current unrealized P&L if still open. Decisions without an attributable outcome are marked unscored. This is outcome attribution, not a counterfactual test of alternative decisions.
+- Portfolio daily/weekly/monthly performance and the equity/drawdown curves are derived from stored snapshots; no missing history is fabricated.
+
+Unauthenticated sessions return `401`; invalid data views return `400`; authentication or database unavailability returns the existing generic `503` response. Responses are `no-store`. Hosted Supabase behavior is not established by local mocked tests.
+
 ### CSV Exports view
 
 The protected Exports page reuses the authenticated `GET /api/dashboard-data` function; it adds no endpoint or Vercel Function. Both views require a verified session and use the caller's JWT and existing RLS policies:
 
-- `view=export-count&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` returns `{ "data": { "count": 123 } }` using an exact, RLS-filtered count.
-- `view=export&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` streams a CSV response. Data is read from Supabase in stable, 500-row Range pages and is written incrementally; it is not accumulated as a full dataset in application memory.
+- `view=export-count&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all>` returns `{ "data": { "exportType": "...", "period": "...", "recordCount": 123 } }`. Analytics report types accept `period=all` only; their count is the number of CSV report rows.
+- `view=export&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all>` streams a CSV response. Raw datasets are read from Supabase in stable, 500-row Range pages and written incrementally; they are not accumulated as a full dataset in application memory. Analytics exports calculate from the paginated analytics view and stream the resulting report rows.
 
 The date filters use rolling UTC cutoffs. The CSV is UTF-8 with a BOM, CRLF line endings, a header row, standard quoting, and spreadsheet-formula neutralization for untrusted text.
 
@@ -145,6 +170,12 @@ Export columns:
 - **Portfolio snapshots** (`AI_Crypto_Bot_Portfolio_Snapshots`): Timestamp, Portfolio Value, Available Balance, Open Positions, Total PnL, Daily PnL. Total PnL uses the stored portfolio starting balance; Daily PnL aggregates stored realized SELL PnL by portfolio and UTC day, consistent with the dashboard.
 - **AI decisions** (`AI_Crypto_Bot_AI_Decisions`): Timestamp, Symbol, Decision, Confidence, Market Strength, Reason. Market Strength is read from the stored `indicators.marketStrength` value.
 - **Positions** (`AI_Crypto_Bot_Positions`): Open Date, Symbol, Entry Price, Current Price, Position Value, Unrealized PnL, Status. Position Value uses the stored current price × amount.
+- **Analytics Summary**: metric, value, unit, and methodology/detail rows.
+- **Trade Analytics**: overall and per-symbol closed/winning/losing/breakeven counts, win rate, average outcomes, profit factor, realized P&L, largest outcomes, and average hold time.
+- **Portfolio Analytics**: one row per retained daily period with portfolio value, period P&L, drawdown, and growth.
+- **AI Analytics**: confidence-bucket, action, strategy, and market outcome summaries, including scored/unscored decisions and attributed P&L.
+
+Analytics reports use all retained history and have no date filter. The export count is based on report rows rather than source trade/decision counts.
 
 The export view returns `400` for invalid export types or periods and `401` for missing or expired sessions. Configuration, permission, and database failures use the existing generic `503` response. Once streaming starts, a later storage failure terminates the stream rather than returning a success-shaped partial file. Responses are `no-store` and contain no provider credentials or raw database errors.
 

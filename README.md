@@ -21,28 +21,29 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Phase 10 vervangt de history-placeholder door een geauthenticeerd, filterbaar en server-side gepagineerd overzicht van opgeslagen paper-trades. Zoeken, actie/periodefilters en sortering werken op de server; statistieken worden met een SECURITY INVOKER-RPC over alle zichtbare opgeslagen SELL-uitvoeringen berekend. Trade History en Portfolio tonen BUY-kosten en SELL-opbrengsten uit bestaande uitvoeringsvelden; dit wijzigt geen database- of paper-tradingberekeningen.
 - Phase 11 gebruikt een gedeelde client-side Supabase Realtime-manager voor dashboard, portfolio, trade history en scanner. Tabelupdates triggeren bestaande geauthenticeerde API-refreshes; polling blijft de fallback, en er zijn geen Vercel Functions of endpoints toegevoegd.
 - De beschermde Exports-pagina downloadt Trades, Portfolio Snapshots, AI Decisions en Positions als gefilterde CSV-bestanden. Exacte recordaantallen en gestreamde pagina's gebruiken de bestaande geauthenticeerde `/api/dashboard-data`-function; de API-functiontelling blijft 12 en er zijn geen databasewijzigingen.
+- Phase 13 voegt een aparte, beschermde Analytics-pagina toe voor trade-, AI-, strategie- en portfolioprestaties. De berekeningen gebruiken uitsluitend bestaande RLS-afgeschermde gegevens, worden via bestaande 500-rijpaginatie geladen en zijn als vier CSV-rapporten beschikbaar via de bestaande dashboard-datafunctie. Er zijn geen tabellen, API-functions of handelslogica toegevoegd.
 - De Three.js Agent Brain gebruikt de actuele `AI_Crypto_Bot_Status.status`-waarde en ververst deze via een geauthenticeerde status-API. Een front-facing, bilaterale contour met ongeveer 13% extra hoogte ten opzichte van de breedteschaal, een duidelijke middenspleet, gebogen corticale paden, neuronen, hotspots en bewegende energie vormt het brein. Subtiele blauwe golfbanen links en vertakkende circuitsporen rechts volgen de aangeleverde beeldreferentie; langs beide kanten zijn extra neuronen en statusgestuurde bewegende lichtsignalen zichtbaar. Tijdens `ANALYZING` lichten 52 extra neuronen groen op; de bestaande statusbron, statusmapping en agentlogica blijven ongewijzigd. Alle 720 basisneuronen pulseren onafhankelijk en maximaal 48 signalen bewegen langs opeenvolgende verbindingen. Agent Status gebruikt een grotere, volledige dashboardrij met een statusgestuurde animatie; Emergency State/Risk Control staat onderaan het dashboard.
 - De scanner gebruikt bestaande opgeslagen marktdata en AI-beslissingen, maar voert geen AI-analyse of trades uit. Settings blijft een placeholder; strategieoptimalisatie, backtesting en live trading zijn niet geïmplementeerd. De AI Engine blijft analysis-only; paper-trades worden uitsluitend door de afzonderlijke Phase 08 risk-managed executor aangemaakt.
 - Trading-gerelateerde pagina's tonen **PAPER ACTIVE**. Er worden geen echte orders uitgevoerd.
 - `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard. De paper-tradingcode gebruikt geen private Bitvavo-endpoints, exchange-accountgegevens of echte orders.
-- Phase 11 code en lokale validatie zijn afgerond; verificatie van de hosted Supabase-publicatiemigratie en live reconnects blijft open. De Phase 12-systeemvalidatie is uitgevoerd: 169 tests en de statische/database-build slaagden, met een productie-readinessscore van 50% (WARNING). Phase 13 is niet gestart.
+- Phase 11 code en lokale validatie zijn afgerond; verificatie van de hosted Supabase-publicatiemigratie en live reconnects blijft open. De Phase 12-systeemvalidatie noteerde een productie-readinessscore van 50% (WARNING). Phase 13 Analytics is lokaal geïmplementeerd en gevalideerd; hosted productiegedrag is niet geverifieerd. Phase 14 is niet gestart.
 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, export-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
+api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, analytics-, export-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
-js/         Browsercode, Supabase Auth- en Realtime-services, dashboard-, scanner-, exports- en trade-history-rendering en Three.js Agent Brain
-lib/        Server-side sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
+js/         Browsercode, Supabase Auth- en Realtime-services, dashboard-, analytics-, scanner-, exports- en trade-history-rendering en Three.js Agent Brain
+lib/        Server-side analytics-, sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
 tests/      Node.js unit- en routetests
 ```
 
-Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`. Beschermde pagina's: `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html`, `exports.html` en `settings.html`. De Supabase anon key wordt vanuit serveromgeving beschikbaar gemaakt voor de browser; gebruik nooit een service-role key.
+Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`. Beschermde pagina's: `dashboard.html`, `analytics.html`, `portfolio.html`, `scanner.html`, `history.html`, `exports.html` en `settings.html`. De Supabase anon key wordt vanuit serveromgeving beschikbaar gemaakt voor de browser; gebruik nooit een service-role key.
 
 ## Configuratie en checks
 
@@ -97,4 +98,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 10 completion report](./docs/PHASE_10_COMPLETION_REPORT.md)
 - [Phase 11 completion report](./docs/PHASE_11_COMPLETION_REPORT.md)
 - [Exports module report](./EXPORTS_MODULE_REPORT.md)
+- [Phase 13 Analytics report](./PHASE_13_ANALYTICS_REPORT.md)
 - [Phase 07 candle query fix report](./docs/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
