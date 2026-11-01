@@ -153,6 +153,24 @@ test("subscribes only to scanner tables and coalesces event bursts", () => {
   unsubscribe();
 });
 
+test("recommendations subscribe to analytics source tables only", () => {
+  const client = createClient();
+  const environment = createBrowserEnvironment();
+  const unsubscribe = subscribe(client, environment, "recommendations", () => {});
+
+  assert.deepEqual(
+    client.channels[0].bindings.map((binding) => binding.filter.table).sort(),
+    [
+      "AI_Crypto_Bot_AI_Decisions",
+      "AI_Crypto_Bot_Portfolio_Snapshots",
+      "AI_Crypto_Bot_Portfolios",
+      "AI_Crypto_Bot_Positions",
+      "AI_Crypto_Bot_Trades"
+    ].sort()
+  );
+  unsubscribe();
+});
+
 test("recovers after a Realtime connection error and reports state", () => {
   const client = createClient();
   const environment = createBrowserEnvironment();

@@ -16,6 +16,7 @@ import {
   getAnalyticsExportCounts,
   isAnalyticsExportType
 } from "../lib/analytics-exports.mjs";
+import { generateRecommendations } from "../lib/recommendations.mjs";
 
 const {
   clearSessionCookie,
@@ -163,6 +164,14 @@ export function createHandler({
           period: readAnalyticsPeriod(request.params)
         });
         data.exportCounts = getAnalyticsExportCounts(data);
+      } else if (request.view === "recommendations") {
+        const analytics = await analyticsService.load({
+          config,
+          accessToken,
+          now: now(),
+          period: readAnalyticsPeriod(request.params)
+        });
+        data = generateRecommendations(analytics);
       } else {
         data = await loadDashboardData({ config, accessToken, fetchImpl, now });
       }
@@ -316,7 +325,13 @@ function readDashboardRequest(req) {
     return null;
   }
   const views = url.searchParams.getAll("view");
-  const supportedViews = new Set(["trade-history", "analytics", "export-count", "export"]);
+  const supportedViews = new Set([
+    "trade-history",
+    "analytics",
+    "recommendations",
+    "export-count",
+    "export"
+  ]);
   if (views.length > 1 || (views.length === 1 && !supportedViews.has(views[0]))) {
     return null;
   }

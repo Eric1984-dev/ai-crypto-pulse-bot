@@ -4,6 +4,7 @@
     "/portfolio.html",
     "/scanner.html",
     "/analytics.html",
+    "/recommendations.html",
     "/history.html",
     "/exports.html",
     "/settings.html",

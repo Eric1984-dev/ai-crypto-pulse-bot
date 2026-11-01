@@ -10,6 +10,8 @@
     { "src": "^/scanner\\.html$", "dest": "/api/protected-page?page=scanner" },
     { "src": "^/analytics$", "dest": "/api/protected-page?page=analytics" },
     { "src": "^/analytics\\.html$", "dest": "/api/protected-page?page=analytics" },
+    { "src": "^/recommendations$", "dest": "/api/protected-page?page=recommendations" },
+    { "src": "^/recommendations\\.html$", "dest": "/api/protected-page?page=recommendations" },
     { "src": "^/history$", "dest": "/api/protected-page?page=history" },
     { "src": "^/history\\.html$", "dest": "/api/protected-page?page=history" },
     { "src": "^/exports$", "dest": "/api/protected-page?page=exports" },

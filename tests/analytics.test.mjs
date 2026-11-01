@@ -292,6 +292,12 @@ test("confidence boundaries and BUY, SELL, HOLD outcome attribution are explicit
     ["80–85", 1],
     ["85+", 2]
   ]);
+  assert.deepEqual(ai.confidenceBuckets.map(({ label, tradeCount }) => [label, tradeCount]), [
+    ["70–75", 1],
+    ["75–80", 1],
+    ["80–85", 0],
+    ["85+", 1]
+  ]);
   assert.equal(ai.actions.BUY.scoredCount, 2);
   assert.equal(ai.actions.BUY.wins, 1);
   assert.equal(ai.actions.BUY.losses, 1);
@@ -303,6 +309,7 @@ test("confidence boundaries and BUY, SELL, HOLD outcome attribution are explicit
   assert.equal(ai.bestConfidenceRange.label, "70–75");
   assert.equal(ai.worstConfidenceRange.label, "80–85");
   assert.equal(ai.strategies.length, 2);
+  assert.equal(ai.strategies.find(({ label }) => label === "Momentum · 1.0").tradeCount, 1);
   assert.equal(analytics.dataQuality.unpairedBuyTrades, 0);
   assert.equal(analytics.dataQuality.unmatchedSellTrades, 0);
   assert.equal(analytics.dataQuality.unmatchedDecisionTrades, 0);
@@ -681,6 +688,19 @@ test("dashboard-data serves analytics and its CSV counts through existing authen
   assert.equal(data.period, "30d");
   assert.equal(data.aiPerformance.decisionCount, 6);
   assert.equal(data.exportCounts["portfolio-analytics"], 3);
+  assert.equal(data.exportCounts.recommendations, 0);
+
+  const recommendationsResponse = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=recommendations&period=90d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, recommendationsResponse);
+  assert.equal(recommendationsResponse.statusCode, 200);
+  const recommendations = JSON.parse(recommendationsResponse.body).data;
+  assert.equal(recommendations.analysisPeriod, "90d");
+  assert.equal(recommendations.insufficientData, true);
+  assert.equal(recommendations.periodStart, "2025-12-21T12:00:00.000Z");
 
   const countResponse = createResponse();
   await handler({
@@ -690,6 +710,15 @@ test("dashboard-data serves analytics and its CSV counts through existing authen
   }, countResponse);
   assert.equal(countResponse.statusCode, 200);
   assert.equal(JSON.parse(countResponse.body).data.recordCount, 12);
+
+  const recommendationCountResponse = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=export-count&type=recommendation-history&period=30d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, recommendationCountResponse);
+  assert.equal(recommendationCountResponse.statusCode, 200);
+  assert.equal(JSON.parse(recommendationCountResponse.body).data.recordCount, 0);
 });
 
 test("analytics query failures log exact query and Supabase message while keeping production response generic", async () => {

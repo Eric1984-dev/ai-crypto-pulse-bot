@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" class="auth-pending">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Review advisory recommendations based on historical paper-trading and portfolio performance.">
+    <meta name="apple-mobile-web-app-title" content="AI Crypto Bot">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>AI Recommendations · CryptoPulse</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/js/main.js" defer></script>
+    <script src="/js/auth-service.js" defer></script>
+    <script src="/js/auth.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+    <script src="/js/realtime.js" defer></script>
+    <script src="/js/recommendations.js" defer></script>
+  </head>
+  <body data-auth-page="protected">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" data-nav-link href="/dashboard.html"><img class="brand-mark" src="/assets/icons/apple-touch-icon.png" alt="" aria-hidden="true"> AI Crypto Bot</a>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <details class="nav-dropdown">
+            <summary class="nav-trigger">Menu</summary>
+            <div class="nav-menu">
+              <a data-nav-link href="/dashboard.html">Dashboard</a>
+              <a data-nav-link href="/portfolio.html">Portfolio</a>
+              <a data-nav-link href="/scanner.html">Market Scanner</a>
+              <a data-nav-link href="/analytics.html">Analytics</a>
+              <a data-nav-link href="/recommendations.html">AI Recommendations</a>
+              <a data-nav-link href="/history.html">Trade History</a>
+              <a data-nav-link href="/exports.html">Exports</a>
+              <a data-nav-link href="/settings.html">Settings</a>
+              <a data-nav-link data-admin-nav href="/admin.html" hidden>Admin</a>
+              <span class="account-email" data-user-email></span>
+              <button class="nav-action" data-auth-logout type="button">Sign out</button>
+            </div>
+          </details>
+        </nav>
+      </div>
+    </header>
+    <main class="page-shell" data-recommendations-page>
+      <p data-auth-message role="status" aria-live="polite"></p>
+      <p class="eyebrow">Advisory analysis</p>
+      <h1>AI Recommendations</h1>
+      <p class="page-description">Review evidence-based suggestions derived from historical paper-trading and portfolio data. Recommendations are informational only and never change strategies, risk settings, markets, portfolios, or trades.</p>
+      <div class="mode-banner">
+        <span class="mode-dot" aria-hidden="true"></span>
+        <strong>PAPER ACTIVE</strong>
+        <span>Recommendations do not execute trades or modify settings.</span>
+      </div>
+      <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
+      <div class="analytics-toolbar">
+        <label class="export-filter">
+          Analysis period
+          <select data-recommendations-range aria-label="Recommendations analysis period">
+            <option value="30d" selected>Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="365d">Last 365 Days</option>
+          </select>
+        </label>
+        <p class="dashboard-muted" data-recommendations-updated role="status" aria-live="polite"></p>
+        <a class="history-search-button" href="/exports.html#recommendation-exports">Export Recommendations</a>
+      </div>
+      <p class="dashboard-updated" data-recommendations-loading role="status" aria-live="polite">Loading recommendations…</p>
+      <p class="dashboard-error" data-recommendations-error role="alert" hidden></p>
+      <button class="dashboard-retry" data-recommendations-retry type="button" hidden>Try again</button>
+      <p class="analytics-insight" data-recommendations-insufficient role="status" hidden></p>
+      <p class="dashboard-empty" data-recommendations-empty hidden>No evidence-based recommendations were identified for this period.</p>
+      <p class="card-description">Confidence reflects the available sample size: Preliminary (10–49), Medium (50–99), and High (100 or more). Estimated impacts describe historical evidence and are not forecasts. Recommendations refresh when relevant data changes and through a 30-second fallback.</p>
+
+      <div class="recommendation-grid">
+        <section class="dashboard-panel" aria-labelledby="recommendations-ai-heading">
+          <p class="eyebrow">AI Performance</p>
+          <h2 id="recommendations-ai-heading">Confidence and decision quality</h2>
+          <div class="recommendation-list" data-recommendation-category="AI Performance"></div>
+          <p class="dashboard-empty" data-recommendation-empty="AI Performance" hidden>No recommendations meet the evidence rules for this category.</p>
+        </section>
+        <section class="dashboard-panel" aria-labelledby="recommendations-markets-heading">
+          <p class="eyebrow">Market Selection</p>
+          <h2 id="recommendations-markets-heading">Market performance</h2>
+          <div class="recommendation-list" data-recommendation-category="Market Selection"></div>
+          <p class="dashboard-empty" data-recommendation-empty="Market Selection" hidden>No recommendations meet the evidence rules for this category.</p>
+        </section>
+        <section class="dashboard-panel" aria-labelledby="recommendations-portfolio-heading">
+          <p class="eyebrow">Portfolio Management</p>
+          <h2 id="recommendations-portfolio-heading">Portfolio allocation</h2>
+          <div class="recommendation-list" data-recommendation-category="Portfolio Management"></div>
+          <p class="dashboard-empty" data-recommendation-empty="Portfolio Management" hidden>No recommendations meet the evidence rules for this category.</p>
+        </section>
+        <section class="dashboard-panel" aria-labelledby="recommendations-risk-heading">
+          <p class="eyebrow">Risk Management</p>
+          <h2 id="recommendations-risk-heading">Drawdown review</h2>
+          <div class="recommendation-list" data-recommendation-category="Risk Management"></div>
+          <p class="dashboard-empty" data-recommendation-empty="Risk Management" hidden>No recommendations meet the evidence rules for this category.</p>
+        </section>
+        <section class="dashboard-panel" aria-labelledby="recommendations-strategy-heading">
+          <p class="eyebrow">Strategy Quality</p>
+          <h2 id="recommendations-strategy-heading">Strategy outcomes</h2>
+          <div class="recommendation-list" data-recommendation-category="Strategy Quality"></div>
+          <p class="dashboard-empty" data-recommendation-empty="Strategy Quality" hidden>No recommendations meet the evidence rules for this category.</p>
+        </section>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>CryptoPulse · Paper Trading</span>
+        <span>© <span data-current-year></span> CryptoPulse</span>
+      </div>
+    </footer>
+  </body>
+</html>

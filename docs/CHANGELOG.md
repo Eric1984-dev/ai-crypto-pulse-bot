@@ -6,8 +6,19 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Phase 15 - AI Recommendations
+
+- Added a protected advisory-only recommendations page covering AI performance, market selection, portfolio management, risk management, and strategy quality from existing Analytics outcomes
+- Added 30-, 90-, and 365-day analysis ranges, sample-size confidence tiers, supporting metrics, period/generated timestamps, and explicit insufficient-data behavior
+- Added automatic refresh on source-table Realtime events with a 30-second polling fallback; no trading or configuration changes are performed
+- Added Recommendation and Recommendation History CSV exports through existing Analytics Exports and the authenticated dashboard-data function; history exports are recomputed and no generations are archived
+- Added recommendations to protected navigation and route guards without adding a Vercel Function, database table, or migration
+- Added recommendations generation, evidence thresholds, export, UI, authentication, Realtime, and large aggregated-input regression coverage
+- Documented the Phase 15 scope and deferred Backtesting Engine to Phase 16; Phase 16 work has not started
+
 ### Validation
 
+- Phase 15 AI Recommendations passed all 227 automated tests and static/database build validation; the Vercel API count remains at 12. Recommendation confidence now uses distinct closed-trade evidence rather than scored decision count. Hosted deployment and Realtime behavior remain unverified.
 - Completed the Phase 12 system audit and generated `reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md`; `npm.cmd test` passed 169 tests and `npm.cmd run build` passed static/database validation
 - Recorded a 50% production-readiness score (WARNING), the six known production findings, and the hosted Supabase, Realtime, provider, and external-scheduler checks still outstanding; verified the API function count remains 12
 - Corrected stale Dashboard/scanner documentation and Known Issues status to match current behavior and implementation

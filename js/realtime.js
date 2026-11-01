@@ -31,6 +31,13 @@
       { table: "AI_Crypto_Bot_Watched_Markets" },
       { table: "AI_Crypto_Bot_Market_Data" },
       { table: "AI_Crypto_Bot_Candles", filter: "interval=in.(1h,1d)" }
+    ],
+    recommendations: [
+      { table: "AI_Crypto_Bot_AI_Decisions" },
+      { table: "AI_Crypto_Bot_Trades" },
+      { table: "AI_Crypto_Bot_Positions" },
+      { table: "AI_Crypto_Bot_Portfolios" },
+      { table: "AI_Crypto_Bot_Portfolio_Snapshots" }
     ]
   };
   const connectionsByClient = new WeakMap();

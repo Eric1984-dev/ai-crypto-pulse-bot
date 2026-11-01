@@ -97,4 +97,48 @@ Reuse existing infrastructure.
 
 Do not create unnecessary API endpoints.
 
-Do not start Phase 19.
+Optimization Audit Trail
+
+Do not store recommendation history.
+
+Instead store only:
+
+- Optimization changes
+- Previous parameter values
+- New parameter values
+- Change timestamps
+- Rollback information
+- Before/after performance
+
+Recommendation persistence remains disabled unless explicitly enabled in a future phase.
+
+Recommendation History Policy
+
+Phase 15 recommendations are generated on demand.
+
+Recommendations are not persisted by default.
+
+Current recommendation exports reflect the generated recommendations for the selected analysis period:
+
+- 30 days
+- 90 days
+- 365 days
+
+Do not introduce recommendation-history storage unless a later phase explicitly requires auditability or optimization tracking.
+
+Reuse the existing generated recommendation model whenever possible.
+
+Optimization Audit Trail
+
+Do not store recommendation history.
+
+Instead store only:
+
+- Optimization changes
+- Previous parameter values
+- New parameter values
+- Change timestamps
+- Rollback information
+- Before/after performance
+
+Recommendation persistence remains disabled unless explicitly enabled in a future phase.

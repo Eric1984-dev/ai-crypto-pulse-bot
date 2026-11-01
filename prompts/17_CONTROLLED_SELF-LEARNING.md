@@ -115,4 +115,34 @@ Maximum:
 
 Do not introduce new trading endpoints.
 
+Recommendation History Policy
+
+Phase 15 recommendations are generated on demand.
+
+Recommendations are not persisted by default.
+
+Current recommendation exports reflect the generated recommendations for the selected analysis period:
+
+- 30 days
+- 90 days
+- 365 days
+
+Do not introduce recommendation-history storage unless a later phase explicitly requires auditability or optimization tracking.
+
+Reuse the existing generated recommendation model whenever possible.
+
+Optimization Evidence
+
+Strategy optimization proposals must be based on:
+
+- Current Analytics
+- Current Recommendations
+- Current Simulations
+
+Do not depend on historical recommendation storage.
+
+Generate optimization proposals from live analytics data.
+
+Only introduce persistent recommendation history if required for optimization auditing.
+
 Do not start Phase 18.

@@ -137,7 +137,7 @@ The protected `analytics.html` page uses `GET /api/dashboard-data?view=analytics
 The response contains:
 
 - `tradePerformance`: closed/winning/losing/breakeven trade counts; win/loss rates; average win/loss; profit factor; realized, unrealized, and total P&L; best/worst trade and largest winner/loser; average hold time; open/closed position counts; and per-symbol performance.
-- `aiPerformance`: confidence buckets (`70–75`, `75–80`, `80–85`, `85+`), BUY/SELL/HOLD/WAIT action results, strategy and symbol results, best/worst scored confidence ranges, and decision/scored/unscored counts.
+- `aiPerformance`: confidence buckets (`70–75`, `75–80`, `80–85`, `85+`), BUY/SELL/HOLD/WAIT action results, strategy and symbol results, best/worst scored confidence ranges, and decision/scored/unscored counts. Confidence and strategy groups also expose `tradeCount`, the number of distinct closed trades represented in their scored outcomes, for evidence-based recommendation sample sizes.
 - `portfolio`: current value and growth, maximum drawdown, equity curve, drawdown history, and daily, weekly, and monthly performance.
 - `dataQuality`: unmatched or unpaired trade/decision counts.
 - `exportCounts`: report-row counts for the four Analytics CSV types.
@@ -157,12 +157,58 @@ Calculation and attribution semantics:
 
 Unauthenticated sessions return `401`; invalid data views or periods return `400`; authentication or database unavailability returns the existing generic `503` response. Temporary Analytics failure logs include the request view/export type, exact dataset, exact PostgREST method/path/query, operation, page/range, HTTP status, allowlisted database error code, Supabase message/details/hint, and failure category. They do not include rows, access tokens, request headers, or the full response body. When `NODE_ENV=development`, the same query diagnostics are returned under `error.diagnostics`; production responses contain only the existing generic error code and message. Use these logs to identify which source query failed after deployment; local mocks cannot establish hosted Supabase behavior. Remove the temporary diagnostics after the production root cause is confirmed. Responses are `no-store`.
 
+### AI Recommendations view
+
+The protected `recommendations.html` page uses `GET /api/dashboard-data?view=recommendations&period=<30d|90d|365d>` on the existing authenticated function. It runs the existing bounded Analytics loader with the caller's verified JWT/RLS visibility and derives advisory recommendations from its aggregates. The default period is `30d`; the supported windows are rolling 30, 90, and 365 days. No source records are written and recommendations never change strategies, risk controls, markets, portfolio settings, AI parameters, or trades.
+
+The response contains the analysis period and cutoff, generation timestamp, closed-trade sample size, the insufficient-data flag, and recommendations grouped under AI Performance, Market Selection, Portfolio Management, Risk Management, and Strategy Quality. Each recommendation includes its reason, supporting metrics, descriptive estimated impact, confidence tier, sample size/unit, period, and generated timestamp. At least 10 closed trades are required for preliminary recommendations; confidence is Preliminary for 10–49 represented closed trades, Medium for 50–99, and High for 100 or more. Confidence-bucket comparisons use a conservative lower bound of distinct closed trades represented on each side and separately report the scored-outcome counts used in their outcome metrics. If fewer than 10 closed trades exist, the recommendation list is empty and `insufficientData` is true. Confidence-bucket evidence is outcome-attributed Analytics data and is not a counterfactual estimate.
+
+Example:
+
+```json
+{
+  "data": {
+    "generatedAt": "2026-03-21T12:00:00.000Z",
+    "analysisPeriod": "30d",
+    "periodStart": "2026-02-19T12:00:00.000Z",
+    "closedTrades": 12,
+    "insufficientData": false,
+    "minimumSampleSize": 10,
+    "recommendations": [{
+      "category": "Strategy Quality",
+      "title": "Review Momentum · 1.0",
+      "reason": "Scored outcomes for this strategy had negative net P&L and a lower win rate than the account-wide rate.",
+      "metrics": [
+        { "label": "Scored outcomes", "value": 12, "format": "count" },
+        { "label": "Win rate", "value": 25, "format": "percent" },
+        { "label": "Net P&L", "value": -20, "format": "currency" }
+      ],
+      "estimatedImpact": "Reviewing the strategy may help address observed weakness; future performance is not guaranteed.",
+      "confidenceLevel": "Preliminary",
+      "sampleSize": 12,
+      "sampleUnit": "scored decision outcomes",
+      "analysisPeriod": "30d",
+      "generatedAt": "2026-03-21T12:00:00.000Z"
+    }],
+    "categories": [
+      { "name": "AI Performance", "recommendations": [] },
+      { "name": "Market Selection", "recommendations": [] },
+      { "name": "Portfolio Management", "recommendations": [] },
+      { "name": "Risk Management", "recommendations": [] },
+      { "name": "Strategy Quality", "recommendations": [] }
+    ]
+  }
+}
+```
+
+The page refreshes after relevant AI-decision, trade, position, portfolio, or snapshot Realtime events, on period changes, and through a 30-second visible-page polling fallback. Hosted Realtime delivery remains subject to the existing publication configuration.
+
 ### CSV Exports view
 
 The protected Exports page reuses the authenticated `GET /api/dashboard-data` function; it adds no endpoint or Vercel Function. Both views require a verified session and use the caller's JWT and existing RLS policies:
 
 - `view=export-count&type=<trades|portfolio|decisions|positions>&period=<24h|7d|30d|all>` returns `{ "data": { "exportType": "...", "period": "...", "recordCount": 123 } }`. For Analytics report types, `period=<30d|90d|365d>` returns the generated CSV report-row count; it defaults to `30d`.
-- `view=export&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics>&period=<24h|7d|30d|all|90d|365d>` streams a CSV response. Raw datasets retain their existing filters and are read in stable, 500-row Range pages written incrementally. Analytics exports use the same selected period and Analytics calculations as the dedicated page.
+- `view=export&type=<trades|portfolio|decisions|positions|analytics-summary|trade-analytics|portfolio-analytics|ai-analytics|recommendations|recommendation-history>&period=<24h|7d|30d|all|90d|365d>` streams a CSV response. Raw datasets retain their existing filters and are read in stable, 500-row Range pages written incrementally. Analytics and recommendation exports use the same selected period and calculations as their dedicated pages.
 
 The date filters use rolling UTC cutoffs. The CSV is UTF-8 with a BOM, CRLF line endings, a header row, standard quoting, and spreadsheet-formula neutralization for untrusted text.
 
@@ -176,6 +222,7 @@ Export columns:
 - **Trade Analytics**: overall and per-symbol closed/winning/losing/breakeven counts, win rate, average outcomes, profit factor, realized P&L, largest outcomes, and average hold time.
 - **Portfolio Analytics**: one row per retained daily period with portfolio value, period P&L, drawdown, and growth.
 - **AI Analytics**: confidence-bucket, action, strategy, and market outcome summaries, including scored/unscored decisions and attributed P&L.
+- **Recommendation exports**: category, recommendation, rationale, supporting metrics, historical impact description, confidence, period, generated timestamp, sample size, and sample unit. Recommendation History is recomputed from stored Analytics inputs and explicitly does not represent an archived sequence of earlier generations.
 
 Analytics reports support the same rolling 30-, 90-, and 365-day ranges as the Analytics page; their count is based on report rows rather than source trade/decision counts. The default Analytics range is 30 days. Raw data exports continue to use their existing 24-hour, 7-day, 30-day, and all-data filters.
 

@@ -207,34 +207,49 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 
-Status: Local interface refinements, responsive viewport checks, accessibility fixes, 212 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 has not started.
+Status: Local interface refinements, responsive viewport checks, accessibility fixes, 212 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 AI Recommendations follows this phase; no Phase 16 work has started.
 
 ---
 
 # Future Phases
 
-## Phase 15 - Backtesting Engine
+## Phase 15 - AI Recommendations
+
+- [x] Generate advisory-only recommendations from existing Analytics outcomes
+- [x] Support 30-, 90-, and 365-day ranges with evidence-based confidence levels
+- [x] Add a protected recommendations page with automatic Realtime and polling refresh
+- [x] Reuse the authenticated dashboard-data and Analytics CSV export infrastructure
+- [x] Keep recommendation history ephemeral; history CSVs recompute from existing data
+- [x] Add recommendation, export, UI, authentication, and Realtime regression tests
+- [x] Update project instructions and documentation; verify the existing 12-function limit
+- [ ] Complete hosted production smoke testing
+
+Status: Implementation is complete. `npm.cmd test` passed 227 tests, `npm.cmd run build` passed static/database validation, and the API remains at 12 functions. Production deployment and hosted Supabase/Realtime checks remain unverified. Phase 16 has not started. See [the Phase 15 AI Recommendations report](docs/reports/PHASE_15_AI_RECOMMENDATIONS_REPORT.md).
+
+---
+
+## Phase 16 - Backtesting Engine
 
 - Historical Simulation
 - Strategy Evaluation
 
 ---
 
-## Phase 16 - Strategy Optimization
+## Phase 17 - Strategy Optimization
 
 - Strategy Ranking
 - Strategy Comparison
 
 ---
 
-## Phase 17 - Autonomous Agent Enhancement
+## Phase 18 - Autonomous Agent Enhancement
 
 - Self Optimization
 - Autonomous Learning
 
 ---
 
-## Phase 18 - Live Trading Preparation
+## Phase 19 - Live Trading Preparation
 
 - Additional Risk Controls
 - Audit Logging
@@ -242,14 +257,14 @@ Status: Local interface refinements, responsive viewport checks, accessibility f
 
 ---
 
-## Phase 19 - Live Trading Infrastructure
+## Phase 20 - Live Trading Infrastructure
 
 - Order Layer
 - Exchange Validation
 
 ---
 
-## Phase 20 - Live Trading Activation
+## Phase 21 - Live Trading Activation
 
 - Controlled Rollout
 - Production Validation

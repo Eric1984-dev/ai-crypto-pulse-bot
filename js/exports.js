@@ -14,7 +14,9 @@
     "analytics-summary",
     "trade-analytics",
     "portfolio-analytics",
-    "ai-analytics"
+    "ai-analytics",
+    "recommendations",
+    "recommendation-history"
   ]);
   const countFormat = new Intl.NumberFormat("en-GB");
 

@@ -149,7 +149,14 @@ test("export page displays counts, empty states, download status, and failures",
 });
 
 test("analytics export cards share a selected-range request and download range-filtered CSV", async () => {
-  const types = ["analytics-summary", "trade-analytics", "portfolio-analytics", "ai-analytics"];
+  const types = [
+    "analytics-summary",
+    "trade-analytics",
+    "portfolio-analytics",
+    "ai-analytics",
+    "recommendations",
+    "recommendation-history"
+  ];
   const cards = types.map(createAnalyticsExportCard);
   const documentRef = createExportsDocument(cards);
   const requests = [];

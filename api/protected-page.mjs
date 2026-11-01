@@ -14,6 +14,7 @@ const protectedPages = new Set([
   "portfolio",
   "scanner",
   "analytics",
+  "recommendations",
   "history",
   "exports",
   "settings",

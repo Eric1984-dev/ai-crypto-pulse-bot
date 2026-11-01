@@ -407,25 +407,29 @@ Never claim deployment success unless verified.
 
 Phase 15
 
-Backtesting Engine
+AI Recommendations (advisory only)
 
 Phase 16
 
-Strategy Optimization
+Backtesting Engine
 
 Phase 17
 
-Autonomous Agent Enhancement
+Strategy Optimization
 
 Phase 18
 
-Live Trading Preparation
+Autonomous Agent Enhancement
 
 Phase 19
 
-Live Trading Infrastructure
+Live Trading Preparation
 
 Phase 20
+
+Live Trading Infrastructure
+
+Phase 21
 
 Live Trading Activation
 

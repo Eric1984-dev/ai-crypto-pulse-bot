@@ -308,6 +308,22 @@ The browser sweep used a local static server with authentication scripts blocked
 
 ---
 
+## Phase 15 AI Recommendations coverage
+
+Recommendation tests cover the five advisory categories, 30/90/365-day selection through the existing Analytics loader, 10/50/100 distinct-trade confidence tiers, confidence-bucket comparisons, symbol and strategy performance, portfolio realized losses, drawdown evidence, empty and insufficient data, large aggregated inputs, EUR supporting metrics, and non-forecast impact descriptions. API/export tests verify the existing authenticated `dashboard-data` view and CSV count/stream paths, including recomputed Recommendation History exports. UI tests cover safe rendering, empty/loading/error/auth behavior, selected-range refresh, Realtime refresh, 30-second fallback polling, protected navigation, and the explicit no-mutation boundary. Realtime tests verify subscriptions to the five existing Analytics source tables.
+
+```powershell
+node --test tests/recommendations.test.mjs tests/recommendations-ui.test.js tests/analytics.test.mjs tests/exports.test.mjs tests/exports-ui.test.js tests/realtime.test.js tests/auth.test.js tests/project-setup.test.js
+npm.cmd test
+npm.cmd run build
+```
+
+Recommendation History is generated from current stored Analytics inputs and does not archive earlier generations. These tests use local fixtures and mocked Supabase requests; hosted Supabase, deployed Vercel, and live Realtime behavior require separate production smoke testing. No migration or Vercel Function is introduced.
+
+Phase 15 validation result: `npm.cmd test` passed 226 tests with 0 failures; `npm.cmd run build` passed static project and database migration validation (16 prefixed tables, RLS coverage, initial seed consistency). The API directory remains at 12 deployable `.mjs` functions.
+
+---
+
 ## Regression Testing
 
 Every completed phase must be followed by regression testing.

@@ -9,6 +9,7 @@
 - A prior Market Scanner HTTP 503 (`MARKET_DATA_UNAVAILABLE`) was associated with a failing database/PostgREST read, but its original query and production root cause remain unconfirmed. The later-range `416/PGRST103` pagination case has a targeted fix; production errors remain generic.
 - Market snapshot, candle refresh, AI analysis, and paper-trading execution require configured external scheduler jobs. Production scheduler configuration and execution are unverified.
 - Admin Actions require the server-side `ADMIN_USER_IDS` allowlist to be configured and verified.
+- Phase 15 AI Recommendations have local automated coverage but have not been verified against hosted Supabase, deployed Vercel, or live Realtime. Recommendation History exports are recomputed from current stored Analytics data; prior generated recommendation snapshots are not retained.
 
 See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md) for status classification, [the Analytics root-cause report](reports/ANALYTICS_ROOT_CAUSE_REPORT.md) for the latest evidence, and recommended follow-up.
 

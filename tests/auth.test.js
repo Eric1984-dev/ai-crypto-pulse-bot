@@ -349,9 +349,10 @@ test("Supabase client persists sessions and handles auth redirect URLs", () => {
 });
 
 test("post-login redirects allow only protected internal pages", () => {
-  const allowed = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/analytics.html", "/history.html", "/exports.html", "/settings.html", "/admin.html"];
+  const allowed = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/analytics.html", "/recommendations.html", "/history.html", "/exports.html", "/settings.html", "/admin.html"];
 
   assert.equal(safeNextPath("/scanner", allowed), "/scanner.html");
+  assert.equal(safeNextPath("/recommendations", allowed), "/recommendations.html");
   assert.equal(safeNextPath("//attacker.example", allowed), "/dashboard.html");
   assert.equal(safeNextPath("/login.html", allowed), "/dashboard.html");
 });
@@ -682,7 +683,7 @@ test("authentication pages expose the required forms", () => {
 });
 
 test("every protected page exposes a logout control", () => {
-  for (const page of ["dashboard.html", "portfolio.html", "scanner.html", "analytics.html", "history.html", "exports.html", "settings.html", "admin.html"]) {
+  for (const page of ["dashboard.html", "portfolio.html", "scanner.html", "analytics.html", "recommendations.html", "history.html", "exports.html", "settings.html", "admin.html"]) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     assert.match(html, /<button[^>]*data-auth-logout[^>]*>/);
   }
