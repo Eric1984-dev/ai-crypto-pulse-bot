@@ -67,34 +67,69 @@ Future Investigation:
 ## Investigation - Intermittent AI Analysis Timeouts
 
 Status:
-Monitoring
+Resolved - Monitoring
+
+Date:
+2026-11-02
 
 Observation:
 
-Production AI Analysis occasionally reports timeout failures.
+Production AI Analysis intermittently reported timeout failures.
 
-Findings:
+Original Findings:
 
-- Successful runs analyze 102 markets.
-- Six candle intervals are processed per market.
-- Approx. 612 candle reads occur per execution.
-- Recent successful runs completed in approximately 26.5 seconds.
-- Primary runtime cost appears to be candle retrieval across 77 sequential batches.
+- Successful runs analyzed 102 markets.
+- Six candle intervals were processed per market.
+- Approximately 612 candle reads occurred per execution.
+- Runtime frequently approached the Vercel execution limit.
+- Multiple production timeout failures were observed.
+
+Root Cause:
+
+The primary runtime bottleneck was sequential candle retrieval across a large number of database batches.
+
+Resolution:
+
+AI Analysis runtime was optimized by replacing sequential candle retrieval batching with a bounded worker queue.
+
+No changes were made to:
+
+- Trading logic
+- Risk management
+- BUY logic
+- SELL logic
+- HOLD logic
+- WAIT logic
+- Confidence calculations
+- Decision generation
+
+Validation Results:
+
+Production verification confirmed:
+
+- Runtime reduced from approximately 26-28 seconds to approximately 11.5 seconds.
+- 102/102 markets analyzed.
+- 102/102 decisions stored.
+- 612/612 candle reads completed successfully.
+- 300,849 candle rows processed.
+- 0 failed reads.
+- 0 skipped markets.
+- 0 omitted markets.
+- Full six-interval analysis coverage preserved.
 
 Current Assessment:
 
-The root cause remains unconfirmed.
+The optimization successfully reduced production runtime while preserving complete analysis coverage.
 
-Recent successful executions complete within acceptable runtime limits, but execution time scales with market count and candle-processing workload.
+No loss of decisions, markets, candle data, or indicator calculations was observed.
 
-Future Investigation:
+Remaining Validation:
 
-- Runtime instrumentation per analysis stage
-- Candle-query optimization
-- Batch-size review
-- Parallelization opportunities
-- Market-count growth impact
+- Monitor production runtime for 24-48 hours.
+- Confirm timeout failures no longer occur.
+- Confirm runtime remains below 15 seconds under normal load.
+- Confirm stability as market count grows.
 
 Status:
 
-Monitoring pending additional timeout evidence.
+Resolved and under post-deployment monitoring.
