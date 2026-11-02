@@ -8,7 +8,7 @@ All notable project changes should be documented here.
 
 ### Market display refinements
 
-- Highlight market symbols in gold across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
+- Use the shared blue accent for market symbols across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
 - Use neutral gray Dashboard chart legend icons while preserving dataset line colors
 - Use neutral gray Dashboard KPI info icons while retaining a visible blue keyboard-focus indicator
 - Color BUY actions green and SELL actions red across trade, scanner, and Analytics displays

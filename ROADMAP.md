@@ -228,7 +228,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [x] Separate core data exports from Analytics and Recommendation reports; group Trade and Position exports together
 - [x] Synchronize Dashboard, Portfolio, and Trade History refreshes across tabs and polling intervals without changing P&L calculations
-- [x] Highlight market symbols in gold across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
+- [x] Use the shared blue accent for market symbols across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
 - [x] Use gray legend swatches in the Dashboard portfolio chart without changing dataset line colors
 - [x] Use neutral gray Dashboard KPI info icons while retaining a visible blue keyboard-focus indicator
 - [x] Color BUY actions green and SELL actions red across trade, scanner, and Analytics displays

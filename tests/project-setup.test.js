@@ -153,6 +153,8 @@ test("shared page theme uses a charcoal background and directional financial col
   assert.match(styles, /--surface:\s*#1b2027;/);
   assert.match(styles, /--surface-raised:\s*#20252d;/);
   assert.match(styles, /--accent:\s*#5b9cff;/);
+  assert.match(styles, /\.market-symbol\s*\{[^}]*color:\s*var\(--accent\);/s);
+  assert.doesNotMatch(styles, /--market-accent:\s*#dfbd63;/);
   assert.match(styles, /--positive:\s*#34d399;/);
   assert.match(styles, /--negative:\s*#ff6078;/);
   assert.match(styles, /\.brand-mark\s*\{[^}]*0 0 26px rgb\(91 156 255 \/ 20%\)/s);

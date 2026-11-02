@@ -19,11 +19,10 @@
   --positive-border: #2f8062;
   --negative: #ff6078;
   --warning: #fbbf24;
-  --market-accent: #dfbd63;
 }
 
 .market-symbol {
-  color: var(--market-accent);
+  color: var(--accent);
   font-weight: 700;
 }
 
