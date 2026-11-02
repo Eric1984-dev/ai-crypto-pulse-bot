@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Agent Brain refinement
+
+- Added a subtle, status-driven green glow around the chip during `ANALYZING`
+- Reduced the circuit visualization to a 440px maximum width on desktop while preserving its full-width mobile layout
+- Kept the glow static and transition-free for users who prefer reduced motion
+
 ### Green Visual Theme
 
 - Restored the original green application palette across page surfaces, chart accents, browser theme colors, and the shared Bitcoin-in-hands app icon

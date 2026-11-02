@@ -205,7 +205,8 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
-- [x] Keep the circuit artwork frame-free; fill the available mobile width (bounded by 90vh) and keep fading neuron motion on visible traces from the chip edges
+- [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
+- [x] Add a subtle chip-edge glow only during ANALYZING
 - [x] Subdue the static circuit glow and strengthen neuron halos so status activity remains easy to distinguish
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
@@ -386,6 +387,76 @@ Review:
 - Decision quality impact
 
 Use Analytics and AI Recommendations before implementing changes.
+
+## Future Enhancement - Paper Trading Execution Audit
+
+Status:
+Backlog
+
+Priority:
+Medium
+
+Rationale:
+
+The current Paper Trading Engine records executed trades but does not preserve detailed execution outcomes for decisions that were evaluated but not executed.
+
+As a result, it is difficult to determine why eligible BUY or SELL decisions did not result in trades.
+
+Examples:
+
+- POSITION_ALREADY_OPEN
+- COOLDOWN
+- INSUFFICIENT_FUNDS
+- STALE_DECISION
+- STALE_MARKET_DATA
+- MAX_OPEN_POSITIONS
+- MARKET_DISABLED
+- EMERGENCY_STOP
+- DRAWDOWN_PROTECTION
+
+Future analytics, recommendations, simulations, and optimization phases would benefit from visibility into these outcomes.
+
+---
+
+Goals
+
+Provide visibility into:
+
+- Executed Decisions
+- Rejected Decisions
+- Skipped Decisions
+- Duplicate Decisions
+
+Track:
+
+- Decision Timestamp
+- Symbol
+- Decision
+- Confidence
+- Execution Result
+- Rejection Reason
+- Evaluation Timestamp
+
+---
+
+Potential Uses
+
+- Analytics
+- AI Recommendations
+- Strategy Simulation
+- Strategy Optimization
+- Production Diagnostics
+
+---
+
+Important
+
+Execution auditing must not change trading behavior.
+
+Its purpose is observability only.
+
+Implement only when operational insight becomes more valuable than the additional storage and complexity.
+
 
 ## Phase 19 - Live Trading Preparation
 

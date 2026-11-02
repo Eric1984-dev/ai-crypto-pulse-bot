@@ -55,6 +55,7 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   );
   assert.match(container.innerHTML, /viewBox="0 0 1254 1254"/);
   assert.match(container.innerHTML, /class="circuit-board-image" href="\/assets\/agent-circuit-board\.png"/);
+  assert.match(container.innerHTML, /class="circuit-chip-analyzing-glow"[^>]+filter="url\(#circuit-chip-analyzing-glow\)"/);
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
@@ -172,4 +173,22 @@ test("the base circuit glow is subdued so status neurons remain prominent", () =
   assert.match(analyzingHalo[1], /drop-shadow\(0 0 30px rgb\(75 255 145 \/ 98%\)\)/);
   assert.ok(errorHalo);
   assert.match(errorHalo[1], /drop-shadow\(0 0 24px rgb\(255 100 120 \/ 90%\)\)/);
+});
+
+test("ANALYZING adds a restrained chip glow while desktop keeps the circuit compact", () => {
+  const stylesPath = path.join(__dirname, "..", "css", "styles.css");
+  const styles = fs.readFileSync(stylesPath, "utf8");
+  const desktopBlock = styles.match(/@media \(min-width: 900px\)\s*\{([\s\S]*?)\n\}/);
+  const analyzingGlow = styles.match(
+    /\.agent-brain\[data-state="analyzing"\] \.circuit-chip-analyzing-glow\s*\{([\s\S]*?)\n\}/
+  );
+
+  assert.ok(desktopBlock);
+  assert.match(desktopBlock[1], /\.agent-brain-stage\s*\{\s*width:\s*min\(100%,\s*440px\);/);
+  assert.ok(analyzingGlow);
+  assert.match(analyzingGlow[1], /opacity:\s*0\.32;/);
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.circuit-chip-analyzing-glow\s*\{\s*transition:\s*none;/
+  );
 });

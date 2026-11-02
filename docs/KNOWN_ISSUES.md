@@ -21,3 +21,45 @@ See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_R
 - Realtime has polling fallback, but hosted publication delivery has not been verified.
 - Chart.js uses a pinned CDN. The Agent Status circuit is native SVG/CSS and does not require WebGL; physical-device visual checks remain outstanding.
 - Automated mobile/browser tests do not replace physical-device smoke testing.
+
+## Investigation - Low Trade Conversion
+
+Status:
+Open Investigation
+
+Date:
+2026-11-02
+
+Observation:
+
+- 156 BUY decisions with confidence >= 70
+- 1 executed BUY trade
+
+Findings:
+
+- 142 qualified BUY decisions originated from BEAM-EUR.
+- One BEAM position remains open.
+- Repeated BEAM BUY decisions are expected to be blocked by the one-position-per-symbol rule.
+- WIN-EUR generated 14 qualified BUY decisions.
+- WIN-EUR produced no trades.
+- WIN-EUR had no open position, no cooldown, sufficient balance, and was enabled.
+
+Current Assessment:
+
+Multi-market trading is supported by the implementation.
+
+The low number of executed trades appears lower than expected.
+
+Unknown:
+
+- Whether paper-trading execution occurred during the WIN-EUR decision windows.
+- Whether decisions expired before execution.
+- Whether a scheduler timing issue exists.
+- Whether an unrecorded runtime gate prevented execution.
+
+Future Investigation:
+
+- Execution Audit Trail
+- Scheduler validation
+- Run history visibility
+- Decision execution tracking

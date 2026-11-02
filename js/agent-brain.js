@@ -102,6 +102,10 @@
           <feGaussianBlur stdDeviation="7" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
+        <filter id="circuit-chip-analyzing-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
         <filter id="circuit-trace-mask-filter" color-interpolation-filters="sRGB">
           <feColorMatrix type="matrix" values="1 0 1 0 0 1 0 1 0 0 1 0 1 0 0 0 0 0 1 0"/>
           <feComponentTransfer>
@@ -115,6 +119,7 @@
         </mask>
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
+      <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="10" filter="url(#circuit-chip-analyzing-glow)"/>
       <g class="circuit-flows" mask="url(#circuit-trace-mask)">${signals}</g>
     </svg>`;
   }
