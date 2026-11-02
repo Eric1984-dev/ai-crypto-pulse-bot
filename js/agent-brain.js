@@ -180,7 +180,7 @@
     return `<svg class="agent-circuit-art" viewBox="0 0 1254 1254" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
       <defs>
         <filter id="circuit-neuron-glow" x="-250%" y="-250%" width="600%" height="600%">
-          <feGaussianBlur stdDeviation="7" result="blur"/>
+          <feGaussianBlur stdDeviation="10" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <filter id="circuit-chip-analyzing-glow" x="-50%" y="-50%" width="200%" height="200%">

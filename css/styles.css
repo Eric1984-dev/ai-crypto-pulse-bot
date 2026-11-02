@@ -791,7 +791,7 @@ a:focus-visible {
 }
 
 .circuit-chip-analyzing-glow {
-  opacity: 0;
+  opacity: 0.18;
   pointer-events: none;
   transition: opacity 450ms ease;
 }
@@ -812,7 +812,7 @@ a:focus-visible {
 }
 
 .circuit-neuron-halo {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 12px #78ffad) drop-shadow(0 0 24px rgb(75 255 145 / 88%));
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 18px #78ffad) drop-shadow(0 0 40px rgb(75 255 145 / 96%));
   opacity: 1;
 }
 
@@ -823,7 +823,7 @@ a:focus-visible {
 }
 
 .circuit-neuron--analyzing .circuit-neuron-halo {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 16px #9dffbd) drop-shadow(0 0 30px rgb(75 255 145 / 98%));
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 24px #9dffbd) drop-shadow(0 0 48px rgb(75 255 145 / 100%));
   opacity: 1;
 }
 
@@ -832,7 +832,7 @@ a:focus-visible {
 }
 
 .circuit-neuron--error .circuit-neuron-halo {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 12px #ff6478) drop-shadow(0 0 24px rgb(255 100 120 / 90%));
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 18px #ff6478) drop-shadow(0 0 36px rgb(255 100 120 / 94%));
 }
 
 .circuit-neuron--error .circuit-neuron-core {

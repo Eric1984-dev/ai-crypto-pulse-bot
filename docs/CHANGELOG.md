@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Agent Brain glow tuning
+
+- Added a subtle static green glow around the chip in every status, retaining a brighter overlay during `ANALYZING`
+- Increased neuron blur and halo strength across normal, analyzing, and error states while preserving their existing status colors and reduced-motion behavior
+
 ### Trade History and Dashboard trade visibility
 
 - Enriched open BUY executions with the latest available market snapshot, current unrealized EUR P&L, and return percentage; SELL executions now show derived entry price and realized return percentage

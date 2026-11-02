@@ -177,23 +177,29 @@ test("reduced-motion styling leaves the circuit static and visible", () => {
   assert.match(styles, /\.circuit-flow--analyzing/);
 });
 
-test("the base circuit glow is subdued so status neurons remain prominent", () => {
+test("the chip has a subtle default glow and status neurons have stronger halos", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
+  const brainSource = fs.readFileSync(path.join(__dirname, "..", "js", "agent-brain.js"), "utf8");
   const boardImage = styles.match(/\.circuit-board-image\s*\{([\s\S]*?)\n\}/);
+  const chipGlow = styles.match(/\.circuit-chip-analyzing-glow\s*\{([\s\S]*?)\n\}/);
   const signalHalo = styles.match(/\.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
   const analyzingHalo = styles.match(/\.circuit-neuron--analyzing \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
   const errorHalo = styles.match(/\.circuit-neuron--error \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
 
   assert.ok(boardImage);
   assert.match(boardImage[1], /opacity:\s*0\.45;/);
+  assert.ok(chipGlow);
+  assert.match(chipGlow[1], /opacity:\s*0\.18;/);
   assert.ok(signalHalo);
   assert.match(signalHalo[1], /opacity:\s*1;/);
-  assert.match(signalHalo[1], /drop-shadow\(0 0 12px #78ffad\)/);
+  assert.match(signalHalo[1], /drop-shadow\(0 0 18px #78ffad\)/);
+  assert.match(signalHalo[1], /drop-shadow\(0 0 40px rgb\(75 255 145 \/ 96%\)\)/);
   assert.ok(analyzingHalo);
-  assert.match(analyzingHalo[1], /drop-shadow\(0 0 30px rgb\(75 255 145 \/ 98%\)\)/);
+  assert.match(analyzingHalo[1], /drop-shadow\(0 0 48px rgb\(75 255 145 \/ 100%\)\)/);
   assert.ok(errorHalo);
-  assert.match(errorHalo[1], /drop-shadow\(0 0 24px rgb\(255 100 120 \/ 90%\)\)/);
+  assert.match(errorHalo[1], /drop-shadow\(0 0 36px rgb\(255 100 120 \/ 94%\)\)/);
+  assert.match(brainSource, /feGaussianBlur stdDeviation="10" result="blur"/);
 });
 
 test("ANALYZING adds a stronger chip glow while desktop keeps the circuit compact", () => {
