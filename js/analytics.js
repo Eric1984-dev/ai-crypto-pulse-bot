@@ -261,8 +261,8 @@
           labels: points.map((point) => point.period),
           datasets: [{
             data: points.map((point) => isEquity ? point.portfolioValue : point.drawdownPercent),
-            borderColor: isEquity ? "#9de7ba" : "#ff9f9a",
-            backgroundColor: isEquity ? "rgb(157 231 186 / 12%)" : "rgb(255 159 154 / 12%)",
+            borderColor: isEquity ? "#c78cf0" : "#ff9f9a",
+            backgroundColor: isEquity ? "rgb(199 140 240 / 14%)" : "rgb(255 159 154 / 12%)",
             fill: true,
             tension: 0.25,
             pointRadius: points.length > 90 ? 0 : 2
@@ -276,12 +276,12 @@
           scales: {
             x: {
               grid: { color: "rgb(255 255 255 / 5%)" },
-              ticks: { color: "#a8b7ae", maxTicksLimit: 8 }
+              ticks: { color: "#b2a7bc", maxTicksLimit: 8 }
             },
             y: {
               grid: { color: "rgb(255 255 255 / 7%)" },
               ticks: {
-                color: "#a8b7ae",
+                color: "#b2a7bc",
                 callback: (value) => isEquity ? formatCurrency(value) : `${formatNumber(value)}%`
               }
             }

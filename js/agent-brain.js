@@ -10,131 +10,188 @@
   const statusMap = Object.freeze({
     ACTIVE: Object.freeze({
       status: "ACTIVE",
-      color: 0x389cff,
-      emissiveIntensity: 0.95,
-      pulseSpeed: 1.7,
-      pulseAmount: 0.035,
-      activationThreshold: 0.82,
-      neuronBaseline: 0.055,
-      neuronGain: 0.95,
-      signalSpeed: 0.72,
-      connectionPulseGain: 0.78,
-      activityPoints: 28,
-      animated: true,
-      mode: "continuous"
+      color: "#c780f0",
+      signalCount: 16,
+      signalDuration: 3.2
     }),
     ANALYZING: Object.freeze({
       status: "ANALYZING",
-      color: 0x36b8ff,
-      emissiveIntensity: 2.4,
-      pulseSpeed: 4.2,
-      pulseAmount: 0.07,
-      activationThreshold: 0.62,
-      neuronBaseline: 0.07,
-      neuronGain: 0.98,
-      signalSpeed: 0.82,
-      connectionPulseGain: 1,
-      activityPoints: 48,
-      animated: true,
-      mode: "continuous"
+      color: "#ed9cff",
+      signalCount: 36,
+      signalDuration: 1.25
     }),
     IDLE: Object.freeze({
       status: "IDLE",
-      color: 0x76aee2,
-      emissiveIntensity: 0.35,
-      pulseSpeed: 0.48,
-      pulseAmount: 0.018,
-      activationThreshold: 0.975,
-      neuronBaseline: 0.025,
-      neuronGain: 0.78,
-      signalSpeed: 0.48,
-      connectionPulseGain: 0.58,
-      activityPoints: 4,
-      animated: true,
-      mode: "breathing"
+      color: "#8f76a1",
+      signalCount: 3,
+      signalDuration: 7.5
     }),
     STOPPED: Object.freeze({
       status: "STOPPED",
-      color: 0x87919b,
-      emissiveIntensity: 0.08,
-      pulseSpeed: 0,
-      pulseAmount: 0,
-      activationThreshold: 1.1,
-      neuronBaseline: 0.018,
-      neuronGain: 0,
-      signalSpeed: 0,
-      connectionPulseGain: 0,
-      activityPoints: 0,
-      animated: false,
-      mode: "static"
+      color: "#75808d",
+      signalCount: 0,
+      signalDuration: 0
     }),
     ERROR: Object.freeze({
       status: "ERROR",
-      color: 0xff4655,
-      emissiveIntensity: 1.7,
-      pulseSpeed: 2.6,
-      pulseAmount: 0.055,
-      activationThreshold: 0.78,
-      neuronBaseline: 0.045,
-      neuronGain: 0.95,
-      signalSpeed: 0.72,
-      connectionPulseGain: 0.9,
-      activityPoints: 20,
-      animated: true,
-      mode: "warning"
+      color: "#ff6478",
+      signalCount: 8,
+      signalDuration: 2.4
     }),
     UNKNOWN: Object.freeze({
       status: "UNKNOWN",
-      color: 0x8c99a6,
-      emissiveIntensity: 0.12,
-      pulseSpeed: 0,
-      pulseAmount: 0,
-      activationThreshold: 1.1,
-      neuronBaseline: 0.025,
-      neuronGain: 0,
-      signalSpeed: 0,
-      connectionPulseGain: 0,
-      activityPoints: 0,
-      animated: false,
-      mode: "neutral"
+      color: "#75808d",
+      signalCount: 0,
+      signalDuration: 0
     })
   });
 
-  const performanceLimits = Object.freeze({
-    maxFramesPerSecond: 30,
-    maxPixelRatio: 1.5,
-    mobilePixelRatio: 1.25,
-    maxActivityPoints: 48,
-    maxAnalyzingNeurons: 80,
-    maxNeuralNodes: 720,
-    maxConnections: 2160
-  });
-  const brainWidthScale = 0.76;
+  const tracePaths = createTracePaths();
+  const signalRoutes = Object.freeze(tracePaths.slice(0, 32));
+
+  function createTracePaths() {
+    const paths = [];
+    for (let index = 0; index < 16; index += 1) {
+      const y = 18 + index * 20.4;
+      const bendY = y + ((index % 3) - 1) * 13;
+      const firstElbow = 75 + ((index * 41) % 122);
+      const secondElbow = 244 + ((index * 29) % 120);
+      paths.push(`M0 ${y}H${firstElbow}V${bendY}H${secondElbow}V${y}H420`);
+      paths.push(`M1000 ${y}H${1000 - firstElbow}V${bendY}H${1000 - secondElbow}V${y}H580`);
+    }
+
+    for (let index = 0; index < 8; index += 1) {
+      const x = 132 + index * 105;
+      const y = 44 + (index % 4) * 67;
+      const direction = index % 2 === 0 ? 1 : -1;
+      paths.push(`M${x} 0V${y}H${x + 34 * direction}V${y + 46}`);
+    }
+
+    paths.push("M0 94H122V72H256V88H300");
+    paths.push("M0 286H116V306H276V278H414");
+    paths.push("M1000 94H878V72H744V88H700");
+    paths.push("M1000 286H884V306H724V278H586");
+    return Object.freeze(paths);
+  }
 
   function mapAgentStatus(status) {
     const key = typeof status === "string" ? status.trim().toUpperCase() : "";
     return statusMap[key] || statusMap.UNKNOWN;
   }
 
-  function getPixelRatio(devicePixelRatio, isMobile) {
-    const requestedRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
-      ? devicePixelRatio
-      : 1;
-    return Math.min(
-      requestedRatio,
-      isMobile ? performanceLimits.mobilePixelRatio : performanceLimits.maxPixelRatio
-    );
+  function renderComponent({ x, y, width, height, pins = 5, primary = false }) {
+    const pinPaths = [];
+    for (let index = 0; index < pins; index += 1) {
+      const pinX = x + 7 + (index * (width - 14)) / Math.max(1, pins - 1);
+      pinPaths.push(`M${pinX} ${y - 5}v5m0 ${height}v5`);
+    }
+    const sidePinCount = Math.max(3, Math.floor(pins / 2));
+    for (let index = 0; index < sidePinCount; index += 1) {
+      const pinY = y + 7 + (index * (height - 14)) / (sidePinCount - 1);
+      pinPaths.push(`M${x - 5} ${pinY}h5m${width} 0h5`);
+    }
+    const componentClass = primary
+      ? "circuit-component circuit-component--primary"
+      : "circuit-component";
+    return `<g class="${componentClass}">
+      <path class="circuit-pin" d="${pinPaths.join("")}"/>
+      <rect class="circuit-chip" x="${x}" y="${y}" width="${width}" height="${height}" rx="4"/>
+      <rect class="circuit-chip-inner" x="${x + 5}" y="${y + 5}" width="${width - 10}" height="${height - 10}" rx="2"/>
+      <path class="circuit-chip-mark" d="M${x + 10} ${y + height - 8}h${width - 20}"/>
+      <circle class="circuit-chip-led" cx="${x + width - 9}" cy="${y + 9}" r="1.7"/>
+    </g>`;
   }
 
-  function createAgentBrain({
-    THREE,
-    container,
-    stateElement = container,
-    windowRef = window,
-    documentRef = document,
-    initialStatus = null
-  } = {}) {
-    const unavailableBrain = {
+  function renderVia(x, y, index) {
+    return `<g class="circuit-via">
+      <circle class="circuit-via-ring" cx="${x}" cy="${y}" r="${index % 3 === 0 ? 4 : 3}"/>
+      <circle class="circuit-via-core" cx="${x}" cy="${y}" r="${index % 3 === 0 ? 1.6 : 1.1}"/>
+    </g>`;
+  }
+
+  function renderSignalGroup(status, config) {
+    const statusClass = status.toLowerCase();
+    const signals = [];
+    for (let index = 0; index < config.signalCount; index += 1) {
+      const duration = config.signalDuration + (index % 4) * 0.13;
+      const startOffset = (index % 9) * 0.31;
+      const route = signalRoutes[(index * 7 + 3) % signalRoutes.length];
+      signals.push(`<circle class="circuit-neuron circuit-neuron--${statusClass}" r="${index % 5 === 0 ? 3.8 : 2.9}" fill="${config.color}">
+        <animateMotion dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite" path="${route}"/>
+      </circle>`);
+    }
+    return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${signals.join("")}</g>`;
+  }
+
+  function createCircuitMarkup() {
+    const traces = tracePaths.map((path, index) => {
+      const colorClass = index % 4 === 0 ? "circuit-trace--lavender" : "circuit-trace--violet";
+      return `<path class="circuit-trace ${colorClass}" d="${path}"/>`;
+    }).join("");
+    const glowTraces = tracePaths.map((path) => `<path d="${path}"/>`).join("");
+    const vias = [];
+    for (let index = 0; index < 16; index += 1) {
+      const y = 18 + index * 20.4;
+      const x = 74 + ((index * 41) % 122);
+      vias.push(renderVia(x, y, index));
+      vias.push(renderVia(1000 - x, y, index + 1));
+    }
+    const components = [
+      { x: 432, y: 127, width: 136, height: 106, pins: 11, primary: true },
+      { x: 285, y: 75, width: 70, height: 36, pins: 5 },
+      { x: 645, y: 75, width: 70, height: 36, pins: 5 },
+      { x: 285, y: 266, width: 84, height: 34, pins: 6 },
+      { x: 631, y: 266, width: 84, height: 34, pins: 6 },
+      { x: 54, y: 148, width: 76, height: 50, pins: 5 },
+      { x: 870, y: 148, width: 76, height: 50, pins: 5 },
+      { x: 381, y: 46, width: 54, height: 28, pins: 4 },
+      { x: 565, y: 46, width: 54, height: 28, pins: 4 },
+      { x: 381, y: 296, width: 54, height: 28, pins: 4 },
+      { x: 565, y: 296, width: 54, height: 28, pins: 4 }
+    ].map(renderComponent).join("");
+    const signals = Object.entries(statusMap)
+      .map(([status, config]) => renderSignalGroup(status, config))
+      .join("");
+
+    return `<svg class="agent-circuit-art" viewBox="0 0 1000 360" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="circuit-board-light">
+          <stop offset="0" stop-color="#281936"/>
+          <stop offset="1" stop-color="#0b0810"/>
+        </radialGradient>
+        <filter id="circuit-line-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="2.4"/>
+        </filter>
+        <filter id="circuit-neuron-glow" x="-250%" y="-250%" width="600%" height="600%">
+          <feGaussianBlur stdDeviation="7" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <pattern id="circuit-board-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <path d="M24 0H0V24" fill="none" stroke="#76508d" stroke-opacity=".2" stroke-width=".6"/>
+          <circle cx="0" cy="0" r="1" fill="#a16bbc" fill-opacity=".3"/>
+        </pattern>
+      </defs>
+      <rect class="circuit-board-background" width="1000" height="360" rx="14" fill="url(#circuit-board-light)"/>
+      <rect class="circuit-board-grid" x="8" y="8" width="984" height="344" rx="10" fill="url(#circuit-board-grid)"/>
+      <rect class="circuit-board-frame" x="8" y="8" width="984" height="344" rx="10"/>
+      <g class="circuit-trace-glow" filter="url(#circuit-line-glow)">${glowTraces}</g>
+      <g class="circuit-traces">${traces}</g>
+      <g class="circuit-vias">${vias.join("")}</g>
+      <g class="circuit-ports">
+        <path d="M8 32h18m-18 7h12M992 32h-18m18 7h-12M8 321h20m-20 7h13M992 321h-20m20 7h-13"/>
+      </g>
+      <g class="circuit-components">${components}</g>
+      <g class="circuit-board-markings">
+        <path d="M403 118h18m160 124h16M405 242h18m158-124h16M145 116h28m654 0h28M145 244h28m654 0h28"/>
+        <circle cx="24" cy="24" r="3"/><circle cx="976" cy="24" r="3"/>
+        <circle cx="24" cy="336" r="3"/><circle cx="976" cy="336" r="3"/>
+      </g>
+      <g class="circuit-flows">${signals}</g>
+    </svg>`;
+  }
+
+  function createUnavailableCircuit() {
+    return {
       available: false,
       isAvailable() {
         return false;
@@ -142,1579 +199,51 @@
       setStatus() {},
       dispose() {}
     };
+  }
 
-    if (!THREE || !container || typeof THREE.WebGLRenderer !== "function") {
-      return unavailableBrain;
+  function createAgentBrain({ container, stateElement = container, initialStatus = null } = {}) {
+    if (!container || typeof container !== "object") {
+      return createUnavailableCircuit();
     }
 
-    let renderer;
-    let resizeObserver;
-    let animationFrame = null;
     let disposed = false;
-    let visible = documentRef.visibilityState !== "hidden";
-    let lastRenderAt = 0;
-    let resizeHandler = null;
-    let visibilityHandler = null;
-    let pageHideHandler = null;
-    let pageShowHandler = null;
-    let config = mapAgentStatus(initialStatus);
-    const geometries = new Set();
-    const materials = new Set();
+    container.innerHTML = createCircuitMarkup();
 
-    try {
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 20);
-      camera.position.z = 2.45;
-      const mobileViewport = isMobileViewport(windowRef, container);
-      renderer = new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: !mobileViewport,
-        powerPreference: "low-power"
-      });
-      const pixelRatio = getPixelRatio(
-        windowRef.devicePixelRatio,
-        mobileViewport
-      );
-      renderer.setPixelRatio(pixelRatio);
-      renderer.setSize(1, 1, false);
-      renderer.domElement.className = "agent-brain-canvas";
-      if (typeof renderer.domElement.setAttribute === "function") {
-        renderer.domElement.setAttribute("aria-hidden", "true");
+    function setStatus(status) {
+      if (disposed) {
+        throw new Error("Cannot update a disposed Agent Status visualization.");
       }
-      container.replaceChildren();
-      container.appendChild(renderer.domElement);
-
-      const brain = new THREE.Group();
-      scene.add(brain);
-      const neuralLayout = createNeuralLayout(THREE);
-      const nodePositions = neuralLayout.nodePositions;
-      const connectionPairs = neuralLayout.connectionPairs;
-      const connectionWeights = neuralLayout.connectionWeights;
-      const hotspotIndices = neuralLayout.hotspotIndices;
-      const signalRoutes = createSignalRoutes(connectionPairs, nodePositions.length);
-      const neuronActivity = new Float32Array(nodePositions.length);
-      const connectionActivity = new Float32Array(connectionPairs.length);
-      const connectionSignalProgress = new Float32Array(connectionPairs.length);
-      const connectionsGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      connectionsGeometry.setFromPoints(createConnectionLinePoints(nodePositions, connectionPairs));
-      const connectionPositionAttribute = connectionsGeometry.getAttribute("position");
-      const connectionColorAttribute = new THREE.BufferAttribute(
-        new Float32Array(connectionPairs.length * 6),
-        3
-      );
-      connectionsGeometry.setAttribute("color", connectionColorAttribute);
-      const connectionMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0xffffff,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.4,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const connectionGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0xffffff,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.12,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      brain.add(new THREE.LineSegments(connectionsGeometry, connectionGlowMaterial));
-      brain.add(new THREE.LineSegments(connectionsGeometry, connectionMaterial));
-
-      const nodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      nodeGeometry.setFromPoints(nodePositions);
-      const nodePositionAttribute = nodeGeometry.getAttribute("position");
-      const nodeColorAttribute = new THREE.BufferAttribute(
-        new Float32Array(nodePositions.length * 3),
-        3
-      );
-      nodeGeometry.setAttribute("color", nodeColorAttribute);
-      const animatedNodePositions = new Float32Array(nodePositions.length * 3);
-      const nodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: config.color,
-        size: 0.12,
-        sizeAttenuation: true,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.14,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      brain.add(new THREE.Points(nodeGeometry, nodeGlowMaterial));
-      const nodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: config.color,
-        size: 0.045,
-        sizeAttenuation: true,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.95,
-        depthTest: false,
-        depthWrite: false
-      }));
-      brain.add(new THREE.Points(nodeGeometry, nodeMaterial));
-
-      const hotspotGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      hotspotGeometry.setFromPoints(hotspotIndices.map((index) => nodePositions[index]));
-      const hotspotPositionAttribute = hotspotGeometry.getAttribute("position");
-      const hotspotColorAttribute = new THREE.BufferAttribute(
-        new Float32Array(hotspotIndices.length * 3),
-        3
-      );
-      hotspotGeometry.setAttribute("color", hotspotColorAttribute);
-      const hotspotMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: config.color,
-        size: 0.085,
-        sizeAttenuation: true,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.65,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const hotspotGlowMaterial = trackMaterial(materials, new THREE.ShaderMaterial({
-        uniforms: {
-          uColor: { value: new THREE.Color(config.color) },
-          uOpacity: { value: 0.32 },
-          uSize: { value: 18 * pixelRatio }
-        },
-        vertexShader: `
-          attribute vec3 color;
-          varying vec3 vIntensity;
-          uniform float uSize;
-          void main() {
-            vIntensity = color;
-            vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-            gl_Position = projectionMatrix * viewPosition;
-            gl_PointSize = uSize;
-          }
-        `,
-        fragmentShader: `
-          varying vec3 vIntensity;
-          uniform vec3 uColor;
-          uniform float uOpacity;
-          void main() {
-            float radius = length(gl_PointCoord - vec2(0.5));
-            float core = 1.0 - smoothstep(0.04, 0.2, radius);
-            float halo = 1.0 - smoothstep(0.08, 0.5, radius);
-            float intensity = max(max(vIntensity.r, vIntensity.g), vIntensity.b);
-            float alpha = (core * 0.8 + halo * 0.38) * uOpacity * intensity;
-            if (alpha < 0.01) discard;
-            gl_FragColor = vec4(uColor * vIntensity, alpha);
-            #include <colorspace_fragment>
-          }
-        `,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false,
-        toneMapped: false
-      }));
-      brain.add(new THREE.Points(hotspotGeometry, hotspotGlowMaterial));
-      brain.add(new THREE.Points(hotspotGeometry, hotspotMaterial));
-
-      const activityGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      activityGeometry.setFromPoints(createEnergyParticlePositions(THREE, nodePositions, connectionPairs));
-      activityGeometry.setDrawRange(0, config.activityPoints);
-      const activityMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: config.color,
-        size: 0.075,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.98,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const activityGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: config.color,
-        size: 0.11,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.16,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      brain.add(new THREE.Points(activityGeometry, activityGlowMaterial));
-      brain.add(new THREE.Points(activityGeometry, activityMaterial));
-
-      const referenceTraceLayout = createReferenceTraceLayout(
-        THREE,
-        neuralLayout.leftContourPath,
-        neuralLayout.rightContourPath,
-        neuralLayout.corticalPaths
-      );
-      const referenceTraceGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      referenceTraceGeometry.setFromPoints(referenceTraceLayout.segmentPoints);
-      const referenceTraceStrokeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      referenceTraceStrokeGeometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(referenceTraceLayout.circuitStrokePositions, 3)
-      );
-      const referenceTraceStrokeMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
-        color: 0x159fe8,
-        transparent: true,
-        opacity: 0.7,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      }));
-      const referenceTraceStroke = new THREE.Mesh(
-        referenceTraceStrokeGeometry,
-        referenceTraceStrokeMaterial
-      );
-      referenceTraceStroke.renderOrder = -3;
-      const referenceTraceGlowMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0x36bfff,
-        transparent: true,
-        opacity: 0.28,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const referenceTraceMaterial = trackMaterial(materials, new THREE.LineBasicMaterial({
-        color: 0x7ae8ff,
-        transparent: true,
-        opacity: 0.94,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const referenceTraceGlow = new THREE.LineSegments(
-        referenceTraceGeometry,
-        referenceTraceGlowMaterial
-      );
-      const referenceTraces = new THREE.LineSegments(
-        referenceTraceGeometry,
-        referenceTraceMaterial
-      );
-      referenceTraceGlow.renderOrder = 0;
-      referenceTraces.renderOrder = 1;
-      brain.add(referenceTraceStroke, referenceTraceGlow, referenceTraces);
-
-      const referenceTraceNodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      referenceTraceNodeGeometry.setFromPoints(referenceTraceLayout.neuronPositions);
-      const referenceTraceNodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x83eaff,
-        size: 0.052,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.88,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const referenceTraceNodes = new THREE.Points(
-        referenceTraceNodeGeometry,
-        referenceTraceNodeMaterial
-      );
-      referenceTraceNodes.renderOrder = -1;
-      brain.add(referenceTraceNodes);
-
-      const binaryCodeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      binaryCodeGeometry.setFromPoints(referenceTraceLayout.binaryCodePositions);
-      const binaryCodeGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x28bfff,
-        size: 0.05,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.14,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const binaryCodeMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0xa6f4ff,
-        size: 0.022,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.9,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const binaryCodeStrokeGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      binaryCodeStrokeGeometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(
-          new Float32Array(referenceTraceLayout.binaryCodeStrokePositions),
-          3
-        )
-      );
-      const binaryCodeStrokeMaterial = trackMaterial(materials, new THREE.MeshBasicMaterial({
-        color: 0x8bf2ff,
-        transparent: true,
-        opacity: 0.82,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      }));
-      const binaryCodeStrokes = new THREE.Mesh(
-        binaryCodeStrokeGeometry,
-        binaryCodeStrokeMaterial
-      );
-      binaryCodeStrokes.renderOrder = 2;
-      brain.add(
-        new THREE.Points(binaryCodeGeometry, binaryCodeGlowMaterial),
-        new THREE.Points(binaryCodeGeometry, binaryCodeMaterial),
-        binaryCodeStrokes
-      );
-
-      const maxTraceSignalCount = referenceTraceLayout.pulseRoutes.length * 2;
-      const traceSignalGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      traceSignalGeometry.setFromPoints(Array.from(
-        { length: maxTraceSignalCount },
-        (_, index) => referenceTraceLayout.pulseRoutes[
-          index % referenceTraceLayout.pulseRoutes.length
-        ].points[0]
-      ));
-      const traceSignalPositionAttribute = traceSignalGeometry.getAttribute("position");
-      traceSignalGeometry.setDrawRange(
-        0,
-        Math.min(config.activityPoints, maxTraceSignalCount)
-      );
-      const traceSignalGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x23aaff,
-        size: 0.13,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.28,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const traceSignalMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0xd8faff,
-        size: 0.065,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.96,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const traceSignalGlow = new THREE.Points(traceSignalGeometry, traceSignalGlowMaterial);
-      const traceSignals = new THREE.Points(traceSignalGeometry, traceSignalMaterial);
-      traceSignalGlow.renderOrder = 1;
-      traceSignals.renderOrder = 2;
-      brain.add(traceSignalGlow, traceSignals);
-
-      const analyzingNeuronIndices = Array.from(
-        { length: Math.min(performanceLimits.maxAnalyzingNeurons, nodePositions.length) },
-        (_, index) => (index * 149 + 37) % nodePositions.length
-      );
-      const analyzingNeuronRoutes = createSignalRoutes(
-        connectionPairs,
-        nodePositions.length,
-        analyzingNeuronIndices.length
-      );
-      const analyzingNeuronGeometry = trackGeometry(geometries, new THREE.BufferGeometry());
-      analyzingNeuronGeometry.setFromPoints(
-        analyzingNeuronIndices.map((index) => nodePositions[index])
-      );
-      const analyzingNeuronGlowMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x39ff14,
-        size: 0.17,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.5,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const analyzingNeuronMaterial = trackMaterial(materials, new THREE.PointsMaterial({
-        color: 0x7fff00,
-        size: 0.07,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.96,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      }));
-      const analyzingNeuronGlow = new THREE.Points(
-        analyzingNeuronGeometry,
-        analyzingNeuronGlowMaterial
-      );
-      const analyzingNeurons = new THREE.Points(
-        analyzingNeuronGeometry,
-        analyzingNeuronMaterial
-      );
-      analyzingNeuronGlow.visible = false;
-      analyzingNeurons.visible = false;
-      analyzingNeuronGlow.renderOrder = 1;
-      analyzingNeurons.renderOrder = 2;
-      brain.add(analyzingNeuronGlow, analyzingNeurons);
-
-      function updateVisualIntensity(elapsed, breath) {
-        const rawIntensity = pulseIntensity(config, elapsed, breath);
-        const strength = Math.max(0, Math.min(1, rawIntensity / 2.4));
-        const idleBreath = config.mode === "breathing" ? (breath + 1) * 0.5 : 0;
-        const warningDim = config.mode === "warning" && rawIntensity < 0.3;
-        const visibleStrength = warningDim ? 0.08 : strength;
-        connectionMaterial.opacity = 0.3;
-        connectionGlowMaterial.opacity = 0.035 + visibleStrength * 0.05;
-        nodeMaterial.opacity = 0.96;
-        nodeGlowMaterial.opacity = 0.12 + visibleStrength * 0.15 + idleBreath * 0.02;
-        hotspotMaterial.opacity = 0.92;
-        hotspotGlowMaterial.uniforms.uOpacity.value = 0.15 + visibleStrength * 0.42;
-        activityMaterial.opacity = 0.92;
-        activityGlowMaterial.opacity = 0.07 + visibleStrength * 0.14;
+      const config = mapAgentStatus(status);
+      if (stateElement && stateElement.dataset) {
+        stateElement.dataset.state = config.status.toLowerCase();
       }
+      if (typeof container.setAttribute === "function") {
+        container.setAttribute("aria-label", `Agent circuit visualization; status ${config.status}`);
+      }
+      return config;
+    }
 
-      function resize() {
+    setStatus(initialStatus);
+    return {
+      available: true,
+      isAvailable() {
+        return !disposed;
+      },
+      setStatus,
+      dispose() {
         if (disposed) {
           return;
         }
-        const width = Math.max(1, container.clientWidth || 320);
-        const height = Math.max(1, container.clientHeight || 200);
-        camera.aspect = width / height;
-        const responsiveScale = Math.min(1.18, 1 + Math.max(0, (camera.aspect - 1.5) * 0.08));
-        brain.scale.set(responsiveScale * 1.08, responsiveScale * 1.22, responsiveScale);
-        brain.position.y = responsiveScale * 0.55 * 0.13;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height, false);
-        renderStatic();
-      }
-
-      function renderStatic() {
-        if (!disposed) {
-          renderer.render(scene, camera);
-        }
-      }
-
-      function stopAnimation() {
-        if (animationFrame !== null && typeof windowRef.cancelAnimationFrame === "function") {
-          windowRef.cancelAnimationFrame(animationFrame);
-        }
-        animationFrame = null;
-      }
-
-      function canAnimate() {
-        return !disposed && visible && config.animated
-          && typeof windowRef.requestAnimationFrame === "function";
-      }
-
-      function isRendererAvailable() {
-        if (disposed || !renderer) {
-          return false;
-        }
-        if (typeof renderer.getContext !== "function") {
-          return true;
-        }
-        const context = renderer.getContext();
-        return Boolean(context)
-          && (typeof context.isContextLost !== "function" || !context.isContextLost());
-      }
-
-      function animate(timestamp) {
-        animationFrame = null;
-        if (!canAnimate()) {
-          return;
-        }
-
-        const minimumFrameInterval = 1000 / performanceLimits.maxFramesPerSecond;
-        if (timestamp - lastRenderAt >= minimumFrameInterval) {
-          const elapsed = timestamp * 0.001 * config.pulseSpeed;
-          const breath = Math.sin(elapsed);
-          updateNeuralNetwork(
-            nodePositionAttribute,
-          nodeColorAttribute,
-          connectionPositionAttribute,
-          connectionColorAttribute,
-          nodePositions,
-          connectionPairs,
-          connectionWeights,
-          animatedNodePositions,
-          neuronActivity,
-          connectionActivity,
-          connectionSignalProgress,
-          signalRoutes,
-          config,
-          elapsed
-          );
-          updateHotspotPositions(
-          hotspotPositionAttribute,
-          animatedNodePositions,
-          hotspotIndices
-          );
-          if (config.status === "ANALYZING") {
-            updateEnergyParticles(
-              analyzingNeuronGeometry,
-              connectionPairs,
-              analyzingNeuronRoutes,
-              animatedNodePositions,
-              analyzingNeuronIndices.length,
-              elapsed,
-              config
-            );
-          }
-          updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
-          updateEnergyParticles(
-          activityGeometry,
-          connectionPairs,
-          signalRoutes,
-          animatedNodePositions,
-          config.activityPoints,
-          elapsed,
-          config
-          );
-          const traceSignalCount = Math.min(config.activityPoints, maxTraceSignalCount);
-          updateReferenceTraceParticles(
-          traceSignalPositionAttribute,
-          referenceTraceLayout.pulseRoutes,
-          traceSignalCount,
-          elapsed,
-          config.signalSpeed
-          );
-          updateVisualIntensity(elapsed, breath);
-          renderer.render(scene, camera);
-          lastRenderAt = timestamp;
-        }
-        animationFrame = windowRef.requestAnimationFrame(animate);
-      }
-
-      function startAnimation() {
-        if (animationFrame === null && canAnimate()) {
-          animationFrame = windowRef.requestAnimationFrame(animate);
-        }
-      }
-
-      function applyStatus(status) {
-        config = mapAgentStatus(status);
-        if (stateElement) {
-          stateElement.dataset.state = config.status.toLowerCase();
-        }
-        if (typeof container.setAttribute === "function") {
-          container.setAttribute("aria-label", `3D Agent Brain; status ${config.status}`);
-        }
-        setMaterialColor(connectionMaterial, config.color);
-        setMaterialColor(connectionGlowMaterial, config.color);
-        setMaterialColor(nodeMaterial, config.color);
-        setMaterialColor(nodeGlowMaterial, config.color);
-        setMaterialColor(hotspotMaterial, config.color);
-        setMaterialColor(hotspotGlowMaterial, config.color);
-        setMaterialColor(activityMaterial, config.color);
-        setMaterialColor(activityGlowMaterial, config.color);
-        const analyzing = config.status === "ANALYZING";
-        analyzingNeuronGlow.visible = analyzing;
-        analyzingNeurons.visible = analyzing;
-        connectionMaterial.color.setHex(0xffffff);
-        connectionGlowMaterial.color.setHex(0xffffff);
-        activityGeometry.setDrawRange(0, config.activityPoints);
-        const traceSignalCount = Math.min(config.activityPoints, maxTraceSignalCount);
-        traceSignalGeometry.setDrawRange(0, traceSignalCount);
-        updateNeuralNetwork(
-          nodePositionAttribute,
-          nodeColorAttribute,
-          connectionPositionAttribute,
-          connectionColorAttribute,
-          nodePositions,
-          connectionPairs,
-          connectionWeights,
-          animatedNodePositions,
-          neuronActivity,
-          connectionActivity,
-          connectionSignalProgress,
-          signalRoutes,
-          config,
-          0
-        );
-        updateHotspotPositions(
-          hotspotPositionAttribute,
-          animatedNodePositions,
-          hotspotIndices
-        );
-        if (config.status === "ANALYZING") {
-          updateEnergyParticles(
-            analyzingNeuronGeometry,
-            connectionPairs,
-            analyzingNeuronRoutes,
-            animatedNodePositions,
-            analyzingNeuronIndices.length,
-            0,
-            config
-          );
-        }
-        updateReferenceTraceParticles(
-          traceSignalPositionAttribute,
-          referenceTraceLayout.pulseRoutes,
-          traceSignalCount,
-          0,
-          config.signalSpeed
-        );
-        updateHotspotColors(hotspotColorAttribute, neuronActivity, hotspotIndices);
-        updateEnergyParticles(
-          activityGeometry,
-          connectionPairs,
-          signalRoutes,
-          animatedNodePositions,
-          config.activityPoints,
-          0,
-          config
-        );
-        updateVisualIntensity(0, 0);
-        brain.rotation.set(0, 0, 0);
-        lastRenderAt = 0;
-        stopAnimation();
-        renderStatic();
-        startAnimation();
-        return config;
-      }
-
-      function onVisibilityChange() {
-        visible = documentRef.visibilityState !== "hidden";
-        if (visible) {
-          lastRenderAt = 0;
-          renderStatic();
-          startAnimation();
-        } else {
-          stopAnimation();
-        }
-      }
-
-      function onPageHide(event) {
-        if (event && event.persisted) {
-          visible = false;
-          stopAnimation();
-          return;
-        }
-        disposeResources();
-      }
-
-      function onPageShow(event) {
-        if (event && event.persisted) {
-          onVisibilityChange();
-        }
-      }
-
-      function disposeResources() {
-        if (disposed) {
-          return;
-        }
+        container.innerHTML = "";
         disposed = true;
-        stopAnimation();
-        if (resizeObserver) {
-          resizeObserver.disconnect();
-        } else if (typeof windowRef.removeEventListener === "function") {
-          windowRef.removeEventListener("resize", resize);
-        }
-        if (typeof documentRef.removeEventListener === "function") {
-          documentRef.removeEventListener("visibilitychange", onVisibilityChange);
-        }
-        if (typeof windowRef.removeEventListener === "function") {
-          windowRef.removeEventListener("pagehide", onPageHide);
-          windowRef.removeEventListener("pageshow", onPageShow);
-        }
-        for (const geometry of geometries) {
-          geometry.dispose();
-        }
-        for (const material of materials) {
-          material.dispose();
-        }
-        if (renderer) {
-          renderer.dispose();
-          if (renderer.domElement.parentNode === container) {
-            container.removeChild(renderer.domElement);
-          }
-        }
       }
-
-      resizeHandler = resize;
-      visibilityHandler = onVisibilityChange;
-      pageHideHandler = onPageHide;
-      pageShowHandler = onPageShow;
-      if (typeof windowRef.ResizeObserver === "function") {
-        resizeObserver = new windowRef.ResizeObserver(resize);
-        resizeObserver.observe(container);
-      } else if (typeof windowRef.addEventListener === "function") {
-        windowRef.addEventListener("resize", resize);
-      }
-      if (typeof documentRef.addEventListener === "function") {
-        documentRef.addEventListener("visibilitychange", onVisibilityChange);
-      }
-      if (typeof windowRef.addEventListener === "function") {
-        windowRef.addEventListener("pagehide", onPageHide);
-        windowRef.addEventListener("pageshow", onPageShow);
-      }
-
-      resize();
-      const instance = {
-        available: true,
-        isAvailable: isRendererAvailable,
-        setStatus: applyStatus,
-        dispose: disposeResources
-      };
-      applyStatus(initialStatus);
-      return instance;
-    } catch (error) {
-      if (animationFrame !== null && typeof windowRef.cancelAnimationFrame === "function") {
-        windowRef.cancelAnimationFrame(animationFrame);
-      }
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      } else if (resizeHandler && typeof windowRef.removeEventListener === "function") {
-        windowRef.removeEventListener("resize", resizeHandler);
-      }
-      if (visibilityHandler && typeof documentRef.removeEventListener === "function") {
-        documentRef.removeEventListener("visibilitychange", visibilityHandler);
-      }
-      if (pageHideHandler && typeof windowRef.removeEventListener === "function") {
-        windowRef.removeEventListener("pagehide", pageHideHandler);
-      }
-      if (pageShowHandler && typeof windowRef.removeEventListener === "function") {
-        windowRef.removeEventListener("pageshow", pageShowHandler);
-      }
-      for (const geometry of geometries) {
-        geometry.dispose();
-      }
-      for (const material of materials) {
-        material.dispose();
-      }
-      if (renderer) {
-        renderer.dispose();
-        if (renderer.domElement.parentNode === container) {
-          container.removeChild(renderer.domElement);
-        }
-      }
-      return { ...unavailableBrain, error };
-    }
-  }
-
-  function createNeuralLayout(THREE) {
-    const nodePositions = [];
-    const connectionPairs = [];
-    const connectionWeights = [];
-    const hotspotIndices = [];
-
-    function addConnection(start, end, weight = 1) {
-      connectionPairs.push([start, end]);
-      connectionWeights.push(weight);
-    }
-
-    function addPath(points, weight = 1, closed = false) {
-      const start = nodePositions.length;
-      nodePositions.push(...points);
-      const end = nodePositions.length;
-      for (let index = start; index < end - 1; index += 1) {
-        addConnection(index, index + 1, weight);
-      }
-      if (closed && end - start > 2) {
-        addConnection(end - 1, start, weight);
-      }
-      return Array.from({ length: end - start }, (_, index) => start + index);
-    }
-
-    function hemispherePoint(side, localX, y, z) {
-      return new THREE.Vector3(
-        side * (0.025 + (localX - 0.05) * brainWidthScale),
-        y,
-        z
-      );
-    }
-
-    function createOuterContour(side) {
-      const points = [];
-      const outerPointCount = 58;
-      const contourPointCount = 80;
-      for (let index = 0; index < outerPointCount; index += 1) {
-        const progress = index / (outerPointCount - 1);
-        const width = 0.62 * Math.sin(Math.PI * progress) ** 0.66;
-        const lobes = 1 + Math.sin(progress * Math.PI * 3 + 0.3) * 0.05
-          + Math.sin(progress * Math.PI * 7 + 1.2) * 0.035
-          + Math.sin(progress * Math.PI * 13) * 0.012;
-        const y = 0.48 - progress * 0.9 + Math.sin(progress * Math.PI * 6) * 0.012;
-        points.push(hemispherePoint(
-          side,
-          0.05 + width * lobes,
-          y,
-          0.075 + Math.sin(progress * Math.PI) * 0.045
-        ));
-      }
-      for (let index = 0; index < contourPointCount - outerPointCount; index += 1) {
-        const progress = index / (contourPointCount - outerPointCount - 1);
-        points.push(hemispherePoint(
-          side,
-          0.05 + Math.sin(progress * Math.PI * 6) * 0.004,
-          -0.42 + progress * 0.9,
-          0.075 + Math.sin(progress * Math.PI * 4) * 0.008
-        ));
-      }
-      return points;
-    }
-
-    function createGyrusPath(side, pathIndex) {
-      const points = [];
-      const pointCount = 28;
-      const rowProgress = (pathIndex + 1) / 7;
-      const centerY = 0.48 - rowProgress * 0.9;
-      const width = 0.59 * Math.sin(Math.PI * rowProgress) ** 0.66;
-      for (let index = 0; index < pointCount; index += 1) {
-        const progress = index / (pointCount - 1);
-        const curve = Math.sin(progress * Math.PI * 2 + pathIndex * 0.7)
-          * Math.sin(progress * Math.PI) * 0.035
-          + Math.sin(progress * Math.PI * 5 + pathIndex * 0.45)
-            * Math.sin(progress * Math.PI) * 0.012;
-        const y = centerY + curve;
-        points.push(hemispherePoint(
-          side,
-          0.05 + width * progress,
-          y,
-          0.105 + Math.sin(progress * Math.PI * 3 + pathIndex) * 0.04
-        ));
-      }
-      return points;
-    }
-
-    function createBranchPath(side, source, target, progress, branchIndex) {
-      const points = [];
-      const pointCount = 8;
-      const sourceIndex = Math.round(progress * (source.length - 1));
-      const targetProgress = Math.max(0.08, Math.min(0.92,
-        progress + (branchIndex % 2 === 0 ? 0.14 : -0.11)));
-      const targetIndex = Math.round(targetProgress * (target.length - 1));
-      const start = nodePositions[source[sourceIndex]];
-      const end = nodePositions[target[targetIndex]];
-      const bendDirection = branchIndex % 2 === 0 ? 1 : -1;
-      for (let index = 0; index < pointCount; index += 1) {
-        const progress = index / (pointCount - 1);
-        points.push(new THREE.Vector3(
-          start.x + (end.x - start.x) * progress
-            + side * Math.sin(progress * Math.PI) * 0.025,
-          start.y + (end.y - start.y) * progress
-            + Math.sin(progress * Math.PI) * bendDirection * 0.035,
-          start.z + (end.z - start.z) * progress + Math.sin(progress * Math.PI) * 0.06
-        ));
-      }
-      return { points, sourceIndex, targetIndex };
-    }
-
-    const hemispherePaths = [];
-    for (const side of [-1, 1]) {
-      const start = nodePositions.length;
-      const contour = addPath(createOuterContour(side), 1.65, true);
-      for (let index = 0; index < contour.length; index += 2) {
-        hotspotIndices.push(contour[index]);
-      }
-
-      const gyri = [];
-      for (let index = 0; index < 6; index += 1) {
-        const path = addPath(createGyrusPath(side, index), 1.12);
-        gyri.push(path);
-        for (const pointIndex of [6, 13, 20]) {
-          hotspotIndices.push(path[pointIndex]);
-        }
-      }
-
-      for (let branchIndex = 0; branchIndex < 10; branchIndex += 1) {
-        const sourceIndex = branchIndex % gyri.length;
-        const targetIndex = (sourceIndex + 1 + branchIndex % 2) % gyri.length;
-        const source = gyri[sourceIndex];
-        const target = gyri[targetIndex];
-        const progress = 0.12 + ((branchIndex * 0.071) % 0.72);
-        const branch = createBranchPath(side, source, target, progress, branchIndex);
-        const branchPath = addPath(branch.points, 0.88);
-        addConnection(branchPath[0], source[branch.sourceIndex], 0.94);
-        addConnection(branchPath[branchPath.length - 1], target[branch.targetIndex], 0.94);
-        hotspotIndices.push(branchPath[Math.floor(branchPath.length / 2)]);
-      }
-      hemispherePaths.push({ side, contour, gyri, start, end: nodePositions.length });
-    }
-
-    const cerebellarPaths = [];
-    for (const side of [-1, 1]) {
-      for (let rowIndex = 0; rowIndex < 2; rowIndex += 1) {
-        const points = [];
-        for (let index = 0; index < 12; index += 1) {
-          const progress = index / 11;
-          points.push(hemispherePoint(
-            side,
-            0.055 + progress * 0.22,
-            -0.405 - Math.sin(progress * Math.PI) * (0.04 - rowIndex * 0.01),
-            0.12 + rowIndex * 0.035
-          ));
-        }
-        cerebellarPaths.push(addPath(points, 1.05));
-      }
-    }
-
-    for (let index = 0; index < cerebellarPaths.length; index += 2) {
-      const outer = cerebellarPaths[index];
-      const inner = cerebellarPaths[index + 1];
-      for (let pointIndex = 1; pointIndex < outer.length - 1; pointIndex += 3) {
-        addConnection(outer[pointIndex], inner[pointIndex], 0.88);
-      }
-      const sidePath = hemispherePaths[index / 2];
-      addConnection(sidePath.contour[57], outer[0], 1.05);
-    }
-
-    const brainstem = [];
-    for (let index = 0; index < 16; index += 1) {
-      brainstem.push(new THREE.Vector3(
-        index % 2 === 0 ? -0.012 : 0.012,
-        -0.475 - index * 0.005,
-        0.11
-      ));
-    }
-    const brainstemPath = addPath(brainstem, 0.9);
-    addConnection(cerebellarPaths[0][0], brainstemPath[0], 0.85);
-    addConnection(cerebellarPaths[2][0], brainstemPath[1], 0.85);
-
-    function addLocalConnections(start, end, targetCount) {
-      const existing = new Set(connectionPairs.map(([left, right]) =>
-        left < right ? `${left}:${right}` : `${right}:${left}`
-      ));
-      const maxDistanceSquared = 0.32 ** 2;
-      const candidatesBySource = [];
-      for (let source = start; source < end; source += 1) {
-        const candidates = [];
-        const sourcePosition = nodePositions[source];
-        for (let target = start; target < end; target += 1) {
-          if (source === target) {
-            continue;
-          }
-          const targetPosition = nodePositions[target];
-          const dx = sourcePosition.x - targetPosition.x;
-          const dy = sourcePosition.y - targetPosition.y;
-          const dz = sourcePosition.z - targetPosition.z;
-          const distanceSquared = dx * dx + dy * dy + dz * dz;
-          if (distanceSquared <= maxDistanceSquared) {
-            candidates.push({ target, distanceSquared });
-          }
-        }
-        candidates.sort((left, right) => left.distanceSquared - right.distanceSquared);
-        candidatesBySource.push(candidates);
-      }
-
-      let added = 0;
-      const longestCandidateList = Math.max(...candidatesBySource.map((items) => items.length));
-      for (
-        let candidateRank = 0;
-        candidateRank < longestCandidateList && added < targetCount;
-        candidateRank += 1
-      ) {
-        for (let sourceOffset = 0; sourceOffset < candidatesBySource.length; sourceOffset += 1) {
-          const candidate = candidatesBySource[sourceOffset][candidateRank];
-          if (!candidate) {
-            continue;
-          }
-          const source = start + sourceOffset;
-          const left = Math.min(source, candidate.target);
-          const right = Math.max(source, candidate.target);
-          const key = `${left}:${right}`;
-          if (existing.has(key)) {
-            continue;
-          }
-          const distance = Math.sqrt(candidate.distanceSquared);
-          const weight = 0.18 + (1 - distance / 0.32) * 0.17;
-          addConnection(source, candidate.target, weight);
-          existing.add(key);
-          added += 1;
-          if (added >= targetCount) {
-            break;
-          }
-        }
-      }
-      return added;
-    }
-
-    let remainingConnectionBudget = performanceLimits.maxConnections - connectionPairs.length;
-    for (let index = 0; index < hemispherePaths.length; index += 1) {
-      const hemispheresRemaining = hemispherePaths.length - index;
-      const targetCount = Math.ceil(remainingConnectionBudget / hemispheresRemaining);
-      const hemisphere = hemispherePaths[index];
-      const added = addLocalConnections(hemisphere.start, hemisphere.end, targetCount);
-      remainingConnectionBudget -= added;
-    }
-
-    if (
-      nodePositions.length !== performanceLimits.maxNeuralNodes
-      || connectionPairs.length > performanceLimits.maxConnections
-      || connectionWeights.length !== connectionPairs.length
-      || hotspotIndices.length > nodePositions.length
-    ) {
-      throw new Error("Agent Brain neural layout exceeds its performance limits.");
-    }
-
-    function getContourPath(side) {
-      const hemisphere = hemispherePaths.find((item) => item.side === side);
-      return hemisphere.contour
-        .slice(0, 58)
-        .map((index) => nodePositions[index]);
-    }
-
-    return {
-      connectionPairs,
-      connectionWeights,
-      hotspotIndices,
-      nodePositions,
-      corticalPaths: hemispherePaths.flatMap((hemisphere) => [
-        {
-          points: hemisphere.contour.map((index) => nodePositions[index]),
-          closed: true
-        },
-        ...(hemisphere.side === -1
-          ? hemisphere.gyri.map((path) => ({
-            points: path.map((index) => nodePositions[index]),
-            closed: false
-          }))
-          : [])
-      ]),
-      leftContourPath: getContourPath(-1),
-      rightContourPath: getContourPath(1)
     };
   }
 
-  function createEnergyParticlePositions(THREE, nodePositions, connectionPairs) {
-    const points = [];
-    for (let index = 0; index < performanceLimits.maxActivityPoints; index += 1) {
-      const pair = connectionPairs[(index * 37) % Math.max(1, connectionPairs.length)];
-      points.push(pair
-        ? nodePositions[pair[0]]
-        : new THREE.Vector3());
-    }
-    return points;
-  }
-
-  function createReferenceTraceLayout(THREE, leftContourPath, rightContourPath, corticalPaths) {
-    const segmentPoints = [];
-    const junctions = [];
-    const neuronPositions = [];
-    const pulseRoutes = [];
-    const circuitStrokePositions = [];
-    const binaryCodePositions = [];
-    const binaryCodeStrokePositions = [];
-
-    function addStrokeSegment(start, end, halfWidth, target = circuitStrokePositions) {
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const length = Math.hypot(dx, dy);
-      if (length === 0) {
-        return;
-      }
-      const normalX = -dy / length * halfWidth;
-      const normalY = dx / length * halfWidth;
-      const startPlus = [start.x + normalX, start.y + normalY, start.z - 0.002];
-      const startMinus = [start.x - normalX, start.y - normalY, start.z - 0.002];
-      const endPlus = [end.x + normalX, end.y + normalY, end.z - 0.002];
-      const endMinus = [end.x - normalX, end.y - normalY, end.z - 0.002];
-      target.push(
-        ...startPlus,
-        ...startMinus,
-        ...endMinus,
-        ...startPlus,
-        ...endMinus,
-        ...endPlus
-      );
-    }
-
-    function addPath(coordinates, z, includeBends = false) {
-      const points = coordinates.map(([x, y]) => new THREE.Vector3(x, y, z));
-      const segmentLengths = [];
-      let totalLength = 0;
-      neuronPositions.push(points[0]);
-      for (let index = 0; index < points.length - 1; index += 1) {
-        const start = points[index];
-        const end = points[index + 1];
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const dz = end.z - start.z;
-        const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        const subdivisions = Math.max(1, Math.ceil(length / 0.12));
-        segmentLengths.push(length);
-        totalLength += length;
-        segmentPoints.push(start, end);
-        if (includeBends) {
-          addStrokeSegment(start, end, 0.006);
-        }
-        for (let step = 1; step <= subdivisions; step += 1) {
-          const progress = step / subdivisions;
-          neuronPositions.push(new THREE.Vector3(
-            start.x + dx * progress,
-            start.y + dy * progress,
-            start.z + dz * progress
-          ));
-        }
-      }
-      junctions.push(points[0]);
-      if (includeBends) {
-        junctions.push(...points.slice(1, -1));
-      }
-      junctions.push(points[points.length - 1]);
-      pulseRoutes.push({
-        phase: pulseRoutes.length * 0.137,
-        points,
-        segmentLengths,
-        totalLength
-      });
-    }
-
-    function getContourXAtY(contourPath, y) {
-      for (let index = 1; index < contourPath.length; index += 1) {
-        const start = contourPath[index - 1];
-        const end = contourPath[index];
-        if (start.y >= y && end.y <= y) {
-          const progress = (start.y - y) / (start.y - end.y);
-          return start.x + (end.x - start.x) * progress;
-        }
-      }
-      throw new Error("Agent Brain trace does not intersect the neural contour.");
-    }
-
-    for (let lane = 0; lane < 3; lane += 1) {
-      const centerY = (lane - 1) * 0.14;
-      const endY = centerY + Math.sin(lane * 0.72) * 0.052;
-      const endX = getContourXAtY(leftContourPath, endY) + 0.01;
-      const coordinates = [];
-      for (let index = 0; index <= 28; index += 1) {
-        const progress = index / 28;
-        coordinates.push([
-          -1.24 + progress * (endX + 1.24),
-          centerY + Math.sin(progress * Math.PI * 4 + lane * 0.72) * 0.052
-        ]);
-      }
-      addPath(coordinates, -0.055, true);
-    }
-
-    function getRightContourX(y) {
-      return getContourXAtY(rightContourPath, y);
-    }
-
-    const circuitPaths = Array.from({ length: 7 }, (_, lane) => {
-      const y = 0.34 - lane * 0.12;
-      const startX = getRightContourX(y) - 0.01;
-      const bendX = startX + 0.29;
-      const bendY = y + 0.115;
-      return [[startX, y], [startX + 0.16, y], [bendX, bendY], [1.16, bendY]];
-    });
-    for (const path of circuitPaths) {
-      addPath(path, -0.045, true);
-    }
-
-    for (const path of corticalPaths) {
-      for (let index = 0; index < path.points.length - 1; index += 1) {
-        segmentPoints.push(path.points[index], path.points[index + 1]);
-        addStrokeSegment(path.points[index], path.points[index + 1], path.closed ? 0.009 : 0.007);
-      }
-      if (path.closed) {
-        segmentPoints.push(path.points[path.points.length - 1], path.points[0]);
-        addStrokeSegment(path.points[path.points.length - 1], path.points[0], 0.009);
-      }
-    }
-
-    const digitSegments = {
-      0: [
-        [[-0.012, -0.018], [0.012, -0.018]],
-        [[0.012, -0.018], [0.016, -0.01]],
-        [[0.016, -0.01], [0.016, 0.01]],
-        [[0.016, 0.01], [0.012, 0.018]],
-        [[0.012, 0.018], [-0.012, 0.018]],
-        [[-0.012, 0.018], [-0.016, 0.01]],
-        [[-0.016, 0.01], [-0.016, -0.01]],
-        [[-0.016, -0.01], [-0.012, -0.018]]
-      ],
-      1: [
-        [[-0.008, 0.008], [0.004, 0.018]],
-        [[0.004, 0.018], [0.004, -0.018]],
-        [[-0.009, -0.018], [0.014, -0.018]]
-      ]
-    };
-    const codeRows = 12;
-    for (let row = 0; row < codeRows; row += 1) {
-      const progress = row / (codeRows - 1);
-      const y = 0.33 - progress * 0.66;
-      const startX = 0.05 + Math.abs(progress - 0.5) * 0.012;
-      const endX = getRightContourX(y) - 0.025;
-      const glyphCount = Math.max(0, Math.floor((endX - startX) / 0.045));
-      for (let column = 0; column < glyphCount; column += 1) {
-        const digit = (row * 7 + column * 3 + Math.floor(Math.sin(row + column) * 4)) & 1;
-        const centerX = startX + column * 0.045
-          + Math.sin(row * 0.48 + column * 0.31) * 0.007;
-        const centerY = y + Math.sin(column * 0.55 + row * 0.2) * 0.016;
-        const rotation = Math.sin(row * 0.48 + column * 0.31) * 0.42;
-        const cosine = Math.cos(rotation);
-        const sine = Math.sin(rotation);
-        function transformGlyphPoint([x, y]) {
-          return new THREE.Vector3(
-            centerX + x * cosine - y * sine,
-            centerY + x * sine + y * cosine,
-            0.2
-          );
-        }
-        for (const [start, end] of digitSegments[digit]) {
-          const strokeStart = transformGlyphPoint(start);
-          const strokeEnd = transformGlyphPoint(end);
-          addStrokeSegment(strokeStart, strokeEnd, 0.002, binaryCodeStrokePositions);
-          for (let step = 0; step <= 2; step += 1) {
-            const amount = step / 2;
-            binaryCodePositions.push(new THREE.Vector3(
-              strokeStart.x + (strokeEnd.x - strokeStart.x) * amount,
-              strokeStart.y + (strokeEnd.y - strokeStart.y) * amount,
-              strokeStart.z + (strokeEnd.z - strokeStart.z) * amount
-            ));
-          }
-        }
-      }
-    }
-
-    return {
-      binaryCodePositions,
-      binaryCodeStrokePositions,
-      circuitStrokePositions: new Float32Array(circuitStrokePositions),
-      junctions,
-      neuronPositions,
-      pulseRoutes,
-      segmentPoints
-    };
-  }
-
-  function updateReferenceTraceParticles(
-    positionAttribute,
-    pulseRoutes,
-    count,
-    elapsed,
-    signalSpeed
-  ) {
-    if (!pulseRoutes.length) {
-      return;
-    }
-
-    for (let index = 0; index < count; index += 1) {
-      const routeIndex = index % pulseRoutes.length;
-      const route = pulseRoutes[routeIndex];
-      const routeParticle = Math.floor(index / pulseRoutes.length);
-      const progress = (elapsed * signalSpeed * 0.22
-        + route.phase + routeParticle * 0.5) % 1;
-      let distance = progress * route.totalLength;
-      let segmentIndex = 0;
-      while (
-        segmentIndex < route.segmentLengths.length - 1
-        && distance > route.segmentLengths[segmentIndex]
-      ) {
-        distance -= route.segmentLengths[segmentIndex];
-        segmentIndex += 1;
-      }
-
-      const start = route.points[segmentIndex];
-      const end = route.points[segmentIndex + 1];
-      const segmentLength = route.segmentLengths[segmentIndex];
-      const segmentProgress = segmentLength > 0
-        ? Math.min(1, distance / segmentLength)
-        : 0;
-      positionAttribute.setXYZ(
-        index,
-        start.x + (end.x - start.x) * segmentProgress,
-        start.y + (end.y - start.y) * segmentProgress,
-        start.z + (end.z - start.z) * segmentProgress
-      );
-    }
-    positionAttribute.needsUpdate = true;
-  }
-
-  function createConnectionLinePoints(nodePositions, connectionPairs) {
-    const points = [];
-    for (const [start, end] of connectionPairs) {
-      points.push(nodePositions[start], nodePositions[end]);
-    }
-    return points;
-  }
-
-  function createSignalRoutes(
-    connectionPairs,
-    nodeCount,
-    routeCount = performanceLimits.maxActivityPoints
-  ) {
-    const adjacency = Array.from({ length: nodeCount }, () => []);
-    connectionPairs.forEach(([start, end], edgeIndex) => {
-      adjacency[start].push({ node: end, edgeIndex });
-      adjacency[end].push({ node: start, edgeIndex });
-    });
-
-    const routes = [];
-    for (let routeIndex = 0; routeIndex < routeCount; routeIndex += 1) {
-      let currentNode = (routeIndex * 137 + 23) % nodeCount;
-      let previousNode = -1;
-      const nodeIndices = [currentNode];
-      const edgeIndices = [];
-      const usedEdges = new Set();
-      for (let step = 0; step < 8; step += 1) {
-        const neighbors = adjacency[currentNode];
-        const candidates = neighbors.filter(({ node, edgeIndex }) =>
-          node !== previousNode && !usedEdges.has(edgeIndex)
-        );
-        const available = candidates.length ? candidates : neighbors;
-        if (!available.length) {
-          break;
-        }
-        const choice = available[(routeIndex * 11 + step * 7) % available.length];
-        edgeIndices.push(choice.edgeIndex);
-        usedEdges.add(choice.edgeIndex);
-        previousNode = currentNode;
-        currentNode = choice.node;
-        nodeIndices.push(currentNode);
-      }
-      if (edgeIndices.length) {
-        routes.push({
-          edgeIndices,
-          nodeIndices,
-          phase: routeIndex * 0.43
-        });
-      }
-    }
-    return routes;
-  }
-
-  function updateNeuralNetwork(
-    nodeAttribute,
-    nodeColorAttribute,
-    connectionAttribute,
-    colorAttribute,
-    nodePositions,
-    connectionPairs,
-    connectionWeights,
-    animatedPositions,
-    neuronActivity,
-    connectionActivity,
-    connectionSignalProgress,
-    signalRoutes,
-    config,
-    elapsed
-  ) {
-    const motion = config.animated ? config.pulseAmount * 0.05 : 0;
-    for (let index = 0; index < nodePositions.length; index += 1) {
-      const base = nodePositions[index];
-      const phase = elapsed * 1.1 + index * 0.19;
-      const x = base.x + Math.sin(phase * 0.63) * motion * 0.65;
-      const y = base.y + Math.sin(phase) * motion;
-      const z = base.z + Math.cos(phase * 0.82) * motion * 0.8;
-      const offset = index * 3;
-      animatedPositions[offset] = x;
-      animatedPositions[offset + 1] = y;
-      animatedPositions[offset + 2] = z;
-      nodeAttribute.setXYZ(index, x, y, z);
-
-      const activationPhase = index * 2.399963229728653 + (index % 13) * 0.17;
-      const oscillator = (Math.sin(elapsed * (0.72 + (index % 9) * 0.045)
-        + activationPhase) + 1) * 0.5;
-      const activationRange = Math.max(0.001, 1 - config.activationThreshold);
-      const activation = config.animated
-        ? Math.pow(Math.max(0, (oscillator - config.activationThreshold) / activationRange), 1.45)
-          * config.neuronGain
-        : 0;
-      neuronActivity[index] = Math.min(1, config.neuronBaseline + activation);
-      nodeColorAttribute.setXYZ(
-        index,
-        neuronActivity[index],
-        neuronActivity[index],
-        neuronActivity[index]
-      );
-    }
-    nodeAttribute.needsUpdate = true;
-    nodeColorAttribute.needsUpdate = true;
-
-    connectionActivity.fill(0);
-    connectionSignalProgress.fill(0);
-    const routeCount = Math.min(config.activityPoints, signalRoutes.length);
-    for (let routeIndex = 0; routeIndex < routeCount; routeIndex += 1) {
-      const route = signalRoutes[routeIndex];
-      const routePosition = (
-        elapsed * config.signalSpeed + route.phase
-      ) % route.edgeIndices.length;
-      const edgeStep = Math.floor(routePosition);
-      const progress = routePosition - edgeStep;
-      const pulse = 0.64 + Math.sin(progress * Math.PI) * 0.36;
-      const edgeIndex = route.edgeIndices[edgeStep];
-      connectionActivity[edgeIndex] = Math.max(connectionActivity[edgeIndex], pulse);
-      connectionSignalProgress[edgeIndex] = progress;
-
-      if (edgeStep > 0) {
-        const trailingEdge = route.edgeIndices[edgeStep - 1];
-        const trailingPulse = (1 - progress) * 0.32;
-        if (trailingPulse > connectionActivity[trailingEdge]) {
-          connectionActivity[trailingEdge] = trailingPulse;
-          connectionSignalProgress[trailingEdge] = 1;
-        }
-      }
-
-      const startNode = route.nodeIndices[edgeStep];
-      const endNode = route.nodeIndices[edgeStep + 1];
-      neuronActivity[startNode] = Math.max(
-        neuronActivity[startNode],
-        0.48 + pulse * 0.46 * (1 - progress)
-      );
-      neuronActivity[endNode] = Math.max(
-        neuronActivity[endNode],
-        0.38 + pulse * 0.56 * progress
-      );
-    }
-    for (let index = 0; index < nodePositions.length; index += 1) {
-      const intensity = neuronActivity[index];
-      nodeColorAttribute.setXYZ(index, intensity, intensity, intensity);
-    }
-    nodeColorAttribute.needsUpdate = true;
-
-    const channels = [
-      ((config.color >> 16) & 0xff) / 255,
-      ((config.color >> 8) & 0xff) / 255,
-      (config.color & 0xff) / 255
-    ];
-    for (let index = 0; index < connectionPairs.length; index += 1) {
-      const [start, end] = connectionPairs[index];
-      const startOffset = start * 3;
-      const endOffset = end * 3;
-      const vertexOffset = index * 2;
-      connectionAttribute.setXYZ(
-        vertexOffset,
-        animatedPositions[startOffset],
-        animatedPositions[startOffset + 1],
-        animatedPositions[startOffset + 2]
-      );
-      connectionAttribute.setXYZ(
-        vertexOffset + 1,
-        animatedPositions[endOffset],
-        animatedPositions[endOffset + 1],
-        animatedPositions[endOffset + 2]
-      );
-
-      const weight = connectionWeights[index] || 1;
-      const pulseBrightness = connectionActivity[index] * config.connectionPulseGain;
-      const weightFactor = 0.35 + Math.min(1, weight) * 0.65;
-      const inactiveBrightness = 0.008 + Math.min(1, weight) * 0.018;
-      const progress = connectionSignalProgress[index];
-      const startBrightness = inactiveBrightness
-        + pulseBrightness * weightFactor * (0.3 + 0.7 * (1 - progress));
-      const endBrightness = inactiveBrightness
-        + pulseBrightness * weightFactor * (0.3 + 0.7 * progress);
-      colorAttribute.setXYZ(
-        vertexOffset,
-        channels[0] * startBrightness,
-        channels[1] * startBrightness,
-        channels[2] * startBrightness
-      );
-      colorAttribute.setXYZ(
-        vertexOffset + 1,
-        channels[0] * endBrightness,
-        channels[1] * endBrightness,
-        channels[2] * endBrightness
-      );
-    }
-    connectionAttribute.needsUpdate = true;
-    colorAttribute.needsUpdate = true;
-  }
-
-  function updateEnergyParticles(
-    geometry,
-    connectionPairs,
-    signalRoutes,
-    animatedPositions,
-    count,
-    elapsed,
-    config
-  ) {
-    if (!connectionPairs.length || typeof geometry.getAttribute !== "function") {
-      return;
-    }
-    const positions = geometry.getAttribute("position");
-    if (!positions || typeof positions.setXYZ !== "function") {
-      return;
-    }
-    for (let index = 0; index < count; index += 1) {
-      const route = signalRoutes[index];
-      if (!route) {
-        continue;
-      }
-      const routePosition = (
-        elapsed * config.signalSpeed + route.phase
-      ) % route.edgeIndices.length;
-      const edgeStep = Math.floor(routePosition);
-      const progress = routePosition - edgeStep;
-      const pair = connectionPairs[route.edgeIndices[edgeStep]];
-      const fromOffset = pair[0] * 3;
-      const toOffset = pair[1] * 3;
-      positions.setXYZ(
-        index,
-        animatedPositions[fromOffset]
-          + (animatedPositions[toOffset] - animatedPositions[fromOffset]) * progress,
-        animatedPositions[fromOffset + 1]
-          + (animatedPositions[toOffset + 1] - animatedPositions[fromOffset + 1]) * progress,
-        animatedPositions[fromOffset + 2]
-          + (animatedPositions[toOffset + 2] - animatedPositions[fromOffset + 2]) * progress
-      );
-    }
-    positions.needsUpdate = true;
-  }
-
-  function updateHotspotPositions(positionAttribute, animatedPositions, hotspotIndices) {
-    for (let index = 0; index < hotspotIndices.length; index += 1) {
-      const sourceOffset = hotspotIndices[index] * 3;
-      positionAttribute.setXYZ(
-        index,
-        animatedPositions[sourceOffset],
-        animatedPositions[sourceOffset + 1],
-        animatedPositions[sourceOffset + 2]
-      );
-    }
-    positionAttribute.needsUpdate = true;
-  }
-
-  function updateHotspotColors(colorAttribute, neuronActivity, hotspotIndices) {
-    for (let index = 0; index < hotspotIndices.length; index += 1) {
-      const intensity = Math.max(0, (neuronActivity[hotspotIndices[index]] - 0.035) * 1.5);
-      colorAttribute.setXYZ(index, intensity, intensity, intensity);
-    }
-    colorAttribute.needsUpdate = true;
-  }
-
-  function pulseIntensity(config, elapsed, breath) {
-    if (config.mode === "warning") {
-      return (Math.sin(elapsed * 2.2) > 0.28 ? config.emissiveIntensity : 0.18);
-    }
-    return config.emissiveIntensity + Math.max(0, breath) * config.pulseAmount * 5;
-  }
-
-  function isMobileViewport(windowRef, container) {
-    if (typeof windowRef.matchMedia === "function") {
-      return windowRef.matchMedia("(max-width: 600px)").matches;
-    }
-    return (container.clientWidth || 0) <= 600;
-  }
-
-  function setMaterialColor(material, color) {
-    if (material) {
-      setColor(material.color, color);
-      setColor(material.emissive, color);
-      if (material.uniforms && material.uniforms.uColor) {
-        setColor(material.uniforms.uColor.value, color);
-      }
-    }
-  }
-
-  function setColor(colorObject, color) {
-    if (colorObject && typeof colorObject.setHex === "function") {
-      colorObject.setHex(color);
-    }
-  }
-
-  function trackGeometry(geometries, geometry) {
-    geometries.add(geometry);
-    return geometry;
-  }
-
-  function trackMaterial(materials, material) {
-    materials.add(material);
-    return material;
-  }
-
-  return {
+  return Object.freeze({
     createAgentBrain,
-    getPixelRatio,
     mapAgentStatus,
-    performanceLimits,
-    pulseIntensity,
-    updateEnergyParticles,
-    statusMap
-  };
+    statusMap,
+    signalRoutes
+  });
 });

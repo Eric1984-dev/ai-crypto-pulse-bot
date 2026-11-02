@@ -24,7 +24,7 @@ Implemented components:
 - Authenticated read-only dashboard API that forwards the caller's JWT to Supabase so RLS remains authoritative
 - Database-backed dashboard summaries, recent activity, and snapshot chart with safe empty/error states
 - Visibility-aware dashboard polling every 30 seconds, with a foreground refresh and duplicate-load protection
-- Three.js Agent Brain visualization driven by the live database status, with bounded rendering, hidden-tab pause, and explicit resource disposal
+- Responsive SVG Agent Status circuit visualization driven by the live database status, with reduced-motion support and no WebGL dependency
 - Authenticated public-market API using Bitvavo's market catalog, 24-hour tickers, and supported OHLCV candles
 - Read-only Market Scanner rankings for active watched markets, using fresh snapshots, stored daily/hourly candles, and latest stored AI decisions
 - 24h/7d/30d gainers, losers, estimated EUR volume, momentum, and AI opportunities; bounded ranking results and range-paginated PostgREST reads
@@ -121,7 +121,7 @@ Responsibilities:
 
 - User Interface
 - Visualizations
-- Agent Brain Rendering
+- Agent Status circuit visualization
 - Portfolio Display
 - Market Display
 - User Settings
@@ -455,7 +455,7 @@ The platform must prevent:
 
 ---
 
-# Agent Brain
+# Agent Status Visualization
 
 Data Source:
 
@@ -469,13 +469,13 @@ Supported States:
 - STOPPED
 - ERROR
 
-The Agent Brain must reflect actual backend state.
+The circuit visualization must reflect actual backend state.
 
-Opening a dashboard page must never activate the Agent Brain.
+Opening a dashboard page must never activate circuit signals independently of the stored status.
 
-The brain is a front-facing bilateral neural drawing with approximately 13% taller proportions relative to its width and a lower contour extended slightly downward: an irregular outer cortical contour and center fissure frame curved gyri, branching pathways, bright neuron hotspots, and up to 48 traveling energy particles. The 720-node network and 2160 connections define the brain itself; no brain-surface mesh, translucent shell, volume layer, fog, or external circuit traces are used. All neurons receive independent, deterministic pulse phases, while routed signals advance across connected neurons and illuminate their current pathways. Inactive connections remain dim; active neuron points and hotspots receive stronger local glow. Both hemispheres share one status color. Radial shader halos brighten selected neurons while signals animate; the silhouette remains stable and does not rotate. The database status controls activity density: moderate blue local activation (ACTIVE), many simultaneous blue activations (ANALYZING), occasional soft blue activations (IDLE), near-static grey (STOPPED), and intermittent red neurons/signals (ERROR). Missing or invalid status is `UNKNOWN` with a neutral, static visualization. The fallback is hidden while a WebGL context is available and appears only when WebGL is unavailable or Three.js initialization fails; transient failures can be retried on later status updates. It does not activate or control the agent.
+The artwork is a detailed inline SVG circuit board with routed purple traces, vias, component packages, and a central processor, with no decorative text inside the artwork. Moving signal dots follow the same routed traces. Activity is mapped from database status: moderate purple flow (ACTIVE), brighter, faster, and denser purple flow (ANALYZING), a few dim violet signals (IDLE), red warning signals (ERROR), and a static board for STOPPED or missing/invalid `UNKNOWN` status. `prefers-reduced-motion` also hides moving signals while preserving the static board and accessible status label. The dashboard cannot activate or control the agent; it only visualizes the current status.
 
-Rendering is capped at 30 FPS and device pixel ratio is capped at 1.5 (1.25 on mobile). The network is capped at 720 nodes, 2160 connections, and 48 traveling energy particles. The loop pauses while the document is hidden. Renderer, geometry, material, observer, and event-listener resources are disposed when the page is left.
+The SVG is rendered once and switches activity groups when the existing 15-second status polling or realtime refresh updates its state. This avoids an animation-frame loop, GPU resource allocation, and WebGL or device-pixel-ratio requirements. The markup is cleared when the dashboard controller is disposed.
 
 ---
 
@@ -493,7 +493,7 @@ Supported Values:
 - PAUSED
 - EMERGENCY_STOP
 
-The Agent Brain must visually indicate emergency conditions.
+The circuit visualization must visually indicate emergency conditions.
 
 Emergency controls may:
 
@@ -580,7 +580,7 @@ Examples:
 
 Database timestamp instants and API values remain UTC. Browser views use the shared `formatTimestamp` utility to display timestamps in `Europe/Brussels`; the IANA timezone rules apply daylight-saving changes automatically. Formatting is presentation-only and does not alter requests, database values, or UTC-based calculations.
 
-`GET /api/agent-status` is an authenticated read-only endpoint for the Agent Brain. It reads a single status row and returns a supported status or `null` when no valid row exists. It uses the public anon key plus the verified user's JWT and never writes to the database.
+`GET /api/agent-status` is an authenticated read-only endpoint for the Agent Status visualization. It reads a single status row and returns a supported status or `null` when no valid row exists. It uses the public anon key plus the verified user's JWT and never writes to the database.
 
 The dashboard API uses only the Supabase anon key and the request user's verified access token. It never uses the service-role key and cannot write to the database. User-visible empty values are represented as `null` or empty collections; read failures return explicit errors rather than mock values.
 

@@ -60,7 +60,7 @@ test("all pages use a dropdown for their top navigation", () => {
   }
 });
 
-test("all page brands use the dark-green icon and link to the dashboard", () => {
+test("all page brands use the purple icon and link to the dashboard", () => {
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     const brand = html.match(/<a class="brand"[\s\S]*?<\/a>/);
@@ -70,7 +70,10 @@ test("all page brands use the dark-green icon and link to the dashboard", () => 
     assert.doesNotMatch(brand[0], />C<\/span>/);
     assert.match(html, /<meta name="apple-mobile-web-app-title" content="AI Crypto Bot">/);
   }
-  assert.equal(fs.statSync(path.join(rootDirectory, "assets", "icons", "apple-touch-icon.png")).isFile(), true);
+  const icon = fs.readFileSync(path.join(rootDirectory, "assets", "icons", "apple-touch-icon.png"));
+  assert.equal(icon.toString("ascii", 1, 4), "PNG");
+  assert.equal(icon.readUInt32BE(16), 180);
+  assert.equal(icon.readUInt32BE(20), 180);
 });
 
 test("all pages enable standalone home-screen app mode", () => {
@@ -80,12 +83,15 @@ test("all pages enable standalone home-screen app mode", () => {
   ));
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.start_url, "/dashboard.html");
+  assert.equal(manifest.theme_color, "#0b0910");
+  assert.equal(manifest.background_color, "#0b0910");
   assert.ok(manifest.icons.some(({ src }) => src === "/assets/icons/apple-touch-icon.png"));
 
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest">/);
     assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
+    assert.match(html, /<meta name="theme-color" content="#0b0910">/);
     assert.doesNotMatch(html, /<a\b[^>]*data-nav-link[^>]*target="_blank"/);
   }
 });

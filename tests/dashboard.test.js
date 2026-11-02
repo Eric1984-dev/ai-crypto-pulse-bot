@@ -469,7 +469,7 @@ test("dashboard omits all scanner content and uses only its watched-market summa
   assert.match(html, /data-portfolio-chart/);
 });
 
-test("Agent Brain uses a full-width panel with Emergency State at the dashboard bottom", () => {
+test("Agent Status uses a full-width circuit panel with Emergency State at the dashboard bottom", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   const statusPanel = html.indexOf('class="dashboard-panel status-panel"');
@@ -487,10 +487,11 @@ test("Agent Brain uses a full-width panel with Emergency State at the dashboard 
   assert.ok(lastDashboardList < emergencyState && emergencyState < mainEnd);
   assert.ok(portfolioSummary < statusPanel);
   assert.match(html, /class="agent-status-monitor"[\s\S]*Live backend signal[\s\S]*status-wave/);
-  assert.doesNotMatch(html, /Agent Brain visualization · Phase 05/);
+  assert.match(html, /Agent circuit visualization; status UNKNOWN/);
+  assert.match(html, /Circuit visualization unavailable/);
   assert.match(styles, /\.dashboard-grid-status,\s*\.dashboard-grid-risk\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /\.agent-brain-stage\s*\{[^}]*height:\s*clamp\(280px,\s*32vw,\s*380px\);/s);
-  assert.match(styles, /@media \(max-width: 559px\)\s*\{[^}]*\.agent-brain-stage\s*\{[^}]*height:\s*230px;/s);
+  assert.match(styles, /@media \(max-width: 559px\)\s*\{[^}]*\.agent-brain-stage\s*\{[^}]*height:\s*clamp\(128px,\s*40vw,\s*170px\);/s);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /\.agent-brain\[data-visualization="ready"\].*\.agent-brain-fallback\s*\{\s*display:\s*none\s*!important;/s);
 });
@@ -762,7 +763,6 @@ test("dashboard displays tracked markets without requesting scanner data", async
     windowRef,
     documentRef: dashboardDocument,
     ChartConstructor: null,
-    loadThree: async () => ({ scene: true })
   });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -794,7 +794,6 @@ test("dashboard refreshes all data periodically and when returning to the foregr
     windowRef,
     documentRef: dashboardDocument,
     ChartConstructor: null,
-    loadThree: async () => ({ scene: true }),
     fetchImpl: async (url) => {
       requests.push(url);
       if (url === "/api/dashboard-data") {
@@ -951,7 +950,6 @@ test("dashboard applies live database status updates and pauses polling while hi
     windowRef,
     documentRef: dashboardDocument,
     ChartConstructor: null,
-    loadThree: async () => ({ scene: true }),
     setIntervalImpl(callback, delay) {
       const id = ++nextIntervalId;
       intervals.set(id, { callback, delay });
@@ -1003,7 +1001,7 @@ test("dashboard applies live database status updates and pauses polling while hi
   assert.equal(intervals.size, 0);
 });
 
-test("dashboard uses UNKNOWN and the neutral fallback when status or Three.js is unavailable", async () => {
+test("dashboard keeps the circuit static and accessible when status is UNKNOWN", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const dashboardData = dashboard.emptyDashboardData();
   dashboardData.agentStatus = null;
@@ -1019,18 +1017,23 @@ test("dashboard uses UNKNOWN and the neutral fallback when status or Three.js is
   dashboard.startDashboard({
     windowRef,
     documentRef: dashboardDocument,
-    ChartConstructor: null,
-    loadThree: async () => { throw new Error("Three.js CDN is unavailable."); }
+    ChartConstructor: null
   });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "UNKNOWN");
   assert.equal(elements.get("[data-agent-brain]")[0].dataset.state, "unknown");
-  assert.equal(elements.get("[data-agent-brain-fallback]")[0].hidden, false);
+  assert.equal(elements.get("[data-agent-brain]")[0].dataset.visualization, "ready");
+  assert.equal(elements.get("[data-agent-brain-fallback]")[0].hidden, true);
+  assert.match(elements.get("[data-agent-brain-stage]")[0].innerHTML, /circuit-flow--stopped/);
+  assert.equal(
+    elements.get("[data-agent-brain-stage]")[0].attributes["aria-label"],
+    "Agent circuit visualization; status UNKNOWN"
+  );
 });
 
-test("dashboard retries renderer initialization and hides fallback after the renderer becomes available", async () => {
+test("dashboard retries circuit initialization after a transient failure", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const dashboardData = dashboard.emptyDashboardData();
   let initializationAttempts = 0;
@@ -1066,8 +1069,7 @@ test("dashboard retries renderer initialization and hides fallback after the ren
   const controller = dashboard.startDashboard({
     windowRef,
     documentRef: dashboardDocument,
-    ChartConstructor: null,
-    loadThree: async () => ({ scene: true })
+    ChartConstructor: null
   });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -1085,7 +1087,7 @@ test("dashboard retries renderer initialization and hides fallback after the ren
   controller.dispose();
 });
 
-test("dashboard keeps fallback hidden when a successful renderer survives a status update error", async () => {
+test("dashboard keeps fallback hidden when the circuit survives a status update error", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const dashboardData = dashboard.emptyDashboardData();
   dashboardData.agentStatus = { status: "ACTIVE" };
@@ -1119,8 +1121,7 @@ test("dashboard keeps fallback hidden when a successful renderer survives a stat
   const controller = dashboard.startDashboard({
     windowRef,
     documentRef: dashboardDocument,
-    ChartConstructor: null,
-    loadThree: async () => ({ scene: true })
+    ChartConstructor: null
   });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));

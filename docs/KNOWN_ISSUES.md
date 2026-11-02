@@ -19,5 +19,5 @@ See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_R
 - Strategy optimization, backtesting, and live trading are not implemented.
 - Dashboard and Portfolio require valid Supabase configuration and applied migrations. Financial aggregates fail closed on invalid or inconsistent reads; Analytics specifically treats an AI-decision HTTP `416` as a terminal range and aggregates only the successful pages received before it.
 - Realtime has polling fallback, but hosted publication delivery has not been verified.
-- Chart.js and Three.js use pinned CDNs. Visualization fallback preserves the surrounding page when a library or WebGL is unavailable; hardware-specific performance varies.
+- Chart.js uses a pinned CDN. The Agent Status circuit is native SVG/CSS and does not require WebGL; physical-device visual checks remain outstanding.
 - Automated mobile/browser tests do not replace physical-device smoke testing.

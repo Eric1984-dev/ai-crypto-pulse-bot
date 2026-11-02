@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Purple Visual Theme
+
+- Recolored the Bitcoin-in-hands app icon with a purple background while preserving its coin-and-circuit artwork, and applied a subdued purple application theme including chart accents and browser theme colors
+- Removed decorative labels from the Agent Status circuit and increased the vivid purple glow and signal density for `ANALYZING`; all signal activity remains driven by the existing agent status
+- Preserved red error signaling, static `STOPPED`/`UNKNOWN` states, reduced-motion behavior, and all trading logic
+
 ### Phase 15 - AI Recommendations
 
 - Added a protected advisory-only recommendations page covering AI performance, market selection, portfolio management, risk management, and strategy quality from existing Analytics outcomes
@@ -27,6 +33,7 @@ All notable project changes should be documented here.
 
 ### Fixed
 
+- Replaced the anatomical Agent Brain with a detailed responsive SVG circuit board; moving signal density, color, and speed follow the live agent status, while reduced-motion users see a static board
 - Brought the Agent Brain hemispheres closer while retaining the outer silhouette; increased `ANALYZING` highlights from 52 to 104 fluorescent-green neurons that travel neural connections with a brighter additive glow
 - Tuned the status-specific `ANALYZING` effect to 80 moving green neurons with a smaller, softer glow; other Agent Status visuals remain unchanged
 - Added a standalone web app manifest and linked it from every page; internal navigation remains same-window, while iOS browser chrome remains OS-controlled

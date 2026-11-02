@@ -51,7 +51,7 @@ Runtime database APIs, market-data ingestion, and trading behavior remain out of
 
 Status: Completed
 
-Phase 04 does not implement market scanning, AI execution, or trading. The Agent Brain visualization is delivered in Phase 05.
+Phase 04 does not implement market scanning, AI execution, or trading. The Agent Status visualization is delivered in Phase 05 and refined in Phase 14.
 
 ---
 
@@ -62,7 +62,7 @@ Phase 04 does not implement market scanning, AI execution, or trading. The Agent
 - [x] ACTIVE, ANALYZING, IDLE, STOPPED, ERROR, and neutral UNKNOWN visualization states
 - [x] 720 independently pulsing neural nodes, 2160 subtly rendered connections, and up to 48 status-driven signals that travel neuron-to-neuron and brighten only the pathways they traverse
 - [x] Stable brain silhouette with animated neural activity and no continuous whole-brain rotation
-- [x] Renderer-aware fallback only for unavailable WebGL or failed Three.js initialization
+- [x] Accessible fallback for visualization initialization failures; the original renderer was replaced by the native SVG circuit in Phase 14
 - [x] Responsive rendering, visibility pause, disposal, and performance safeguards
 - [x] Tests and documentation
 - [x] Shell-free contour with same-color hemispheres, radial neuron glow, reference-inspired blue input waves and right-side circuit traces, and 80 moving green neurons during ANALYZING; status and agent logic unchanged
@@ -197,12 +197,14 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 
 ## Phase 14 - Final Polish
 
-- [x] Match the Agent Brain more closely to the reference with a narrower outlined cortex, left-side input waves, a cyan binary-data field, and a subtle hex grid; connect the waves and separated right-side circuits directly to the contour, with pronounced upward elbows below the top frame
+- [x] Replace the anatomical Agent Brain artwork with a detailed responsive SVG circuit board, including routed traces, vias, component packages, and status-driven moving signals
+- [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
-- [x] Replace the C brand mark with a dark-green app icon and make the AI Crypto Bot brand link to Dashboard on every page
+- [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a purple background and make the AI Crypto Bot brand link to Dashboard on every page
+- [x] Apply a subdued purple theme to shared UI, charts, browser chrome, and the status circuit; remove decorative text from the circuit artwork and strengthen purple status-driven signal glow
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist

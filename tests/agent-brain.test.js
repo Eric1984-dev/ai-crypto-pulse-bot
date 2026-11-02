@@ -1,921 +1,129 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const agentBrain = require("../js/agent-brain.js");
 
-function createBrainHarness({ mobile = false, visibilityState = "visible", rendererFailure = false } = {}) {
-  const calls = {
-    renders: 0,
-    setPixelRatio: [],
-    setSize: [],
-    rendererOptions: null,
-    rendererDisposed: 0,
-    contextLost: false,
-    geometryDisposed: 0,
-    materialDisposed: 0,
-    computedNormals: 0,
-    sphereGeometryArgs: [],
-    surfaceGeometries: [],
-    meshes: [],
-    brainGroups: [],
-    materialInstances: [],
-    lineSegmentGeometries: [],
-    lineSegments: [],
-    points: [],
-    cancelledFrames: [],
-    disconnectedObservers: 0,
-    windowListeners: new Map(),
-    documentListeners: new Map(),
-    frameCallbacks: new Map()
-  };
-  let nextFrameId = 0;
-
-  function createAttribute(points) {
-    const array = new Float32Array(points.length * 3);
-    points.forEach((point, index) => {
-      array[index * 3] = point.x;
-      array[index * 3 + 1] = point.y;
-      array[index * 3 + 2] = point.z;
-    });
-    return {
-      array,
-      count: points.length,
-      needsUpdate: false,
-      getX(index) {
-        return array[index * 3];
-      },
-      getY(index) {
-        return array[index * 3 + 1];
-      },
-      getZ(index) {
-        return array[index * 3 + 2];
-      },
-      setXYZ(index, x, y, z) {
-        array[index * 3] = x;
-        array[index * 3 + 1] = y;
-        array[index * 3 + 2] = z;
-      }
-    };
-  }
-
-  class FakeVector3 {
-    constructor(x = 0, y = 0, z = 0) {
-      this.x = x;
-      this.y = y;
-      this.z = z;
-    }
-  }
-
-  class FakeObject3D {
-    constructor() {
-      this.children = [];
-      this.position = {
-        x: 0,
-        y: 0,
-        z: 0,
-        set(x, y, z) {
-          this.x = x;
-          this.y = y;
-          this.z = z;
-        }
-      };
-      this.rotation = {
-        x: 0,
-        y: 0,
-        z: 0,
-        set(x, y, z) {
-          this.x = x;
-          this.y = y;
-          this.z = z;
-        }
-      };
-      this.scale = {
-        x: 1,
-        y: 1,
-        z: 1,
-        set(x, y, z) {
-          this.x = x;
-          this.y = y;
-          this.z = z;
-        }
-      };
-    }
-    add(...children) {
-      this.children.push(...children);
-    }
-  }
-
-  class FakeGeometry {
-    constructor() {
-      this.points = [];
-      this.attributes = {};
-      this.drawRange = { start: 0, count: Infinity };
-    }
-    setFromPoints(points) {
-      this.points = points;
-      this.attributes.position = createAttribute(points);
-      return this;
-    }
-    setAttribute(name, attribute) {
-      this.attributes[name] = attribute;
-      return this;
-    }
-    getAttribute(name) {
-      return this.attributes[name];
-    }
-    computeVertexNormals() {
-      calls.computedNormals += 1;
-    }
-    setDrawRange(start, count) {
-      this.drawRange = { start, count };
-    }
-    dispose() {
-      calls.geometryDisposed += 1;
-    }
-  }
-
-  class FakeSphereGeometry extends FakeGeometry {
-    constructor(radius, widthSegments, heightSegments) {
-      super();
-      calls.sphereGeometryArgs.push([radius, widthSegments, heightSegments]);
-      const points = [];
-      for (let row = 0; row <= heightSegments; row += 1) {
-        const phi = (row / heightSegments) * Math.PI;
-        for (let column = 0; column <= widthSegments; column += 1) {
-          const theta = (column / widthSegments) * Math.PI * 2;
-          points.push(new FakeVector3(
-            -radius * Math.cos(theta) * Math.sin(phi),
-            radius * Math.cos(phi),
-            radius * Math.sin(theta) * Math.sin(phi)
-          ));
-        }
-      }
-      this.attributes.position = createAttribute(points);
-      calls.surfaceGeometries.push(this);
-    }
-  }
-
-  class FakeBufferAttribute {
-    constructor(array, itemSize) {
-      this.array = array;
-      this.itemSize = itemSize;
-      this.count = array.length / itemSize;
-      this.needsUpdate = false;
-    }
-    setXYZ(index, x, y, z) {
-      this.array[index * this.itemSize] = x;
-      this.array[index * this.itemSize + 1] = y;
-      this.array[index * this.itemSize + 2] = z;
-    }
-  }
-
-  class FakeMaterial {
-    constructor(options) {
-      Object.assign(this, options);
-      this.color = {
-        value: options.color,
-        setHex(value) {
-          this.value = value;
-        }
-      };
-      if (options.emissive !== undefined) {
-        this.emissive = {
-          value: options.emissive,
-          setHex(value) {
-            this.value = value;
-          }
-        };
-      }
-      calls.materialInstances.push(this);
-    }
-    dispose() {
-      calls.materialDisposed += 1;
-    }
-  }
-
-  class FakeColor {
-    constructor(value) {
-      this.value = value;
-    }
-    setHex(value) {
-      this.value = value;
-    }
-  }
-
-  class FakeRenderer {
-    constructor(options) {
-      if (rendererFailure) {
-        throw new Error("WebGL is unavailable.");
-      }
-      calls.rendererOptions = options;
-      this.domElement = {
-        parentNode: null,
-        setAttribute(name, value) {
-          this[name] = value;
-        }
-      };
-    }
-    getContext() {
-      return { isContextLost: () => calls.contextLost };
-    }
-    setPixelRatio(value) {
-      calls.setPixelRatio.push(value);
-    }
-    setSize(width, height, updateStyle) {
-      calls.setSize.push({ width, height, updateStyle });
-    }
-    render() {
-      calls.renders += 1;
-    }
-    dispose() {
-      calls.rendererDisposed += 1;
-    }
-  }
-
-  class FakeResizeObserver {
-    constructor(callback) {
-      this.callback = callback;
-    }
-    observe(target) {
-      this.target = target;
-    }
-    disconnect() {
-      calls.disconnectedObservers += 1;
-    }
-  }
-
-  const THREE = {
-    Scene: FakeObject3D,
-    PerspectiveCamera: class extends FakeObject3D {
-      updateProjectionMatrix() {}
-    },
-    Group: class extends FakeObject3D {
-      constructor() {
-        super();
-        calls.brainGroups.push(this);
-      }
-    },
-    SphereGeometry: FakeSphereGeometry,
-    BufferGeometry: FakeGeometry,
-    BufferAttribute: FakeBufferAttribute,
-    MeshPhongMaterial: FakeMaterial,
-    MeshBasicMaterial: FakeMaterial,
-    ShaderMaterial: FakeMaterial,
-    LineBasicMaterial: FakeMaterial,
-    PointsMaterial: FakeMaterial,
-    Color: FakeColor,
-    AmbientLight: FakeObject3D,
-    PointLight: class extends FakeObject3D {
-      constructor(color) {
-        super();
-        this.color = {
-          value: color,
-          setHex(value) {
-            this.value = value;
-          }
-        };
-      }
-    },
-    Mesh: class extends FakeObject3D {
-      constructor(geometry, material) {
-        super();
-        this.geometry = geometry;
-        this.material = material;
-        calls.meshes.push(this);
-      }
-    },
-    Line: class extends FakeObject3D {
-      constructor(geometry, material) {
-        super();
-        this.geometry = geometry;
-        this.material = material;
-      }
-    },
-    LineSegments: class extends FakeObject3D {
-      constructor(geometry, material) {
-        super();
-        this.geometry = geometry;
-        this.material = material;
-        calls.lineSegmentGeometries.push(geometry);
-        calls.lineSegments.push(this);
-      }
-    },
-    Points: class extends FakeObject3D {
-      constructor(geometry, material) {
-        super();
-        this.geometry = geometry;
-        this.material = material;
-        calls.points.push(this);
-      }
-    },
-    Vector3: FakeVector3,
-    WebGLRenderer: FakeRenderer,
-    AdditiveBlending: 2,
-    BackSide: 1,
-    DoubleSide: 2
-  };
-
-  const container = {
-    clientWidth: mobile ? 360 : 900,
-    clientHeight: mobile ? 200 : 240,
-    dataset: {},
+function createContainer() {
+  return {
     attributes: {},
-    children: [],
-    replaceChildren() {
-      for (const child of this.children) {
-        child.parentNode = null;
-      }
-      this.children = [];
-    },
-    appendChild(child) {
-      child.parentNode = this;
-      this.children.push(child);
-    },
-    removeChild(child) {
-      this.children = this.children.filter((item) => item !== child);
-      child.parentNode = null;
-    },
+    dataset: {},
+    innerHTML: "",
     setAttribute(name, value) {
       this.attributes[name] = value;
     }
   };
-  const stateElement = { dataset: {} };
-  const documentRef = {
-    visibilityState,
-    addEventListener(name, callback) {
-      calls.documentListeners.set(name, callback);
-    },
-    removeEventListener(name) {
-      calls.documentListeners.delete(name);
-    }
-  };
-  const windowRef = {
-    devicePixelRatio: 3,
-    ResizeObserver: FakeResizeObserver,
-    matchMedia(query) {
-      return { matches: query === "(max-width: 600px)" && mobile };
-    },
-    requestAnimationFrame(callback) {
-      const id = ++nextFrameId;
-      calls.frameCallbacks.set(id, callback);
-      return id;
-    },
-    cancelAnimationFrame(id) {
-      calls.cancelledFrames.push(id);
-      calls.frameCallbacks.delete(id);
-    },
-    addEventListener(name, callback) {
-      calls.windowListeners.set(name, callback);
-    },
-    removeEventListener(name) {
-      calls.windowListeners.delete(name);
-    }
-  };
-
-  return {
-    calls,
-    container,
-    documentRef,
-    stateElement,
-    THREE,
-    windowRef
-  };
 }
 
-test("Agent Brain maps all database states and unknown values safely", () => {
-  assert.equal(agentBrain.mapAgentStatus("active").status, "ACTIVE");
-  assert.equal(agentBrain.mapAgentStatus("ANALYZING").activityPoints, 48);
-  assert.ok(agentBrain.mapAgentStatus("ANALYZING").pulseSpeed
-    > agentBrain.mapAgentStatus("ACTIVE").pulseSpeed);
-  assert.equal(agentBrain.mapAgentStatus("IDLE").mode, "breathing");
-  assert.equal(agentBrain.mapAgentStatus("STOPPED").animated, false);
-  assert.equal(agentBrain.mapAgentStatus("ERROR").mode, "warning");
-  assert.ok(agentBrain.pulseIntensity(agentBrain.mapAgentStatus("ERROR"), 0.2, 0)
-    > agentBrain.pulseIntensity(agentBrain.mapAgentStatus("ERROR"), 2.2, 0));
+test("Agent Status maps known and unknown states to explicit circuit activity", () => {
+  const expectedStates = {
+    ACTIVE: { signalCount: 16, color: "#c780f0", signalDuration: 3.2 },
+    ANALYZING: { signalCount: 36, color: "#ed9cff", signalDuration: 1.25 },
+    IDLE: { signalCount: 3, color: "#8f76a1", signalDuration: 7.5 },
+    STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
+    ERROR: { signalCount: 8, color: "#ff6478", signalDuration: 2.4 },
+    UNKNOWN: { signalCount: 0, color: "#75808d", signalDuration: 0 }
+  };
+
+  for (const [status, expected] of Object.entries(expectedStates)) {
+    const config = agentBrain.mapAgentStatus(status);
+    assert.equal(config.status, status);
+    assert.equal(config.signalCount, expected.signalCount);
+    assert.equal(config.color, expected.color);
+    assert.equal(config.signalDuration, expected.signalDuration);
+  }
+  assert.equal(agentBrain.mapAgentStatus("  analyzing ").status, "ANALYZING");
+  assert.equal(agentBrain.mapAgentStatus("not-a-status").status, "UNKNOWN");
   assert.equal(agentBrain.mapAgentStatus(null).status, "UNKNOWN");
-  assert.equal(agentBrain.mapAgentStatus("unrecognized").mode, "neutral");
 });
 
-test("Agent Brain caps renderer pixel ratio for desktop and mobile performance", () => {
-  assert.equal(agentBrain.getPixelRatio(3, false), 1.5);
-  assert.equal(agentBrain.getPixelRatio(3, true), 1.25);
-  assert.equal(agentBrain.getPixelRatio(1, false), 1);
-  assert.equal(agentBrain.getPixelRatio(0, false), 1);
-  assert.equal(agentBrain.performanceLimits.maxFramesPerSecond, 30);
-  assert.equal(agentBrain.performanceLimits.maxActivityPoints, 48);
-  assert.equal(agentBrain.performanceLimits.maxAnalyzingNeurons, 80);
-  assert.equal(agentBrain.performanceLimits.maxNeuralNodes, 720);
-  assert.equal(agentBrain.performanceLimits.maxConnections, 2160);
-});
-
-test("Agent Brain adds reference-inspired traces and green neurons only while analyzing", () => {
-  const harness = createBrainHarness();
-  const brain = agentBrain.createAgentBrain({
-    THREE: harness.THREE,
-    container: harness.container,
-    windowRef: harness.windowRef,
-    documentRef: harness.documentRef,
-    initialStatus: "IDLE"
-  });
-  const referenceTrace = harness.calls.lineSegments.find(({ material }) =>
-    material.color.value === 0x7ae8ff
-  );
-  const referenceTraceStroke = harness.calls.meshes.find(({ material }) =>
-    material.color.value === 0x159fe8
-  );
-  const binaryCodeStrokes = harness.calls.meshes.find(({ material }) =>
-    material.color.value === 0x8bf2ff
-  );
-  const analysisNeurons = harness.calls.points.filter(({ material }) =>
-    material.color.value === 0x7fff00
-  );
-  const analysisNeuronGlow = harness.calls.points.find(({ material }) =>
-    material.color.value === 0x39ff14
-  );
-  const traceNeurons = harness.calls.points.find(({ material }) =>
-    material.color.value === 0x83eaff
-  );
-  const traceSignals = harness.calls.points.find(({ material }) =>
-    material.color.value === 0xd8faff
-  );
-  const binaryCode = harness.calls.points.find(({ material }) =>
-    material.color.value === 0xa6f4ff
-  );
-
-  assert.ok(referenceTrace);
-  assert.ok(referenceTraceStroke);
-  assert.ok(referenceTrace.renderOrder > 0);
-  assert.ok(referenceTrace.geometry.getAttribute("position").count > 800);
-  assert.ok(referenceTraceStroke.geometry.getAttribute("position").count > 2500);
-  assert.equal(referenceTraceStroke.renderOrder, -3);
-  assert.ok(binaryCodeStrokes.geometry.getAttribute("position").count > 600);
-  assert.equal(binaryCodeStrokes.renderOrder, 2);
-  assert.ok(binaryCode.geometry.getAttribute("position").count > 300);
-  const binaryCodePositions = binaryCode.geometry.getAttribute("position");
-  assert.ok(Math.min(...binaryCodePositions.array.filter((_, index) => index % 3 === 0)) > 0.02);
-  const tracePositions = referenceTrace.geometry.getAttribute("position");
-  const brainPositions = harness.calls.points.find(({ material }) => material.size === 0.045)
-    .geometry.getAttribute("position");
-  const circuitStart = 3 * 28 * 2;
-  const circuitLaneBounds = Array.from({ length: 7 }, (_, lane) => {
-    const values = Array.from({ length: 6 }, (_, point) =>
-      tracePositions.getY(circuitStart + lane * 6 + point)
-    );
-    return { minimum: Math.min(...values), maximum: Math.max(...values) };
-  });
-  assert.ok(circuitLaneBounds[0].maximum < 0.47);
-  const rightContourStart = 80 + 6 * 28 + 10 * 8;
-  for (let lane = 0; lane < circuitLaneBounds.length; lane += 1) {
-    const laneStart = circuitStart + lane * 6;
-    const horizontalY = tracePositions.getY(laneStart);
-    const bendY = tracePositions.getY(laneStart + 3);
-    assert.ok(bendY - horizontalY > 0.1);
-    const startX = tracePositions.getX(laneStart);
-    let nearestContourDistance = Infinity;
-    let nearestContourX = 0;
-    for (let index = rightContourStart; index < rightContourStart + 58; index += 1) {
-      const distance = Math.abs(brainPositions.getY(index) - horizontalY);
-      if (distance < nearestContourDistance) {
-        nearestContourDistance = distance;
-        nearestContourX = brainPositions.getX(index);
-      }
-    }
-    assert.ok(Math.abs(startX - nearestContourX) < 0.04, JSON.stringify({
-      lane,
-      startX,
-      nearestContourX,
-      nearestContourDistance
-    }));
-    assert.ok(startX < nearestContourX + 0.005);
-  }
-  for (let lane = 0; lane < 3; lane += 1) {
-    const laneEnd = lane * 28 * 2 + 55;
-    const endY = tracePositions.getY(laneEnd);
-    const endX = tracePositions.getX(laneEnd);
-    let nearestContourDistance = Infinity;
-    let nearestContourX = 0;
-    for (let index = 0; index < 58; index += 1) {
-      const distance = Math.abs(brainPositions.getY(index) - endY);
-      if (distance < nearestContourDistance) {
-        nearestContourDistance = distance;
-        nearestContourX = brainPositions.getX(index);
-      }
-    }
-    assert.ok(Math.abs(endX - nearestContourX) < 0.04);
-    assert.ok(endX > nearestContourX - 0.005);
-  }
-  for (let lane = 0; lane < circuitLaneBounds.length - 1; lane += 1) {
-    assert.ok(circuitLaneBounds[lane + 1].maximum < circuitLaneBounds[lane].minimum);
-  }
-  assert.ok(traceNeurons.geometry.getAttribute("position").count > 100);
-  const traceNeuronPositions = traceNeurons.geometry.getAttribute("position");
-  assert.ok(Math.min(...traceNeuronPositions.array.filter((_, index) => index % 3 === 0)) < -1.2);
-  assert.ok(Math.max(...traceNeuronPositions.array.filter((_, index) => index % 3 === 0)) > 1.1);
-  assert.ok(traceSignals);
-  assert.equal(traceSignals.geometry.drawRange.count, 4);
-  assert.equal(analysisNeurons.length, 1);
-  assert.equal(analysisNeurons[0].geometry.getAttribute("position").count, 80);
-  assert.equal(analysisNeuronGlow.geometry.getAttribute("position").count, 80);
-  assert.equal(analysisNeuronGlow.material.size, 0.17);
-  assert.equal(analysisNeuronGlow.material.opacity, 0.5);
-  assert.equal(analysisNeuronGlow.visible, false);
-  assert.equal(analysisNeurons[0].visible, false);
-
-  assert.equal(brain.setStatus("ANALYZING").status, "ANALYZING");
-  assert.equal(analysisNeuronGlow.visible, true);
-  assert.equal(analysisNeurons[0].visible, true);
-  assert.equal(traceSignals.geometry.drawRange.count, 20);
-  const initialAnalyzingPositions = [...analysisNeurons[0].geometry.getAttribute("position").array];
-  const initialTracePositions = [...traceSignals.geometry.getAttribute("position").array];
-  const [frameId, animate] = harness.calls.frameCallbacks.entries().next().value;
-  harness.calls.frameCallbacks.delete(frameId);
-  animate(500);
-  assert.notDeepEqual(
-    [...traceSignals.geometry.getAttribute("position").array],
-    initialTracePositions
-  );
-  const movingAnalyzingPositions = [...analysisNeurons[0].geometry.getAttribute("position").array];
-  assert.notDeepEqual(movingAnalyzingPositions, initialAnalyzingPositions);
-  assert.ok(Math.max(...movingAnalyzingPositions.map((value, index) =>
-    Math.abs(value - initialAnalyzingPositions[index])
-  )) > 0.02);
-  assert.equal(brain.setStatus("ACTIVE").status, "ACTIVE");
-  assert.equal(analysisNeurons[0].visible, false);
-  assert.equal(traceSignals.geometry.drawRange.count, 20);
-  brain.setStatus("STOPPED");
-  assert.equal(traceSignals.geometry.drawRange.count, 0);
-  brain.dispose();
-});
-
-test("Agent Brain drives independent neuron and traveling signal activity without rotating", () => {
-  const harness = createBrainHarness();
-  const brain = agentBrain.createAgentBrain({
-    THREE: harness.THREE,
-    container: harness.container,
-    windowRef: harness.windowRef,
-    documentRef: harness.documentRef,
-    initialStatus: "IDLE"
-  });
-  const lineMaterial = harness.calls.materialInstances.find((material) => material.vertexColors);
-  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
-  const nodeGlowMaterial = harness.calls.points.find(({ material }) => material.size === 0.12).material;
-  const nodeMaterial = neuralNodes.material;
-  const hotspotMaterial = harness.calls.points.find(({ material }) => material.size === 0.085).material;
-  const nodeColors = neuralNodes.geometry.getAttribute("color");
-  const hotspotColors = harness.calls.points.find(({ material }) => material.size === 0.085)
-    .geometry.getAttribute("color");
-  const brainGroup = harness.calls.brainGroups[0];
-
-  brain.setStatus("ACTIVE");
-  assert.equal(nodeMaterial.color.value, hotspotMaterial.color.value);
-  const activeNodeValues = [...nodeColors.array];
-  const activeHotspotValues = [...hotspotColors.array];
-  const activeConnectionValues = [...harness.calls.lineSegmentGeometries[0]
-    .getAttribute("color").array];
-  const hotspotGlowMaterial = harness.calls.materialInstances.find((material) =>
-    material.uniforms && material.uniforms.uOpacity
-  );
-  assert.ok(new Set(activeNodeValues).size > 10);
-  brain.setStatus("ANALYZING");
-  assert.equal(lineMaterial.opacity, 0.3);
-  assert.ok(nodeGlowMaterial.opacity > 0.24);
-  assert.ok(hotspotGlowMaterial.uniforms.uOpacity.value > 0.55);
-  const analyzingNodeValues = [...nodeColors.array];
-  const analyzingHotspotValues = [...hotspotColors.array];
-  const analyzingConnectionValues = [...harness.calls.lineSegmentGeometries[0]
-    .getAttribute("color").array];
-  let activeConnectionCount = 0;
-  for (let index = 0; index < analyzingConnectionValues.length; index += 6) {
-    if (Math.max(
-      analyzingConnectionValues[index],
-      analyzingConnectionValues[index + 1],
-      analyzingConnectionValues[index + 2],
-      analyzingConnectionValues[index + 3],
-      analyzingConnectionValues[index + 4],
-      analyzingConnectionValues[index + 5]
-    ) > 0.12) {
-      activeConnectionCount += 1;
-    }
-  }
-  assert.ok(activeConnectionCount > 0);
-  assert.ok(activeConnectionCount < analyzingConnectionValues.length / 24);
-  const countBrightNodes = (values, threshold) => {
-    let count = 0;
-    for (let index = 0; index < values.length; index += 3) {
-      if (values[index] > threshold) {
-        count += 1;
-      }
-    }
-    return count;
-  };
-  assert.ok(countBrightNodes(analyzingNodeValues, 0.6)
-    > countBrightNodes(activeNodeValues, 0.6));
-  assert.ok(countBrightNodes(analyzingHotspotValues, 0.35)
-    > countBrightNodes(activeHotspotValues, 0.35));
-  assert.notDeepEqual(analyzingConnectionValues, activeConnectionValues);
-  const connectionGeometry = harness.calls.lineSegmentGeometries[0];
-  const connectionPositions = connectionGeometry.getAttribute("position");
-  const connectionColors = connectionGeometry.getAttribute("color");
-  const sampleHemisphereColor = (side) => {
-    for (let index = 0; index < connectionPositions.count; index += 2) {
-      const midpointX = (connectionPositions.getX(index)
-        + connectionPositions.getX(index + 1)) / 2;
-      if ((side < 0 && midpointX < -0.1) || (side > 0 && midpointX > 0.1)) {
-        return [
-          connectionColors.array[index * 3],
-          connectionColors.array[index * 3 + 1],
-          connectionColors.array[index * 3 + 2]
-        ];
-      }
-    }
-    return null;
-  };
-  const leftColor = sampleHemisphereColor(-1);
-  const rightColor = sampleHemisphereColor(1);
-  assert.ok(leftColor && rightColor);
-  assert.ok(Math.abs(leftColor[0] / leftColor[2] - rightColor[0] / rightColor[2]) < 0.00001);
-  assert.ok(Math.abs(leftColor[1] / leftColor[2] - rightColor[1] / rightColor[2]) < 0.00001);
-
-  brain.setStatus("IDLE");
-  assert.ok(countBrightNodes([...nodeColors.array], 0.6)
-    < countBrightNodes(activeNodeValues, 0.6));
-  brain.setStatus("STOPPED");
-  assert.equal(harness.calls.frameCallbacks.size, 0);
-  assert.ok(Math.max(...nodeColors.array) < Math.max(...activeNodeValues));
-  const stoppedConnectionValues = [...connectionColors.array];
-  assert.ok(Math.max(...stoppedConnectionValues) < Math.max(...analyzingConnectionValues));
-  assert.equal(harness.calls.points.find(({ material }) => material.size === 0.075)
-    .geometry.drawRange.count, 0);
-  brain.setStatus("ERROR");
-  assert.equal(lineMaterial.color.value, 0xffffff);
-  assert.equal(nodeMaterial.color.value, 0xff4655);
-  assert.equal(harness.calls.points.find(({ material }) => material.size === 0.075)
-    .geometry.drawRange.count, 20);
-
-  const runFrame = (timestamp) => {
-    const [frameId, callback] = harness.calls.frameCallbacks.entries().next().value;
-    harness.calls.frameCallbacks.delete(frameId);
-    callback(timestamp);
-  };
-  runFrame(200);
-  const warningSignals = [...connectionColors.array];
-  runFrame(1600);
-  assert.notDeepEqual([...connectionColors.array], warningSignals);
-  assert.equal(brainGroup.rotation.x, 0);
-  assert.equal(brainGroup.rotation.y, 0);
-
-  brain.dispose();
-});
-
-test("Agent Brain initializes a low-power renderer and pauses/resumes animation with page visibility", () => {
-  const harness = createBrainHarness();
-  const brain = agentBrain.createAgentBrain({
-    THREE: harness.THREE,
-    container: harness.container,
-    stateElement: harness.stateElement,
-    windowRef: harness.windowRef,
-    documentRef: harness.documentRef,
+test("circuit SVG includes detailed traces, vias, chips, and route-bound moving signals", () => {
+  const container = createContainer();
+  const stateElement = { dataset: {} };
+  const circuit = agentBrain.createAgentBrain({
+    container,
+    stateElement,
     initialStatus: "ACTIVE"
   });
 
-  assert.equal(brain.available, true);
-  assert.equal(brain.isAvailable(), true);
-  assert.equal(harness.calls.rendererOptions.antialias, true);
-  assert.equal(harness.calls.rendererOptions.powerPreference, "low-power");
-  assert.deepEqual(harness.calls.sphereGeometryArgs, []);
-  assert.equal(harness.calls.surfaceGeometries.length, 0);
-  assert.equal(harness.calls.computedNormals, 0);
-  assert.equal(harness.calls.meshes.length, 2);
-  assert.ok(harness.calls.meshes[0].geometry.getAttribute("position").count > 0);
-  const neuralNodes = harness.calls.points.find(({ material }) => material.size === 0.045);
-  assert.equal(neuralNodes.geometry.getAttribute("position").count, 720);
-  const networkPositions = neuralNodes.geometry.getAttribute("position");
-  let minimumNetworkX = Infinity;
-  let maximumNetworkX = -Infinity;
-  let minimumNetworkY = Infinity;
-  let maximumNetworkY = -Infinity;
-  let networkMaxX = 0;
-  let midlineNodeCount = 0;
-  let leftHemisphereNodes = 0;
-  let rightHemisphereNodes = 0;
-  for (let index = 0; index < networkPositions.count; index += 1) {
-    const x = networkPositions.getX(index);
-    const y = networkPositions.getY(index);
-    minimumNetworkX = Math.min(minimumNetworkX, x);
-    maximumNetworkX = Math.max(maximumNetworkX, x);
-    minimumNetworkY = Math.min(minimumNetworkY, y);
-    maximumNetworkY = Math.max(maximumNetworkY, y);
-    networkMaxX = Math.max(networkMaxX, Math.abs(x));
-    if (Math.abs(x) < 0.018 && y > -0.34) {
-      midlineNodeCount += 1;
-    }
-    if (x < -0.1) {
-      leftHemisphereNodes += 1;
-    } else if (x > 0.1) {
-      rightHemisphereNodes += 1;
-    }
-  }
-  assert.ok(minimumNetworkX < -0.45);
-  assert.ok(maximumNetworkX > 0.45);
-  assert.ok(minimumNetworkY < -0.54);
-  assert.ok(minimumNetworkY > -0.56);
-  assert.ok(maximumNetworkY > 0.4);
-  assert.equal(midlineNodeCount, 0);
-  assert.ok(Math.min(leftHemisphereNodes, rightHemisphereNodes) > 250);
-  assert.ok(networkMaxX > 0.45);
-  assert.ok(networkMaxX < 0.53);
-  const connectionPosition = harness.calls.lineSegmentGeometries[0].getAttribute("position");
-  assert.ok(connectionPosition.count > 1000);
+  assert.equal(circuit.available, true);
+  assert.equal(circuit.isAvailable(), true);
+  assert.equal(stateElement.dataset.state, "active");
   assert.equal(
-    connectionPosition.count,
-    agentBrain.performanceLimits.maxConnections * 2
+    container.attributes["aria-label"],
+    "Agent circuit visualization; status ACTIVE"
   );
-  let leftContourInnerEdge = -Infinity;
-  let leftContourOuterEdge = Infinity;
-  let leftContourTop = -Infinity;
-  let leftContourBottom = Infinity;
-  for (let index = 0; index < 80; index += 1) {
-    const x = networkPositions.getX(index);
-    const y = networkPositions.getY(index);
-    leftContourInnerEdge = Math.max(leftContourInnerEdge, x);
-    leftContourOuterEdge = Math.min(leftContourOuterEdge, x);
-    leftContourTop = Math.max(leftContourTop, y);
-    leftContourBottom = Math.min(leftContourBottom, y);
-    const segmentStart = index * 2;
-    const nextPoint = (index + 1) % 80;
-    assert.equal(connectionPosition.getX(segmentStart), x);
-    assert.equal(connectionPosition.getY(segmentStart), y);
-    assert.equal(connectionPosition.getX(segmentStart + 1), networkPositions.getX(nextPoint));
-    assert.equal(connectionPosition.getY(segmentStart + 1), networkPositions.getY(nextPoint));
+  assert.match(container.innerHTML, /viewBox="0 0 1000 360"/);
+  assert.equal((container.innerHTML.match(/class="circuit-trace circuit-trace--/g) || []).length, 44);
+  assert.equal((container.innerHTML.match(/class="circuit-via-ring"/g) || []).length, 32);
+  assert.equal((container.innerHTML.match(/class="circuit-chip"/g) || []).length, 11);
+  assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
+  assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
+  assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
+  assert.equal(agentBrain.signalRoutes.length, 32);
+  for (const [status, expectedCount] of Object.entries({
+    ACTIVE: 16,
+    ANALYZING: 36,
+    IDLE: 3,
+    STOPPED: 0,
+    ERROR: 8,
+    UNKNOWN: 0
+  })) {
+    const flow = container.innerHTML.match(new RegExp(
+      `<g class="circuit-flow circuit-flow--${status.toLowerCase()}"[^>]*>([\\s\\S]*?)<\\/g>`
+    ));
+    assert.ok(flow, `${status} flow group exists`);
+    assert.equal((flow[1].match(/<animateMotion\b/g) || []).length, expectedCount);
   }
-  assert.ok(leftContourOuterEdge < -0.45);
-  assert.ok(leftContourInnerEdge < -0.02 && leftContourInnerEdge > -0.03);
-  assert.ok(leftContourTop > 0.46);
-  assert.ok(leftContourBottom < -0.4);
-  const uniqueLineGeometries = [...new Set(harness.calls.lineSegmentGeometries)];
-  assert.equal(uniqueLineGeometries.length, 2);
-  assert.ok(harness.calls.lineSegmentGeometries.slice(0, 2).every((geometry) =>
-    geometry === harness.calls.lineSegmentGeometries[0]
-  ));
-  assert.ok(harness.calls.lineSegmentGeometries.slice(2).every((geometry) =>
-    geometry === harness.calls.lineSegmentGeometries[2]
-  ));
-  assert.notEqual(harness.calls.lineSegmentGeometries[0], harness.calls.lineSegmentGeometries[2]);
-  assert.ok(harness.calls.lineSegmentGeometries[0].getAttribute("position").count
-    <= agentBrain.performanceLimits.maxConnections * 2);
-  let leftHemisphereConnections = 0;
-  let rightHemisphereConnections = 0;
-  for (let index = 0; index < connectionPosition.count; index += 2) {
-    const startX = connectionPosition.getX(index);
-    const endX = connectionPosition.getX(index + 1);
-    const midpointX = (startX + endX) / 2;
-    const midpointY = (
-      connectionPosition.getY(index) + connectionPosition.getY(index + 1)
-    ) / 2;
-    assert.ok(!(startX < -0.025 && endX > 0.025 && midpointY > -0.34));
-    assert.ok(!(startX > 0.025 && endX < -0.025 && midpointY > -0.34));
-    if (midpointX < -0.12) {
-      leftHemisphereConnections += 1;
-    } else if (midpointX > 0.12) {
-      rightHemisphereConnections += 1;
-    }
-  }
-  const hemisphereBalance = Math.min(leftHemisphereConnections, rightHemisphereConnections)
-    / Math.max(leftHemisphereConnections, rightHemisphereConnections);
-  assert.ok(hemisphereBalance > 0.65);
-  assert.deepEqual(harness.calls.setPixelRatio, [1.5]);
-  assert.ok(harness.calls.setSize.some(({ width, height }) => width === 900 && height === 240));
-  assert.equal(harness.container.children.length, 1);
-  assert.equal(harness.stateElement.dataset.state, "active");
-  assert.equal(harness.calls.frameCallbacks.size, 1);
 
-  const visibilityListener = harness.calls.documentListeners.get("visibilitychange");
-  harness.documentRef.visibilityState = "hidden";
-  visibilityListener();
-  assert.equal(harness.calls.frameCallbacks.size, 0);
-  assert.equal(harness.calls.cancelledFrames.length, 1);
-
-  harness.documentRef.visibilityState = "visible";
-  visibilityListener();
-  assert.equal(harness.calls.frameCallbacks.size, 1);
-  brain.setStatus("STOPPED");
-  assert.equal(harness.stateElement.dataset.state, "stopped");
-  const stoppedColor = harness.calls.points.find(({ material }) => material.size === 0.045)
-    .material.color.value;
-  const stoppedChannels = [
-    (stoppedColor >> 16) & 0xff,
-    (stoppedColor >> 8) & 0xff,
-    stoppedColor & 0xff
-  ];
-  assert.ok(Math.max(...stoppedChannels) - Math.min(...stoppedChannels) < 35);
-  assert.equal(harness.calls.frameCallbacks.size, 0);
-  assert.ok(harness.calls.renders >= 3);
-
-  brain.dispose();
-  assert.equal(brain.isAvailable(), false);
-  assert.equal(harness.calls.rendererDisposed, 1);
-  assert.ok(harness.calls.geometryDisposed > 0);
-  assert.ok(harness.calls.materialDisposed > 0);
-  assert.equal(harness.calls.disconnectedObservers, 1);
-  assert.equal(harness.calls.documentListeners.size, 0);
-  assert.equal(harness.calls.windowListeners.size, 0);
-  assert.equal(harness.container.children.length, 0);
+  circuit.dispose();
 });
 
-test("Agent Brain reports a lost WebGL context as unavailable", () => {
-  const harness = createBrainHarness();
-  const brain = agentBrain.createAgentBrain({
-    THREE: harness.THREE,
-    container: harness.container,
-    windowRef: harness.windowRef,
-    documentRef: harness.documentRef,
-    initialStatus: "ACTIVE"
-  });
+test("status updates keep accessibility and activity state synchronized", () => {
+  const container = createContainer();
+  const stateElement = { dataset: {} };
+  const circuit = agentBrain.createAgentBrain({ container, stateElement });
 
-  assert.equal(brain.isAvailable(), true);
-  harness.calls.contextLost = true;
-  assert.equal(brain.isAvailable(), false);
-  brain.dispose();
+  const analyzing = circuit.setStatus("ANALYZING");
+  assert.equal(analyzing.signalCount, 36);
+  assert.equal(stateElement.dataset.state, "analyzing");
+  assert.equal(
+    container.attributes["aria-label"],
+    "Agent circuit visualization; status ANALYZING"
+  );
+
+  const stopped = circuit.setStatus("STOPPED");
+  assert.equal(stopped.signalCount, 0);
+  assert.equal(stateElement.dataset.state, "stopped");
+  assert.equal(
+    container.attributes["aria-label"],
+    "Agent circuit visualization; status STOPPED"
+  );
+  circuit.dispose();
 });
 
-test("Agent Brain applies the mobile pixel-ratio safeguard and frame-rate cap", () => {
-  const harness = createBrainHarness({ mobile: true });
-  const brain = agentBrain.createAgentBrain({
-    THREE: harness.THREE,
-    container: harness.container,
-    windowRef: harness.windowRef,
-    documentRef: harness.documentRef,
-    initialStatus: "ANALYZING"
-  });
-  assert.equal(harness.calls.rendererOptions.antialias, false);
-  assert.deepEqual(harness.calls.setPixelRatio, [1.25]);
-  const initialRenderCount = harness.calls.renders;
-  const brainGroup = harness.calls.brainGroups[0];
-  const initialScale = { ...brainGroup.scale };
-  const initialPositionY = brainGroup.position.y;
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x > 1.12);
-  assert.ok(brainGroup.scale.y / brainGroup.scale.x < 1.15);
-  assert.ok(initialPositionY > 0.06 && initialPositionY < 0.08);
-  const nodePositions = harness.calls.points.find(({ material }) => material.size === 0.045)
-    .geometry.getAttribute("position");
-  let minimumNodeY = Infinity;
-  for (let index = 0; index < nodePositions.count; index += 1) {
-    minimumNodeY = Math.min(minimumNodeY, nodePositions.getY(index));
-  }
-  assert.ok(minimumNodeY * brainGroup.scale.y + initialPositionY < -0.58);
+test("circuit renderer handles missing containers and disposes safely", () => {
+  const unavailable = agentBrain.createAgentBrain();
+  assert.equal(unavailable.available, false);
+  assert.equal(unavailable.isAvailable(), false);
 
-  const [frameId, firstFrame] = harness.calls.frameCallbacks.entries().next().value;
-  harness.calls.frameCallbacks.delete(frameId);
-  firstFrame(16);
-  assert.equal(harness.calls.renders, initialRenderCount);
-  const [nextFrameId, secondFrame] = harness.calls.frameCallbacks.entries().next().value;
-  const energyGeometry = harness.calls.points.find(({ material }) => material.size === 0.075).geometry;
-  const energyPositions = energyGeometry.getAttribute("position");
-  const initialEnergyPositions = [...energyPositions.array];
-  const nodeColors = harness.calls.points.find(({ material }) => material.size === 0.045)
-    .geometry.getAttribute("color");
-  const initialNodeColors = [...nodeColors.array];
-  const hotspotGeometry = harness.calls.points.find(({ material }) => material.size === 0.085).geometry;
-  const hotspotPositions = hotspotGeometry.getAttribute("position");
-  const initialHotspotPositions = [...hotspotPositions.array];
-  const linePositions = harness.calls.lineSegmentGeometries[0].getAttribute("position");
-  const initialLinePositions = [...linePositions.array];
-  const connectionColors = harness.calls.lineSegmentGeometries[0].getAttribute("color");
-  const initialConnectionColors = [...connectionColors.array];
-  harness.calls.frameCallbacks.delete(nextFrameId);
-  secondFrame(34);
-  assert.equal(harness.calls.renders, initialRenderCount + 1);
-  assert.equal(energyPositions.needsUpdate, true);
-  assert.notDeepEqual([...energyPositions.array], initialEnergyPositions);
-  assert.notDeepEqual([...nodeColors.array], initialNodeColors);
-  assert.equal(hotspotPositions.needsUpdate, true);
-  assert.notDeepEqual([...hotspotPositions.array], initialHotspotPositions);
-  assert.equal(linePositions.needsUpdate, true);
-  assert.notDeepEqual([...linePositions.array], initialLinePositions);
-  assert.equal(connectionColors.needsUpdate, true);
-  assert.notDeepEqual([...connectionColors.array], initialConnectionColors);
-  assert.equal(brainGroup.rotation.x, 0);
-  assert.equal(brainGroup.rotation.y, 0);
-  assert.deepEqual(brainGroup.scale, initialScale);
-  assert.equal(brainGroup.position.y, initialPositionY);
-
-  brain.dispose();
-  assert.equal(harness.calls.frameCallbacks.size, 0);
+  const container = createContainer();
+  const circuit = agentBrain.createAgentBrain({ container });
+  circuit.dispose();
+  circuit.dispose();
+  assert.equal(circuit.isAvailable(), false);
+  assert.equal(container.innerHTML, "");
+  assert.throws(() => circuit.setStatus("ACTIVE"), /disposed Agent Status visualization/);
 });
 
-test("Agent Brain falls back safely when WebGL initialization is unavailable", () => {
-  const harness = createBrainHarness({ rendererFailure: true });
+test("reduced-motion styling leaves the circuit static and visible", () => {
+  const stylesPath = path.join(__dirname, "..", "css", "styles.css");
+  const styles = fs.readFileSync(stylesPath, "utf8");
+  const reducedMotionBlock = styles.match(
+    /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/
+  );
 
-  assert.doesNotThrow(() => {
-    const brain = agentBrain.createAgentBrain({
-      THREE: harness.THREE,
-      container: harness.container,
-      windowRef: harness.windowRef,
-      documentRef: harness.documentRef,
-      initialStatus: null
-    });
-    assert.equal(brain.available, false);
-    brain.setStatus("UNKNOWN");
-    brain.dispose();
-  });
-  assert.equal(harness.container.children.length, 0);
+  assert.ok(reducedMotionBlock);
+  assert.match(reducedMotionBlock[1], /\.circuit-flow\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(styles, /\.circuit-flow--analyzing/);
 });

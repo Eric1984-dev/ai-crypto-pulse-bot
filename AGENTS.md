@@ -89,8 +89,8 @@ Backend:
 
 Libraries:
 
-- Three.js
 - Chart.js
+- Native SVG and CSS for status visualization
 
 Avoid unnecessary dependencies.
 
@@ -120,11 +120,11 @@ Tracked Markets
 
 ---
 
-# 6 Agent Brain
+# 6 Agent Status Visualization
 
-The dashboard must contain:
+The dashboard must contain a detailed circuit-board visualization.
 
-3D Agent Brain
+The visualization must reflect live agent activity and remain status-driven.
 
 Supported states:
 
@@ -142,8 +142,7 @@ Status must be obtained from:
 
 AI_Crypto_Bot_Status
 
-The brain may not animate solely because the dashboard is open.
-
+The visualization may not animate solely because the dashboard is open. STOPPED and UNKNOWN must remain static.
 ---
 
 # 7 Market Coverage

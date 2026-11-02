@@ -16,11 +16,10 @@
     currency: "EUR",
     maximumFractionDigits: 2
   });
-  const chartColors = ["#9de7ba", "#80b9ff", "#ffc779", "#d0a6ff", "#ff9f9a"];
+  const chartColors = ["#c78cf0", "#80b9ff", "#ffc779", "#9b84e8", "#ff9f9a"];
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
-  const threeModuleUrl = "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
   function emptyDashboardData() {
     return {
@@ -239,18 +238,18 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: portfolioIds.length > 1, labels: { color: "#a4b2aa" } },
+          legend: { display: portfolioIds.length > 1, labels: { color: "#b2a7bc" } },
           tooltip: { mode: "index", intersect: false }
         },
         scales: {
           x: {
             grid: { color: "rgba(164, 178, 170, 0.08)" },
-            ticks: { color: "#a4b2aa", maxTicksLimit: 6 }
+            ticks: { color: "#b2a7bc", maxTicksLimit: 6 }
           },
           y: {
             grid: { color: "rgba(164, 178, 170, 0.08)" },
             ticks: {
-              color: "#a4b2aa",
+              color: "#b2a7bc",
               callback(value) {
                 return currencyFormat.format(value);
               }
@@ -401,7 +400,6 @@
     documentRef = document,
     fetchImpl = windowRef.fetch.bind(windowRef),
     ChartConstructor = windowRef.Chart,
-    loadThree = () => import(threeModuleUrl),
     setIntervalImpl = windowRef.setInterval
       ? windowRef.setInterval.bind(windowRef)
       : globalThis.setInterval,
@@ -418,7 +416,6 @@
     let dashboardPollingTimer = null;
     let statusPollingTimer = null;
     let brain = null;
-    let brainInitialization = null;
     let currentAgentStatus = null;
     let disposed = false;
     let realtimeCleanup = null;
@@ -500,7 +497,7 @@
       if (brainStage) {
         brainStage.setAttribute(
           "aria-label",
-          `3D Agent Brain; status ${currentAgentStatus || "UNKNOWN"}`
+          `Agent circuit visualization; status ${currentAgentStatus || "UNKNOWN"}`
         );
       }
 
@@ -532,61 +529,32 @@
         return;
       }
       if (!windowRef.CryptoPulseAgentBrain) {
-        logBrainError(new Error("Agent Brain module is unavailable."));
+        logBrainError(new Error("Agent circuit visualization module is unavailable."));
         setBrainFallback(true);
         return;
       }
-      if (brainInitialization) {
-        return;
-      }
 
-      brainInitialization = Promise.resolve()
-        .then(loadThree)
-        .then((threeModule) => {
-          if (disposed) {
-            return null;
-          }
-          const three = threeModule && (threeModule.default || threeModule);
-          const brainApi = windowRef.CryptoPulseAgentBrain;
-          if (!three || typeof brainApi.createAgentBrain !== "function") {
-            throw new Error("Three.js Agent Brain dependencies are unavailable.");
-          }
-          const initializedBrain = brainApi.createAgentBrain({
-            THREE: three,
-            container: brainStage,
-            stateElement: brainElement,
-            windowRef,
-            documentRef,
-            initialStatus: currentAgentStatus
-          });
-          if (!initializedBrain || initializedBrain.available !== true) {
-            if (initializedBrain && typeof initializedBrain.dispose === "function") {
-              initializedBrain.dispose();
-            }
-            throw initializedBrain && initializedBrain.error
-              ? initializedBrain.error
-              : new Error("Three.js renderer could not be initialized.");
-          }
-          brain = initializedBrain;
-          setBrainFallback(false);
-          return brain;
-        })
-        .catch((error) => {
-          logBrainError(error);
-          if (!hasAvailableBrain()) {
-            if (brain && typeof brain.dispose === "function") {
-              brain.dispose();
-            }
-            brain = null;
-            setBrainFallback(true);
-          } else {
-            setBrainFallback(false);
-          }
-          return null;
-        })
-        .finally(() => {
-          brainInitialization = null;
+      try {
+        const initializedBrain = windowRef.CryptoPulseAgentBrain.createAgentBrain({
+          container: brainStage,
+          stateElement: brainElement,
+          initialStatus: currentAgentStatus
         });
+        if (!initializedBrain || initializedBrain.available !== true) {
+          if (initializedBrain && typeof initializedBrain.dispose === "function") {
+            initializedBrain.dispose();
+          }
+          throw initializedBrain && initializedBrain.error
+            ? initializedBrain.error
+            : new Error("Agent circuit visualization could not be initialized.");
+        }
+        brain = initializedBrain;
+        setBrainFallback(false);
+      } catch (error) {
+        logBrainError(error);
+        brain = null;
+        setBrainFallback(true);
+      }
     }
 
     function setBrainFallback(isVisible) {
@@ -618,7 +586,7 @@
 
     function logBrainError(error) {
       if (windowRef.console && typeof windowRef.console.error === "function") {
-        windowRef.console.error("Agent Brain initialization or update failed.", error);
+        windowRef.console.error("Agent circuit visualization initialization or update failed.", error);
       }
     }
 
