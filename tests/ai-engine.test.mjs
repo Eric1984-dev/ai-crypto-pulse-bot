@@ -65,76 +65,100 @@ function createEngineHarness({
   candles = buildCandles(),
   postgrestMaxRows = 1000,
   failReadTable = null,
+  candleDelayMs = 0,
   logger = { info() {}, error() {} }
 } = {}) {
   let statusRow = { status };
   const writes = [];
   const requests = [];
+  let activeCandleRequests = 0;
+  let maxActiveCandleRequests = 0;
   const fetchImpl = async (input, options = {}) => {
     const url = new URL(input);
     const table = decodeURIComponent(url.pathname.split("/").pop());
     const method = options.method || "GET";
     requests.push({ table, method, url: url.toString() });
 
-    if (method === "GET") {
-      if (table === failReadTable) {
-        return jsonResponse({ message: "provider detail must not be exposed" }, 503);
+    const isCandleRead = method === "GET" && table === "AI_Crypto_Bot_Candles";
+    if (isCandleRead) {
+      activeCandleRequests += 1;
+      maxActiveCandleRequests = Math.max(maxActiveCandleRequests, activeCandleRequests);
+      if (candleDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, candleDelayMs));
       }
-      if (table === "AI_Crypto_Bot_Status") {
-        return jsonResponse([statusRow]);
-      }
-      if (table === "AI_Crypto_Bot_Watched_Markets") {
-        return jsonResponse(markets);
-      }
-      if (table === "AI_Crypto_Bot_Market_Data") {
-        return jsonResponse(marketData);
-      }
-      if (table === "AI_Crypto_Bot_Candles") {
-        const symbolFilter = url.searchParams.get("symbol");
-        const symbol = symbolFilter?.startsWith("eq.") ? symbolFilter.slice(3) : null;
-        const intervalFilter = url.searchParams.get("interval");
-        const intervals = intervalFilter?.startsWith("eq.")
-          ? [intervalFilter.slice(3)]
-          : intervalFilter?.startsWith("in.(")
-            ? intervalFilter.slice(4, -1).split(",")
-            : null;
-        let rows = candles.filter((candle) =>
-          (!symbol || candle.symbol === symbol)
-          && (!intervals || intervals.includes(candle.interval))
-        );
-        const order = url.searchParams.get("order");
-        if (order === "interval.asc,timestamp.desc") {
-          rows.sort((left, right) => left.interval < right.interval
-            ? -1
-            : left.interval > right.interval
-              ? 1
-              : Date.parse(right.timestamp) - Date.parse(left.timestamp));
-        } else if (order === "timestamp.desc") {
-          rows.sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
-        }
-        const requestLimit = Number(url.searchParams.get("limit"));
-        if (Number.isSafeInteger(requestLimit) && requestLimit >= 0) {
-          rows = rows.slice(0, Math.min(requestLimit, postgrestMaxRows));
-        }
-        return jsonResponse(rows);
-      }
-      throw new Error(`Unexpected read table: ${table}`);
     }
 
-    if (table === "AI_Crypto_Bot_Status" && method === "PATCH") {
-      statusRow = { ...statusRow, ...JSON.parse(options.body) };
-      writes.push({ table, method, body: JSON.parse(options.body) });
-      return jsonResponse([statusRow]);
+    try {
+      if (method === "GET") {
+        if (table === failReadTable) {
+          return jsonResponse({ message: "provider detail must not be exposed" }, 503);
+        }
+        if (table === "AI_Crypto_Bot_Status") {
+          return jsonResponse([statusRow]);
+        }
+        if (table === "AI_Crypto_Bot_Watched_Markets") {
+          return jsonResponse(markets);
+        }
+        if (table === "AI_Crypto_Bot_Market_Data") {
+          return jsonResponse(marketData);
+        }
+        if (table === "AI_Crypto_Bot_Candles") {
+          const symbolFilter = url.searchParams.get("symbol");
+          const symbol = symbolFilter?.startsWith("eq.") ? symbolFilter.slice(3) : null;
+          const intervalFilter = url.searchParams.get("interval");
+          const intervals = intervalFilter?.startsWith("eq.")
+            ? [intervalFilter.slice(3)]
+            : intervalFilter?.startsWith("in.(")
+              ? intervalFilter.slice(4, -1).split(",")
+              : null;
+          let rows = candles.filter((candle) =>
+            (!symbol || candle.symbol === symbol)
+            && (!intervals || intervals.includes(candle.interval))
+          );
+          const order = url.searchParams.get("order");
+          if (order === "interval.asc,timestamp.desc") {
+            rows.sort((left, right) => left.interval < right.interval
+              ? -1
+              : left.interval > right.interval
+                ? 1
+                : Date.parse(right.timestamp) - Date.parse(left.timestamp));
+          } else if (order === "timestamp.desc") {
+            rows.sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
+          }
+          const requestLimit = Number(url.searchParams.get("limit"));
+          if (Number.isSafeInteger(requestLimit) && requestLimit >= 0) {
+            rows = rows.slice(0, Math.min(requestLimit, postgrestMaxRows));
+          }
+          return jsonResponse(rows);
+        }
+        throw new Error(`Unexpected read table: ${table}`);
+      }
+
+      if (table === "AI_Crypto_Bot_Status" && method === "PATCH") {
+        statusRow = { ...statusRow, ...JSON.parse(options.body) };
+        writes.push({ table, method, body: JSON.parse(options.body) });
+        return jsonResponse([statusRow]);
+      }
+      if (table === "AI_Crypto_Bot_AI_Decisions" && method === "POST") {
+        const body = JSON.parse(options.body);
+        writes.push({ table, method, body });
+        return jsonResponse(body);
+      }
+      throw new Error(`Unexpected database operation: ${method} ${table}`);
+    } finally {
+      if (isCandleRead) {
+        activeCandleRequests -= 1;
+      }
     }
-    if (table === "AI_Crypto_Bot_AI_Decisions" && method === "POST") {
-      const body = JSON.parse(options.body);
-      writes.push({ table, method, body });
-      return jsonResponse(body);
-    }
-    throw new Error(`Unexpected database operation: ${method} ${table}`);
   };
   const service = createAIEngineService({ fetchImpl, now: () => fixedNow, logger });
-  return { service, writes, requests, getStatus: () => statusRow };
+  return {
+    service,
+    writes,
+    requests,
+    getStatus: () => statusRow,
+    getMaxActiveCandleRequests: () => maxActiveCandleRequests
+  };
 }
 
 function createResponse() {
@@ -330,6 +354,64 @@ test("analysis retrieves each candle interval independently under a 1000-row Pos
     url.searchParams.get("limit") === "1000"
       && url.searchParams.get("order") === "timestamp.desc"
   ));
+});
+
+test("analysis uses bounded candle workers and preserves every market decision", async () => {
+  const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
+  const markets = Array.from({ length: 102 }, (_, index) => ({
+    symbol: `ASSET${index}-EUR`,
+    enabled: true,
+    priority: index + 1
+  }));
+  const marketData = markets.map((market) => ({
+    ...createSnapshot(),
+    symbol: market.symbol
+  }));
+  const logEntries = [];
+  const candles = markets.flatMap(({ symbol }) =>
+    intervals.map((interval) => createCandles(symbol, interval, 1)[0])
+  );
+  const harness = createEngineHarness({
+    markets,
+    marketData,
+    candles,
+    candleDelayMs: 2,
+    logger: {
+      info(message, fields) {
+        logEntries.push({ message, fields });
+      },
+      error() {}
+    }
+  });
+
+  const result = await harness.service.runAnalysis({ config, serviceRoleKey });
+  const decisions = harness.writes
+    .find(({ table }) => table === "AI_Crypto_Bot_AI_Decisions").body;
+  const expectedDecisions = markets.map((market) => analyzeMarket({
+    symbol: market.symbol,
+    marketData: marketData.find(({ symbol }) => symbol === market.symbol),
+    candles: candles.filter((candle) => candle.symbol === market.symbol),
+    now: fixedNow
+  }));
+  const candleRequests = harness.requests.filter(({ table }) =>
+    table === "AI_Crypto_Bot_Candles"
+  );
+  const uniqueCandleQueries = new Set(candleRequests.map(({ url }) => {
+    const query = new URL(url).searchParams;
+    return `${query.get("symbol")}|${query.get("interval")}`;
+  }));
+
+  assert.equal(result.analyzedMarkets, markets.length);
+  assert.equal(result.decisionsStored, markets.length);
+  assert.equal(candleRequests.length, markets.length * intervals.length);
+  assert.equal(uniqueCandleQueries.size, candleRequests.length);
+  assert.equal(harness.getMaxActiveCandleRequests(), 24);
+  assert.deepEqual(decisions, expectedDecisions);
+  const completionLog = logEntries.find(({ message }) => message === "AI analysis completed.");
+  assert.equal(completionLog.fields.candleQueries, 612);
+  assert.equal(completionLog.fields.candlesLoaded, candles.length);
+  assert.ok(completionLog.fields.runtimeMs >= 0);
+  assert.ok(completionLog.fields.timingMs.candleLoad >= 0);
 });
 
 test("analysis persists real decisions and updates status with PATCH", async () => {

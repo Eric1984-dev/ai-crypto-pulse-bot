@@ -63,3 +63,38 @@ Future Investigation:
 - Scheduler validation
 - Run history visibility
 - Decision execution tracking
+
+## Investigation - Intermittent AI Analysis Timeouts
+
+Status:
+Monitoring
+
+Observation:
+
+Production AI Analysis occasionally reports timeout failures.
+
+Findings:
+
+- Successful runs analyze 102 markets.
+- Six candle intervals are processed per market.
+- Approx. 612 candle reads occur per execution.
+- Recent successful runs completed in approximately 26.5 seconds.
+- Primary runtime cost appears to be candle retrieval across 77 sequential batches.
+
+Current Assessment:
+
+The root cause remains unconfirmed.
+
+Recent successful executions complete within acceptable runtime limits, but execution time scales with market count and candle-processing workload.
+
+Future Investigation:
+
+- Runtime instrumentation per analysis stage
+- Candle-query optimization
+- Batch-size review
+- Parallelization opportunities
+- Market-count growth impact
+
+Status:
+
+Monitoring pending additional timeout evidence.

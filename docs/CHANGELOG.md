@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### AI Analysis runtime optimization
+
+- Replaced sequential groups of eight candle reads with a bounded 24-worker queue, reducing wait barriers without changing candle filters, limits, or ordering
+- Added runtime and stage timing telemetry to AI Analysis completion and failure logs
+- Preserved all AI calculations, confidence, decision rules, persisted outputs, and existing API/function count
+
 ### Agent Brain refinement
 
 - Increased the status-driven green chip glow during `ANALYZING`

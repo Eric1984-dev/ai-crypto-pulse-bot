@@ -20,7 +20,7 @@ External scheduler
   -> existing authenticated dashboard
 ```
 
-The endpoint uses the server-only service role for database reads and writes. The service uses bounded candle-query concurrency and per-request timeouts. It reads each market/interval combination separately, with a 1,000-row limit per interval, so a global PostgREST response cap cannot starve the later intervals. It logs analysis start, each analyzed market and generated decision/confidence, completion, and failures without logging credentials or raw provider errors.
+The endpoint uses the server-only service role for database reads and writes. The service uses a bounded 24-worker queue for candle reads and per-request timeouts. It reads each market/interval combination separately, with a 1,000-row limit per interval, so a global PostgREST response cap cannot starve the later intervals. It logs analysis start, each analyzed market and generated decision/confidence, completion timings, and failures without logging credentials or raw provider errors.
 
 ## Decision logic and confidence model
 
