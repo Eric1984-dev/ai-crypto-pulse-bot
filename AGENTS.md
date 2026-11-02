@@ -484,8 +484,9 @@ The agent may:
 - Generate WAIT decisions
 - Open paper positions
 - Close paper positions
-- Set stop losses
-- Set take profits
+- Scan configured markets
+- Analyze price movements
+- Compare opportunities
 - Evaluate performance
 
 without requiring approval for individual paper trades.
@@ -988,3 +989,88 @@ The platform must function without:
 Future phases may introduce external AI providers.
 
 Current phases must remain functional without external AI services.
+
+## Development Environment
+
+The project is developed in VS Code with direct Supabase access configured.
+
+Copilot may:
+
+- Inspect Supabase tables
+- Inspect Supabase schema
+- Run read-only validation queries
+- Verify migrations
+- Verify production data
+- Compare implementation with live database state
+
+When diagnosing database-related issues:
+
+- Prefer live Supabase verification over assumptions.
+- Verify production schema before assuming migration problems.
+- Verify table contents before assuming missing data.
+- Use existing Supabase access where available.
+
+Important:
+
+Never request private keys to be hardcoded in source code.
+Use existing project environment variables and configured development integrations.
+
+## CryptoPulse Operational Context
+
+Production Platform:
+
+- Vercel Hobby
+- Supabase
+- Bitvavo Public API
+
+Constraints:
+
+- Maximum 12 Vercel Functions
+- Reuse existing endpoints whenever possible
+- Prefer existing infrastructure over new services
+
+Current Mode:
+
+PAPER ACTIVE
+
+Development Access:
+
+- VS Code environment has Supabase access available for diagnostics and validation.
+- Live database verification is preferred for production investigations.
+
+# Recommendation Architecture
+
+AI Recommendations are generated on demand.
+
+Recommendations are derived from:
+
+- Analytics
+- AI Decisions
+- Trades
+- Positions
+- Portfolio History
+
+Recommendations are not persisted by default.
+
+Recommendation exports must be generated from current source data.
+
+Do not introduce recommendation-history tables unless a future phase explicitly requires auditability.
+
+# Deployment Constraints
+
+Current Hosting:
+
+- Vercel Hobby
+
+Maximum:
+
+- 12 Serverless Functions
+
+Requirements:
+
+- Reuse existing endpoints whenever possible.
+- Prefer shared modules and existing APIs.
+- Do not create additional API routes unless absolutely necessary.
+- Any new API route must be justified before implementation.
+
+Function count must remain within platform limits.

@@ -365,6 +365,28 @@ Any future position-management system must:
 - Remain configurable
 - Be validated through Analytics before deployment
 
+## Future Enhancement - Low Price Asset Indicator Precision
+
+Evaluate indicator precision for very low-priced assets.
+
+Potential issue:
+
+MACD histogram values may be rounded away for assets trading at very small prices.
+
+Examples:
+
+- BEAM-EUR
+- SHIB-like assets
+- Other micro-priced assets
+
+Review:
+
+- MACD precision
+- Indicator normalization
+- Decision quality impact
+
+Use Analytics and AI Recommendations before implementing changes.
+
 ## Phase 19 - Live Trading Preparation
 
 - Additional Risk Controls
