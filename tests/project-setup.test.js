@@ -60,7 +60,7 @@ test("all pages use a dropdown for their top navigation", () => {
   }
 });
 
-test("all page brands use the purple icon and link to the dashboard", () => {
+test("all page brands use the green icon and link to the dashboard", () => {
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     const brand = html.match(/<a class="brand"[\s\S]*?<\/a>/);
@@ -83,15 +83,15 @@ test("all pages enable standalone home-screen app mode", () => {
   ));
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.start_url, "/dashboard.html");
-  assert.equal(manifest.theme_color, "#0b0910");
-  assert.equal(manifest.background_color, "#0b0910");
+  assert.equal(manifest.theme_color, "#0b100f");
+  assert.equal(manifest.background_color, "#0b100f");
   assert.ok(manifest.icons.some(({ src }) => src === "/assets/icons/apple-touch-icon.png"));
 
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest">/);
     assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
-    assert.match(html, /<meta name="theme-color" content="#0b0910">/);
+    assert.match(html, /<meta name="theme-color" content="#0b100f">/);
     assert.doesNotMatch(html, /<a\b[^>]*data-nav-link[^>]*target="_blank"/);
   }
 });
@@ -101,13 +101,14 @@ test("global page layout does not force horizontal overflow on narrow screens", 
   assert.doesNotMatch(styles, /body\s*\{[^}]*min-width:\s*320px/s);
 });
 
-test("shared page background softly fades purple into black behind existing card surfaces", () => {
+test("shared page background softly fades green into the original dark green behind cards", () => {
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
-  assert.match(styles, /radial-gradient\(ellipse at 12% 0%, rgb\(87 57 112 \/ 13%\), transparent 38rem\)/);
-  assert.match(styles, /radial-gradient\(ellipse at 88% 96%, rgb\(54 39 70 \/ 11%\), transparent 42rem\)/);
-  assert.match(styles, /linear-gradient\(135deg, #0b0910 0%, #09070d 52%, #040306 100%\)/);
-  assert.match(styles, /--surface:\s*#15111b;/);
-  assert.match(styles, /--surface-raised:\s*#1d1725;/);
+  assert.match(styles, /radial-gradient\(ellipse at 12% 0%, rgb\(39 91 61 \/ 18%\), transparent 36rem\)/);
+  assert.match(styles, /#0b100f;/);
+  assert.match(styles, /--surface:\s*#121a17;/);
+  assert.match(styles, /--surface-raised:\s*#18221e;/);
+  assert.match(styles, /--accent:\s*#9de7ba;/);
+  assert.doesNotMatch(styles, /#b693df|#70528b|#423052/);
 });
 
 test("internal navigation resets to the top on mobile destination loads", () => {

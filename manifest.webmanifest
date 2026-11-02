@@ -5,8 +5,8 @@
   "start_url": "/dashboard.html",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b0910",
-  "theme_color": "#0b0910",
+  "background_color": "#0b100f",
+  "theme_color": "#0b100f",
   "icons": [
     {
       "src": "/assets/icons/apple-touch-icon.png",

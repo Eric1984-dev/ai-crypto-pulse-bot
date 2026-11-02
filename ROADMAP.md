@@ -197,15 +197,15 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 
 ## Phase 14 - Final Polish
 
-- [x] Use the purple circuit-board artwork as the compact Agent Status visual and overlay status-driven glowing neuron signals along its routes
+- [x] Use the frame-free green circuit-board artwork as the compact Agent Status visual and overlay status-driven glowing neuron signals along its routes
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
-- [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a purple background and make the AI Crypto Bot brand link to Dashboard on every page
-- [x] Apply a subdued purple theme with a darker purple-to-black page background and soft fades behind cards; retain existing card surfaces, charts, browser chrome, and status-driven circuit colors
-- [x] Fill the available mobile width with the square circuit visual (bounded by 90vh); start signals at the chip edge, route them in different directions, and fade them before the rounded board border
+- [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
+- [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
+- [x] Keep the circuit artwork frame-free; fill the available mobile width (bounded by 90vh) and keep fading neuron motion on visible traces from the chip edges
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist

@@ -17,9 +17,9 @@ function createContainer() {
 
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
   const expectedStates = {
-    ACTIVE: { signalCount: 12, color: "#c780f0", signalDuration: 3.2 },
-    ANALYZING: { signalCount: 24, color: "#ed9cff", signalDuration: 1.25 },
-    IDLE: { signalCount: 2, color: "#8f76a1", signalDuration: 7.5 },
+    ACTIVE: { signalCount: 12, color: "#65dc92", signalDuration: 3.2 },
+    ANALYZING: { signalCount: 24, color: "#9dffbd", signalDuration: 1.25 },
+    IDLE: { signalCount: 2, color: "#67866f", signalDuration: 7.5 },
     STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
     ERROR: { signalCount: 6, color: "#ff6478", signalDuration: 2.4 },
     UNKNOWN: { signalCount: 0, color: "#75808d", signalDuration: 0 }
@@ -37,7 +37,7 @@ test("Agent Status maps known and unknown states to explicit circuit activity", 
   assert.equal(agentBrain.mapAgentStatus(null).status, "UNKNOWN");
 });
 
-test("circuit SVG uses the purple board and boundary-origin moving signals", () => {
+test("circuit SVG uses the green board and boundary-origin moving signals", () => {
   const container = createContainer();
   const stateElement = { dataset: {} };
   const circuit = agentBrain.createAgentBrain({
@@ -53,50 +53,34 @@ test("circuit SVG uses the purple board and boundary-origin moving signals", () 
     container.attributes["aria-label"],
     "Agent circuit visualization; status ACTIVE"
   );
-  assert.match(container.innerHTML, /viewBox="0 0 1000 1000"/);
+  assert.match(container.innerHTML, /viewBox="0 0 1254 1254"/);
   assert.match(container.innerHTML, /class="circuit-board-image" href="\/assets\/agent-circuit-board\.png"/);
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
   assert.match(container.innerHTML, /<animate attributeName="opacity" values="1;1;0" keyTimes="0;0\.72;1"/);
-  assert.equal(agentBrain.signalRoutes.length, 52);
-  assert.match(container.innerHTML, /clip-path="url\(#circuit-board-clip\)"/);
-  assert.match(container.innerHTML, /<clipPath id="circuit-board-clip">\s*<rect x="52" y="52" width="896" height="896" rx="188"\/>/);
-  assert.ok(fs.statSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png")).size > 100000);
+  assert.equal(agentBrain.signalRoutes.length, 16);
+  assert.match(container.innerHTML, /<mask id="circuit-trace-mask"[^>]+mask-type="luminance">/);
+  assert.match(container.innerHTML, /mask="url\(#circuit-trace-mask\)"/);
+  assert.doesNotMatch(container.innerHTML, /circuit-board-clip|clip-path=/);
+  const circuitArtwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
+  assert.ok(circuitArtwork.length > 100000);
+  assert.equal(circuitArtwork.readUInt32BE(16), 1254);
+  assert.equal(circuitArtwork.readUInt32BE(20), 1254);
   const routeStarts = agentBrain.signalRoutes.map((route) => {
     const [, x, y] = route.match(/^M([\d.]+)\s([\d.]+)/);
     return { x: Number(x), y: Number(y) };
   });
-  assert.ok(routeStarts.every(({ x, y }) => Math.max(Math.abs(x - 500), Math.abs(y - 500)) >= 130));
-  const routePointsStayInsideRoundedBorder = agentBrain.signalRoutes.every((route) => {
-    const tokens = route.match(/[MHV]|[\d.]+/g);
-    let x = 0;
-    let y = 0;
-    while (tokens.length) {
-      const command = tokens.shift();
-      if (command === "M") {
-        x = Number(tokens.shift());
-        y = Number(tokens.shift());
-      } else if (command === "H") {
-        x = Number(tokens.shift());
-      } else {
-        y = Number(tokens.shift());
-      }
-
-      const nearestX = Math.max(240, Math.min(760, x));
-      const nearestY = Math.max(240, Math.min(760, y));
-      if (Math.hypot(x - nearestX, y - nearestY) > 188) return false;
-    }
-    return true;
-  });
-  assert.ok(routePointsStayInsideRoundedBorder, "signal routes must stay inside the rounded board border");
-  assert.deepEqual(new Set(agentBrain.signalRoutes.map((route) => {
-    if (route.endsWith("V70")) return "up";
-    if (route.endsWith("V930")) return "down";
-    if (route.endsWith("H70")) return "left";
-    if (route.endsWith("H930")) return "right";
-    return "diagonal";
-  })), new Set(["up", "down", "left", "right", "diagonal"]));
+  assert.ok(routeStarts.every(({ x, y }) => Math.max(Math.abs(x - 627), Math.abs(y - 627)) >= 100));
+  const routeDirections = new Set(agentBrain.signalRoutes.map((route) => {
+    const [, startX, startY] = route.match(/^M([\d.]+)\s([\d.]+)/);
+    const endX = Number(route.match(/H([\d.]+)$/)?.[1] || startX);
+    const endY = Number(route.match(/V([\d.]+)$/)?.[1] || startY);
+    return Math.abs(endX - Number(startX)) > Math.abs(endY - Number(startY))
+      ? (endX < Number(startX) ? "left" : "right")
+      : (endY < Number(startY) ? "up" : "down");
+  }));
+  assert.deepEqual(routeDirections, new Set(["up", "down", "left", "right"]));
   for (const [status, expectedCount] of Object.entries({
     ACTIVE: 12,
     ANALYZING: 24,
@@ -156,10 +140,14 @@ test("circuit renderer handles missing containers and disposes safely", () => {
 test("reduced-motion styling leaves the circuit static and visible", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
+  const brainBlock = styles.match(/\.agent-brain\s*\{([\s\S]*?)\n\}/);
   const reducedMotionBlock = styles.match(
     /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/
   );
 
+  assert.ok(brainBlock);
+  assert.match(brainBlock[1], /background:\s*transparent;/);
+  assert.doesNotMatch(brainBlock[1], /border(?:-radius)?:/);
   assert.ok(reducedMotionBlock);
   assert.match(reducedMotionBlock[1], /\.circuit-flow\s*\{\s*display:\s*none\s*!important;/);
   assert.match(styles, /\.circuit-flow--analyzing/);

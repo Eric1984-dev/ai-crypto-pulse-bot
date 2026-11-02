@@ -10,19 +10,19 @@
   const statusMap = Object.freeze({
     ACTIVE: Object.freeze({
       status: "ACTIVE",
-      color: "#c780f0",
+      color: "#65dc92",
       signalCount: 12,
       signalDuration: 3.2
     }),
     ANALYZING: Object.freeze({
       status: "ANALYZING",
-      color: "#ed9cff",
+      color: "#9dffbd",
       signalCount: 24,
       signalDuration: 1.25
     }),
     IDLE: Object.freeze({
       status: "IDLE",
-      color: "#8f76a1",
+      color: "#67866f",
       signalCount: 2,
       signalDuration: 7.5
     }),
@@ -49,25 +49,24 @@
   const signalRoutes = createSignalRoutes();
 
   function createSignalRoutes() {
-    const routes = [];
-    for (let index = 0; index < 12; index += 1) {
-      const pin = 382 + index * 21.5;
-      const edge = 212 + index * 52;
-      const topElbow = 280 + (index % 4) * 22;
-      const sideElbow = 280 + ((index + 2) % 4) * 22;
-      routes.push(`M${pin} 370V${topElbow}H${edge}V70`);
-      routes.push(`M${pin} 630V${1000 - topElbow}H${1000 - edge}V930`);
-      routes.push(`M370 ${pin}H${sideElbow}V${edge}H70`);
-      routes.push(`M630 ${pin}H${1000 - sideElbow}V${1000 - edge}H930`);
-    }
-
-    routes.push(
-      "M370 370H340V310H270V240H200V170H120",
-      "M630 370H660V310H730V240H800V170H880",
-      "M370 630H340V690H270V760H200V830H120",
-      "M630 630H660V690H730V760H800V830H880"
-    );
-    return Object.freeze(routes);
+    return Object.freeze([
+      "M626 430V109",
+      "M570 430V127",
+      "M680 430V123",
+      "M520 430V128",
+      "M626 747V1140",
+      "M570 747V903",
+      "M680 747V902",
+      "M550 747V899",
+      "M462 445H115",
+      "M462 510H115",
+      "M462 568H120",
+      "M462 620H136",
+      "M790 445H1139",
+      "M790 510H1159",
+      "M790 568H1134",
+      "M790 620H1116"
+    ]);
   }
 
   function mapAgentStatus(status) {
@@ -97,18 +96,26 @@
       .map(([status, config]) => renderSignalGroup(status, config))
       .join("");
 
-    return `<svg class="agent-circuit-art" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+    return `<svg class="agent-circuit-art" viewBox="0 0 1254 1254" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
       <defs>
         <filter id="circuit-neuron-glow" x="-250%" y="-250%" width="600%" height="600%">
           <feGaussianBlur stdDeviation="7" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <clipPath id="circuit-board-clip">
-          <rect x="52" y="52" width="896" height="896" rx="188"/>
-        </clipPath>
+        <filter id="circuit-trace-mask-filter" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="1 0 1 0 0 1 0 1 0 0 1 0 1 0 0 0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="2.2" intercept="-0.25"/>
+            <feFuncG type="linear" slope="2.2" intercept="-0.25"/>
+            <feFuncB type="linear" slope="2.2" intercept="-0.25"/>
+          </feComponentTransfer>
+        </filter>
+        <mask id="circuit-trace-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254" mask-type="luminance">
+          <image href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" filter="url(#circuit-trace-mask-filter)"/>
+        </mask>
       </defs>
-      <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet"/>
-      <g class="circuit-flows" clip-path="url(#circuit-board-clip)">${signals}</g>
+      <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
+      <g class="circuit-flows" mask="url(#circuit-trace-mask)">${signals}</g>
     </svg>`;
   }
 

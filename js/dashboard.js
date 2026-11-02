@@ -16,7 +16,7 @@
     currency: "EUR",
     maximumFractionDigits: 2
   });
-  const chartColors = ["#c78cf0", "#80b9ff", "#ffc779", "#9b84e8", "#ff9f9a"];
+  const chartColors = ["#9de7ba", "#80b9ff", "#ffc779", "#78ffad", "#ff9f9a"];
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
@@ -238,18 +238,18 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: portfolioIds.length > 1, labels: { color: "#b2a7bc" } },
+          legend: { display: portfolioIds.length > 1, labels: { color: "#a4b2aa" } },
           tooltip: { mode: "index", intersect: false }
         },
         scales: {
           x: {
             grid: { color: "rgba(164, 178, 170, 0.08)" },
-            ticks: { color: "#b2a7bc", maxTicksLimit: 6 }
+            ticks: { color: "#a4b2aa", maxTicksLimit: 6 }
           },
           y: {
             grid: { color: "rgba(164, 178, 170, 0.08)" },
             ticks: {
-              color: "#b2a7bc",
+              color: "#a4b2aa",
               callback(value) {
                 return currencyFormat.format(value);
               }
