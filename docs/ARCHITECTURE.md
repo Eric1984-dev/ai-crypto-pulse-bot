@@ -33,7 +33,7 @@ Implemented components:
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
 - Separate scheduler-protected market-snapshot and bounded candle-refresh endpoints, plus AI analysis; candle work handles one interval and at most five markets per invocation, with external schedulers supported without a Vercel Cron route
 - Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
-- Independent bounded PostgREST candle reads for every supported interval, preventing global row caps from excluding later timeframes
+- Bounded PostgREST candle queries batch up to four markets per interval and paginate while retaining each market's 1,000-row cap
 - Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
 - Scheduler-protected Phase 08 paper-trading endpoint backed by service-role-only PostgreSQL functions
 - Stored-decision trade audit links, deterministic idempotency, transaction/advisory locks, and real portfolio snapshots

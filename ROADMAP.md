@@ -93,7 +93,7 @@ Status: Completed
 ## Phase 07 - AI Engine
 
 - [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
-- [x] Retrieve each supported candle interval independently so PostgREST row caps cannot exclude later intervals
+- [x] Batch candle queries by interval, paginate PostgREST responses, and preserve the latest 1,000 candles per market/interval
 - [x] Confidence-weighted BUY, SELL, HOLD, and WAIT decisions from real watched-market snapshots and candles
 - [x] Persist decisions and status transitions through existing `AI_Crypto_Bot_*` tables only
 - [x] Graceful handling for missing, stale, partial, and invalid market data
@@ -443,6 +443,8 @@ Future analytics, recommendations, simulations, and optimization phases would be
 
 ---
 
+
+
 Goals
 
 Provide visibility into:
@@ -482,6 +484,79 @@ Its purpose is observability only.
 
 Implement only when operational insight becomes more valuable than the additional storage and complexity.
 
+## Future Enhancement - Data Retention & Archiving
+
+Status:
+Backlog
+
+Priority:
+Low
+
+Rationale:
+
+Historical data is growing continuously.
+
+Current storage is primarily consumed by:
+
+- AI_Crypto_Bot_Candles
+- AI_Crypto_Bot_AI_Decisions
+
+As market coverage and history increase, storage requirements will continue to grow.
+
+Future phases should introduce evidence-based retention and archiving policies without impacting Analytics, Recommendations, Strategy Simulation, or Backtesting.
+
+Goals:
+
+- Preserve required analytical history
+- Reduce unnecessary long-term storage growth
+- Maintain reproducible simulations
+- Maintain historical performance analysis
+
+Areas for evaluation:
+
+### AI Decisions
+
+Review retention periods:
+
+- 30 days
+- 90 days
+- 365 days
+- Archive beyond retention period
+
+### Candle Data
+
+Review retention by interval:
+
+- 1m candles
+- 5m candles
+- 15m candles
+- 1h candles
+- 4h candles
+- 1d candles
+
+Potential future policy:
+
+- Retain recent lower-timeframe data
+- Retain longer-term higher-timeframe data
+- Archive historical raw candle data
+
+Requirements:
+
+- No data deletion without documented retention policy
+- Must not break Analytics
+- Must not break Recommendations
+- Must not break Strategy Simulation
+- Must not break Backtesting
+
+Important:
+
+No implementation is currently planned.
+
+Re-evaluate when database size exceeds 75% of allocated capacity.
+or
+
+AI_Crypto_Bot_AI_Decisions exceeds 1 million rows.
+
 ## Strategy Experiment - Confidence Threshold
 
 Status:
@@ -505,6 +580,15 @@ Review after:
 - 25 closed trades
 or
 - 50 closed trades
+
+Evaluation Metrics:
+
+- Trade Count
+- Win Rate
+- Profit Factor
+- Portfolio Growth
+- Drawdown
+- Average Trade Return
 
 Possible Outcomes:
 

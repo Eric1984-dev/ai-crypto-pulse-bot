@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### AI candle query batching
+
+- Batch up to four markets per candle-interval request and paginate PostgREST responses while preserving each market's latest 1,000 candles
+- Log actual candle REST request/page counts separately from logical market/interval reads
+- Keep analysis calculations, decisions, database schema, API routes, and scheduler cadence unchanged
+
 ### Market display refinements
 
 - Use the shared blue accent for market symbols across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
