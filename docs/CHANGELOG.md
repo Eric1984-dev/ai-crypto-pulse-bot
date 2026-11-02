@@ -11,7 +11,7 @@ All notable project changes should be documented here.
 - Added a subtle, status-driven green glow around the chip during `ANALYZING`
 - Reduced the circuit visualization to a 440px maximum width on desktop while preserving its full-width mobile layout
 - Expanded signal routing from 16 to 32 PCB traces; `ANALYZING` now lights 24 distinct routes without adding more neurons
-- Kept each neuron on its assigned trace through crossings using route-specific SVG clipping and straight, single-lane paths
+- Kept each neuron on its assigned trace through crossings using route-specific SVG luminance masks and straight, single-lane paths
 - Kept the glow static and transition-free for users who prefer reduced motion
 
 ### Green Visual Theme

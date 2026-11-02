@@ -98,7 +98,7 @@
       const startOffset = (index % 9) * 0.31;
       const routeIndex = (index * 7 + 3) % signalRoutes.length;
       const route = signalRoutes[routeIndex];
-      signals.push(`<g class="circuit-neuron-track" clip-path="url(#circuit-neuron-route-${routeIndex})">
+      signals.push(`<g class="circuit-neuron-track" mask="url(#circuit-neuron-route-${routeIndex})">
         <g class="circuit-neuron circuit-neuron--${statusClass}">
           <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 22 : 18}" fill="${config.color}"/>
           <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 8 : 6}"/>
@@ -110,11 +110,12 @@
     return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${signals.join("")}</g>`;
   }
 
-  function createRouteClipPaths() {
+  function createRouteMasks() {
     return signalRoutes.map((route, index) => `
-        <clipPath id="circuit-neuron-route-${index}" clipPathUnits="userSpaceOnUse">
+        <mask id="circuit-neuron-route-${index}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254" mask-type="luminance">
+          <rect x="0" y="0" width="1254" height="1254" fill="black"/>
           <path d="${route}" fill="none" stroke="white" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-        </clipPath>`).join("");
+        </mask>`).join("");
   }
 
   function createCircuitMarkup() {
@@ -143,7 +144,7 @@
         <mask id="circuit-trace-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254" mask-type="luminance">
           <image href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" filter="url(#circuit-trace-mask-filter)"/>
         </mask>
-        ${createRouteClipPaths()}
+        ${createRouteMasks()}
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
       <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="10" filter="url(#circuit-chip-analyzing-glow)"/>
