@@ -8,6 +8,7 @@ function createNode() {
   return {
     textContent: "",
     hidden: false,
+    dataset: {},
     children: [],
     append(child) {
       this.children.push(child);
@@ -140,9 +141,12 @@ test("analytics page renders EUR metrics, outcome tables, portfolio periods, and
 
   assert.equal(documentRef.querySelector('[data-analytics-value="winRate"]').textContent, "75%");
   assert.equal(documentRef.querySelector('[data-analytics-value="averageLoss"]').textContent, "-€10.00");
+  assert.equal(documentRef.querySelector('[data-analytics-value="averageLoss"]').dataset.valueTone, "negative");
+  assert.equal(documentRef.querySelector('[data-analytics-value="unrealizedPnl"]').dataset.valueTone, "negative");
   assert.equal(documentRef.querySelector('[data-analytics-value="averageHoldTime"]').textContent, "1h 1m");
   assert.equal(documentRef.querySelector("[data-analytics-confidence]").children.length, 1);
   assert.equal(documentRef.querySelector("[data-analytics-actions]").children.length, 3);
+  assert.equal(documentRef.querySelector("[data-analytics-actions]").children[1].children[5].dataset.valueTone, "negative");
   assert.equal(documentRef.querySelector("[data-analytics-strategies]").children.length, 1);
   assert.equal(documentRef.querySelector('[data-analytics-period="daily"]').children.length, 1);
   assert.equal(documentRef.querySelector('[data-analytics-period-empty="weekly"]').hidden, false);

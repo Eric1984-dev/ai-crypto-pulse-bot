@@ -205,6 +205,8 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
+- [x] Restyle shared surfaces with a navy palette and blue accents; color positive/negative financial values without changing labels or trading behavior
+- [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
 - [x] Strengthen the chip-edge glow during ANALYZING
 - [x] Expand neuron routing across 32 distinct traces and activate 32 neurons during ANALYZING
@@ -220,7 +222,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 
-Status: Local interface refinements, responsive viewport checks, accessibility fixes, 212 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 AI Recommendations follows this phase; no Phase 16 work has started.
+Status: Local interface refinements, responsive viewport checks, accessibility fixes, 237 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 AI Recommendations follows this phase; no Phase 16 work has started.
 
 ---
 

@@ -229,6 +229,12 @@ test("authenticated dashboard API returns real table data and computed summaries
   assert.equal(data.recentTrades.count, 2);
   assert.equal(data.watchedMarkets.count, 1);
   assert.equal(data.aiDecisions.count, 1);
+  assert.equal(data.lastMarketDataAt, "2026-03-20T11:59:00.000Z");
+  assert.ok(calls.some(({ table, query }) => (
+    table === "AI_Crypto_Bot_Market_Data"
+    && query.get("select") === "captured_at"
+    && query.get("order") === "captured_at.desc"
+  )));
   assert.deepEqual(data.portfolioSnapshots.map((snapshot) => snapshot.portfolio_value), ["1050", "1100"]);
   assert.equal(data.generatedAt, generatedAt.toISOString());
 });
@@ -366,6 +372,9 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"paperTrades\"]",
     "[data-dashboard-value=\"trackedMarkets\"]",
     "[data-dashboard-value=\"portfolioCount\"]",
+    "[data-dashboard-activity=\"bot-run\"]",
+    "[data-dashboard-activity=\"market-data\"]",
+    "[data-dashboard-activity=\"paper-trade\"]",
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
     "[data-dashboard-list=\"positions\"]",
@@ -424,7 +433,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     }
   }
   const data = {
-    agentStatus: { status: "ANALYZING" },
+    agentStatus: { status: "ANALYZING", last_run: "2026-03-20T11:55:00.000Z" },
+    lastMarketDataAt: "2026-03-20T11:59:00.000Z",
     emergencyState: { status: "PAUSED" },
     portfolio: {
       count: 1,
@@ -457,7 +467,7 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
           price: 1124,
           fees: 2.81,
           realized_pnl: 118.69,
-          created_at: generatedAt
+          created_at: generatedAt.toISOString()
         },
         {
           side: "BUY",
@@ -490,13 +500,18 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     ]
   };
 
+  data.portfolio.totalPnl = -25;
   dashboard.renderDashboard(data, dashboardDocument, FakeChart);
 
   assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1,100/);
+  assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].dataset.valueTone, "negative");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "1");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
+  assert.match(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, /12:55/);
+  assert.match(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, /12:59/);
+  assert.match(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, /13:00/);
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0.01 units");
   assert.match(
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
@@ -576,6 +591,9 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "0");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "UNKNOWN");
+  assert.equal(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, true);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, true);

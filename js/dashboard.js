@@ -16,7 +16,7 @@
     currency: "EUR",
     maximumFractionDigits: 2
   });
-  const chartColors = ["#9de7ba", "#80b9ff", "#ffc779", "#78ffad", "#ff9f9a"];
+  const chartColors = ["#5b9cff", "#34d399", "#fbbf24", "#a78bfa", "#ff6078"];
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
@@ -25,6 +25,7 @@
     return {
       agentStatus: null,
       emergencyState: null,
+      lastMarketDataAt: null,
       portfolio: {
         count: 0,
         portfolioValue: null,
@@ -108,10 +109,10 @@
     const aiDecisions = view.aiDecisions || { count: 0, items: [] };
 
     setText(documentRef, "portfolioValue", formatCurrency(portfolio.portfolioValue));
-    setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl));
-    setText(documentRef, "realizedPnl", formatCurrency(portfolio.realizedPnl));
-    setText(documentRef, "unrealizedPnl", formatCurrency(portfolio.unrealizedPnl));
-    setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl));
+    setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl), portfolio.totalPnl);
+    setText(documentRef, "realizedPnl", formatCurrency(portfolio.realizedPnl), portfolio.realizedPnl);
+    setText(documentRef, "unrealizedPnl", formatCurrency(portfolio.unrealizedPnl), portfolio.unrealizedPnl);
+    setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl), portfolio.dailyPnl);
     setText(documentRef, "winRate", formatPercent(portfolio.winRate));
     setText(documentRef, "openPositions", formatCount(openPositions.count));
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
@@ -125,6 +126,7 @@
 
     setStatus(documentRef, "agent", view.agentStatus && view.agentStatus.status);
     setStatus(documentRef, "emergency", view.emergencyState && view.emergencyState.status);
+    renderActivityTimestamps(documentRef, view, recentTrades);
     setText(documentRef, "portfolioCount", formatCount(portfolio.count || 0));
 
     renderCollection(documentRef, "positions", openPositions.items, (item) => {
@@ -247,18 +249,18 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: portfolioIds.length > 1, labels: { color: "#a4b2aa" } },
+          legend: { display: portfolioIds.length > 1, labels: { color: "#9ca8ba" } },
           tooltip: { mode: "index", intersect: false }
         },
         scales: {
           x: {
-            grid: { color: "rgba(164, 178, 170, 0.08)" },
-            ticks: { color: "#a4b2aa", maxTicksLimit: 6 }
+            grid: { color: "rgba(156, 168, 186, 0.08)" },
+            ticks: { color: "#9ca8ba", maxTicksLimit: 6 }
           },
           y: {
-            grid: { color: "rgba(164, 178, 170, 0.08)" },
+            grid: { color: "rgba(156, 168, 186, 0.08)" },
             ticks: {
-              color: "#a4b2aa",
+              color: "#9ca8ba",
               callback(value) {
                 return currencyFormat.format(value);
               }
@@ -294,10 +296,34 @@
     }
   }
 
-  function setText(documentRef, name, text) {
+  function renderActivityTimestamps(documentRef, view, recentTrades) {
+    const latestTrade = Array.isArray(recentTrades.items) ? recentTrades.items[0] : null;
+    const values = {
+      "bot-run": view.agentStatus && view.agentStatus.last_run,
+      "market-data": view.lastMarketDataAt,
+      "paper-trade": latestTrade && latestTrade.created_at
+    };
+
+    for (const [name, value] of Object.entries(values)) {
+      const target = documentRef.querySelector(`[data-dashboard-activity="${name}"]`);
+      if (!target) {
+        continue;
+      }
+      const timestamp = typeof value === "string" && Number.isFinite(Date.parse(value))
+        ? value
+        : "";
+      target.textContent = timestamp ? formatters.formatTimestamp(timestamp) : "—";
+      target.dateTime = timestamp;
+    }
+  }
+
+  function setText(documentRef, name, text, toneValue) {
     const targets = documentRef.querySelectorAll(`[data-dashboard-value="${name}"]`);
     for (const target of targets) {
       target.textContent = text;
+      if (arguments.length > 3) {
+        formatters.setValueTone(target, toneValue);
+      }
     }
   }
 

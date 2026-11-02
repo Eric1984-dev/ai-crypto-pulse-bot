@@ -324,7 +324,7 @@ test("trade history renders all required fields as text and treats buys as unrea
   ];
   const elements = new Map(values.map((value) => [
     `[data-history-value="${value}"]`,
-    { textContent: "", hidden: false, disabled: false }
+    { textContent: "", hidden: false, disabled: false, dataset: {} }
   ]));
   const rows = {
     children: [],
@@ -352,6 +352,7 @@ test("trade history renders all required fields as text and treats buys as unrea
     createElement() {
       return {
         textContent: "",
+        dataset: {},
         children: [],
         append(...children) {
           this.children.push(...children);
@@ -388,16 +389,16 @@ test("trade history renders all required fields as text and treats buys as unrea
       }),
       createTradeRow({ id: "trade-3", price: "0.98123456" }),
       createTradeRow({ id: "trade-4", price: "12.3456" }),
-      createTradeRow({ id: "trade-5", price: "69421.22" })
+      createTradeRow({ id: "trade-5", price: "69421.22", realized_pnl: "-10" })
     ],
     stats: {
       closedTrades: 1,
       winningTrades: 1,
-      losingTrades: 0,
+      losingTrades: 1,
       averageProfit: 10,
-      averageLoss: null,
+      averageLoss: -4,
       bestTrade: 10,
-      worstTrade: 10
+      worstTrade: -10
     }
   }, documentRef);
 
@@ -411,6 +412,11 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.match(rows.children[2].children[3].textContent, /0\.98123$/);
   assert.match(rows.children[3].children[3].textContent, /12\.35$/);
   assert.match(rows.children[4].children[3].textContent, /69,421\.22$/);
+  assert.equal(rows.children[0].dataset.tradeSide, "buy");
+  assert.equal(rows.children[1].dataset.tradeSide, "sell");
+  assert.equal(rows.children[1].children[7].dataset.valueTone, "positive");
+  assert.equal(rows.children[4].children[7].dataset.valueTone, "negative");
+  assert.equal(elements.get('[data-history-value="worstTrade"]').dataset.valueTone, "negative");
   assert.deepEqual(
     rows.children[0].children[5].children[0].children.map((line) => line.textContent),
     [

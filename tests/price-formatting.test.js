@@ -11,7 +11,8 @@ const {
   formatTimestamp,
   formatTradeValueDetails,
   getClosedTradeMetrics,
-  getOpenPositionMetrics
+  getOpenPositionMetrics,
+  setValueTone
 } = require("../js/formatters.js");
 
 test("price formatting preserves five decimals below one euro and two decimals from one euro", () => {
@@ -85,6 +86,28 @@ test("trade value details display BUY cost and SELL proceeds from stored executi
   ]);
   assert.equal(formatCurrency(null), "—");
   assert.equal(formatSignedCurrency(-4.5), "-€4.50");
+});
+
+test("signed value tone updates between positive, negative, and neutral values", () => {
+  const card = { dataset: {} };
+  const element = {
+    dataset: {},
+    closest(selector) {
+      return selector === ".metric-card" ? card : null;
+    }
+  };
+
+  setValueTone(element, -4.5);
+  assert.equal(element.dataset.valueTone, "negative");
+  assert.equal(card.dataset.valueTone, "negative");
+
+  setValueTone(element, 8);
+  assert.equal(element.dataset.valueTone, "positive");
+  assert.equal(card.dataset.valueTone, "positive");
+
+  setValueTone(element, 0);
+  assert.equal("valueTone" in element.dataset, false);
+  assert.equal("valueTone" in card.dataset, false);
 });
 
 test("timestamp formatting uses Europe/Brussels in standard and daylight time", () => {

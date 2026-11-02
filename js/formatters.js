@@ -89,6 +89,31 @@
     return amount === null ? "—" : currencyFormat.format(amount);
   }
 
+  function setValueTone(element, value) {
+    if (!element || !element.dataset) {
+      return;
+    }
+    const amount = numericValue(value);
+    const tone = amount === null || amount === 0
+      ? ""
+      : amount < 0 ? "negative" : "positive";
+    if (tone) {
+      element.dataset.valueTone = tone;
+    } else {
+      delete element.dataset.valueTone;
+    }
+    const card = typeof element.closest === "function"
+      ? element.closest(".metric-card")
+      : null;
+    if (card && card.dataset) {
+      if (tone) {
+        card.dataset.valueTone = tone;
+      } else {
+        delete card.dataset.valueTone;
+      }
+    }
+  }
+
   function formatSignedCurrency(value) {
     const amount = numericValue(value);
     if (amount === null) {
@@ -229,6 +254,7 @@
     formatQuantity,
     formatSignedPercent,
     formatSignedCurrency,
+    setValueTone,
     formatTimestamp,
     formatTradeValueDetails,
     getClosedTradeMetrics,

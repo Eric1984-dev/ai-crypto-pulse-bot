@@ -8,6 +8,7 @@ function createElement() {
   return {
     textContent: "",
     hidden: false,
+    dataset: {},
     children: [],
     replaceChildren() {
       this.children = [];
@@ -99,6 +100,28 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
   );
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").hidden, false);
   assert.equal(elements.get("[data-portfolio-empty=\"trades\"]").hidden, true);
+});
+
+test("portfolio uses a negative tone for negative P&L values", () => {
+  const { documentRef, elements } = createDocument();
+  portfolio.renderPortfolio({
+    portfolio: {
+      count: 1,
+      portfolioValue: 950,
+      availableBalance: 900,
+      totalPnl: -50,
+      realizedPnl: -25,
+      unrealizedPnl: -25,
+      dailyPnl: -10,
+      winRate: 40
+    },
+    openPositions: { count: 0, items: [] },
+    recentTrades: { count: 0, items: [] }
+  }, documentRef);
+
+  for (const name of ["totalPnl", "realizedPnl", "unrealizedPnl", "dailyPnl"]) {
+    assert.equal(elements.get(`[data-portfolio-value="${name}"]`).dataset.valueTone, "negative");
+  }
 });
 
 test("portfolio data request uses the authenticated no-store dashboard API and validates its response", async () => {

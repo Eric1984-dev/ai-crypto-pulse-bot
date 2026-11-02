@@ -39,7 +39,7 @@ Registration, login, logout, password-reset email, and password updates use the 
 
 Authentication is required. The endpoint reads the `cp_access_token` HttpOnly cookie, verifies it with Supabase Auth, and sends the verified user's JWT together with the public anon key on read-only PostgREST requests. Supabase RLS scopes user-owned rows. It does not use a service-role key and does not write data.
 
-The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, and up to 100 persisted portfolio snapshots. Open positions include the latest available `current_market_price` and its `current_market_captured_at`; when no market snapshot is available, the stored position price is used. A matching recent BUY trade includes the same position data as `openPosition`. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
+The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, the latest market-data capture timestamp (`lastMarketDataAt`), and up to 100 persisted portfolio snapshots. Open positions include the latest available `current_market_price` and its `current_market_captured_at`; when no market snapshot is available, the stored position price is used. A matching recent BUY trade includes the same position data as `openPosition`. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
 
 Timestamp fields are returned as UTC values and remain unchanged by the API. Browser clients use the shared formatter to display those instants in `Europe/Brussels`; date filters and daily P&L boundaries remain UTC.
 
@@ -57,6 +57,7 @@ Success response:
   "data": {
     "agentStatus": { "status": "IDLE" },
     "emergencyState": { "status": "NORMAL" },
+  "lastMarketDataAt": null,
     "portfolio": {
       "count": 0,
       "portfolioValue": null,
@@ -78,7 +79,7 @@ Success response:
 
 Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configuration, unavailable Supabase, or invalid database responses: `503`. The endpoint sets `Cache-Control: no-store`; it returns no provider credentials or raw database errors.
 
-The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. Watched-market symbols and priorities are included in this response. The dashboard does not request scanner rankings; the dedicated Scanner page uses `/api/market-summary`. Browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
+The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. Watched-market symbols and priorities are included in this response. Its subtle activity strip displays the stored bot `last_run`, latest market-data `captured_at`, and latest paper-trade timestamp. Analytics and Market Scanner are on-demand views and do not persist run history, so they are labeled accordingly rather than given fabricated timestamps. The dashboard does not request scanner rankings; the dedicated Scanner page uses `/api/market-summary`. Browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
 
 ### Trade History view
 

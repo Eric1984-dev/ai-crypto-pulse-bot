@@ -47,10 +47,10 @@
     setText(documentRef, "count", formatCount(portfolio.count));
     setText(documentRef, "portfolioValue", formatCurrency(portfolio.portfolioValue));
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
-    setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl));
-    setText(documentRef, "realizedPnl", formatCurrency(portfolio.realizedPnl));
-    setText(documentRef, "unrealizedPnl", formatCurrency(portfolio.unrealizedPnl));
-    setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl));
+    setText(documentRef, "totalPnl", formatCurrency(portfolio.totalPnl), portfolio.totalPnl);
+    setText(documentRef, "realizedPnl", formatCurrency(portfolio.realizedPnl), portfolio.realizedPnl);
+    setText(documentRef, "unrealizedPnl", formatCurrency(portfolio.unrealizedPnl), portfolio.unrealizedPnl);
+    setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl), portfolio.dailyPnl);
     setText(documentRef, "winRate", formatPercent(portfolio.winRate));
     setText(documentRef, "openPositions", formatCount(data.openPositions.count));
     setText(documentRef, "paperTrades", formatCount(data.recentTrades.count));
@@ -220,10 +220,13 @@
     emptyState.hidden = Boolean(items && items.length);
   }
 
-  function setText(documentRef, name, value) {
+  function setText(documentRef, name, value, toneValue) {
     const element = documentRef.querySelector(`[data-portfolio-value="${name}"]`);
     if (element) {
       element.textContent = value;
+      if (arguments.length > 3) {
+        formatters.setValueTone(element, toneValue);
+      }
     }
   }
 

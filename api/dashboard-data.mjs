@@ -576,6 +576,7 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     watchedMarkets,
     aiDecisions,
     portfolioSnapshots,
+    latestMarketData,
     dailySellTrades,
     realizedSellTrades,
     winningSellTradeCount
@@ -620,6 +621,11 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
       select: "portfolio_id,portfolio_value,captured_at",
       order: "captured_at.desc",
       limit: String(limits.snapshots)
+    }),
+    fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Market_Data", {
+      select: "captured_at",
+      order: "captured_at.desc",
+      limit: "1"
     }),
     fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
       select: "realized_pnl",
@@ -672,6 +678,9 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     generatedAt: currentTime.toISOString(),
     agentStatus: agentStatus.rows[0] || null,
     emergencyState: emergencyState.rows[0] || null,
+    lastMarketDataAt: latestMarketData.rows[0]
+      ? latestMarketData.rows[0].captured_at
+      : null,
     portfolio: portfolioSummary,
     openPositions: {
       count: openPositions.count,

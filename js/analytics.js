@@ -1,12 +1,15 @@
 (function attachAnalytics(root, createApi) {
-  const api = createApi();
+  const formatters = typeof module !== "undefined" && module.exports
+    ? require("./formatters.js")
+    : root.CryptoPulseFormatters;
+  const api = createApi(formatters);
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     api.startAnalytics({ windowRef: window, documentRef: document });
   }
-})(globalThis, function createAnalyticsApi() {
+})(globalThis, function createAnalyticsApi(formatters) {
   const currencyFormat = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
@@ -69,22 +72,42 @@
     const portfolio = data.portfolio;
     setText(documentRef, "winRate", formatPercent(trade.winRate));
     setText(documentRef, "lossRate", formatPercent(trade.lossRate));
-    setText(documentRef, "averageWin", formatCurrency(trade.averageWin));
-    setText(documentRef, "averageLoss", formatCurrency(trade.averageLoss));
+    setText(documentRef, "averageWin", formatCurrency(trade.averageWin), trade.averageWin);
+    setText(documentRef, "averageLoss", formatCurrency(trade.averageLoss), trade.averageLoss);
     setText(documentRef, "profitFactor", formatNumber(trade.profitFactor));
-    setText(documentRef, "realizedPnl", formatCurrency(trade.realizedPnl));
-    setText(documentRef, "unrealizedPnl", formatCurrency(trade.unrealizedPnl));
-    setText(documentRef, "totalPnl", formatCurrency(trade.totalPnl));
-    setText(documentRef, "bestTrade", formatTrade(trade.bestTrade));
-    setText(documentRef, "worstTrade", formatTrade(trade.worstTrade));
-    setText(documentRef, "largestWinner", formatTrade(trade.largestWinner));
-    setText(documentRef, "largestLoser", formatTrade(trade.largestLoser));
+    setText(documentRef, "realizedPnl", formatCurrency(trade.realizedPnl), trade.realizedPnl);
+    setText(documentRef, "unrealizedPnl", formatCurrency(trade.unrealizedPnl), trade.unrealizedPnl);
+    setText(documentRef, "totalPnl", formatCurrency(trade.totalPnl), trade.totalPnl);
+    setText(
+      documentRef,
+      "bestTrade",
+      formatTrade(trade.bestTrade),
+      trade.bestTrade && trade.bestTrade.realizedPnl
+    );
+    setText(
+      documentRef,
+      "worstTrade",
+      formatTrade(trade.worstTrade),
+      trade.worstTrade && trade.worstTrade.realizedPnl
+    );
+    setText(
+      documentRef,
+      "largestWinner",
+      formatTrade(trade.largestWinner),
+      trade.largestWinner && trade.largestWinner.realizedPnl
+    );
+    setText(
+      documentRef,
+      "largestLoser",
+      formatTrade(trade.largestLoser),
+      trade.largestLoser && trade.largestLoser.realizedPnl
+    );
     setText(documentRef, "averageHoldTime", formatDuration(trade.averageHoldTimeSeconds));
     setText(documentRef, "openPositions", formatCount(trade.openPositions));
     setText(documentRef, "closedPositions", formatCount(trade.closedPositions));
     setText(documentRef, "closedTrades", formatCount(trade.closedTrades));
     setText(documentRef, "decisionCount", formatCount(data.aiPerformance.decisionCount));
-    setText(documentRef, "portfolioGrowth", formatPercent(portfolio.growthPercent));
+    setText(documentRef, "portfolioGrowth", formatPercent(portfolio.growthPercent), portfolio.growthPercent);
     setText(
       documentRef,
       "best-confidence",
@@ -137,8 +160,8 @@
       formatCount(bucket.decisionCount),
       formatCount(bucket.scoredCount),
       formatPercent(bucket.winRate),
-      formatCurrency(bucket.averagePnl),
-      formatCurrency(bucket.netPnl)
+      colorCurrency(bucket.averagePnl),
+      colorCurrency(bucket.netPnl)
     ]);
     renderTable(documentRef, "[data-analytics-confidence]", rows);
   }
@@ -152,7 +175,7 @@
         formatCount(group.scoredCount),
         formatCount(group.unscoredCount),
         formatPercent(group.winRate),
-        formatCurrency(group.netPnl)
+        colorCurrency(group.netPnl)
       ];
     });
     renderTable(documentRef, "[data-analytics-actions]", rows);
@@ -164,7 +187,7 @@
       formatCount(strategy.decisionCount),
       formatCount(strategy.scoredCount),
       formatPercent(strategy.winRate),
-      formatCurrency(strategy.netPnl)
+      colorCurrency(strategy.netPnl)
     ]);
     renderTable(documentRef, "[data-analytics-strategies]", rows);
     setHidden(documentRef, "[data-analytics-strategies-empty]", rows.length > 0);
@@ -179,7 +202,7 @@
       symbol.symbol,
       formatCount(symbol.closedTrades),
       formatPercent(symbol.winRate),
-      formatCurrency(symbol.realizedPnl)
+      colorCurrency(symbol.realizedPnl)
     ]);
     renderTable(documentRef, "[data-analytics-symbols]", rows);
     setHidden(documentRef, "[data-analytics-symbols-empty]", rows.length > 0);
@@ -189,7 +212,7 @@
     const recent = points.slice(-visibleCount).reverse();
     const rows = recent.map((point) => [
       point.period,
-      formatCurrency(point.pnl),
+      colorCurrency(point.pnl),
       formatCurrency(point.portfolioValue)
     ]);
     renderTable(documentRef, `[data-analytics-period="${period}"]`, rows);
@@ -206,7 +229,12 @@
       const row = documentRef.createElement("tr");
       for (const value of values) {
         const cell = documentRef.createElement("td");
-        cell.textContent = value;
+        const isColoredValue = value && typeof value === "object"
+          && Object.prototype.hasOwnProperty.call(value, "toneValue");
+        cell.textContent = isColoredValue ? value.text : value;
+        if (isColoredValue) {
+          formatters.setValueTone(cell, value.toneValue);
+        }
         row.append(cell);
       }
       body.append(row);
@@ -261,8 +289,8 @@
           labels: points.map((point) => point.period),
           datasets: [{
             data: points.map((point) => isEquity ? point.portfolioValue : point.drawdownPercent),
-            borderColor: isEquity ? "#9de7ba" : "#ff9f9a",
-            backgroundColor: isEquity ? "rgb(199 140 240 / 14%)" : "rgb(255 159 154 / 12%)",
+            borderColor: isEquity ? "#5b9cff" : "#ff6078",
+            backgroundColor: isEquity ? "rgb(91 156 255 / 14%)" : "rgb(255 96 120 / 12%)",
             fill: true,
             tension: 0.25,
             pointRadius: points.length > 90 ? 0 : 2
@@ -276,12 +304,12 @@
           scales: {
             x: {
               grid: { color: "rgb(255 255 255 / 5%)" },
-              ticks: { color: "#a4b2aa", maxTicksLimit: 8 }
+              ticks: { color: "#9ca8ba", maxTicksLimit: 8 }
             },
             y: {
               grid: { color: "rgb(255 255 255 / 7%)" },
               ticks: {
-                color: "#a4b2aa",
+                color: "#9ca8ba",
                 callback: (value) => isEquity ? formatCurrency(value) : `${formatNumber(value)}%`
               }
             }
@@ -414,10 +442,13 @@
     return cleanup;
   }
 
-  function setText(documentRef, name, value) {
+  function setText(documentRef, name, value, toneValue) {
     const element = documentRef.querySelector(`[data-analytics-value="${name}"]`);
     if (element) {
       element.textContent = value;
+      if (arguments.length > 3) {
+        formatters.setValueTone(element, toneValue);
+      }
     }
   }
 
@@ -432,6 +463,10 @@
     return typeof value === "number" && Number.isFinite(value)
       ? currencyFormat.format(value)
       : "—";
+  }
+
+  function colorCurrency(value) {
+    return { text: formatCurrency(value), toneValue: value };
   }
 
   function formatPercent(value) {

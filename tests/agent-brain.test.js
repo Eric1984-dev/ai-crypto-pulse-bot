@@ -200,6 +200,11 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
   assert.ok(errorHalo);
   assert.match(errorHalo[1], /drop-shadow\(0 0 36px rgb\(255 100 120 \/ 94%\)\)/);
   assert.match(brainSource, /feGaussianBlur stdDeviation="10" result="blur"/);
+  assert.match(
+    styles,
+    /\.agent-brain-stage\s*\{[^}]*box-shadow:[\s\S]*?rgb\(91 156 255 \/ 12%\)/s
+  );
+  assert.match(chipGlow[1], /stroke:\s*var\(--accent\);/);
 });
 
 test("ANALYZING adds a stronger chip glow while desktop keeps the circuit compact", () => {
@@ -215,6 +220,7 @@ test("ANALYZING adds a stronger chip glow while desktop keeps the circuit compac
   assert.match(desktopBlock[1], /\.agent-brain-stage\s*\{\s*width:\s*min\(100%,\s*440px\);/);
   assert.ok(analyzingGlow);
   assert.match(analyzingGlow[1], /opacity:\s*0\.58;/);
+  assert.match(analyzingGlow[1], /drop-shadow\(0 0 14px rgb\(91 156 255 \/ 45%\)\)/);
   assert.match(
     brainSource,
     /class="circuit-chip-analyzing-glow"[^>]+stroke-width="14" filter="url\(#circuit-chip-analyzing-glow\)"/

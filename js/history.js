@@ -88,10 +88,10 @@
     const stats = data.stats;
     setText(documentRef, "winningTrades", formatCount(stats.winningTrades));
     setText(documentRef, "losingTrades", formatCount(stats.losingTrades));
-    setText(documentRef, "averageProfit", formatCurrency(stats.averageProfit));
-    setText(documentRef, "averageLoss", formatCurrency(stats.averageLoss));
-    setText(documentRef, "bestTrade", formatCurrency(stats.bestTrade));
-    setText(documentRef, "worstTrade", formatCurrency(stats.worstTrade));
+    setText(documentRef, "averageProfit", formatCurrency(stats.averageProfit), stats.averageProfit);
+    setText(documentRef, "averageLoss", formatCurrency(stats.averageLoss), stats.averageLoss);
+    setText(documentRef, "bestTrade", formatCurrency(stats.bestTrade), stats.bestTrade);
+    setText(documentRef, "worstTrade", formatCurrency(stats.worstTrade), stats.worstTrade);
     setText(documentRef, "totalCount", formatCount(data.totalCount));
     setText(documentRef, "pageNumber", data.totalPages ? `${data.page} / ${data.totalPages}` : "0 / 0");
 
@@ -123,12 +123,16 @@
 
   function createTradeRow(documentRef, trade) {
     const row = documentRef.createElement("tr");
+    row.dataset.tradeSide = typeof trade.side === "string" ? trade.side.toLowerCase() : "";
     const openPositionMetrics = trade.side === "BUY" && trade.openPosition
       ? formatters.getOpenPositionMetrics(trade.openPosition)
       : null;
     const closedTradeMetrics = trade.side === "SELL"
       ? formatters.getClosedTradeMetrics(trade)
       : null;
+    const pnlAmount = openPositionMetrics
+      ? openPositionMetrics.unrealizedPnl
+      : trade.side === "SELL" ? trade.realized_pnl : null;
     const positionDetails = openPositionMetrics
       ? [
         `Entry Price: ${formatters.formatPrice(trade.openPosition.entry_price)}`,
@@ -168,9 +172,14 @@
         cell.className = "trade-value-cell";
         const breakdown = documentRef.createElement("div");
         breakdown.className = "trade-value-breakdown";
-        for (const detail of value) {
+        for (const [detailIndex, detail] of value.entries()) {
           const line = documentRef.createElement("span");
           line.textContent = detail;
+          if (detail.startsWith("Fees:")) {
+            line.dataset.valueTone = "warning";
+          } else if (trade.side === "SELL" && detailIndex === value.length - 1) {
+            formatters.setValueTone(line, trade.realized_pnl);
+          }
           breakdown.append(line);
         }
         cell.append(breakdown);
@@ -182,6 +191,9 @@
           for (const detail of value) {
             const line = documentRef.createElement("span");
             line.textContent = detail;
+            if (detail.startsWith("Unrealized P&L:") || detail.startsWith("Realized P&L:")) {
+              formatters.setValueTone(line, pnlAmount);
+            }
             breakdown.append(line);
           }
           cell.append(breakdown);
@@ -190,6 +202,11 @@
         }
       } else {
         cell.textContent = value === null || value === undefined ? "—" : value;
+        if (index === 6) {
+          cell.dataset.valueTone = "warning";
+        } else if (index === 7) {
+          formatters.setValueTone(cell, pnlAmount);
+        }
       }
       row.append(cell);
     }
@@ -389,10 +406,13 @@
     return cleanup;
   }
 
-  function setText(documentRef, name, value) {
+  function setText(documentRef, name, value, toneValue) {
     const element = documentRef.querySelector(`[data-history-value="${name}"]`);
     if (element) {
       element.textContent = value;
+      if (arguments.length > 3) {
+        formatters.setValueTone(element, toneValue);
+      }
     }
   }
 
