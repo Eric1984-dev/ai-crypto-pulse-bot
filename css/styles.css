@@ -897,8 +897,8 @@ a:focus-visible {
   display: block;
   width: 100%;
   height: 100%;
-  filter: hue-rotate(95deg) saturate(1.05);
-  opacity: 0.45;
+  filter: saturate(1.1);
+  opacity: 0.62;
 }
 
 .circuit-chip-analyzing-glow {

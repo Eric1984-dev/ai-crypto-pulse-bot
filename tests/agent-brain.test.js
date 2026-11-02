@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const zlib = require("node:zlib");
 const agentBrain = require("../js/agent-brain.js");
 
 function createContainer() {
@@ -13,6 +14,114 @@ function createContainer() {
       this.attributes[name] = value;
     }
   };
+}
+
+function decodeRgbPng(buffer) {
+  const chunks = [];
+  let offset = 8;
+  let width;
+  let height;
+  let bitDepth;
+  let colorType;
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    offset += 4;
+    const type = buffer.toString("ascii", offset, offset + 4);
+    offset += 4;
+    const data = buffer.subarray(offset, offset + length);
+    offset += length + 4;
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === "IDAT") {
+      chunks.push(data);
+    } else if (type === "IEND") {
+      break;
+    }
+  }
+
+  assert.equal(bitDepth, 8);
+  assert.equal(colorType, 2);
+  const channels = 3;
+  const stride = width * channels;
+  const scanlines = zlib.inflateSync(Buffer.concat(chunks));
+  const pixels = Buffer.alloc(height * stride);
+
+  function paethPredictor(left, up, upperLeft) {
+    const estimate = left + up - upperLeft;
+    const leftDistance = Math.abs(estimate - left);
+    const upDistance = Math.abs(estimate - up);
+    const upperLeftDistance = Math.abs(estimate - upperLeft);
+    if (leftDistance <= upDistance && leftDistance <= upperLeftDistance) {
+      return left;
+    }
+    return upDistance <= upperLeftDistance ? up : upperLeft;
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    const scanlineOffset = y * (stride + 1);
+    const filter = scanlines[scanlineOffset];
+    for (let x = 0; x < stride; x += 1) {
+      const value = scanlines[scanlineOffset + 1 + x];
+      const left = x >= channels ? pixels[y * stride + x - channels] : 0;
+      const up = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const upperLeft = y > 0 && x >= channels
+        ? pixels[(y - 1) * stride + x - channels]
+        : 0;
+      const predictor = filter === 0 ? 0
+        : filter === 1 ? left
+          : filter === 2 ? up
+            : filter === 3 ? Math.floor((left + up) / 2)
+              : filter === 4 ? paethPredictor(left, up, upperLeft)
+                : NaN;
+      assert.ok(Number.isFinite(predictor), `Unsupported PNG filter ${filter}`);
+      pixels[y * stride + x] = (value + predictor) & 255;
+    }
+  }
+
+  return { width, height, pixels, stride, channels };
+}
+
+function getRoutePoints(route) {
+  let x = 0;
+  let y = 0;
+  const points = [];
+  for (const command of route.match(/[MLHV][^MLHV]+/g) || []) {
+    const values = command.slice(1).trim().split(/\s+/).map(Number);
+    if (command[0] === "M" || command[0] === "L") {
+      [x, y] = values;
+    } else if (command[0] === "H") {
+      x = values[0];
+    } else {
+      y = values[0];
+    }
+    points.push({ x, y });
+  }
+  return points;
+}
+
+function hasVisibleTraceNear(image, viewX, viewY) {
+  const x = Math.round(viewX * image.width / 1254);
+  const y = Math.round(viewY * image.height / 1254);
+  for (let dy = -5; dy <= 5; dy += 1) {
+    for (let dx = -5; dx <= 5; dx += 1) {
+      const sampleX = x + dx;
+      const sampleY = y + dy;
+      if (sampleX < 0 || sampleY < 0 || sampleX >= image.width || sampleY >= image.height) {
+        continue;
+      }
+      const offset = sampleY * image.stride + sampleX * image.channels;
+      const red = image.pixels[offset];
+      const green = image.pixels[offset + 1];
+      const blue = image.pixels[offset + 2];
+      if (blue > 90 && blue > red * 1.35 && blue >= green * 0.9) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
@@ -37,7 +146,7 @@ test("Agent Status maps known and unknown states to explicit circuit activity", 
   assert.equal(agentBrain.mapAgentStatus(null).status, "UNKNOWN");
 });
 
-test("circuit SVG uses a blue-tinted board and boundary-origin moving signals", () => {
+test("circuit SVG uses blue AI artwork and boundary-origin moving signals", () => {
   const container = createContainer();
   const stateElement = { dataset: {} };
   const circuit = agentBrain.createAgentBrain({
@@ -81,20 +190,20 @@ test("circuit SVG uses a blue-tinted board and boundary-origin moving signals", 
   assert.match(container.innerHTML, /<path d="M\d+ \d+[VHL]/);
   const circuitArtwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
   assert.ok(circuitArtwork.length > 100000);
-  assert.equal(circuitArtwork.readUInt32BE(16), 1254);
-  assert.equal(circuitArtwork.readUInt32BE(20), 1254);
+  assert.equal(circuitArtwork.readUInt32BE(16), 1024);
+  assert.equal(circuitArtwork.readUInt32BE(20), 1024);
   const routeStarts = agentBrain.signalRoutes.map((route) => {
     const [, x, y] = route.match(/^M([\d.]+)\s([\d.]+)/);
     return { x: Number(x), y: Number(y) };
   });
   assert.ok(routeStarts.every(({ x, y }) => Math.max(Math.abs(x - 627), Math.abs(y - 627)) >= 100));
   const routeDirections = new Set(agentBrain.signalRoutes.map((route) => {
-    const [, startX, startY] = route.match(/^M([\d.]+)\s([\d.]+)/);
-    const endX = Number(route.match(/H([\d.]+)$/)?.[1] || startX);
-    const endY = Number(route.match(/V([\d.]+)$/)?.[1] || startY);
-    return Math.abs(endX - Number(startX)) > Math.abs(endY - Number(startY))
-      ? (endX < Number(startX) ? "left" : "right")
-      : (endY < Number(startY) ? "up" : "down");
+    const points = getRoutePoints(route);
+    const start = points[0];
+    const end = points[points.length - 1];
+    return Math.abs(end.x - start.x) > Math.abs(end.y - start.y)
+      ? (end.x < start.x ? "left" : "right")
+      : (end.y < start.y ? "up" : "down");
   }));
   assert.deepEqual(routeDirections, new Set(["up", "down", "left", "right"]));
   for (const [status, expectedCount] of Object.entries({
@@ -121,6 +230,51 @@ test("circuit SVG uses a blue-tinted board and boundary-origin moving signals", 
   assert.equal(new Set(analyzingRoutes).size, 32);
 
   circuit.dispose();
+});
+
+test("neuron routes follow visible circuit traces and fade near the artwork edges", () => {
+  const artwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
+  const image = decodeRgbPng(artwork);
+  const container = createContainer();
+  const circuit = agentBrain.createAgentBrain({ container, initialStatus: "ANALYZING" });
+  const nodes = Array.from(
+    container.innerHTML.matchAll(/class="circuit-neuron-node" cx="([\d.]+)" cy="([\d.]+)"/g),
+    ([, x, y]) => ({ x: Number(x), y: Number(y) })
+  );
+  assert.equal(nodes.length, 24);
+  const missingNodes = nodes.filter((node) => !hasVisibleTraceNear(image, node.x, node.y));
+  assert.deepEqual(missingNodes, [], "neuron nodes must remain on visible circuit traces");
+  circuit.dispose();
+
+  for (const route of agentBrain.signalRoutes) {
+    const points = getRoutePoints(route);
+    let sampleCount = 0;
+    let visibleSamples = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      const steps = Math.max(1, Math.ceil(Math.hypot(end.x - start.x, end.y - start.y) / 8));
+      for (let step = 0; step <= steps; step += 1) {
+        const progress = step / steps;
+        const x = start.x + (end.x - start.x) * progress;
+        const y = start.y + (end.y - start.y) * progress;
+        sampleCount += 1;
+        if (hasVisibleTraceNear(image, x, y)) {
+          visibleSamples += 1;
+        }
+      }
+    }
+
+    const endpoint = points[points.length - 1];
+    const edgeDistance = Math.min(
+      endpoint.x,
+      endpoint.y,
+      1254 - endpoint.x,
+      1254 - endpoint.y
+    ) * image.width / 1254;
+    assert.ok(visibleSamples / sampleCount >= 0.8, `${route} does not follow a visible trace`);
+    assert.ok(edgeDistance <= 20, `${route} does not fade near the artwork edge`);
+  }
 });
 
 test("status updates keep accessibility and activity state synchronized", () => {
@@ -188,8 +342,8 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
   const errorHalo = styles.match(/\.circuit-neuron--error \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
 
   assert.ok(boardImage);
-  assert.match(boardImage[1], /opacity:\s*0\.45;/);
-  assert.match(boardImage[1], /hue-rotate\(95deg\)/);
+  assert.match(boardImage[1], /opacity:\s*0\.62;/);
+  assert.match(boardImage[1], /saturate\(1\.1\)/);
   assert.ok(chipGlow);
   assert.match(chipGlow[1], /opacity:\s*0\.18;/);
   assert.ok(signalHalo);

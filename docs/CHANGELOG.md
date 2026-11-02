@@ -12,7 +12,8 @@ All notable project changes should be documented here.
 - Highlighted positive and negative financial values in green and red without changing labels or trading behavior
 - Added a subtle recent-activity strip with stored bot-run, market-data, and paper-trade timestamps; Analytics and Market Scan are marked on-demand because their run history is not persisted
 - Added soft blue glow accents to cards, the app icon, export controls, and Agent Status chip
-- Recolored the circuit artwork and ACTIVE/ANALYZING/IDLE signals blue while retaining red ERROR and gray STOPPED/UNKNOWN states
+- Replaced the green circuit board with blue AI-brain artwork inspired by the supplied reference; aligned all 32 animated routes and 24 pulsing pads to its visible traces, with signal fades just inside the artwork edges
+- Recolored ACTIVE/ANALYZING/IDLE signals blue while retaining red ERROR and gray STOPPED/UNKNOWN states
 
 ### Paper-mode header and navigation
 

@@ -208,9 +208,10 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
 - [x] Recolor the Agent Status circuit and active signals blue while retaining red error and static gray stopped/unknown states
+- [x] Use blue AI-brain artwork inspired by the supplied reference beneath the route-masked moving neuron signals
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
 - [x] Strengthen the chip-edge glow during ANALYZING
-- [x] Expand neuron routing across 32 distinct traces and activate 32 neurons during ANALYZING
+- [x] Align all 32 distinct neuron routes and 24 pulsing pads to visible artwork traces; fade signal paths just inside the artwork edges
 - [x] Keep each neuron masked to its assigned trace segment so it cannot jump to a neighboring lane at crossings
 - [x] Extend neuron paths to trace endpoints, delay fading until near arrival, and illuminate terminal pads in sync
 - [x] Pulse intermediate circular pads during ANALYZING
