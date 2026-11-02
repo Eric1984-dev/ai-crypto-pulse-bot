@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### AI Analysis logging optimization
+
+- Replaced start and per-market informational events with one completion summary per successful run, including market and decision counts, candle reads, failed reads, runtime, and stage timings
+- Preserved error/failure logs and all AI analysis behavior, persisted decisions, and database writes
+- Added regression coverage for one summary per completed run, zero-market runs, decision counts, and retained failure logging
+
 ### Paper Trading confidence-threshold experiment
 
 - Lowered the server-side paper BUY-entry confidence gate from 70 to 67 through a forward migration; all other Risk Manager checks remain in force

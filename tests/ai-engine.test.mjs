@@ -407,8 +407,21 @@ test("analysis uses bounded candle workers and preserves every market decision",
   assert.equal(uniqueCandleQueries.size, candleRequests.length);
   assert.equal(harness.getMaxActiveCandleRequests(), 24);
   assert.deepEqual(decisions, expectedDecisions);
-  const completionLog = logEntries.find(({ message }) => message === "AI analysis completed.");
+  assert.equal(logEntries.length, 1);
+  const completionLog = logEntries[0];
+  const expectedDecisionCounts = expectedDecisions.reduce((counts, { decision }) => {
+    counts[decision] += 1;
+    return counts;
+  }, { BUY: 0, SELL: 0, HOLD: 0, WAIT: 0 });
+  assert.equal(completionLog.message, "AI analysis completed.");
+  assert.equal(completionLog.fields.analyzedMarkets, markets.length);
+  assert.equal(completionLog.fields.buyCount, expectedDecisionCounts.BUY);
+  assert.equal(completionLog.fields.sellCount, expectedDecisionCounts.SELL);
+  assert.equal(completionLog.fields.holdCount, expectedDecisionCounts.HOLD);
+  assert.equal(completionLog.fields.waitCount, expectedDecisionCounts.WAIT);
+  assert.equal(completionLog.fields.candleReads, 612);
   assert.equal(completionLog.fields.candleQueries, 612);
+  assert.equal(completionLog.fields.failedReads, 0);
   assert.equal(completionLog.fields.candlesLoaded, candles.length);
   assert.ok(completionLog.fields.runtimeMs >= 0);
   assert.ok(completionLog.fields.timingMs.candleLoad >= 0);
@@ -465,17 +478,46 @@ test("STOPPED agent status prevents reads and all writes beyond the status check
 });
 
 test("empty watched-market universe returns agent to IDLE without decisions", async () => {
-  const harness = createEngineHarness({ markets: [] });
+  const logEntries = [];
+  const harness = createEngineHarness({
+    markets: [],
+    logger: {
+      info(message, fields) {
+        logEntries.push({ message, fields });
+      },
+      error() {}
+    }
+  });
   const result = await harness.service.runAnalysis({ config, serviceRoleKey });
 
   assert.equal(result.status, "IDLE");
   assert.equal(result.decisionsStored, 0);
   assert.equal(harness.getStatus().status, "IDLE");
   assert.equal(harness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"), false);
+  assert.equal(logEntries.length, 1);
+  assert.equal(logEntries[0].message, "AI analysis completed.");
+  assert.equal(logEntries[0].fields.analyzedMarkets, 0);
+  assert.equal(logEntries[0].fields.buyCount, 0);
+  assert.equal(logEntries[0].fields.sellCount, 0);
+  assert.equal(logEntries[0].fields.holdCount, 0);
+  assert.equal(logEntries[0].fields.waitCount, 0);
+  assert.equal(logEntries[0].fields.candleReads, 0);
+  assert.equal(logEntries[0].fields.failedReads, 0);
 });
 
 test("database failure is surfaced and attempts to persist ERROR status", async () => {
-  const harness = createEngineHarness({ failReadTable: "AI_Crypto_Bot_Market_Data" });
+  const logEntries = [];
+  const harness = createEngineHarness({
+    failReadTable: "AI_Crypto_Bot_Market_Data",
+    logger: {
+      info(message, fields) {
+        logEntries.push({ level: "info", message, fields });
+      },
+      error(message, fields) {
+        logEntries.push({ level: "error", message, fields });
+      }
+    }
+  });
 
   await assert.rejects(
     harness.service.runAnalysis({ config, serviceRoleKey }),
@@ -485,6 +527,10 @@ test("database failure is surfaced and attempts to persist ERROR status", async 
   assert.ok(harness.writes.some(({ table, body }) =>
     table === "AI_Crypto_Bot_Status" && body.status === "ERROR"
   ));
+  assert.ok(logEntries.some(({ level, message }) =>
+    level === "error" && message === "AI analysis failed."
+  ));
+  assert.equal(logEntries.some(({ message }) => message === "AI analysis completed."), false);
 });
 
 test("AI analysis endpoint rejects methods, missing configuration, and unauthorized schedulers", async () => {
