@@ -490,8 +490,8 @@ test("Agent Status uses a full-width circuit panel with Emergency State at the d
   assert.match(html, /Agent circuit visualization; status UNKNOWN/);
   assert.match(html, /Circuit visualization unavailable/);
   assert.match(styles, /\.dashboard-grid-status,\s*\.dashboard-grid-risk\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.match(styles, /\.agent-brain-stage\s*\{[^}]*height:\s*clamp\(280px,\s*32vw,\s*380px\);/s);
-  assert.match(styles, /@media \(max-width: 559px\)\s*\{[^}]*\.agent-brain-stage\s*\{[^}]*height:\s*clamp\(128px,\s*40vw,\s*170px\);/s);
+  assert.match(styles, /\.agent-brain-stage\s*\{[^}]*width:\s*min\(100%,\s*90vh\);[^}]*aspect-ratio:\s*1;/s);
+  assert.match(styles, /\.circuit-board-image\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /\.agent-brain\[data-visualization="ready"\].*\.agent-brain-fallback\s*\{\s*display:\s*none\s*!important;/s);
 });

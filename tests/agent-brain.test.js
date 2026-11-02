@@ -17,11 +17,11 @@ function createContainer() {
 
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
   const expectedStates = {
-    ACTIVE: { signalCount: 16, color: "#c780f0", signalDuration: 3.2 },
-    ANALYZING: { signalCount: 36, color: "#ed9cff", signalDuration: 1.25 },
-    IDLE: { signalCount: 3, color: "#8f76a1", signalDuration: 7.5 },
+    ACTIVE: { signalCount: 12, color: "#c780f0", signalDuration: 3.2 },
+    ANALYZING: { signalCount: 24, color: "#ed9cff", signalDuration: 1.25 },
+    IDLE: { signalCount: 2, color: "#8f76a1", signalDuration: 7.5 },
     STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
-    ERROR: { signalCount: 8, color: "#ff6478", signalDuration: 2.4 },
+    ERROR: { signalCount: 6, color: "#ff6478", signalDuration: 2.4 },
     UNKNOWN: { signalCount: 0, color: "#75808d", signalDuration: 0 }
   };
 
@@ -37,7 +37,7 @@ test("Agent Status maps known and unknown states to explicit circuit activity", 
   assert.equal(agentBrain.mapAgentStatus(null).status, "UNKNOWN");
 });
 
-test("circuit SVG includes detailed traces, vias, chips, and route-bound moving signals", () => {
+test("circuit SVG uses the purple board and boundary-origin moving signals", () => {
   const container = createContainer();
   const stateElement = { dataset: {} };
   const circuit = agentBrain.createAgentBrain({
@@ -53,27 +53,44 @@ test("circuit SVG includes detailed traces, vias, chips, and route-bound moving 
     container.attributes["aria-label"],
     "Agent circuit visualization; status ACTIVE"
   );
-  assert.match(container.innerHTML, /viewBox="0 0 1000 360"/);
-  assert.equal((container.innerHTML.match(/class="circuit-trace circuit-trace--/g) || []).length, 44);
-  assert.equal((container.innerHTML.match(/class="circuit-via-ring"/g) || []).length, 32);
-  assert.equal((container.innerHTML.match(/class="circuit-chip"/g) || []).length, 11);
+  assert.match(container.innerHTML, /viewBox="0 0 1000 1000"/);
+  assert.match(container.innerHTML, /class="circuit-board-image" href="\/assets\/agent-circuit-board\.png"/);
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
-  assert.equal(agentBrain.signalRoutes.length, 32);
+  assert.equal(agentBrain.signalRoutes.length, 52);
+  assert.match(container.innerHTML, /clip-path="url\(#circuit-board-clip\)"/);
+  assert.match(container.innerHTML, /<clipPath id="circuit-board-clip">\s*<rect x="22" y="22" width="956" height="956" rx="76"\/>/);
+  assert.ok(fs.statSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png")).size > 100000);
+  const routeStarts = agentBrain.signalRoutes.map((route) => {
+    const [, x, y] = route.match(/^M([\d.]+)\s([\d.]+)/);
+    return { x: Number(x), y: Number(y) };
+  });
+  assert.ok(routeStarts.every(({ x, y }) => Math.max(Math.abs(x - 500), Math.abs(y - 500)) >= 130));
+  assert.ok(agentBrain.signalRoutes.every((route) =>
+    route.match(/[\d.]+/g).every((coordinate) => Number(coordinate) >= 22 && Number(coordinate) <= 978)
+  ));
+  assert.deepEqual(new Set(agentBrain.signalRoutes.map((route) => {
+    if (route.endsWith("V36")) return "up";
+    if (route.endsWith("V964")) return "down";
+    if (route.endsWith("H36")) return "left";
+    if (route.endsWith("H964")) return "right";
+    return "diagonal";
+  })), new Set(["up", "down", "left", "right", "diagonal"]));
   for (const [status, expectedCount] of Object.entries({
-    ACTIVE: 16,
-    ANALYZING: 36,
-    IDLE: 3,
+    ACTIVE: 12,
+    ANALYZING: 24,
+    IDLE: 2,
     STOPPED: 0,
-    ERROR: 8,
+    ERROR: 6,
     UNKNOWN: 0
   })) {
-    const flow = container.innerHTML.match(new RegExp(
-      `<g class="circuit-flow circuit-flow--${status.toLowerCase()}"[^>]*>([\\s\\S]*?)<\\/g>`
-    ));
-    assert.ok(flow, `${status} flow group exists`);
-    assert.equal((flow[1].match(/<animateMotion\b/g) || []).length, expectedCount);
+    const statusClass = status.toLowerCase();
+    assert.ok(container.innerHTML.includes(`class="circuit-flow circuit-flow--${statusClass}"`));
+    const signalGroups = container.innerHTML.match(
+      new RegExp(`<g class="circuit-neuron circuit-neuron--${statusClass}"`, "g")
+    );
+    assert.equal(signalGroups?.length || 0, expectedCount);
   }
 
   circuit.dispose();
@@ -85,7 +102,7 @@ test("status updates keep accessibility and activity state synchronized", () => 
   const circuit = agentBrain.createAgentBrain({ container, stateElement });
 
   const analyzing = circuit.setStatus("ANALYZING");
-  assert.equal(analyzing.signalCount, 36);
+  assert.equal(analyzing.signalCount, 24);
   assert.equal(stateElement.dataset.state, "analyzing");
   assert.equal(
     container.attributes["aria-label"],

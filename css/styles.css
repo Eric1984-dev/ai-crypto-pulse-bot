@@ -768,8 +768,9 @@ a:focus-visible {
 
 .agent-brain-stage {
   display: grid;
-  width: 100%;
-  height: clamp(280px, 32vw, 380px);
+  width: min(100%, 90vh);
+  aspect-ratio: 1;
+  margin: 0 auto;
   place-items: center;
   overflow: hidden;
   background: radial-gradient(ellipse at center, #20152a 0%, #0c0811 72%);
@@ -781,117 +782,10 @@ a:focus-visible {
   height: 100%;
 }
 
-.circuit-board-frame {
-  fill: none;
-  stroke: #634875;
-  stroke-opacity: 0.8;
-  stroke-width: 1.3;
-}
-
-.circuit-board-grid {
-  opacity: 0.74;
-}
-
-.circuit-trace-glow {
-  fill: none;
-  stroke: #a64de0;
-  stroke-width: 4.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.34;
-}
-
-.circuit-trace {
-  fill: none;
-  stroke-width: 1.25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.circuit-trace--violet {
-  stroke: #813ab8;
-  stroke-opacity: 0.92;
-}
-
-.circuit-trace--lavender {
-  stroke: #c276f4;
-  stroke-opacity: 0.9;
-}
-
-.circuit-via-ring {
-  fill: #171021;
-  stroke: #9665bd;
-  stroke-width: 1;
-}
-
-.circuit-via-core {
-  fill: #ca86ff;
-  fill-opacity: 0.9;
-}
-
-.circuit-component {
-  color: #a874d0;
-}
-
-.circuit-chip {
-  fill: #100b18;
-  stroke: currentColor;
-  stroke-opacity: 0.9;
-  stroke-width: 1.25;
-}
-
-.circuit-chip-inner {
-  fill: #1a1125;
-  stroke: #8c62ae;
-  stroke-opacity: 0.66;
-  stroke-width: 0.7;
-}
-
-.circuit-chip-mark {
-  fill: none;
-  stroke: #a576cc;
-  stroke-opacity: 0.5;
-  stroke-width: 0.8;
-}
-
-.circuit-pin {
-  fill: none;
-  stroke: #9778b1;
-  stroke-width: 1.5;
-  stroke-linecap: square;
-}
-
-.circuit-component--primary .circuit-chip {
-  stroke: #d78aff;
-  stroke-width: 2.4;
-}
-
-.circuit-component--primary .circuit-chip-inner {
-  fill: #120b19;
-  stroke: #ad66db;
-  stroke-width: 1.2;
-}
-
-.circuit-chip-led {
-  fill: #e2a2ff;
-  filter: url("#circuit-neuron-glow");
-}
-
-.circuit-ports,
-.circuit-board-markings {
-  fill: #b18bc9;
-  fill-opacity: 0.82;
-}
-
-.circuit-ports path,
-.circuit-board-markings path {
-  fill: none;
-  stroke: #80579b;
-  stroke-width: 1.2;
-}
-
-.circuit-board-markings circle {
-  fill: #9669bb;
+.circuit-board-image {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .circuit-flow {
@@ -905,19 +799,24 @@ a:focus-visible {
   display: inline;
 }
 
-.circuit-neuron {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 4px #d77bff);
-  opacity: 1;
-  stroke: #fff0ff;
-  stroke-opacity: 0.98;
-  stroke-width: 1.1;
+.circuit-neuron-halo {
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 5px #d77bff);
+  opacity: 0.72;
 }
 
-.circuit-neuron--analyzing {
-  opacity: 1;
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 8px #d876ff);
+.circuit-neuron-core {
+  fill: #fff7ff;
   stroke: #ffffff;
-  stroke-width: 1.5;
+  stroke-width: 0.8;
+}
+
+.circuit-neuron--analyzing .circuit-neuron-halo {
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 8px #d876ff);
+  opacity: 1;
+}
+
+.circuit-neuron--idle .circuit-neuron-halo {
+  opacity: 0.38;
 }
 
 .agent-status-monitor {
@@ -1450,10 +1349,6 @@ a:focus-visible {
 }
 
 @media (max-width: 559px) {
-  .agent-brain-stage {
-    height: clamp(128px, 40vw, 170px);
-  }
-
   .agent-status-monitor {
     gap: 12px;
     padding: 12px;

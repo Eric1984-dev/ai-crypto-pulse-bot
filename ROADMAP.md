@@ -197,7 +197,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 
 ## Phase 14 - Final Polish
 
-- [x] Replace the anatomical Agent Brain artwork with a detailed responsive SVG circuit board, including routed traces, vias, component packages, and status-driven moving signals
+- [x] Use the purple circuit-board artwork as the compact Agent Status visual and overlay status-driven glowing neuron signals along its routes
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
@@ -205,6 +205,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a purple background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Apply a subdued purple theme to shared UI, charts, browser chrome, and the status circuit; remove decorative text from the circuit artwork and strengthen purple status-driven signal glow
+- [x] Fill the available mobile width with the square circuit visual (bounded by 90vh); start signals at the chip edge, route them in different directions, and clip them inside the board border
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist
