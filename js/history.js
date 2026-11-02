@@ -242,7 +242,7 @@
     let page = 1;
     let activeLoad = null;
     let refreshPending = false;
-    let intervalId = null;
+    let pollingCleanup = null;
     let disposed = false;
     let realtimeCleanup = null;
 
@@ -333,16 +333,24 @@
     }
 
     function stopPolling() {
-      if (intervalId !== null) {
-        windowRef.clearInterval(intervalId);
-        intervalId = null;
-      }
+      pollingCleanup?.();
+      pollingCleanup = null;
     }
 
     function startPolling() {
-      if (intervalId === null && documentRef.visibilityState !== "hidden"
+      if (pollingCleanup === null && documentRef.visibilityState !== "hidden"
         && typeof windowRef.setInterval === "function") {
-        intervalId = windowRef.setInterval(refresh, refreshIntervalMs);
+        const realtime = windowRef.CryptoPulseRealtime;
+        if (realtime && typeof realtime.startAlignedPolling === "function") {
+          pollingCleanup = realtime.startAlignedPolling({
+            callback: refresh,
+            intervalMs: refreshIntervalMs,
+            windowRef
+          });
+          return;
+        }
+        const timer = windowRef.setInterval(refresh, refreshIntervalMs);
+        pollingCleanup = () => windowRef.clearInterval(timer);
       }
     }
 

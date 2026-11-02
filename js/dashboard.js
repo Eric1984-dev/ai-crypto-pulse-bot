@@ -487,7 +487,7 @@
     let statusRequestInProgress = false;
     let foregroundRefreshPending = false;
     let dashboardDataLoaded = false;
-    let dashboardPollingTimer = null;
+    let dashboardPollingCleanup = null;
     let statusPollingTimer = null;
     let brain = null;
     let currentAgentStatus = null;
@@ -692,19 +692,29 @@
     }
 
     function startDashboardPolling() {
-      if (dashboardPollingTimer !== null || disposed
+      if (dashboardPollingCleanup !== null || disposed
         || documentRef.visibilityState === "hidden"
         || typeof setIntervalImpl !== "function") {
         return;
       }
-      dashboardPollingTimer = setIntervalImpl(load, dashboardRefreshIntervalMs);
+      const realtime = windowRef.CryptoPulseRealtime;
+      if (realtime && typeof realtime.startAlignedPolling === "function") {
+        dashboardPollingCleanup = realtime.startAlignedPolling({
+          callback: load,
+          intervalMs: dashboardRefreshIntervalMs,
+          windowRef,
+          setIntervalImpl,
+          clearIntervalImpl
+        });
+        return;
+      }
+      const timer = setIntervalImpl(load, dashboardRefreshIntervalMs);
+      dashboardPollingCleanup = () => clearIntervalImpl(timer);
     }
 
     function stopDashboardPolling() {
-      if (dashboardPollingTimer !== null) {
-        clearIntervalImpl(dashboardPollingTimer);
-        dashboardPollingTimer = null;
-      }
+      dashboardPollingCleanup?.();
+      dashboardPollingCleanup = null;
     }
 
     function refreshDashboardOnForeground() {

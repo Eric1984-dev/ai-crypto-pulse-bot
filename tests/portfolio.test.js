@@ -145,3 +145,75 @@ test("portfolio data request uses the authenticated no-store dashboard API and v
     (error) => error.status === 401
   );
 });
+
+test("portfolio reruns refreshes queued during an active request", async () => {
+  const { documentRef, elements } = createDocument();
+  documentRef.visibilityState = "visible";
+  documentRef.addEventListener = () => {};
+  documentRef.removeEventListener = () => {};
+  const originalQuerySelector = documentRef.querySelector;
+  documentRef.querySelector = (selector) => (
+    selector === "[data-portfolio-page]" ? createElement() : originalQuerySelector(selector)
+  );
+
+  const data = {
+    portfolio: {
+      count: 0,
+      portfolioValue: 0,
+      availableBalance: 0,
+      totalPnl: 0,
+      realizedPnl: 0,
+      unrealizedPnl: 0,
+      dailyPnl: 0,
+      winRate: 0
+    },
+    openPositions: { count: 0, items: [] },
+    recentTrades: { count: 0, items: [] }
+  };
+  let requestCount = 0;
+  let resolveInitialRequest;
+  let realtimeUpdate;
+  const windowRef = {
+    addEventListener() {},
+    removeEventListener() {},
+    CryptoPulseAuthReady: Promise.resolve(),
+    CryptoPulseRealtime: {
+      startAlignedPolling() {
+        return () => {};
+      },
+      startPageRealtime({ onUpdate }) {
+        realtimeUpdate = onUpdate;
+        return () => {};
+      }
+    }
+  };
+  const fetchImpl = () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return new Promise((resolve) => {
+        resolveInitialRequest = () => resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ data })
+        });
+      });
+    }
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({ data })
+    });
+  };
+
+  const cleanup = portfolio.startPortfolio({ windowRef, documentRef, fetchImpl });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(typeof realtimeUpdate, "function");
+  realtimeUpdate();
+  resolveInitialRequest();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(requestCount, 2);
+  assert.equal(elements.get("[data-portfolio-value=\"count\"]").textContent, "0");
+  cleanup();
+});

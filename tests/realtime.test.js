@@ -106,6 +106,49 @@ function createClient() {
   };
 }
 
+function createBroadcastChannelHarness() {
+  const channels = new Set();
+
+  class SharedBroadcastChannel {
+    constructor(name) {
+      this.name = name;
+      this.listeners = new Set();
+      channels.add(this);
+    }
+
+    addEventListener(type, listener) {
+      if (type === "message") {
+        this.listeners.add(listener);
+      }
+    }
+
+    removeEventListener(type, listener) {
+      if (type === "message") {
+        this.listeners.delete(listener);
+      }
+    }
+
+    postMessage(data) {
+      for (const channel of channels) {
+        if (channel !== this && channel.name === this.name) {
+          for (const listener of channel.listeners) {
+            listener({ data });
+          }
+        }
+      }
+    }
+
+    close() {
+      channels.delete(this);
+    }
+  }
+
+  return {
+    BroadcastChannel: SharedBroadcastChannel,
+    activeChannelCount: () => channels.size
+  };
+}
+
 function subscribe(client, environment, surface, onUpdate, onStatus) {
   return realtime.subscribeToChanges({
     client,
@@ -187,6 +230,110 @@ test("trade history refreshes for execution and market-price updates", () => {
   environment.flushTimers();
   assert.equal(updates, 1);
   unsubscribe();
+});
+
+test("portfolio refreshes for market-price updates", () => {
+  const client = createClient();
+  const environment = createBrowserEnvironment();
+  let updates = 0;
+  const unsubscribe = subscribe(client, environment, "portfolio", () => {
+    updates += 1;
+  });
+
+  assert.deepEqual(
+    client.channels[0].bindings.map((binding) => binding.filter.table).sort(),
+    [
+      "AI_Crypto_Bot_Market_Data",
+      "AI_Crypto_Bot_Portfolios",
+      "AI_Crypto_Bot_Positions",
+      "AI_Crypto_Bot_Trades"
+    ].sort()
+  );
+  environment.flushTimers();
+  client.channels[0].emit("AI_Crypto_Bot_Market_Data");
+  environment.flushTimers();
+  assert.equal(updates, 2);
+  unsubscribe();
+});
+
+test("shares refresh invalidations across open tabs", () => {
+  const broadcast = createBroadcastChannelHarness();
+  const dashboardClient = createClient();
+  const historyClient = createClient();
+  const dashboardEnvironment = createBrowserEnvironment();
+  const historyEnvironment = createBrowserEnvironment();
+  dashboardEnvironment.windowRef.BroadcastChannel = broadcast.BroadcastChannel;
+  historyEnvironment.windowRef.BroadcastChannel = broadcast.BroadcastChannel;
+  let dashboardUpdates = 0;
+  let historyUpdates = 0;
+  const unsubscribeDashboard = subscribe(
+    dashboardClient,
+    dashboardEnvironment,
+    "dashboard",
+    () => { dashboardUpdates += 1; }
+  );
+  const unsubscribeHistory = subscribe(
+    historyClient,
+    historyEnvironment,
+    "history",
+    () => { historyUpdates += 1; }
+  );
+
+  dashboardEnvironment.flushTimers();
+  historyEnvironment.flushTimers();
+  dashboardClient.channels[0].emit("AI_Crypto_Bot_Trades");
+  dashboardEnvironment.flushTimers();
+  historyEnvironment.flushTimers();
+
+  assert.equal(dashboardUpdates, 2);
+  assert.equal(historyUpdates, 2);
+  unsubscribeDashboard();
+  unsubscribeHistory();
+  assert.equal(broadcast.activeChannelCount(), 0);
+});
+
+test("aligns polling to a shared wall-clock boundary and cleans up timers", () => {
+  const timeouts = new Map();
+  const intervals = new Map();
+  let nextTimerId = 0;
+  let updates = 0;
+  const windowRef = {
+    setTimeout(callback, delay) {
+      const id = ++nextTimerId;
+      timeouts.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timeouts.delete(id);
+    },
+    setInterval(callback, delay) {
+      const id = ++nextTimerId;
+      intervals.set(id, { callback, delay });
+      return id;
+    },
+    clearInterval(id) {
+      intervals.delete(id);
+    }
+  };
+  const cleanup = realtime.startAlignedPolling({
+    callback: () => { updates += 1; },
+    intervalMs: 30000,
+    nowImpl: () => 61000,
+    windowRef
+  });
+
+  assert.deepEqual([...timeouts.values()].map(({ delay }) => delay), [29000]);
+  const [timeoutId, timeout] = [...timeouts.entries()][0];
+  timeouts.delete(timeoutId);
+  timeout.callback();
+  assert.equal(updates, 1);
+  assert.deepEqual([...intervals.values()].map(({ delay }) => delay), [30000]);
+  [...intervals.values()][0].callback();
+  assert.equal(updates, 2);
+
+  cleanup();
+  assert.equal(timeouts.size, 0);
+  assert.equal(intervals.size, 0);
 });
 
 test("recovers after a Realtime connection error and reports state", () => {
@@ -300,16 +447,19 @@ test("refreshes visible pages after returning from a hidden state", () => {
 
 test("authenticated views wire the shared Realtime service after Auth initializes", () => {
   const views = [
-    { file: "dashboard", surface: "dashboard" },
-    { file: "portfolio", surface: "portfolio" },
-    { file: "history", surface: "history" },
+    { file: "dashboard", surface: "dashboard", alignedPolling: true },
+    { file: "portfolio", surface: "portfolio", alignedPolling: true },
+    { file: "history", surface: "history", alignedPolling: true },
     { file: "scanner", surface: "scanner" }
   ];
 
-  for (const { file, surface } of views) {
+  for (const { file, surface, alignedPolling } of views) {
     const script = fs.readFileSync(path.join(rootDirectory, "js", `${file}.js`), "utf8");
     const page = fs.readFileSync(path.join(rootDirectory, `${file}.html`), "utf8");
     assert.match(script, /startPageRealtime/);
+    if (alignedPolling) {
+      assert.match(script, /startAlignedPolling/);
+    }
     assert.match(script, new RegExp(`surface: "${surface}"`));
     assert.ok(page.includes('<script src="/js/realtime.js" defer></script>'));
     assert.match(page, /data-realtime-status/);

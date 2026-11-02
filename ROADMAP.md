@@ -227,6 +227,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [x] Separate core data exports from Analytics and Recommendation reports; group Trade and Position exports together
+- [x] Synchronize Dashboard, Portfolio, and Trade History refreshes across tabs and polling intervals without changing P&L calculations
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 

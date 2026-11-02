@@ -21,7 +21,8 @@
     portfolio: [
       { table: "AI_Crypto_Bot_Portfolios" },
       { table: "AI_Crypto_Bot_Positions" },
-      { table: "AI_Crypto_Bot_Trades" }
+      { table: "AI_Crypto_Bot_Trades" },
+      { table: "AI_Crypto_Bot_Market_Data" }
     ],
     history: [
       { table: "AI_Crypto_Bot_Trades" },
@@ -43,6 +44,7 @@
   };
   const connectionsByClient = new WeakMap();
   const refreshDebounceMs = 250;
+  const crossTabChannelName = "cryptopulse-data-invalidations";
 
   function subscribeToChanges({
     client,
@@ -96,6 +98,69 @@
     };
   }
 
+  function startAlignedPolling({
+    callback,
+    intervalMs = 30000,
+    windowRef = globalThis,
+    setTimeoutImpl = windowRef.setTimeout
+      ? windowRef.setTimeout.bind(windowRef)
+      : globalThis.setTimeout,
+    clearTimeoutImpl = windowRef.clearTimeout
+      ? windowRef.clearTimeout.bind(windowRef)
+      : globalThis.clearTimeout,
+    setIntervalImpl = windowRef.setInterval
+      ? windowRef.setInterval.bind(windowRef)
+      : globalThis.setInterval,
+    clearIntervalImpl = windowRef.clearInterval
+      ? windowRef.clearInterval.bind(windowRef)
+      : globalThis.clearInterval,
+    nowImpl = Date.now
+  } = {}) {
+    if (typeof callback !== "function" || !Number.isSafeInteger(intervalMs) || intervalMs <= 0) {
+      throw new TypeError("Aligned polling requires a callback and positive interval.");
+    }
+
+    let timeoutId = null;
+    let intervalId = null;
+    let stopped = false;
+    const run = () => {
+      if (!stopped) {
+        callback();
+      }
+    };
+
+    if (typeof setTimeoutImpl === "function" && typeof setIntervalImpl === "function") {
+      const now = nowImpl();
+      if (!Number.isFinite(now)) {
+        throw new TypeError("Aligned polling requires a finite clock value.");
+      }
+      const remainder = ((now % intervalMs) + intervalMs) % intervalMs;
+      const delay = intervalMs - remainder;
+      timeoutId = setTimeoutImpl(() => {
+        timeoutId = null;
+        if (stopped) {
+          return;
+        }
+        intervalId = setIntervalImpl(run, intervalMs);
+        run();
+      }, delay);
+    } else if (typeof setIntervalImpl === "function") {
+      intervalId = setIntervalImpl(run, intervalMs);
+    }
+
+    return () => {
+      stopped = true;
+      if (timeoutId !== null && typeof clearTimeoutImpl === "function") {
+        clearTimeoutImpl(timeoutId);
+        timeoutId = null;
+      }
+      if (intervalId !== null && typeof clearIntervalImpl === "function") {
+        clearIntervalImpl(intervalId);
+        intervalId = null;
+      }
+    };
+  }
+
   function createConnection({ client, documentRef, surface, windowRef }) {
     const channel = client.channel(`cryptopulse-${surface}-updates`);
     if (!channel || typeof channel.on !== "function" || typeof channel.subscribe !== "function") {
@@ -114,6 +179,7 @@
       : "connecting";
     let refreshTimer = null;
     let disposed = false;
+    let crossTabChannel = null;
 
     function logCallbackFailure(error) {
       if (windowRef.console && typeof windowRef.console.error === "function") {
@@ -179,6 +245,35 @@
       refreshTimer = setTimeoutImpl(dispatchUpdate, refreshDebounceMs);
     }
 
+    function onCrossTabMessage(event) {
+      if (event && event.data && event.data.type === "data-invalidated") {
+        scheduleUpdate();
+      }
+    }
+
+    function logCrossTabFailure(error) {
+      if (windowRef.console && typeof windowRef.console.warn === "function") {
+        windowRef.console.warn(
+          "Cross-tab refresh sync is unavailable; Realtime and polling remain active.",
+          error instanceof Error ? error.name : "Unknown error"
+        );
+      }
+    }
+
+    function onDatabaseChange() {
+      if (disposed) {
+        return;
+      }
+      scheduleUpdate();
+      if (crossTabChannel) {
+        try {
+          crossTabChannel.postMessage({ type: "data-invalidated" });
+        } catch (error) {
+          logCrossTabFailure(error);
+        }
+      }
+    }
+
     function onChannelStatus(status) {
       if (disposed) {
         return;
@@ -208,6 +303,16 @@
       }
     }
 
+    if (typeof windowRef.BroadcastChannel === "function") {
+      try {
+        crossTabChannel = new windowRef.BroadcastChannel(crossTabChannelName);
+        crossTabChannel.addEventListener("message", onCrossTabMessage);
+      } catch (error) {
+        crossTabChannel = null;
+        logCrossTabFailure(error);
+      }
+    }
+
     function removeChannel() {
       try {
         const result = typeof client.removeChannel === "function"
@@ -230,7 +335,7 @@
         if (subscription.filter) {
           filter.filter = subscription.filter;
         }
-        subscribedChannel = subscribedChannel.on("postgres_changes", filter, scheduleUpdate);
+        subscribedChannel = subscribedChannel.on("postgres_changes", filter, onDatabaseChange);
       }
       subscribedChannel.subscribe(onChannelStatus);
     } catch (error) {
@@ -261,6 +366,11 @@
         windowRef.removeEventListener?.("online", onOnline);
         windowRef.removeEventListener?.("offline", onOffline);
         documentRef.removeEventListener?.("visibilitychange", onVisibilityChange);
+        if (crossTabChannel) {
+          crossTabChannel.removeEventListener("message", onCrossTabMessage);
+          crossTabChannel.close();
+          crossTabChannel = null;
+        }
         removeChannel();
         return true;
       }
@@ -296,6 +406,7 @@
 
   return {
     refreshDebounceMs,
+    startAlignedPolling,
     startPageRealtime,
     subscribeToChanges,
     surfaceSubscriptions

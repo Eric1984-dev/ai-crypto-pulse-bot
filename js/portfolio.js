@@ -87,7 +87,8 @@
     const errorMessage = documentRef.querySelector("[data-portfolio-error]");
     const retryButton = documentRef.querySelector("[data-portfolio-retry]");
     let activeLoad = null;
-    let intervalId = null;
+    let pollingCleanup = null;
+    let refreshPending = false;
     let disposed = false;
     let realtimeCleanup = null;
 
@@ -96,6 +97,7 @@
         return Promise.resolve();
       }
       if (activeLoad) {
+        refreshPending = true;
         return activeLoad;
       }
       if (loading) {
@@ -130,6 +132,10 @@
             loading.hidden = true;
           }
           activeLoad = null;
+          if (refreshPending && !disposed) {
+            refreshPending = false;
+            void refresh();
+          }
         });
       return activeLoad;
     };
@@ -143,15 +149,23 @@
       }
     };
     const startPolling = () => {
-      if (intervalId === null && documentRef.visibilityState !== "hidden") {
-        intervalId = windowRef.setInterval(refresh, refreshIntervalMs);
+      if (pollingCleanup === null && documentRef.visibilityState !== "hidden") {
+        const realtime = windowRef.CryptoPulseRealtime;
+        if (realtime && typeof realtime.startAlignedPolling === "function") {
+          pollingCleanup = realtime.startAlignedPolling({
+            callback: refresh,
+            intervalMs: refreshIntervalMs,
+            windowRef
+          });
+          return;
+        }
+        const timer = windowRef.setInterval(refresh, refreshIntervalMs);
+        pollingCleanup = () => windowRef.clearInterval(timer);
       }
     };
     const stopPolling = () => {
-      if (intervalId !== null) {
-        windowRef.clearInterval(intervalId);
-        intervalId = null;
-      }
+      pollingCleanup?.();
+      pollingCleanup = null;
     };
     const startRealtime = () => {
       if (disposed || realtimeCleanup) {

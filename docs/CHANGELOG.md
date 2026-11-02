@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Synchronized data refresh
+
+- Broadcast Realtime data invalidations across open tabs and align Dashboard, Portfolio, and Trade History fallback polling to shared 30-second boundaries
+- Refresh Portfolio on market-price changes and retain a follow-up refresh when an update arrives during an active request; P&L calculations remain unchanged
+
 ### iPhone home-screen icon
 
 - Changed the shared 180×180 app icon background from dark green to deep blue while preserving the existing Bitcoin-and-hands artwork
