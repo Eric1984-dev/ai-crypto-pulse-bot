@@ -6,6 +6,13 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Paper Trading confidence-threshold experiment
+
+- Lowered the server-side paper BUY-entry confidence gate from 70 to 67 through a forward migration; all other Risk Manager checks remain in force
+- Added migration-backed integration coverage for rejecting confidence 66 and accepting confidence 67
+- Left AI decision generation, confidence calculations, Analytics, SELL execution, and live-trading behavior unchanged
+- Documented the experiment and its 25-/50-closed-trade review checkpoints; production migration and deployment remain unverified
+
 ### AI Analysis runtime optimization
 
 - Replaced sequential groups of eight candle reads with a bounded 24-worker queue, reducing wait barriers without changing candle filters, limits, or ordering

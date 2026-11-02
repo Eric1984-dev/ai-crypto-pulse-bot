@@ -461,6 +461,35 @@ Its purpose is observability only.
 
 Implement only when operational insight becomes more valuable than the additional storage and complexity.
 
+## Strategy Experiment - Confidence Threshold
+
+Status:
+Active Paper-Trading Experiment
+
+Change:
+
+Minimum Confidence
+70 -> 67
+
+Objective:
+
+Increase trade volume and collect additional Analytics data.
+
+Environment:
+
+Paper Trading only.
+
+Review after:
+
+- 25 closed trades
+or
+- 50 closed trades
+
+Possible Outcomes:
+
+- Keep 67
+- Return to 70
+- Further optimize based on Analytics evidence
 
 ## Phase 19 - Live Trading Preparation
 

@@ -84,3 +84,46 @@ Future roadmap items created:
 Status:
 
 Monitoring. Further investigation may require execution-level audit data or scheduler history.
+
+### Date
+
+2026-11-02
+
+### Event Type
+
+Strategy Experiment
+
+### Description
+
+Approved Paper Trading experiment to lower the BUY-entry confidence threshold from 70 to 67. The implementation is in migration `20261102140000_paper_trading_confidence_experiment.sql`; it changes only the server-side paper-trading gate.
+
+Reason:
+
+Analysis showed:
+
+- BUY 65-70: 625
+- BUY 70-75: 156
+
+Approximately 80% of BUY signals were being filtered out by the existing entry threshold.
+
+The change is intended to increase paper-trading activity and collect more Analytics data.
+
+### Result
+
+Pending Evaluation. The migration and local validation are recorded in the experiment report. Production migration and deployment have not been verified.
+
+### Notes
+
+Paper Trading only.
+
+No Live Trading impact.
+
+Review at 25 closed trades and, if continued, make the final evaluation at 50 closed trades.
+
+Metrics:
+
+- Win Rate
+- Profit Factor
+- Drawdown
+- Portfolio Growth
+- Trade Count

@@ -24,7 +24,9 @@ Maximum Open Positions:
 
 ## Confidence Threshold
 
-Minimum entry confidence: 70. This threshold applies to BUY entries; a valid SELL may reduce exposure without the entry threshold.
+Minimum entry confidence: 67 during the approved Paper Trading experiment. The Phase 08 baseline was 70; migration `20261102140000_paper_trading_confidence_experiment.sql` changes only the BUY-entry gate. A valid SELL may reduce exposure without the entry threshold.
+
+The experiment changes neither AI decision generation nor confidence calculations, Analytics, or any other risk control. Review results at 25 closed trades and, if the experiment continues, make a final evaluation at 50 closed trades using trade count, win rate, profit factor, drawdown, and portfolio growth.
 
 ---
 

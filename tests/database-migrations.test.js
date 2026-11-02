@@ -19,6 +19,9 @@ const seedMigration = migrationSql.find((sql) => sql.includes('INSERT INTO publi
 const paperTradingMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Run_Paper_Trading"')
 );
+const confidenceThresholdMigration = migrationSql.find((sql) =>
+  sql.includes("v_decision.confidence < 67")
+);
 const tradeHistoryMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Trade_History_Stats"')
 );
@@ -54,6 +57,7 @@ async function createDatabase() {
   await database.exec(schemaMigration);
   await database.exec(seedMigration);
   await database.exec(paperTradingMigration);
+  await database.exec(confidenceThresholdMigration);
   await database.exec(tradeHistoryMigration);
   return database;
 }
@@ -652,7 +656,7 @@ test("paper trading buys from a stored confident AI decision with bounded fees a
   }
 });
 
-test("paper trading retries are idempotent and HOLD or WAIT decisions never trade", async () => {
+test("paper trading retries are idempotent and HOLD, WAIT, or below-threshold BUY decisions never trade", async () => {
   const database = await createDatabase();
   try {
     const portfolioId = await getInitialPortfolio(database);
@@ -669,7 +673,7 @@ test("paper trading retries are idempotent and HOLD or WAIT decisions never trad
 
     await addDecision(database, "BTC-EUR", "WAIT", 95);
     await addDecision(database, "ETH-EUR", "HOLD", 95);
-    await addDecision(database, "SOL-EUR", "BUY", 69);
+    await addDecision(database, "SOL-EUR", "BUY", 66);
     const noTradeRun = await runPaperTrading(database);
     const trades = await database.query(
       `SELECT count(*)::integer AS count
@@ -679,6 +683,35 @@ test("paper trading retries are idempotent and HOLD or WAIT decisions never trad
     );
     assert.equal(noTradeRun.tradesExecuted, 0);
     assert.equal(trades.rows[0].count, 1);
+  } finally {
+    await database.close();
+  }
+});
+
+test("paper trading accepts BUY confidence 67 and rejects confidence below 67", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await setMarketPrice(database, "ETH-EUR", 50);
+    await addDecision(database, "BTC-EUR", "BUY", 66);
+
+    const belowThreshold = await runPaperTrading(database);
+    assert.equal(belowThreshold.tradesExecuted, 0);
+    assert.equal(belowThreshold.skipped, 1);
+
+    await addDecision(database, "ETH-EUR", "BUY", 67);
+    const atThreshold = await runPaperTrading(database);
+    const trades = await database.query(
+      `SELECT symbol, side
+       FROM public."AI_Crypto_Bot_Trades"
+       WHERE portfolio_id = $1`,
+      [portfolioId]
+    );
+
+    assert.equal(atThreshold.tradesExecuted, 1);
+    assert.equal(atThreshold.skipped, 1);
+    assert.deepEqual(trades.rows, [{ symbol: "ETH-EUR", side: "BUY" }]);
   } finally {
     await database.close();
   }

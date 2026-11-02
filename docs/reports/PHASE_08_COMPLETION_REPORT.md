@@ -4,6 +4,8 @@
 
 Phase 08 is implemented and locally validated. Phase 09 has not been started.
 
+The confidence threshold documented below (70) was the Phase 08 baseline. The active BUY-entry threshold is 67 during the approved paper-only experiment implemented by [`20261102140000_paper_trading_confidence_experiment.sql`](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql); see the [experiment report](./CONFIDENCE_THRESHOLD_EXPERIMENT_REPORT.md). All other risk controls remain unchanged.
+
 ## Architecture
 
 1. `/api/ai-analysis` stores decisions in `AI_Crypto_Bot_AI_Decisions`; it remains analysis-only.
