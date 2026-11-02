@@ -11,6 +11,7 @@ All notable project changes should be documented here.
 - Replaced sequential groups of eight candle reads with a bounded 24-worker queue, reducing wait barriers without changing candle filters, limits, or ordering
 - Added runtime and stage timing telemetry to AI Analysis completion and failure logs
 - Preserved all AI calculations, confidence, decision rules, persisted outputs, and existing API/function count
+- Production verification on 2026-11-02 confirmed the first observed optimized run completed in 11.484 seconds, analyzed 102 markets, stored 102 decisions, and loaded 300,849 candles across 612 reads. All 102 stored decisions retained all six candle intervals, with no omitted symbols; sustained runtime and timeout rates remain under observation.
 
 ### Agent Brain refinement
 
