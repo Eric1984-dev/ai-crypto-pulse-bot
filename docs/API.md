@@ -224,7 +224,7 @@ Export columns:
 - **AI Analytics**: confidence-bucket, action, strategy, and market outcome summaries, including scored/unscored decisions and attributed P&L.
 - **Recommendation exports**: category, recommendation, rationale, supporting metrics, historical impact description, confidence, period, generated timestamp, sample size, and sample unit. Recommendation History is recomputed from stored Analytics inputs and explicitly does not represent an archived sequence of earlier generations.
 
-Analytics reports support the same rolling 30-, 90-, and 365-day ranges as the Analytics page; their count is based on report rows rather than source trade/decision counts. The default Analytics range is 30 days. Raw data exports continue to use their existing 24-hour, 7-day, 30-day, and all-data filters.
+Analytics reports support rolling 30-, 90-, and 365-day ranges; each report on the Exports page has its own date selector, defaulting to 30 days. A report's count and download use that card's selected period, and counts are based on report rows rather than source trade/decision counts. Raw data exports continue to use their existing 24-hour, 7-day, 30-day, and all-data filters.
 
 Analytics Export count/download failures use the same Analytics source loader and query diagnostics as the Analytics page. Production responses remain generic; development diagnostics identify the request view and export type as well as the failing source query.
 

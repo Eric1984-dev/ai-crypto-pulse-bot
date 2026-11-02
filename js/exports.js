@@ -109,9 +109,7 @@
 
     const cleanupCallbacks = [];
     const cards = [...documentRef.querySelectorAll("[data-export-card]")];
-    const analyticsPeriodSelect = documentRef.querySelector("[data-analytics-export-period]");
     const analyticsCountRequests = new Map();
-    const analyticsCardRefreshers = [];
 
     function getAnalyticsCounts(period) {
       if (!analyticsCountRequests.has(period)) {
@@ -142,7 +140,7 @@
         const currentRequest = ++requestNumber;
         const period = periodSelect
           ? periodSelect.value
-          : (analyticsExportTypes.has(type) ? analyticsPeriodSelect?.value || "30d" : "all");
+          : (analyticsExportTypes.has(type) ? "30d" : "all");
         const validPeriod = analyticsExportTypes.has(type)
           ? analyticsPeriods.has(period)
           : supportedPeriods.has(period);
@@ -208,7 +206,7 @@
         try {
           const period = periodSelect
             ? periodSelect.value
-            : (analyticsExportTypes.has(type) ? analyticsPeriodSelect?.value || "30d" : "all");
+            : (analyticsExportTypes.has(type) ? "30d" : "all");
           const anchor = documentRef.createElement("a");
           anchor.href = buildExportUrl(type, period, "export");
           anchor.download = `cryptopulse-${type}-${period}.csv`;
@@ -222,7 +220,12 @@
         }
       }
 
-      const onPeriodChange = () => { void loadCount(); };
+      const onPeriodChange = () => {
+        if (analyticsExportTypes.has(type)) {
+          analyticsCountRequests.clear();
+        }
+        void loadCount();
+      };
       const onDownload = () => downloadCsv();
       const onPageHide = () => {
         disposed = true;
@@ -236,22 +239,8 @@
       downloadButton?.addEventListener("click", onDownload);
       windowRef.addEventListener?.("pagehide", onPageHide);
       cleanupCallbacks.push(onPageHide);
-      if (analyticsExportTypes.has(type)) {
-        analyticsCardRefreshers.push(loadCount);
-      }
       void loadCount();
     }
-
-    const onAnalyticsPeriodChange = () => {
-      analyticsCountRequests.clear();
-      for (const refresh of analyticsCardRefreshers) {
-        void refresh();
-      }
-    };
-    analyticsPeriodSelect?.addEventListener("change", onAnalyticsPeriodChange);
-    cleanupCallbacks.push(() => {
-      analyticsPeriodSelect?.removeEventListener("change", onAnalyticsPeriodChange);
-    });
 
     return () => {
       for (const cleanup of cleanupCallbacks) {

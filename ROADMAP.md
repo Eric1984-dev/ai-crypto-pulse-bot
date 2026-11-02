@@ -191,7 +191,7 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 - [x] Validate 100,001 AI decisions, 100,001 snapshots, and 10,001 trades without loading full source histories into browser memory
 - [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Status: The AI-decision 416 pagination fix and requested boundary regressions are implemented. The supplied production log identifies page 3 (`1000-1499`) and `PGRST103`; that range now terminates the stream rather than failing Analytics or Analytics Exports. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 UI polish is in progress.
+Status: The AI-decision 416 pagination fix and requested boundary regressions are implemented. The supplied production log identifies page 3 (`1000-1499`) and `PGRST103`; that range now terminates the stream rather than failing Analytics or Analytics Exports. The four Analytics CSV reports each have an independent date range. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 UI polish is in progress.
 
 ---
 

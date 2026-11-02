@@ -45,6 +45,7 @@ function createExportCard(type) {
 
 function createAnalyticsExportCard(type) {
   const nodes = {
+    "[data-export-period]": createControl("30d"),
     "[data-export-count]": createControl(),
     "[data-export-empty]": createControl(),
     "[data-export-download]": createControl(),
@@ -59,7 +60,7 @@ function createAnalyticsExportCard(type) {
   };
 }
 
-function createExportsDocument(cards, analyticsPeriod = createControl("30d")) {
+function createExportsDocument(cards) {
   const appended = [];
   const cardList = Array.isArray(cards) ? cards : [cards];
   return {
@@ -69,12 +70,11 @@ function createExportsDocument(cards, analyticsPeriod = createControl("30d")) {
       }
     },
     appended,
-    analyticsPeriod,
     querySelector(selector) {
       if (selector === "[data-exports-page]") {
         return {};
       }
-      return selector === "[data-analytics-export-period]" ? analyticsPeriod : null;
+      return null;
     },
     querySelectorAll(selector) {
       return selector === "[data-export-card]" ? cardList : [];
@@ -148,7 +148,7 @@ test("export page displays counts, empty states, download status, and failures",
   cleanup();
 });
 
-test("analytics export cards share a selected-range request and download range-filtered CSV", async () => {
+test("analytics export cards use independent ranges for their counts and downloads", async () => {
   const types = [
     "analytics-summary",
     "trade-analytics",
@@ -194,14 +194,20 @@ test("analytics export cards share a selected-range request and download range-f
     "/api/dashboard-data?view=export&type=analytics-summary&period=30d"
   );
 
-  documentRef.analyticsPeriod.value = "90d";
-  await documentRef.analyticsPeriod.trigger("change");
+  cards[0].nodes["[data-export-period]"].value = "90d";
+  await cards[0].nodes["[data-export-period]"].trigger("change");
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics&period=90d").length, 1);
   await cards[0].nodes["[data-export-download]"].trigger("click");
   assert.equal(
     documentRef.appended[1].href,
     "/api/dashboard-data?view=export&type=analytics-summary&period=90d"
+  );
+  assert.equal(cards[1].nodes["[data-export-period]"].value, "30d");
+  await cards[1].nodes["[data-export-download]"].trigger("click");
+  assert.equal(
+    documentRef.appended[2].href,
+    "/api/dashboard-data?view=export&type=trade-analytics&period=30d"
   );
   cleanup();
 });
@@ -217,6 +223,22 @@ test("Exports page is English, protected, and links to the existing data API", (
   assert.match(html, /Portfolio Exports/);
   assert.match(html, /AI Decision Exports/);
   assert.match(html, /Position Exports/);
+  assert.doesNotMatch(html, /data-analytics-export-period/);
+  for (const type of [
+    "analytics-summary",
+    "trade-analytics",
+    "portfolio-analytics",
+    "ai-analytics",
+    "recommendations",
+    "recommendation-history"
+  ]) {
+    const card = html.match(new RegExp(`data-export-card="${type}"[\\s\\S]*?<\\/section>`));
+    assert.ok(card, `${type} export card exists`);
+    assert.match(card[0], /<select data-export-period>/);
+    for (const period of ["30d", "90d", "365d"]) {
+      assert.match(card[0], new RegExp(`value="${period}"`));
+    }
+  }
   for (const period of ["24h", "7d", "30d", "all"]) {
     assert.match(html, new RegExp(`value="${period}"`));
   }

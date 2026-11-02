@@ -139,20 +139,20 @@
             <h2 id="analytics-exports-heading">Analytics Exports</h2>
           </div>
         </div>
-        <p class="card-description">Choose a shared history range for all Analytics reports. Current balances and total P&amp;L remain current account metrics; portfolio time-series exports are limited to the selected range.</p>
-        <label class="export-filter">
-          Analytics history range
-          <select data-analytics-export-period>
-            <option value="30d" selected>Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-            <option value="365d">Last 365 Days</option>
-          </select>
-        </label>
+        <p class="card-description">Choose a date range separately for each report. Current balances and total P&amp;L remain current account metrics; portfolio time-series exports are limited to that report's selected range.</p>
         <div class="export-grid">
           <section class="dashboard-panel export-card" data-export-card="analytics-summary" aria-labelledby="export-analytics-summary-heading">
             <p class="eyebrow">Key metrics</p>
             <h3 id="export-analytics-summary-heading">Analytics Summary</h3>
             <p class="card-description">Core P&amp;L, risk, win-rate, and portfolio-growth metrics with calculation notes.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No report rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
@@ -163,6 +163,14 @@
             <p class="eyebrow">Market results</p>
             <h3 id="export-trade-analytics-heading">Trade Analytics</h3>
             <p class="card-description">Closed-trade counts, win rates, realized P&amp;L, and hold time by market.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No report rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
@@ -173,6 +181,14 @@
             <p class="eyebrow">Equity and drawdown</p>
             <h3 id="export-portfolio-analytics-heading">Portfolio Analytics</h3>
             <p class="card-description">Daily portfolio value, period P&amp;L, growth, and drawdown history.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No report rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
@@ -183,6 +199,14 @@
             <p class="eyebrow">Decision quality</p>
             <h3 id="export-ai-analytics-heading">AI Analytics</h3>
             <p class="card-description">Confidence-range, action, and versioned-strategy decision outcomes.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No report rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
@@ -197,12 +221,20 @@
             <h2 id="recommendation-exports-heading">Recommendation Exports</h2>
           </div>
         </div>
-        <p class="card-description">Export generated recommendations for the selected 30-, 90-, or 365-day window. History files are recomputed from stored Analytics data; individual recommendation generations are not archived.</p>
+        <p class="card-description">Export generated recommendations for each report's selected 30-, 90-, or 365-day window. History files are recomputed from stored Analytics data; individual recommendation generations are not archived.</p>
         <div class="export-grid">
           <section class="dashboard-panel export-card" data-export-card="recommendations" aria-labelledby="export-recommendations-heading">
             <p class="eyebrow">Current analysis</p>
             <h3 id="export-recommendations-heading">Recommendation Export</h3>
             <p class="card-description">Recommendations, supporting metrics, confidence, sample size, and analysis period.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No recommendation rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
@@ -212,6 +244,14 @@
             <p class="eyebrow">Historical window</p>
             <h3 id="export-recommendation-history-heading">Recommendation History Export</h3>
             <p class="card-description">A fresh analysis of historical outcomes for the selected period, not an archive of earlier recommendation generations.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="30d" selected>Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="365d">Last 365 Days</option>
+              </select>
+            </label>
             <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading report count…</p>
             <p class="dashboard-empty" data-export-empty hidden>No recommendation history rows are available.</p>
             <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>

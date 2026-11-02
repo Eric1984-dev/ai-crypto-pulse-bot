@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Exports date filters
+
+- Added independent 30-, 90-, and 365-day date selectors to each Performance and Recommendation report
+- Removed the shared Analytics export date selector; each report count and CSV download now follows its own range
+
 ### Agent Brain glow tuning
 
 - Added a subtle static green glow around the chip in every status, retaining a brighter overlay during `ANALYZING`
