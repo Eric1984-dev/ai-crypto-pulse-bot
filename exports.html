@@ -50,83 +50,91 @@
       <h1>Exports</h1>
       <p class="page-description">Download account-scoped trading and portfolio records as CSV for analysis in spreadsheets, BI tools, Python, and backtesting workflows. Timestamps are UTC.</p>
       <p class="dashboard-error" data-exports-error role="alert" hidden></p>
-      <div class="export-grid">
-        <section class="dashboard-panel export-card" data-export-card="trades" aria-labelledby="export-trades-heading">
-          <p class="eyebrow">Execution history</p>
-          <h2 id="export-trades-heading">Trade Exports</h2>
-          <p class="card-description">Execution prices, fees, gross and net values, and realized P&amp;L.</p>
-          <label class="export-filter">
-            Date range
-            <select data-export-period>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="all">All Data</option>
-            </select>
-          </label>
-          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
-          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
-          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
-          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
-        </section>
+      <section class="dashboard-section" aria-labelledby="data-exports-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Core data</p>
+            <h2 id="data-exports-heading">Data Exports</h2>
+          </div>
+        </div>
+        <div class="export-grid">
+          <section class="dashboard-panel export-card" data-export-card="trades" aria-labelledby="export-trades-heading">
+            <p class="eyebrow">Execution history</p>
+            <h2 id="export-trades-heading">Trade Exports</h2>
+            <p class="card-description">Execution prices, fees, gross and net values, and realized P&amp;L.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="all">All Data</option>
+              </select>
+            </label>
+            <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+            <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+            <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+            <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+          </section>
 
-        <section class="dashboard-panel export-card" data-export-card="portfolio" aria-labelledby="export-portfolio-heading">
-          <p class="eyebrow">Portfolio history</p>
-          <h2 id="export-portfolio-heading">Portfolio Exports</h2>
-          <p class="card-description">Stored portfolio snapshots with derived total P&amp;L and daily realized P&amp;L.</p>
-          <label class="export-filter">
-            Date range
-            <select data-export-period>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="all">All Data</option>
-            </select>
-          </label>
-          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
-          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
-          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
-          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
-        </section>
+          <section class="dashboard-panel export-card" data-export-card="positions" aria-labelledby="export-positions-heading">
+            <p class="eyebrow">Position history</p>
+            <h2 id="export-positions-heading">Position Exports</h2>
+            <p class="card-description">Open and closed positions with stored entry/current prices and unrealized P&amp;L.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="all">All Data</option>
+              </select>
+            </label>
+            <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+            <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+            <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+            <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+          </section>
 
-        <section class="dashboard-panel export-card" data-export-card="decisions" aria-labelledby="export-decisions-heading">
-          <p class="eyebrow">Agent activity</p>
-          <h2 id="export-decisions-heading">AI Decision Exports</h2>
-          <p class="card-description">Recorded decisions, confidence, market-strength score, and reason.</p>
-          <label class="export-filter">
-            Date range
-            <select data-export-period>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="all">All Data</option>
-            </select>
-          </label>
-          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
-          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
-          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
-          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
-        </section>
+          <section class="dashboard-panel export-card" data-export-card="portfolio" aria-labelledby="export-portfolio-heading">
+            <p class="eyebrow">Portfolio history</p>
+            <h2 id="export-portfolio-heading">Portfolio Exports</h2>
+            <p class="card-description">Stored portfolio snapshots with derived total P&amp;L and daily realized P&amp;L.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="all">All Data</option>
+              </select>
+            </label>
+            <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+            <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+            <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+            <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+          </section>
 
-        <section class="dashboard-panel export-card" data-export-card="positions" aria-labelledby="export-positions-heading">
-          <p class="eyebrow">Position history</p>
-          <h2 id="export-positions-heading">Position Exports</h2>
-          <p class="card-description">Open and closed positions with stored entry/current prices and unrealized P&amp;L.</p>
-          <label class="export-filter">
-            Date range
-            <select data-export-period>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="all">All Data</option>
-            </select>
-          </label>
-          <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
-          <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
-          <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
-          <p class="export-status" data-export-status role="status" aria-live="polite"></p>
-        </section>
-      </div>
+          <section class="dashboard-panel export-card" data-export-card="decisions" aria-labelledby="export-decisions-heading">
+            <p class="eyebrow">Agent activity</p>
+            <h2 id="export-decisions-heading">AI Decision Exports</h2>
+            <p class="card-description">Recorded decisions, confidence, market-strength score, and reason.</p>
+            <label class="export-filter">
+              Date range
+              <select data-export-period>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="all">All Data</option>
+              </select>
+            </label>
+            <p class="export-record-count" data-export-count role="status" aria-live="polite">Loading record count…</p>
+            <p class="dashboard-empty" data-export-empty hidden>No records match this date range.</p>
+            <button class="history-search-button" data-export-download type="button" disabled>Download CSV</button>
+            <p class="export-status" data-export-status role="status" aria-live="polite"></p>
+          </section>
+        </div>
+      </section>
 
       <section id="analytics-exports" class="dashboard-section" aria-labelledby="analytics-exports-heading">
         <div class="section-heading">

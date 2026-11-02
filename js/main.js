@@ -35,6 +35,14 @@ for (const link of document.querySelectorAll("[data-nav-link]")) {
   });
 }
 
+document.addEventListener("click", (event) => {
+  for (const dropdown of document.querySelectorAll(".nav-dropdown[open]")) {
+    if (!dropdown.contains(event.target)) {
+      dropdown.open = false;
+    }
+  }
+});
+
 window.addEventListener("pageshow", () => {
   let targetPath;
   try {

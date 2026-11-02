@@ -224,6 +224,15 @@ test("Exports page is English, protected, and links to the existing data API", (
   assert.match(html, /AI Decision Exports/);
   assert.match(html, /Position Exports/);
   assert.doesNotMatch(html, /data-analytics-export-period/);
+  const dataExportSection = html.match(
+    /<section class="dashboard-section" aria-labelledby="data-exports-heading">([\s\S]*?)<\/section>\s*<section id="analytics-exports"/
+  );
+  assert.ok(dataExportSection, "core data exports have their own section");
+  assert.match(dataExportSection[1], /<h2 id="data-exports-heading">Data Exports<\/h2>/);
+  assert.deepEqual(
+    [...dataExportSection[1].matchAll(/data-export-card="([^"]+)"/g)].map(([, type]) => type),
+    ["trades", "positions", "portfolio", "decisions"]
+  );
   for (const type of [
     "analytics-summary",
     "trade-analytics",

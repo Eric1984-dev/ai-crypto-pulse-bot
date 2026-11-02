@@ -186,7 +186,8 @@ test("internal navigation resets to the top on mobile destination loads", () => 
   };
   const createDocument = (links) => ({
     querySelectorAll() { return links; },
-    querySelector() { return null; }
+    querySelector() { return null; },
+    addEventListener() {}
   });
   vm.runInNewContext(source, {
     window: dashboardWindow,
@@ -221,6 +222,40 @@ test("internal navigation resets to the top on mobile destination loads", () => 
 
   assert.deepEqual(scrollCalls, [[0, 0]]);
   assert.equal(storage.has("cryptopulse:navigation-target"), false);
+});
+
+test("open navigation dropdown closes on an outside click but stays open for inside clicks", () => {
+  const source = fs.readFileSync(path.join(rootDirectory, "js", "main.js"), "utf8");
+  const documentListeners = {};
+  const inside = {};
+  const outside = {};
+  const dropdown = {
+    open: true,
+    contains(target) {
+      return target === inside;
+    }
+  };
+  const documentRef = {
+    querySelectorAll(selector) {
+      return selector === ".nav-dropdown[open]" && dropdown.open ? [dropdown] : [];
+    },
+    querySelector() {
+      return null;
+    },
+    addEventListener(name, callback) {
+      documentListeners[name] = callback;
+    }
+  };
+  const windowRef = {
+    location: { pathname: "/dashboard.html" },
+    addEventListener() {}
+  };
+
+  vm.runInNewContext(source, { window: windowRef, document: documentRef });
+  documentListeners.click({ target: inside });
+  assert.equal(dropdown.open, true);
+  documentListeners.click({ target: outside });
+  assert.equal(dropdown.open, false);
 });
 
 test("trade history filters start collapsed and the table supports vertical scrolling", () => {

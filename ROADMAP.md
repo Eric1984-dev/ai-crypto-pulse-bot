@@ -211,7 +211,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
 - [x] Show persisted run times in a green dashboard activity strip, keep Analytics/Market Scan on-demand, and use a yellow PAPER MODE badge
 - [x] Remove redundant PAPER ACTIVE banners and footer notices from app pages
-- [x] Add blue menu-item hover glow and keep the open navigation above sticky Analytics table headings
+- [x] Add blue menu-item hover glow, close navigation on outside click, and keep it above sticky Analytics table headings
 - [x] Recolor the Agent Status circuit and active signals blue while retaining red error and static gray stopped/unknown states
 - [x] Use blue AI-brain artwork inspired by the supplied reference beneath the route-masked moving neuron signals
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
@@ -226,6 +226,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Improve Dashboard Recent Trades with position status and EUR P&L details; compact large quantities and preserve precision for micro-priced assets
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
+- [x] Separate core data exports from Analytics and Recommendation reports; group Trade and Position exports together
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 

@@ -29,13 +29,14 @@ All notable project changes should be documented here.
 - Replaced the Dashboard's full-width paper-trading notice with a compact yellow PAPER MODE badge beside the app icon
 - Removed redundant PAPER ACTIVE banners and auth-footer notices across app pages; the shared header remains the visible mode indicator
 - Pinned Dashboard to the top of each application menu, separated the remaining alphabetically sorted links with a divider, and kept account actions at the bottom
-- Added blue hover glows to menu links and stacked the open menu above sticky Analytics table headers
+- Added blue hover glows to menu links, closed the menu on outside click, and stacked it above sticky Analytics table headers
 - Collapsed Dashboard Portfolio, Activity, Market universe, and Agent log panels by default
 
 ### Exports date filters
 
 - Added independent 30-, 90-, and 365-day date selectors to each Performance and Recommendation report
 - Removed the shared Analytics export date selector; each report count and CSV download now follows its own range
+- Grouped core data exports separately from Analytics and Recommendation reports, with Trade and Position exports adjacent
 
 ### Agent Brain glow tuning
 
