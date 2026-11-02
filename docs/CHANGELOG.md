@@ -10,6 +10,11 @@ All notable project changes should be documented here.
 
 - Changed the shared 180×180 app icon background from dark green to deep blue while preserving the existing Bitcoin-and-hands artwork
 
+### Dashboard overview spacing and counts
+
+- Reduced the gap between the header and Overview
+- Moved dashboard list counts next to their titles and displayed them in parentheses
+
 ### Charcoal visual theme and P&L tones
 
 - Restyled the page background in neutral charcoal, with dark slate cards and blue accents

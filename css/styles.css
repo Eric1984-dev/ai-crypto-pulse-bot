@@ -520,7 +520,7 @@ a:focus-visible {
 }
 
 .dashboard-shell {
-  padding-block: 38px 64px;
+  padding-block: 16px 64px;
 }
 
 .section-heading,
@@ -857,6 +857,13 @@ a:focus-visible {
   margin-bottom: 0;
 }
 
+.dashboard-panel-count {
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .trade-history-dashboard-actions {
   display: flex;
   flex-wrap: wrap;
@@ -876,8 +883,7 @@ a:focus-visible {
   text-decoration: underline;
 }
 
-.status-pill,
-.count-pill {
+.status-pill {
   display: inline-flex;
   min-height: 28px;
   flex: 0 0 auto;

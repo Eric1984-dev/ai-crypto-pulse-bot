@@ -201,6 +201,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Dashboard Portfolio, Activity, Market universe, and Agent log panels by default
+- [x] Reduce whitespace above the Dashboard Overview and show list counts inline with their panel titles
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS

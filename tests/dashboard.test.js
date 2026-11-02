@@ -657,6 +657,19 @@ test("dashboard list panels start collapsed and the activity strip uses the five
     "Agent log"
   ]);
   assert.doesNotMatch(listSection[1], /<details\b[^>]*\bopen(?:\s|>)/);
+  for (const [title, value] of [
+    ["Open Positions", "openPositions"],
+    ["Recent Trades", "paperTrades"],
+    ["Watched Markets", "trackedMarkets"],
+    ["Recent AI Decisions", "aiDecisions"]
+  ]) {
+    assert.match(
+      listSection[1],
+      new RegExp(`<h2>${title} <span class="dashboard-panel-count">\\(<span data-dashboard-value="${value}">0<\\/span>\\)<\\/span><\\/h2>`)
+    );
+  }
+  assert.doesNotMatch(listSection[1], /class="count-pill"/);
+  assert.match(styles, /\.dashboard-shell\s*\{[^}]*padding-block:\s*16px 64px;/s);
   for (const listName of ["positions", "trades", "markets", "decisions"]) {
     assert.match(listSection[1], new RegExp(`data-dashboard-list="${listName}"`));
   }
