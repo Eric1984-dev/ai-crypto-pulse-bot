@@ -27,6 +27,16 @@
   font-weight: 700;
 }
 
+.trade-action-buy {
+  color: var(--positive);
+  font-weight: 700;
+}
+
+.trade-action-sell {
+  color: var(--negative);
+  font-weight: 700;
+}
+
 .trade-position-breakdown {
   display: grid;
   gap: 3px;
@@ -698,10 +708,10 @@ a:focus-visible {
   place-items: center;
   margin: -4px -4px 0 0;
   padding: 0;
-  border: 1px solid var(--accent-border);
+  border: 1px solid #6d7785;
   border-radius: 50%;
-  background: #1c2b43;
-  color: var(--accent);
+  background: var(--surface-raised);
+  color: var(--muted);
   font: inherit;
   font-size: 15px;
   line-height: 1;
@@ -710,7 +720,7 @@ a:focus-visible {
 
 .kpi-info-trigger:hover,
 .kpi-info-trigger[aria-expanded="true"] {
-  background: #294a73;
+  background: #303741;
 }
 
 .kpi-info-trigger:focus-visible {
@@ -1288,6 +1298,14 @@ a:focus-visible {
 .history-page-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.history-filters option[value="buy"] {
+  color: var(--positive);
+}
+
+.history-filters option[value="sell"] {
+  color: var(--negative);
 }
 
 .history-search-button,

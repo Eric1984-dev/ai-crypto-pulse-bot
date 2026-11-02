@@ -74,9 +74,15 @@
           const secondary = documentRef.createElement("span");
           primary.className = "dashboard-row-primary";
           secondary.className = "dashboard-row-secondary";
-          const [primaryText, secondaryText, marketSymbol] = describeRankingItem(ranking, item);
-          if (marketSymbol) {
-            formatters.setMarketSymbolText(documentRef, primary, primaryText, marketSymbol);
+          const [primaryText, secondaryText, marketSymbol, tradeAction] = describeRankingItem(ranking, item);
+          if (marketSymbol || tradeAction) {
+            formatters.setMarketAndTradeText(
+              documentRef,
+              primary,
+              primaryText,
+              marketSymbol,
+              tradeAction
+            );
           } else {
             primary.textContent = primaryText;
           }
@@ -97,7 +103,8 @@
       return [
         `${item.decision || "—"} · ${symbol} · ${formatPercent(item.confidence)}`,
         `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`,
-        item.symbol
+        item.symbol,
+        item.decision
       ];
     }
     const metric = ranking === "highestVolume"

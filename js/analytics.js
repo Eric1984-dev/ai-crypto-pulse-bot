@@ -150,7 +150,7 @@
     const rows = ["BUY", "SELL", "HOLD"].map((action) => {
       const group = actions[action];
       return [
-        action,
+        { tradeAction: action },
         formatCount(group.decisionCount),
         formatCount(group.scoredCount),
         formatCount(group.unscoredCount),
@@ -213,8 +213,12 @@
           && Object.prototype.hasOwnProperty.call(value, "toneValue");
         const isMarketSymbol = value && typeof value === "object"
           && Object.prototype.hasOwnProperty.call(value, "marketSymbol");
+        const isTradeAction = value && typeof value === "object"
+          && Object.prototype.hasOwnProperty.call(value, "tradeAction");
         if (isMarketSymbol) {
           cell.append(formatters.createMarketSymbol(documentRef, value.marketSymbol));
+        } else if (isTradeAction) {
+          cell.append(formatters.createTradeActionLabel(documentRef, value.tradeAction));
         } else {
           cell.textContent = isColoredValue ? value.text : value;
         }

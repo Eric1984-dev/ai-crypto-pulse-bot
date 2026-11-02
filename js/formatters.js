@@ -72,8 +72,57 @@
   function setMarketSymbolText(documentRef, element, text, symbol) {
     const value = typeof text === "string" ? text : String(text ?? "");
     const market = typeof symbol === "string" ? symbol.trim() : "";
-    const index = market ? value.indexOf(market) : -1;
-    if (index < 0) {
+    setHighlightedText(documentRef, element, value, market
+      ? [{ text: market, className: "market-symbol" }]
+      : []);
+  }
+
+  function setTradeActionText(documentRef, element, text, action) {
+    const side = normalizeTradeSide(action);
+    setHighlightedText(documentRef, element, text, side
+      ? [{ text: side, className: `trade-action-${side.toLowerCase()}` }]
+      : []);
+  }
+
+  function setMarketAndTradeText(documentRef, element, text, symbol, action) {
+    const markers = [];
+    const side = normalizeTradeSide(action);
+    const market = typeof symbol === "string" ? symbol.trim() : "";
+    if (side) {
+      markers.push({
+        text: side,
+        className: `trade-action-${side.toLowerCase()}`
+      });
+    }
+    if (market) {
+      markers.push({ text: market, className: "market-symbol" });
+    }
+    setHighlightedText(documentRef, element, text, markers);
+  }
+
+  function createTradeActionLabel(documentRef, action) {
+    const element = documentRef.createElement("span");
+    const side = normalizeTradeSide(action);
+    element.textContent = typeof action === "string" ? action.toUpperCase() : "—";
+    if (side) {
+      element.className = `trade-action-${side.toLowerCase()}`;
+    }
+    return element;
+  }
+
+  function setHighlightedText(documentRef, element, text, markers) {
+    const value = typeof text === "string" ? text : String(text ?? "");
+    const matches = markers.map((marker) => {
+      const markerText = typeof marker.text === "string" ? marker.text : "";
+      const index = markerText
+        ? value.toUpperCase().indexOf(markerText.toUpperCase())
+        : -1;
+      return index < 0
+        ? null
+        : { ...marker, index, value: value.slice(index, index + markerText.length) };
+    }).filter(Boolean).sort((left, right) => left.index - right.index);
+
+    if (!matches.length) {
       element.textContent = value;
       return;
     }
@@ -82,9 +131,25 @@
     } else {
       element.textContent = "";
     }
-    element.append(value.slice(0, index));
-    element.append(createMarketSymbol(documentRef, market));
-    element.append(value.slice(index + market.length));
+
+    let position = 0;
+    for (const match of matches) {
+      if (match.index < position) {
+        continue;
+      }
+      element.append(value.slice(position, match.index));
+      const highlighted = documentRef.createElement("span");
+      highlighted.className = match.className;
+      highlighted.textContent = match.value;
+      element.append(highlighted);
+      position = match.index + match.value.length;
+    }
+    element.append(value.slice(position));
+  }
+
+  function normalizeTradeSide(action) {
+    const side = typeof action === "string" ? action.toUpperCase() : "";
+    return side === "BUY" || side === "SELL" ? side : "";
   }
 
   function formatPrice(value) {
@@ -288,6 +353,9 @@
     formatTradeValueDetails,
     getClosedTradeMetrics,
     getOpenPositionMetrics,
-    setMarketSymbolText
+    setMarketSymbolText,
+    setTradeActionText,
+    setMarketAndTradeText,
+    createTradeActionLabel
   };
 });

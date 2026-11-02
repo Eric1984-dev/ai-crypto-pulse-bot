@@ -411,6 +411,8 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.match(rows.children[0].children[0].textContent, /12:00/);
   assert.equal(rows.children[0].children[1].textContent, "<img src=x>");
   assert.equal(rows.children[0].children[1].children[0].className, "market-symbol");
+  assert.equal(rows.children[0].children[2].children[0].className, "trade-action-buy");
+  assert.equal(rows.children[1].children[2].children[0].className, "trade-action-sell");
   assert.match(rows.children[0].children[3].textContent, /1,000\.00$/);
   assert.match(rows.children[1].children[3].textContent, /1,124\.00$/);
   assert.match(rows.children[2].children[3].textContent, /0\.98123$/);

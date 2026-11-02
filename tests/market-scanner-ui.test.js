@@ -156,6 +156,10 @@ test("scanner deduplicates requests and safely renders selected timeframe rankin
     selectors.get('[data-scanner-list="topGainers"]').children[0].children[0].children[1].className,
     "market-symbol"
   );
+  assert.equal(
+    selectors.get('[data-scanner-list="aiOpportunities"]').children[0].children[0].children[1].className,
+    "trade-action-buy"
+  );
   assert.match(
     selectors.get('[data-scanner-list="topGainers"]').children[0].children[1].textContent,
     /Captured 13:00/

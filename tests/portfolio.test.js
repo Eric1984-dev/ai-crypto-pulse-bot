@@ -106,6 +106,14 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
     elements.get("[data-portfolio-list=\"trades\"]").children[0].children[1].textContent,
     /Price €1,124\.00 · Gross Proceeds: €1,124\.00 · Fees: €2\.81 · Net Proceeds: €1,121\.19 · Realized P&L: \+€118\.69 · Executed .*12:00/
   );
+  assert.equal(
+    elements.get("[data-portfolio-list=\"trades\"]").children[0].children[0].children[1].className,
+    "trade-action-sell"
+  );
+  assert.equal(
+    elements.get("[data-portfolio-list=\"trades\"]").children[0].children[0].children[3].className,
+    "market-symbol"
+  );
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").hidden, false);
   assert.equal(elements.get("[data-portfolio-empty=\"trades\"]").hidden, true);
 });

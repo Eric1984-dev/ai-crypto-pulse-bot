@@ -146,7 +146,8 @@
     renderCollection(documentRef, "trades", recentTrades.items, (item) => [
       item.symbol || "—",
       describeRecentTrade(item),
-      item.symbol
+      item.symbol,
+      item.side
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
@@ -156,7 +157,8 @@
     renderCollection(documentRef, "decisions", aiDecisions.items, (item) => [
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
       `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`,
-      item.symbol
+      item.symbol,
+      item.decision
     ]);
     const chart = renderPortfolioChart(
       documentRef,
@@ -314,18 +316,28 @@
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
       for (const item of safeItems) {
-        const [primaryText, secondaryText, marketSymbol] = describeItem(item);
+        const [primaryText, secondaryText, marketSymbol, tradeAction] = describeItem(item);
         const row = documentRef.createElement("li");
         const primary = documentRef.createElement("span");
         const secondary = documentRef.createElement("span");
         primary.className = "dashboard-row-primary";
         secondary.className = "dashboard-row-secondary";
-        if (marketSymbol) {
-          formatters.setMarketSymbolText(documentRef, primary, primaryText, marketSymbol);
+        if (marketSymbol || tradeAction) {
+          formatters.setMarketAndTradeText(
+            documentRef,
+            primary,
+            primaryText,
+            marketSymbol,
+            tradeAction
+          );
         } else {
           primary.textContent = primaryText;
         }
-        secondary.textContent = secondaryText;
+        if (tradeAction) {
+          formatters.setTradeActionText(documentRef, secondary, secondaryText, tradeAction);
+        } else {
+          secondary.textContent = secondaryText;
+        }
         row.append(primary, secondary);
         list.append(row);
       }

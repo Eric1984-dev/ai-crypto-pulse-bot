@@ -152,6 +152,14 @@ test("analytics page renders EUR metrics, outcome tables, portfolio periods, and
   assert.equal(documentRef.querySelector('[data-analytics-value="averageHoldTime"]').textContent, "1h 1m");
   assert.equal(documentRef.querySelector("[data-analytics-confidence]").children.length, 1);
   assert.equal(documentRef.querySelector("[data-analytics-actions]").children.length, 3);
+  assert.equal(
+    documentRef.querySelector("[data-analytics-actions]").children[0].children[0].children[0].className,
+    "trade-action-buy"
+  );
+  assert.equal(
+    documentRef.querySelector("[data-analytics-actions]").children[1].children[0].children[0].className,
+    "trade-action-sell"
+  );
   assert.equal(documentRef.querySelector("[data-analytics-actions]").children[1].children[5].dataset.valueTone, "negative");
   assert.equal(documentRef.querySelector("[data-analytics-strategies]").children.length, 1);
   assert.equal(

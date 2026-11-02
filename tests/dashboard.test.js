@@ -530,12 +530,20 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     /SELL · Quantity: 1.*Exit: €\s?1,124\.00.*\+€118\.69 \(\+11\.84%\).*13:00.*Status: CLOSED/s
   );
   assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].children[1].className,
+    "trade-action-sell"
+  );
+  assert.equal(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[0].textContent,
     "WIN-EUR"
   );
   assert.match(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[1].textContent,
     /BUY · Quantity: 16\.35M.*Entry: €\s?0\.00006123.*Current: €\s?0\.000067.*P&L: \+€.*\(\+9\.42%\).*Status: OPEN/s
+  );
+  assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[1].children[1].className,
+    "trade-action-buy"
   );
   assert.match(
     elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,
@@ -668,6 +676,26 @@ test("dashboard KPI information is accessible, English-only, and covers all port
     assert.match(html, new RegExp(`id="kpi-info-${id}" role="tooltip" hidden`));
   }
   assert.doesNotMatch(html, /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i);
+});
+
+test("dashboard KPI info icons use neutral gray while retaining keyboard focus visibility", () => {
+  const styles = fs.readFileSync(path.join(rootDirectory, "css/styles.css"), "utf8");
+
+  assert.match(
+    styles,
+    /\.kpi-info-trigger\s*\{[^}]*border:\s*1px solid #6d7785;[^}]*background:\s*var\(--surface-raised\);[^}]*color:\s*var\(--muted\);/s
+  );
+  assert.match(styles, /\.kpi-info-trigger:hover,[\s\S]*?background:\s*#303741;/);
+  assert.match(styles, /\.kpi-info-trigger:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--accent\);/s);
+});
+
+test("BUY and SELL labels use the shared positive and negative colors", () => {
+  const styles = fs.readFileSync(path.join(rootDirectory, "css/styles.css"), "utf8");
+
+  assert.match(styles, /\.trade-action-buy\s*\{[^}]*color:\s*var\(--positive\);/s);
+  assert.match(styles, /\.trade-action-sell\s*\{[^}]*color:\s*var\(--negative\);/s);
+  assert.match(styles, /\.history-filters option\[value="buy"\]\s*\{[^}]*color:\s*var\(--positive\);/s);
+  assert.match(styles, /\.history-filters option\[value="sell"\]\s*\{[^}]*color:\s*var\(--negative\);/s);
 });
 
 test("dashboard collapses portfolio metrics after Win Rate by default", () => {

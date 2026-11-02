@@ -69,11 +69,15 @@
         item.symbol
       ];
     });
-    renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
-      `${item.side || "—"} ${item.symbol || "—"} · ${formatters.formatQuantity(item.quantity)} units`,
-      `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`,
-      item.symbol
-    ]);
+    renderCollection(documentRef, "trades", data.recentTrades.items, (item) => {
+      const side = typeof item.side === "string" ? item.side.toUpperCase() : "—";
+      return [
+        `${side} ${item.symbol || "—"} · ${formatters.formatQuantity(item.quantity)} units`,
+        `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`,
+        item.symbol,
+        side
+      ];
+    });
   }
 
   function startPortfolio({
@@ -226,9 +230,15 @@
       const row = documentRef.createElement("li");
       const title = documentRef.createElement("strong");
       const details = documentRef.createElement("span");
-      const [primaryText, secondaryText, marketSymbol] = describeItem(item);
-      if (marketSymbol) {
-        formatters.setMarketSymbolText(documentRef, title, primaryText, marketSymbol);
+      const [primaryText, secondaryText, marketSymbol, tradeAction] = describeItem(item);
+      if (marketSymbol || tradeAction) {
+        formatters.setMarketAndTradeText(
+          documentRef,
+          title,
+          primaryText,
+          marketSymbol,
+          tradeAction
+        );
       } else {
         title.textContent = primaryText;
       }
