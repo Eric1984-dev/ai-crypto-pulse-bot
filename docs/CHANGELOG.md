@@ -9,6 +9,7 @@ All notable project changes should be documented here.
 ### Purple Visual Theme
 
 - Recolored the Bitcoin-in-hands app icon with a purple background while preserving its coin-and-circuit artwork, and applied a subdued purple application theme including chart accents and browser theme colors
+- Darkened the shared page background with soft purple glows fading into black behind tiles; retained existing card surfaces and functional status colors
 - Removed decorative labels from the Agent Status circuit and increased the vivid purple glow and signal density for `ANALYZING`; all signal activity remains driven by the existing agent status
 - Expanded the square circuit artwork to fill available mobile width, bounded by 90vh; neuron routes now start at the chip edge, move in multiple directions, and remain clipped inside the board border
 - Preserved red error signaling, static `STOPPED`/`UNKNOWN` states, reduced-motion behavior, and all trading logic

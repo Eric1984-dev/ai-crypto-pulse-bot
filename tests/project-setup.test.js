@@ -101,6 +101,15 @@ test("global page layout does not force horizontal overflow on narrow screens", 
   assert.doesNotMatch(styles, /body\s*\{[^}]*min-width:\s*320px/s);
 });
 
+test("shared page background softly fades purple into black behind existing card surfaces", () => {
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+  assert.match(styles, /radial-gradient\(ellipse at 12% 0%, rgb\(87 57 112 \/ 13%\), transparent 38rem\)/);
+  assert.match(styles, /radial-gradient\(ellipse at 88% 96%, rgb\(54 39 70 \/ 11%\), transparent 42rem\)/);
+  assert.match(styles, /linear-gradient\(135deg, #0b0910 0%, #09070d 52%, #040306 100%\)/);
+  assert.match(styles, /--surface:\s*#15111b;/);
+  assert.match(styles, /--surface-raised:\s*#1d1725;/);
+});
+
 test("internal navigation resets to the top on mobile destination loads", () => {
   const source = fs.readFileSync(path.join(rootDirectory, "js", "main.js"), "utf8");
   const storage = new Map();

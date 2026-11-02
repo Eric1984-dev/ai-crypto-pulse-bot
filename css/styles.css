@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: "Segoe UI", sans-serif;
-  background: #0b0910;
+  background: #08070c;
   color: #f1ecf5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,8 +23,9 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(ellipse at 12% 0%, rgb(105 69 134 / 17%), transparent 36rem),
-    #0b0910;
+    radial-gradient(ellipse at 12% 0%, rgb(87 57 112 / 13%), transparent 38rem),
+    radial-gradient(ellipse at 88% 96%, rgb(54 39 70 / 11%), transparent 42rem),
+    linear-gradient(135deg, #0b0910 0%, #09070d 52%, #040306 100%);
 }
 
 a {
