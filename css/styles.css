@@ -19,6 +19,12 @@
   --positive-border: #2f8062;
   --negative: #ff6078;
   --warning: #fbbf24;
+  --market-accent: #dfbd63;
+}
+
+.market-symbol {
+  color: var(--market-accent);
+  font-weight: 700;
 }
 
 .trade-position-breakdown {
@@ -993,6 +999,7 @@ a:focus-visible {
 .agent-status-monitor {
   display: flex;
   min-height: 74px;
+  margin-top: 8px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;

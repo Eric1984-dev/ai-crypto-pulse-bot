@@ -139,20 +139,24 @@
       const unrealizedPnl = metrics ? metrics.unrealizedPnl : item.unrealized_pnl;
       return [
         `${item.symbol || "—"} · ${formatters.formatQuantity(item.amount)} units`,
-        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
+        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`,
+        item.symbol
       ];
     });
     renderCollection(documentRef, "trades", recentTrades.items, (item) => [
       item.symbol || "—",
-      describeRecentTrade(item)
+      describeRecentTrade(item),
+      item.symbol
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
-      `Priority ${formatCount(item.priority)}`
+      `Priority ${formatCount(item.priority)}`,
+      item.symbol
     ]);
     renderCollection(documentRef, "decisions", aiDecisions.items, (item) => [
       `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
-      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
+      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`,
+      item.symbol
     ]);
     const chart = renderPortfolioChart(
       documentRef,
@@ -207,7 +211,7 @@
       emptyState.hidden = true;
     }
     try {
-      return new ChartConstructor(chartContext, createPortfolioChartConfig(snapshots));
+      return new ChartConstructor(chartContext, createPortfolioChartConfig(snapshots, ChartConstructor));
     } catch {
       canvas.hidden = true;
       if (emptyState) {
@@ -218,7 +222,7 @@
     }
   }
 
-  function createPortfolioChartConfig(snapshots) {
+  function createPortfolioChartConfig(snapshots, ChartConstructor) {
     const timestamps = [...new Set(snapshots.map((snapshot) => snapshot.captured_at))]
       .filter((timestamp) => Number.isFinite(Date.parse(timestamp)))
       .sort((left, right) => Date.parse(left) - Date.parse(right));
@@ -242,6 +246,13 @@
       };
     });
 
+    const legendLabels = ChartConstructor
+      && ChartConstructor.defaults
+      && ChartConstructor.defaults.plugins
+      && ChartConstructor.defaults.plugins.legend
+      && ChartConstructor.defaults.plugins.legend.labels;
+    const defaultGenerateLabels = legendLabels && legendLabels.generateLabels;
+
     return {
       type: "line",
       data: { labels, datasets },
@@ -249,7 +260,31 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: portfolioIds.length > 1, labels: { color: "#9ca8ba" } },
+          legend: {
+            display: portfolioIds.length > 1,
+            labels: {
+              color: "#9ca8ba",
+              generateLabels(chart) {
+                const labels = typeof defaultGenerateLabels === "function"
+                  ? defaultGenerateLabels.call(legendLabels, chart)
+                  : chart.data.datasets.map((dataset, index) => ({
+                    text: dataset.label,
+                    fillStyle: dataset.backgroundColor,
+                    strokeStyle: dataset.borderColor,
+                    lineWidth: dataset.borderWidth,
+                    hidden: typeof chart.isDatasetVisible === "function"
+                      ? !chart.isDatasetVisible(index)
+                      : false,
+                    datasetIndex: index
+                  }));
+                return labels.map((label) => ({
+                  ...label,
+                  fillStyle: "#8792a1",
+                  strokeStyle: "#8792a1"
+                }));
+              }
+            }
+          },
           tooltip: { mode: "index", intersect: false }
         },
         scales: {
@@ -279,13 +314,17 @@
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
       for (const item of safeItems) {
-        const [primaryText, secondaryText] = describeItem(item);
+        const [primaryText, secondaryText, marketSymbol] = describeItem(item);
         const row = documentRef.createElement("li");
         const primary = documentRef.createElement("span");
         const secondary = documentRef.createElement("span");
         primary.className = "dashboard-row-primary";
         secondary.className = "dashboard-row-secondary";
-        primary.textContent = primaryText;
+        if (marketSymbol) {
+          formatters.setMarketSymbolText(documentRef, primary, primaryText, marketSymbol);
+        } else {
+          primary.textContent = primaryText;
+        }
         secondary.textContent = secondaryText;
         row.append(primary, secondary);
         list.append(row);

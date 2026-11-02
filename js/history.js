@@ -200,6 +200,8 @@
         } else {
           cell.textContent = "—";
         }
+      } else if (index === 1) {
+        cell.append(formatters.createMarketSymbol(documentRef, value));
       } else {
         cell.textContent = value === null || value === undefined ? "—" : value;
         if (index === 6) {

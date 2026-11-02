@@ -228,6 +228,9 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [x] Separate core data exports from Analytics and Recommendation reports; group Trade and Position exports together
 - [x] Synchronize Dashboard, Portfolio, and Trade History refreshes across tabs and polling intervals without changing P&L calculations
+- [x] Highlight market symbols in gold across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
+- [x] Use gray legend swatches in the Dashboard portfolio chart without changing dataset line colors
+- [x] Add a small visual gap between the AI Brain and live backend status
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 

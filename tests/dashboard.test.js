@@ -341,9 +341,13 @@ function createElement() {
     classList: { contains: () => false },
     replaceChildren() {
       this.children = [];
+      this.textContent = "";
     },
     append(...children) {
       this.children.push(...children);
+      this.textContent += children.map((child) => (
+        typeof child === "string" ? child : child && child.textContent || ""
+      )).join("");
     },
     addEventListener(name, callback) {
       this.listeners[name] = callback;
@@ -513,6 +517,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "20/03/2026, 12:59");
   assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "20/03/2026, 13:00");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0.01 units");
+  assert.equal(
+    elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].children[1].className,
+    "market-symbol"
+  );
   assert.match(
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
     /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?100\.00 · Opened .*11:00/
@@ -577,9 +585,43 @@ test("Agent Status uses a full-width circuit panel with Emergency State at the d
   assert.match(html, /Circuit visualization unavailable/);
   assert.match(styles, /\.dashboard-grid-status,\s*\.dashboard-grid-risk\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.match(styles, /\.agent-brain-stage\s*\{[^}]*width:\s*min\(100%,\s*90vh\);[^}]*aspect-ratio:\s*1;/s);
+  assert.match(styles, /\.agent-status-monitor\s*\{[^}]*margin-top:\s*8px;/s);
   assert.match(styles, /\.circuit-board-image\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /\.agent-brain\[data-visualization="ready"\].*\.agent-brain-fallback\s*\{\s*display:\s*none\s*!important;/s);
+});
+
+test("portfolio chart legend icons are gray without recoloring chart datasets", () => {
+  const defaultLabels = [{
+    text: "Portfolio 1",
+    fillStyle: "#5b9cff22",
+    strokeStyle: "#5b9cff",
+    datasetIndex: 0
+  }];
+  const ChartConstructor = {
+    defaults: {
+      plugins: {
+        legend: {
+          labels: {
+            generateLabels: () => defaultLabels
+          }
+        }
+      }
+    }
+  };
+  const config = dashboard.createPortfolioChartConfig([
+    { portfolio_id: "one", captured_at: "2026-03-20T10:00:00.000Z", portfolio_value: "100" },
+    { portfolio_id: "two", captured_at: "2026-03-20T10:00:00.000Z", portfolio_value: "200" }
+  ], ChartConstructor);
+  const labels = config.options.plugins.legend.labels.generateLabels({
+    data: config.data,
+    isDatasetVisible: () => true
+  });
+
+  assert.equal(config.options.plugins.legend.display, true);
+  assert.equal(labels[0].fillStyle, "#8792a1");
+  assert.equal(labels[0].strokeStyle, "#8792a1");
+  assert.notEqual(config.data.datasets[0].borderColor, "#8792a1");
 });
 
 test("dashboard renders safe empty states without inventing portfolio history", () => {

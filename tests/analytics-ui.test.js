@@ -10,8 +10,11 @@ function createNode() {
     hidden: false,
     dataset: {},
     children: [],
-    append(child) {
-      this.children.push(child);
+    append(...children) {
+      this.children.push(...children);
+      this.textContent += children.map((child) => (
+        typeof child === "string" ? child : child && child.textContent || ""
+      )).join("");
     },
     addEventListener(name, callback) {
       this.listeners ||= {};
@@ -25,6 +28,9 @@ function createNode() {
     },
     replaceChildren(...children) {
       this.children = children;
+      this.textContent = children.map((child) => (
+        typeof child === "string" ? child : child && child.textContent || ""
+      )).join("");
     },
     getContext() {
       return null;
@@ -148,6 +154,14 @@ test("analytics page renders EUR metrics, outcome tables, portfolio periods, and
   assert.equal(documentRef.querySelector("[data-analytics-actions]").children.length, 3);
   assert.equal(documentRef.querySelector("[data-analytics-actions]").children[1].children[5].dataset.valueTone, "negative");
   assert.equal(documentRef.querySelector("[data-analytics-strategies]").children.length, 1);
+  assert.equal(
+    documentRef.querySelector("[data-analytics-symbols]").children[0].children[0].children[0].className,
+    "market-symbol"
+  );
+  assert.equal(
+    documentRef.querySelector('[data-analytics-value="bestTrade"]').children[1].className,
+    "market-symbol"
+  );
   assert.equal(documentRef.querySelector('[data-analytics-period="daily"]').children.length, 1);
   assert.equal(documentRef.querySelector('[data-analytics-period-empty="weekly"]').hidden, false);
   assert.equal(documentRef.querySelector('[data-analytics-chart-empty="equity"]').hidden, false);

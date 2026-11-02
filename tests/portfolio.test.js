@@ -12,9 +12,13 @@ function createElement() {
     children: [],
     replaceChildren() {
       this.children = [];
+      this.textContent = "";
     },
     append(...children) {
       this.children.push(...children);
+      this.textContent += children.map((child) => (
+        typeof child === "string" ? child : child && child.textContent || ""
+      )).join("");
     }
   };
 }
@@ -90,6 +94,10 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
   assert.match(elements.get("[data-portfolio-value=\"realizedPnl\"]").textContent, /50\.00/);
   assert.equal(elements.get("[data-portfolio-value=\"openPositions\"]").textContent, "1");
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].textContent, "<img src=x> · 0.01 units");
+  assert.equal(
+    elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].children[1].className,
+    "market-symbol"
+  );
   assert.match(
     elements.get("[data-portfolio-list=\"positions\"]").children[0].children[1].textContent,
     /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?0\.05 · Opened .*11:00/

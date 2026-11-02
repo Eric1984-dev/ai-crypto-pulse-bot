@@ -65,12 +65,14 @@
       const unrealizedPnl = metrics ? metrics.unrealizedPnl : item.unrealized_pnl;
       return [
         `${item.symbol || "—"} · ${formatters.formatQuantity(item.amount)} units`,
-        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
+        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`,
+        item.symbol
       ];
     });
     renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
       `${item.side || "—"} ${item.symbol || "—"} · ${formatters.formatQuantity(item.quantity)} units`,
-      `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`
+      `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`,
+      item.symbol
     ]);
   }
 
@@ -224,9 +226,13 @@
       const row = documentRef.createElement("li");
       const title = documentRef.createElement("strong");
       const details = documentRef.createElement("span");
-      const [primary, secondary] = describeItem(item);
-      title.textContent = primary;
-      details.textContent = secondary;
+      const [primaryText, secondaryText, marketSymbol] = describeItem(item);
+      if (marketSymbol) {
+        formatters.setMarketSymbolText(documentRef, title, primaryText, marketSymbol);
+      } else {
+        title.textContent = primaryText;
+      }
+      details.textContent = secondaryText;
       row.append(title, details);
       list.append(row);
     }

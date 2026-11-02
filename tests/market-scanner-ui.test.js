@@ -52,9 +52,13 @@ function element(dataset = {}) {
     listeners: {},
     replaceChildren() {
       this.children = [];
+      this.textContent = "";
     },
     append(...children) {
       this.children.push(...children);
+      this.textContent += children.map((child) => (
+        typeof child === "string" ? child : child && child.textContent || ""
+      )).join("");
     },
     addEventListener(name, callback) {
       this.listeners[name] = callback;
@@ -147,6 +151,10 @@ test("scanner deduplicates requests and safely renders selected timeframe rankin
   assert.equal(
     selectors.get('[data-scanner-list="topGainers"]').children[0].children[0].textContent,
     "BTC-EUR · 2%"
+  );
+  assert.equal(
+    selectors.get('[data-scanner-list="topGainers"]').children[0].children[0].children[1].className,
+    "market-symbol"
   );
   assert.match(
     selectors.get('[data-scanner-list="topGainers"]').children[0].children[1].textContent,

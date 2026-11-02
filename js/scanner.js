@@ -74,8 +74,12 @@
           const secondary = documentRef.createElement("span");
           primary.className = "dashboard-row-primary";
           secondary.className = "dashboard-row-secondary";
-          const [primaryText, secondaryText] = describeRankingItem(ranking, item);
-          primary.textContent = primaryText;
+          const [primaryText, secondaryText, marketSymbol] = describeRankingItem(ranking, item);
+          if (marketSymbol) {
+            formatters.setMarketSymbolText(documentRef, primary, primaryText, marketSymbol);
+          } else {
+            primary.textContent = primaryText;
+          }
           secondary.textContent = secondaryText;
           row.append(primary, secondary);
           list.append(row);
@@ -92,7 +96,8 @@
     if (ranking === "aiOpportunities") {
       return [
         `${item.decision || "—"} · ${symbol} · ${formatPercent(item.confidence)}`,
-        `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`
+        `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`,
+        item.symbol
       ];
     }
     const metric = ranking === "highestVolume"
@@ -102,7 +107,7 @@
     const secondary = ranking === "highestVolume"
       ? `Estimated quote volume · Price ${formatCurrency(item.price)}`
       : `Price ${formatCurrency(item.price)} · Captured ${formatTime(item.captured_at)}`;
-    return [`${symbol} · ${metric}`, secondary];
+    return [`${symbol} · ${metric}`, secondary, item.symbol];
   }
 
   function formatPercent(value) {

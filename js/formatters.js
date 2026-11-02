@@ -59,6 +59,34 @@
     })
   };
 
+  function createMarketSymbol(documentRef, symbol) {
+    const text = typeof symbol === "string" ? symbol.trim() : "";
+    const element = documentRef.createElement("span");
+    element.textContent = text || "—";
+    if (text) {
+      element.className = "market-symbol";
+    }
+    return element;
+  }
+
+  function setMarketSymbolText(documentRef, element, text, symbol) {
+    const value = typeof text === "string" ? text : String(text ?? "");
+    const market = typeof symbol === "string" ? symbol.trim() : "";
+    const index = market ? value.indexOf(market) : -1;
+    if (index < 0) {
+      element.textContent = value;
+      return;
+    }
+    if (typeof element.replaceChildren === "function") {
+      element.replaceChildren();
+    } else {
+      element.textContent = "";
+    }
+    element.append(value.slice(0, index));
+    element.append(createMarketSymbol(documentRef, market));
+    element.append(value.slice(index + market.length));
+  }
+
   function formatPrice(value) {
     const price = numericValue(value);
     if (price === null) {
@@ -249,6 +277,7 @@
   }
 
   return {
+    createMarketSymbol,
     formatCurrency,
     formatPrice,
     formatQuantity,
@@ -258,6 +287,7 @@
     formatTimestamp,
     formatTradeValueDetails,
     getClosedTradeMetrics,
-    getOpenPositionMetrics
+    getOpenPositionMetrics,
+    setMarketSymbolText
   };
 });

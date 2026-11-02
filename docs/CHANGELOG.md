@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Market display refinements
+
+- Highlight market symbols in gold across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
+- Use neutral gray Dashboard chart legend icons while preserving dataset line colors
+- Add a small gap between the AI Brain and live backend status
+
 ### Synchronized data refresh
 
 - Broadcast Realtime data invalidations across open tabs and align Dashboard, Portfolio, and Trade History fallback polling to shared 30-second boundaries

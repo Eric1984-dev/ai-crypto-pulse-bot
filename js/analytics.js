@@ -78,30 +78,10 @@
     setText(documentRef, "realizedPnl", formatCurrency(trade.realizedPnl), trade.realizedPnl);
     setText(documentRef, "unrealizedPnl", formatCurrency(trade.unrealizedPnl), trade.unrealizedPnl);
     setText(documentRef, "totalPnl", formatCurrency(trade.totalPnl), trade.totalPnl);
-    setText(
-      documentRef,
-      "bestTrade",
-      formatTrade(trade.bestTrade),
-      trade.bestTrade && trade.bestTrade.realizedPnl
-    );
-    setText(
-      documentRef,
-      "worstTrade",
-      formatTrade(trade.worstTrade),
-      trade.worstTrade && trade.worstTrade.realizedPnl
-    );
-    setText(
-      documentRef,
-      "largestWinner",
-      formatTrade(trade.largestWinner),
-      trade.largestWinner && trade.largestWinner.realizedPnl
-    );
-    setText(
-      documentRef,
-      "largestLoser",
-      formatTrade(trade.largestLoser),
-      trade.largestLoser && trade.largestLoser.realizedPnl
-    );
+    setTradeText(documentRef, "bestTrade", trade.bestTrade);
+    setTradeText(documentRef, "worstTrade", trade.worstTrade);
+    setTradeText(documentRef, "largestWinner", trade.largestWinner);
+    setTradeText(documentRef, "largestLoser", trade.largestLoser);
     setText(documentRef, "averageHoldTime", formatDuration(trade.averageHoldTimeSeconds));
     setText(documentRef, "openPositions", formatCount(trade.openPositions));
     setText(documentRef, "closedPositions", formatCount(trade.closedPositions));
@@ -199,7 +179,7 @@
       symbols.set(symbol.symbol, symbol);
     }
     const rows = [...symbols.values()].map((symbol) => [
-      symbol.symbol,
+      { marketSymbol: symbol.symbol },
       formatCount(symbol.closedTrades),
       formatPercent(symbol.winRate),
       colorCurrency(symbol.realizedPnl)
@@ -231,7 +211,13 @@
         const cell = documentRef.createElement("td");
         const isColoredValue = value && typeof value === "object"
           && Object.prototype.hasOwnProperty.call(value, "toneValue");
-        cell.textContent = isColoredValue ? value.text : value;
+        const isMarketSymbol = value && typeof value === "object"
+          && Object.prototype.hasOwnProperty.call(value, "marketSymbol");
+        if (isMarketSymbol) {
+          cell.append(formatters.createMarketSymbol(documentRef, value.marketSymbol));
+        } else {
+          cell.textContent = isColoredValue ? value.text : value;
+        }
         if (isColoredValue) {
           formatters.setValueTone(cell, value.toneValue);
         }
@@ -452,6 +438,27 @@
     }
   }
 
+  function setTradeText(documentRef, name, trade) {
+    const target = documentRef.querySelector(`[data-analytics-value="${name}"]`);
+    if (!target) {
+      return;
+    }
+    if (!trade || typeof trade.realizedPnl !== "number") {
+      target.textContent = "—";
+      return;
+    }
+    const symbol = typeof trade.symbol === "string" && trade.symbol
+      ? trade.symbol
+      : "—";
+    formatters.setMarketSymbolText(
+      documentRef,
+      target,
+      `${formatCurrency(trade.realizedPnl)} · ${symbol}`,
+      trade.symbol
+    );
+    formatters.setValueTone(target, trade.realizedPnl);
+  }
+
   function setHidden(documentRef, selector, hasContent) {
     const element = documentRef.querySelector(selector);
     if (element) {
@@ -485,13 +492,6 @@
     return Number.isSafeInteger(value) && value >= 0
       ? countFormat.format(value)
       : "—";
-  }
-
-  function formatTrade(trade) {
-    if (!trade || typeof trade.realizedPnl !== "number") {
-      return "—";
-    }
-    return `${formatCurrency(trade.realizedPnl)} · ${trade.symbol}`;
   }
 
   function formatDuration(seconds) {
