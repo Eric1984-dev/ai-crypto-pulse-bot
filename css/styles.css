@@ -182,6 +182,12 @@ a {
   box-shadow: 0 16px 38px rgb(0 0 0 / 40%);
 }
 
+.nav-menu-divider {
+  display: block;
+  margin: 3px 4px;
+  border-top: 1px solid var(--border);
+}
+
 .primary-nav .nav-menu a {
   padding: 10px 11px;
   border-radius: 8px;

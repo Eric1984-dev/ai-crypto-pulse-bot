@@ -9,7 +9,7 @@ All notable project changes should be documented here.
 ### Paper-mode header and navigation
 
 - Replaced the Dashboard's full-width paper-trading notice with a compact PAPER MODE badge beside the app icon
-- Sorted application menu links alphabetically across all pages, keeping account actions at the bottom
+- Pinned Dashboard to the top of each application menu, separated the remaining alphabetically sorted links with a divider, and kept account actions at the bottom
 
 ### Exports date filters
 

@@ -49,10 +49,10 @@ test("all pages use a dropdown for their top navigation", () => {
       assert.match(menu[1], /href="\/register\.html"/);
     } else {
       const expectedLinks = [
+        "/dashboard.html",
         "/admin.html",
         "/recommendations.html",
         "/analytics.html",
-        "/dashboard.html",
         "/exports.html",
         "/scanner.html",
         "/portfolio.html",
@@ -60,10 +60,10 @@ test("all pages use a dropdown for their top navigation", () => {
         "/history.html"
       ];
       const expectedItems = [
+        "Dashboard",
         "Admin",
         "AI Recommendations",
         "Analytics",
-        "Dashboard",
         "Exports",
         "Market Scanner",
         "Portfolio",
@@ -71,10 +71,14 @@ test("all pages use a dropdown for their top navigation", () => {
         "Trade History"
       ];
       if (!protectedPages.includes(page)) {
-        expectedLinks.shift();
-        expectedItems.shift();
+        expectedLinks.splice(1, 1);
+        expectedItems.splice(1, 1);
       }
       assert.deepEqual(menuItems, expectedItems);
+      assert.match(
+        menu[1],
+        /<a data-nav-link href="\/dashboard\.html">Dashboard<\/a>\s*<span class="nav-menu-divider" aria-hidden="true"><\/span>/
+      );
       for (const href of expectedLinks) {
         assert.ok(menu[1].includes(`href="${href}"`), `${page} should retain ${href}`);
       }
