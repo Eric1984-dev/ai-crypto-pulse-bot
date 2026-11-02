@@ -133,3 +133,16 @@ Remaining Validation:
 Status:
 
 Resolved and under post-deployment monitoring.
+
+Additional Findings
+
+Confidence Distribution:
+
+BUY 65-70 : 625
+BUY 70-75 : 156
+
+Approximately 80% of BUY decisions currently fall below the Paper Trading entry threshold of 70.
+
+This suggests the confidence threshold may be a significant contributor to low trade volume.
+
+Further evaluation should be based on additional historical trade data before any threshold changes are considered.
