@@ -64,9 +64,14 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   assert.match(container.innerHTML, /class="circuit-neuron-core" r="8"/);
   assert.equal(agentBrain.signalRoutes.length, 32);
   assert.equal(new Set(agentBrain.signalRoutes).size, 32);
+  assert.ok(agentBrain.signalRoutes.every((route) => /^M\d+ \d+[HV]\d+$/.test(route)));
   assert.match(container.innerHTML, /<mask id="circuit-trace-mask"[^>]+mask-type="luminance">/);
   assert.match(container.innerHTML, /mask="url\(#circuit-trace-mask\)"/);
-  assert.doesNotMatch(container.innerHTML, /circuit-board-clip|clip-path=/);
+  assert.equal((container.innerHTML.match(/<clipPath id="circuit-neuron-route-\d+"/g) || []).length, 32);
+  assert.equal(
+    (container.innerHTML.match(/class="circuit-neuron-track" clip-path="url\(#circuit-neuron-route-\d+\)"/g) || []).length,
+    44
+  );
   const circuitArtwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
   assert.ok(circuitArtwork.length > 100000);
   assert.equal(circuitArtwork.readUInt32BE(16), 1254);

@@ -50,38 +50,38 @@
 
   function createSignalRoutes() {
     return Object.freeze([
-      "M626 430V109",
-      "M570 430V127",
-      "M680 430V123",
-      "M520 430V128",
+      "M626 430V320",
+      "M570 430V358",
+      "M680 430V317",
+      "M520 430V362",
       "M626 747V1140",
       "M570 747V903",
       "M680 747V902",
-      "M550 747V899",
-      "M462 445H115",
-      "M462 510H115",
-      "M462 568H120",
-      "M462 620H136",
-      "M790 445H1139",
-      "M790 510H1159",
-      "M790 568H1134",
-      "M790 620H1116",
-      "M548 430V358L472 282H421L344 205H303L246 148V111",
-      "M598 430V293L548 243H496L425 172V111",
-      "M655 430V293L706 242V166L742 130V104",
-      "M705 430V357L764 298H832L889 241H943L1023 151V111",
-      "M524 747V827L456 895H410L331 974H281L212 1043V1100",
-      "M598 747V858L548 908V975L492 1031V1105",
-      "M655 747V852L710 907V980L765 1034V1104",
-      "M730 747V827L802 899H847L925 977H1012L1088 1053V1110",
-      "M462 474H354L300 420H226L180 374H126",
-      "M462 542H335L284 491H225L179 445H104",
-      "M462 594H320L270 642H218L168 692H104",
-      "M462 671H320L270 621H214L162 570H104",
-      "M790 474H899L953 420H1028L1074 374H1128",
-      "M790 542H917L968 491H1027L1073 445H1150",
-      "M790 594H932L982 642H1034L1084 692H1150",
-      "M790 671H932L982 621H1040L1092 570H1150"
+      "M548 747V823",
+      "M548 430V342",
+      "M598 430V373",
+      "M655 430V369",
+      "M705 430V363",
+      "M520 747V799",
+      "M598 747V960",
+      "M655 747V962",
+      "M730 747V834",
+      "M462 445H397",
+      "M462 510H286",
+      "M462 568H411",
+      "M462 620H359",
+      "M462 469H396",
+      "M462 492H440",
+      "M462 538H241",
+      "M462 594H192",
+      "M790 445H852",
+      "M790 510H966",
+      "M790 568H819",
+      "M790 620H880",
+      "M790 469H854",
+      "M790 492H880",
+      "M790 538H1012",
+      "M790 594H1055"
     ]);
   }
 
@@ -96,15 +96,25 @@
     for (let index = 0; index < config.signalCount; index += 1) {
       const duration = config.signalDuration + (index % 4) * 0.13;
       const startOffset = (index % 9) * 0.31;
-      const route = signalRoutes[(index * 7 + 3) % signalRoutes.length];
-      signals.push(`<g class="circuit-neuron circuit-neuron--${statusClass}">
-        <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 22 : 18}" fill="${config.color}"/>
-        <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 8 : 6}"/>
-        <animateMotion dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite" path="${route}"/>
-        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.72;1" dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite"/>
+      const routeIndex = (index * 7 + 3) % signalRoutes.length;
+      const route = signalRoutes[routeIndex];
+      signals.push(`<g class="circuit-neuron-track" clip-path="url(#circuit-neuron-route-${routeIndex})">
+        <g class="circuit-neuron circuit-neuron--${statusClass}">
+          <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 22 : 18}" fill="${config.color}"/>
+          <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 8 : 6}"/>
+          <animateMotion dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite" path="${route}"/>
+          <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.72;1" dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite"/>
+        </g>
       </g>`);
     }
     return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${signals.join("")}</g>`;
+  }
+
+  function createRouteClipPaths() {
+    return signalRoutes.map((route, index) => `
+        <clipPath id="circuit-neuron-route-${index}" clipPathUnits="userSpaceOnUse">
+          <path d="${route}" fill="none" stroke="white" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+        </clipPath>`).join("");
   }
 
   function createCircuitMarkup() {
@@ -133,6 +143,7 @@
         <mask id="circuit-trace-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254" mask-type="luminance">
           <image href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" filter="url(#circuit-trace-mask-filter)"/>
         </mask>
+        ${createRouteClipPaths()}
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
       <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="10" filter="url(#circuit-chip-analyzing-glow)"/>
