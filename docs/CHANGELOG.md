@@ -8,11 +8,11 @@ All notable project changes should be documented here.
 
 ### Agent Brain refinement
 
-- Added a subtle, status-driven green glow around the chip during `ANALYZING`
+- Increased the status-driven green chip glow during `ANALYZING`
 - Reduced the circuit visualization to a 440px maximum width on desktop while preserving its full-width mobile layout
-- Expanded signal routing from 16 to 32 PCB traces; `ANALYZING` now lights 24 distinct routes without adding more neurons
+- Expanded signal routing from 16 to 32 PCB traces; `ANALYZING` now uses all 32 routes
 - Extended neurons along longer trace-following paths, slowed `ANALYZING` signals, and delayed their fade until near the route end
-- Added synchronized endpoint glows so circuit terminal dots light up as neurons arrive
+- Added synchronized endpoint and mid-trace node glows so circuit dots light up during `ANALYZING`
 - Kept each neuron on its assigned trace through crossings using route-specific SVG luminance masks
 - Kept the glow static and transition-free for users who prefer reduced motion
 

@@ -17,7 +17,7 @@
     ANALYZING: Object.freeze({
       status: "ANALYZING",
       color: "#9dffbd",
-      signalCount: 24,
+      signalCount: 32,
       signalDuration: 2.6
     }),
     IDLE: Object.freeze({
@@ -47,6 +47,32 @@
   });
 
   const signalRoutes = createSignalRoutes();
+  const circuitNodes = Object.freeze([
+    Object.freeze({ x: 596, y: 183 }),
+    Object.freeze({ x: 493, y: 258 }),
+    Object.freeze({ x: 339, y: 271 }),
+    Object.freeze({ x: 912, y: 271 }),
+    Object.freeze({ x: 760, y: 276 }),
+    Object.freeze({ x: 626, y: 331 }),
+    Object.freeze({ x: 261, y: 372 }),
+    Object.freeze({ x: 993, y: 370 }),
+    Object.freeze({ x: 212, y: 507 }),
+    Object.freeze({ x: 1041, y: 507 }),
+    Object.freeze({ x: 367, y: 592 }),
+    Object.freeze({ x: 885, y: 592 }),
+    Object.freeze({ x: 218, y: 702 }),
+    Object.freeze({ x: 1032, y: 702 }),
+    Object.freeze({ x: 334, y: 782 }),
+    Object.freeze({ x: 918, y: 780 }),
+    Object.freeze({ x: 626, y: 862 }),
+    Object.freeze({ x: 455, y: 922 }),
+    Object.freeze({ x: 796, y: 922 }),
+    Object.freeze({ x: 351, y: 992 }),
+    Object.freeze({ x: 901, y: 992 }),
+    Object.freeze({ x: 625, y: 1039 }),
+    Object.freeze({ x: 804, y: 154 }),
+    Object.freeze({ x: 655, y: 165 })
+  ]);
 
   function createSignalRoutes() {
     return Object.freeze([
@@ -110,6 +136,13 @@
   function renderSignalGroup(status, config) {
     const statusClass = status.toLowerCase();
     const signals = [];
+    const nodePulses = status === "ANALYZING" ? circuitNodes.map((node, index) => {
+      const duration = config.signalDuration + (index % 4) * 0.13;
+      const startOffset = (index % 9) * 0.31;
+      return `<circle class="circuit-neuron-node" cx="${node.x}" cy="${node.y}" r="14" fill="${config.color}" filter="url(#circuit-neuron-glow)">
+        <animate attributeName="opacity" values="0;0;1;0" keyTimes="0;0.84;0.9;1" dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite"/>
+      </circle>`;
+    }) : [];
     for (let index = 0; index < config.signalCount; index += 1) {
       const duration = config.signalDuration + (index % 4) * 0.13;
       const startOffset = (index % 9) * 0.31;
@@ -128,7 +161,7 @@
         </g>
       </g>`);
     }
-    return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${signals.join("")}</g>`;
+    return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${nodePulses.join("")}${signals.join("")}</g>`;
   }
 
   function createRouteMasks() {
@@ -151,7 +184,7 @@
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <filter id="circuit-chip-analyzing-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <filter id="circuit-trace-mask-filter" color-interpolation-filters="sRGB">
@@ -168,7 +201,7 @@
         ${createRouteMasks()}
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
-      <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="10" filter="url(#circuit-chip-analyzing-glow)"/>
+      <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="14" filter="url(#circuit-chip-analyzing-glow)"/>
       <g class="circuit-flows" mask="url(#circuit-trace-mask)">${signals}</g>
     </svg>`;
   }

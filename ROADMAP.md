@@ -206,10 +206,11 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
-- [x] Add a subtle chip-edge glow only during ANALYZING
-- [x] Expand neuron routing across 32 distinct circuit traces while keeping the ANALYZING signal count unchanged
+- [x] Strengthen the chip-edge glow during ANALYZING
+- [x] Expand neuron routing across 32 distinct traces and activate 32 neurons during ANALYZING
 - [x] Keep each neuron masked to its assigned trace segment so it cannot jump to a neighboring lane at crossings
 - [x] Extend neuron paths to trace endpoints, delay fading until near arrival, and illuminate terminal pads in sync
+- [x] Pulse intermediate circular pads during ANALYZING
 - [x] Subdue the static circuit glow and strengthen neuron halos so status activity remains easy to distinguish
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables

@@ -18,7 +18,7 @@ function createContainer() {
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
   const expectedStates = {
     ACTIVE: { signalCount: 12, color: "#65dc92", signalDuration: 3.2 },
-    ANALYZING: { signalCount: 24, color: "#9dffbd", signalDuration: 2.6 },
+    ANALYZING: { signalCount: 32, color: "#9dffbd", signalDuration: 2.6 },
     IDLE: { signalCount: 2, color: "#67866f", signalDuration: 7.5 },
     STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
     ERROR: { signalCount: 6, color: "#ff6478", signalDuration: 2.4 },
@@ -74,9 +74,10 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   assert.equal((container.innerHTML.match(/<mask id="circuit-neuron-route-\d+"/g) || []).length, 32);
   assert.equal(
     (container.innerHTML.match(/class="circuit-neuron-track" mask="url\(#circuit-neuron-route-\d+\)"/g) || []).length,
-    44
+    52
   );
-  assert.equal((container.innerHTML.match(/class="circuit-neuron-terminal"/g) || []).length, 44);
+  assert.equal((container.innerHTML.match(/class="circuit-neuron-node"/g) || []).length, 24);
+  assert.equal((container.innerHTML.match(/class="circuit-neuron-terminal"/g) || []).length, 52);
   assert.match(container.innerHTML, /<path d="M\d+ \d+[VHL]/);
   const circuitArtwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
   assert.ok(circuitArtwork.length > 100000);
@@ -98,7 +99,7 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   assert.deepEqual(routeDirections, new Set(["up", "down", "left", "right"]));
   for (const [status, expectedCount] of Object.entries({
     ACTIVE: 12,
-    ANALYZING: 24,
+    ANALYZING: 32,
     IDLE: 2,
     STOPPED: 0,
     ERROR: 6,
@@ -117,7 +118,7 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
     ),
     ([, markup]) => markup.match(/path="([^"]+)"/)?.[1]
   );
-  assert.equal(new Set(analyzingRoutes).size, 24);
+  assert.equal(new Set(analyzingRoutes).size, 32);
 
   circuit.dispose();
 });
@@ -128,7 +129,7 @@ test("status updates keep accessibility and activity state synchronized", () => 
   const circuit = agentBrain.createAgentBrain({ container, stateElement });
 
   const analyzing = circuit.setStatus("ANALYZING");
-  assert.equal(analyzing.signalCount, 24);
+  assert.equal(analyzing.signalCount, 32);
   assert.equal(stateElement.dataset.state, "analyzing");
   assert.equal(
     container.attributes["aria-label"],
@@ -162,6 +163,7 @@ test("circuit renderer handles missing containers and disposes safely", () => {
 test("reduced-motion styling leaves the circuit static and visible", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
+  const brainSource = fs.readFileSync(path.join(__dirname, "..", "js", "agent-brain.js"), "utf8");
   const brainBlock = styles.match(/\.agent-brain\s*\{([\s\S]*?)\n\}/);
   const reducedMotionBlock = styles.match(
     /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/
@@ -194,9 +196,10 @@ test("the base circuit glow is subdued so status neurons remain prominent", () =
   assert.match(errorHalo[1], /drop-shadow\(0 0 24px rgb\(255 100 120 \/ 90%\)\)/);
 });
 
-test("ANALYZING adds a restrained chip glow while desktop keeps the circuit compact", () => {
+test("ANALYZING adds a stronger chip glow while desktop keeps the circuit compact", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
+  const brainSource = fs.readFileSync(path.join(__dirname, "..", "js", "agent-brain.js"), "utf8");
   const desktopBlock = styles.match(/@media \(min-width: 900px\)\s*\{([\s\S]*?)\n\}/);
   const analyzingGlow = styles.match(
     /\.agent-brain\[data-state="analyzing"\] \.circuit-chip-analyzing-glow\s*\{([\s\S]*?)\n\}/
@@ -205,7 +208,11 @@ test("ANALYZING adds a restrained chip glow while desktop keeps the circuit comp
   assert.ok(desktopBlock);
   assert.match(desktopBlock[1], /\.agent-brain-stage\s*\{\s*width:\s*min\(100%,\s*440px\);/);
   assert.ok(analyzingGlow);
-  assert.match(analyzingGlow[1], /opacity:\s*0\.32;/);
+  assert.match(analyzingGlow[1], /opacity:\s*0\.58;/);
+  assert.match(
+    brainSource,
+    /class="circuit-chip-analyzing-glow"[^>]+stroke-width="14" filter="url\(#circuit-chip-analyzing-glow\)"/
+  );
   assert.match(
     styles,
     /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.circuit-chip-analyzing-glow\s*\{\s*transition:\s*none;/

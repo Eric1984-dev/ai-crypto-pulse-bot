@@ -784,7 +784,7 @@ a:focus-visible {
 }
 
 .agent-brain[data-state="analyzing"] .circuit-chip-analyzing-glow {
-  opacity: 0.32;
+  opacity: 0.58;
 }
 
 .circuit-flow {
