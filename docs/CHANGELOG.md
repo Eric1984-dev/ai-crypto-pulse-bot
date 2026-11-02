@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Paper-mode header and navigation
+
+- Replaced the Dashboard's full-width paper-trading notice with a compact PAPER MODE badge beside the app icon
+- Sorted application menu links alphabetically across all pages, keeping account actions at the bottom
+
 ### Exports date filters
 
 - Added independent 30-, 90-, and 365-day date selectors to each Performance and Recommendation report

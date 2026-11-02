@@ -93,6 +93,30 @@ a {
   box-shadow: 0 0 12px rgb(157 231 186 / 22%);
 }
 
+.paper-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.paper-mode-badge::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgb(157 231 186 / 65%);
+  content: "";
+}
+
 .primary-nav {
   display: flex;
   align-items: center;
@@ -447,6 +471,17 @@ a:focus-visible {
     min-height: 68px;
     gap: 12px;
     padding-block: 8px;
+  }
+
+  .brand {
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  .paper-mode-badge {
+    gap: 4px;
+    padding: 4px 5px;
+    font-size: 8px;
   }
 
   .primary-nav {

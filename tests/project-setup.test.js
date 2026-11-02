@@ -41,14 +41,40 @@ test("all pages use a dropdown for their top navigation", () => {
 
     const menu = nav[0].match(/<div class="nav-menu">([\s\S]*?)<\/div>/);
     assert.ok(menu);
+    const menuItems = [...menu[1].matchAll(/<a\b[^>]*>([^<]*)<\/a>/g)]
+      .map(([, label]) => label.trim());
     if (accountPages.includes(page)) {
+      assert.deepEqual(menuItems, ["Create Account", "Sign In"]);
       assert.match(menu[1], /href="\/login\.html"/);
       assert.match(menu[1], /href="\/register\.html"/);
     } else {
-      const expectedLinks = ["/dashboard.html", "/portfolio.html", "/scanner.html", "/analytics.html", "/recommendations.html", "/history.html", "/exports.html", "/settings.html"];
-      if (protectedPages.includes(page)) {
-        expectedLinks.push("/admin.html");
+      const expectedLinks = [
+        "/admin.html",
+        "/recommendations.html",
+        "/analytics.html",
+        "/dashboard.html",
+        "/exports.html",
+        "/scanner.html",
+        "/portfolio.html",
+        "/settings.html",
+        "/history.html"
+      ];
+      const expectedItems = [
+        "Admin",
+        "AI Recommendations",
+        "Analytics",
+        "Dashboard",
+        "Exports",
+        "Market Scanner",
+        "Portfolio",
+        "Settings",
+        "Trade History"
+      ];
+      if (!protectedPages.includes(page)) {
+        expectedLinks.shift();
+        expectedItems.shift();
       }
+      assert.deepEqual(menuItems, expectedItems);
       for (const href of expectedLinks) {
         assert.ok(menu[1].includes(`href="${href}"`), `${page} should retain ${href}`);
       }
@@ -66,7 +92,7 @@ test("all page brands use the green icon and link to the dashboard", () => {
     const brand = html.match(/<a class="brand"[\s\S]*?<\/a>/);
     assert.ok(brand, `${page} should render the shared brand`);
     assert.match(brand[0], /href="\/dashboard\.html"/);
-    assert.match(brand[0], /<img class="brand-mark" src="\/assets\/icons\/apple-touch-icon\.png" alt="" aria-hidden="true"> AI Crypto Bot/);
+    assert.match(brand[0], /<img class="brand-mark" src="\/assets\/icons\/apple-touch-icon\.png" alt="" aria-hidden="true"> AI Crypto Bot <span class="paper-mode-badge">PAPER MODE<\/span>/);
     assert.doesNotMatch(brand[0], />C<\/span>/);
     assert.match(html, /<meta name="apple-mobile-web-app-title" content="AI Crypto Bot">/);
   }
@@ -203,17 +229,18 @@ test("Vercel serverless function count remains at the 12-function limit", () => 
 test("protected trading pages disclose paper-only mode and initialize the auth guard", () => {
   for (const page of ["dashboard.html", "portfolio.html", "scanner.html", "history.html"]) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
-    assert.match(html, /PAPER ACTIVE/);
+    assert.match(html, /class="paper-mode-badge">PAPER MODE<\/span>/);
     assert.match(html, /data-auth-page="protected"/);
     assert.match(html, /\/js\/auth\.js/);
   }
 });
 
-test("dashboard keeps the paper-mode notice and removes redundant visible descriptions", () => {
+test("dashboard uses the header paper-mode badge without the redundant paper-mode banner", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
 
   assert.match(html, /<h1 class="visually-hidden">Dashboard<\/h1>/);
-  assert.match(html, /<strong>PAPER ACTIVE<\/strong>\s*<span>All amounts are simulated\. This dashboard does not place real orders\.<\/span>/);
+  assert.match(html, /class="paper-mode-badge">PAPER MODE<\/span>/);
+  assert.doesNotMatch(html, /PAPER ACTIVE|All amounts are simulated\. This dashboard does not place real orders\./);
   assert.doesNotMatch(html, /Paper portfolio|Je agent, portefeuille en recente activiteit uit Supabase\./);
   assert.doesNotMatch(html, /Status wordt gelezen uit AI_Crypto_Bot_Status|Visualisatie van de actuele status uit AI_Crypto_Bot_Status/);
 });
