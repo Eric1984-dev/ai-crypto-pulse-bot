@@ -202,7 +202,7 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
   assert.match(brainSource, /feGaussianBlur stdDeviation="10" result="blur"/);
   assert.match(
     styles,
-    /\.agent-brain-stage\s*\{[^}]*box-shadow:[\s\S]*?rgb\(91 156 255 \/ 12%\)/s
+    /\.agent-brain-stage\s*\{[^}]*box-shadow:[\s\S]*?rgb\(91 156 255 \/ 8%\)/s
   );
   assert.match(chipGlow[1], /stroke:\s*var\(--accent\);/);
 });

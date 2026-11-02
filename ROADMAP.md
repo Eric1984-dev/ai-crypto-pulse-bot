@@ -205,7 +205,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
-- [x] Restyle shared surfaces with a navy palette and blue accents; color positive/negative financial values without changing labels or trading behavior
+- [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
 - [x] Strengthen the chip-edge glow during ANALYZING

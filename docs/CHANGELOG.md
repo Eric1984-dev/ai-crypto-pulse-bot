@@ -6,9 +6,9 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
-### Navy visual theme and P&L tones
+### Charcoal visual theme and P&L tones
 
-- Restyled shared page, card, chart, and control surfaces with a navy palette and blue accents
+- Restyled the page background in neutral charcoal, with dark slate cards and blue accents
 - Highlighted positive and negative financial values in green and red without changing labels or trading behavior
 - Added a subtle recent-activity strip with stored bot-run, market-data, and paper-trade timestamps; Analytics and Market Scan are marked on-demand because their run history is not persisted
 - Added soft blue glow accents to cards, the app icon, export controls, and Agent Status chip while preserving status-driven signal colors

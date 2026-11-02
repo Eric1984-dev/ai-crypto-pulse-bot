@@ -131,18 +131,18 @@ test("global page layout does not force horizontal overflow on narrow screens", 
   assert.doesNotMatch(styles, /body\s*\{[^}]*min-width:\s*320px/s);
 });
 
-test("shared page theme uses navy surfaces and directional financial colors", () => {
+test("shared page theme uses a charcoal background and directional financial colors", () => {
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
-  assert.match(styles, /radial-gradient\(ellipse at 12% 0%, rgb\(91 156 255 \/ 16%\), transparent 36rem\)/);
-  assert.match(styles, /#10141c;/);
-  assert.match(styles, /--surface:\s*#1a202b;/);
-  assert.match(styles, /--surface-raised:\s*#202734;/);
+  assert.match(styles, /background:\s*#111418;/);
+  assert.doesNotMatch(styles, /radial-gradient\(ellipse at 12% 0%,\s*rgb\(91 156 255/);
+  assert.match(styles, /--surface:\s*#1b2027;/);
+  assert.match(styles, /--surface-raised:\s*#20252d;/);
   assert.match(styles, /--accent:\s*#5b9cff;/);
   assert.match(styles, /--positive:\s*#34d399;/);
   assert.match(styles, /--negative:\s*#ff6078;/);
   assert.match(styles, /\.brand-mark\s*\{[^}]*0 0 26px rgb\(91 156 255 \/ 20%\)/s);
   assert.match(styles, /\.export-card \.card-description\s*\{[^}]*border-bottom:\s*1px solid var\(--border\);/s);
-  assert.match(styles, /\.export-card \[data-export-download\]\s*\{[^}]*background:\s*#121720;/s);
+  assert.match(styles, /\.export-card \[data-export-download\]\s*\{[^}]*background:\s*#15191f;/s);
   assert.doesNotMatch(styles, /#b693df|#70528b|#423052/);
 });
 
