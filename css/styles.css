@@ -774,6 +774,7 @@ a:focus-visible {
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0.45;
 }
 
 .circuit-flow {
@@ -788,23 +789,31 @@ a:focus-visible {
 }
 
 .circuit-neuron-halo {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 5px #78ffad);
-  opacity: 0.72;
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 12px #78ffad) drop-shadow(0 0 24px rgb(75 255 145 / 88%));
+  opacity: 1;
 }
 
 .circuit-neuron-core {
   fill: #ffffff;
-  stroke: #ffffff;
-  stroke-width: 0.8;
+  stroke: #39ff83;
+  stroke-width: 1.5;
 }
 
 .circuit-neuron--analyzing .circuit-neuron-halo {
-  filter: url("#circuit-neuron-glow") drop-shadow(0 0 8px #9dffbd);
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 16px #9dffbd) drop-shadow(0 0 30px rgb(75 255 145 / 98%));
   opacity: 1;
 }
 
 .circuit-neuron--idle .circuit-neuron-halo {
-  opacity: 0.38;
+  opacity: 0.55;
+}
+
+.circuit-neuron--error .circuit-neuron-halo {
+  filter: url("#circuit-neuron-glow") drop-shadow(0 0 12px #ff6478) drop-shadow(0 0 24px rgb(255 100 120 / 90%));
+}
+
+.circuit-neuron--error .circuit-neuron-core {
+  stroke: #ff6478;
 }
 
 .agent-status-monitor {

@@ -82,8 +82,8 @@
       const startOffset = (index % 9) * 0.31;
       const route = signalRoutes[(index * 7 + 3) % signalRoutes.length];
       signals.push(`<g class="circuit-neuron circuit-neuron--${statusClass}">
-        <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 11 : 8}" fill="${config.color}"/>
-        <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 3.2 : 2.4}"/>
+        <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 22 : 18}" fill="${config.color}"/>
+        <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 8 : 6}"/>
         <animateMotion dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite" path="${route}"/>
         <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.72;1" dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite"/>
       </g>`);

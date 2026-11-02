@@ -59,6 +59,8 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
   assert.match(container.innerHTML, /<animate attributeName="opacity" values="1;1;0" keyTimes="0;0\.72;1"/);
+  assert.match(container.innerHTML, /class="circuit-neuron-halo" r="22"/);
+  assert.match(container.innerHTML, /class="circuit-neuron-core" r="8"/);
   assert.equal(agentBrain.signalRoutes.length, 16);
   assert.match(container.innerHTML, /<mask id="circuit-trace-mask"[^>]+mask-type="luminance">/);
   assert.match(container.innerHTML, /mask="url\(#circuit-trace-mask\)"/);
@@ -151,4 +153,23 @@ test("reduced-motion styling leaves the circuit static and visible", () => {
   assert.ok(reducedMotionBlock);
   assert.match(reducedMotionBlock[1], /\.circuit-flow\s*\{\s*display:\s*none\s*!important;/);
   assert.match(styles, /\.circuit-flow--analyzing/);
+});
+
+test("the base circuit glow is subdued so status neurons remain prominent", () => {
+  const stylesPath = path.join(__dirname, "..", "css", "styles.css");
+  const styles = fs.readFileSync(stylesPath, "utf8");
+  const boardImage = styles.match(/\.circuit-board-image\s*\{([\s\S]*?)\n\}/);
+  const signalHalo = styles.match(/\.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
+  const analyzingHalo = styles.match(/\.circuit-neuron--analyzing \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
+  const errorHalo = styles.match(/\.circuit-neuron--error \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
+
+  assert.ok(boardImage);
+  assert.match(boardImage[1], /opacity:\s*0\.45;/);
+  assert.ok(signalHalo);
+  assert.match(signalHalo[1], /opacity:\s*1;/);
+  assert.match(signalHalo[1], /drop-shadow\(0 0 12px #78ffad\)/);
+  assert.ok(analyzingHalo);
+  assert.match(analyzingHalo[1], /drop-shadow\(0 0 30px rgb\(75 255 145 \/ 98%\)\)/);
+  assert.ok(errorHalo);
+  assert.match(errorHalo[1], /drop-shadow\(0 0 24px rgb\(255 100 120 \/ 90%\)\)/);
 });

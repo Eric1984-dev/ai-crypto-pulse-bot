@@ -10,6 +10,7 @@ All notable project changes should be documented here.
 
 - Restored the original green application palette across page surfaces, chart accents, browser theme colors, and the shared Bitcoin-in-hands app icon
 - Recolored only the circuit artwork and status-driven neuron effects; preserved the chip shape, traces, layout, movement, and responsive sizing
+- Reduced the circuit image opacity and strengthened neuron cores and status-specific glow so moving signals remain visible over the board
 - Kept the frame-free square artwork responsive to available mobile width, bounded by 90vh, with status-driven signals fading at route ends
 - Preserved red error signaling, static `STOPPED`/`UNKNOWN` states, reduced-motion behavior, and all trading logic
 
