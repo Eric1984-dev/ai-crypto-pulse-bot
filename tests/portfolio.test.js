@@ -66,15 +66,25 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
       winRate: 60
     },
     openPositions: {
-      count: 1,
-      items: [{
-        symbol: "<img src=x>",
-        amount: 0.01,
-        entry_price: 0.00453954,
-        current_price: 0.05671234,
-        unrealized_pnl: 0.05,
-        created_at: "2026-03-20T10:00:00.000Z"
-      }]
+      count: 2,
+      items: [
+        {
+          symbol: "<img src=x>",
+          amount: 0.01,
+          entry_price: 0.00453954,
+          current_price: 0.05671234,
+          unrealized_pnl: 0.05,
+          created_at: "2026-03-20T10:00:00.000Z"
+        },
+        {
+          symbol: "BEAM-EUR",
+          amount: 220837,
+          entry_price: 0.00454,
+          current_price: 0.00397,
+          unrealized_pnl: -125.78,
+          created_at: "2026-03-20T09:00:00.000Z"
+        }
+      ]
     },
     recentTrades: {
       count: 1,
@@ -92,7 +102,7 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
 
   assert.match(elements.get("[data-portfolio-value=\"portfolioValue\"]").textContent, /10,100/);
   assert.match(elements.get("[data-portfolio-value=\"realizedPnl\"]").textContent, /50\.00/);
-  assert.equal(elements.get("[data-portfolio-value=\"openPositions\"]").textContent, "1");
+  assert.equal(elements.get("[data-portfolio-value=\"openPositions\"]").textContent, "2");
   assert.equal(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].textContent, "<img src=x> · 0.01 units");
   assert.equal(
     elements.get("[data-portfolio-list=\"positions\"]").children[0].children[0].children[1].className,
@@ -102,10 +112,22 @@ test("portfolio renders real P&L, balances, positions, and trades as text", () =
     elements.get("[data-portfolio-list=\"positions\"]").children[0].children[1].textContent,
     /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?0\.05 · Opened .*11:00/
   );
+  assert.ok(elements.get("[data-portfolio-list=\"positions\"]").children[0].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "positive"
+      && child.textContent === "P&L €0.05"
+  )));
+  assert.ok(elements.get("[data-portfolio-list=\"positions\"]").children[1].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "negative"
+      && child.textContent === "P&L -€125.78"
+  )));
   assert.match(
     elements.get("[data-portfolio-list=\"trades\"]").children[0].children[1].textContent,
     /Price €1,124\.00 · Gross Proceeds: €1,124\.00 · Fees: €2\.81 · Net Proceeds: €1,121\.19 · Realized P&L: \+€118\.69 · Executed .*12:00/
   );
+  assert.ok(elements.get("[data-portfolio-list=\"trades\"]").children[0].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "warning"
+      && child.textContent === "Fees: €2.81"
+  )));
   assert.equal(
     elements.get("[data-portfolio-list=\"trades\"]").children[0].children[0].children[1].className,
     "trade-action-sell"

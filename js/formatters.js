@@ -100,6 +100,10 @@
     setHighlightedText(documentRef, element, text, markers);
   }
 
+  function setTradeDetailsText(documentRef, element, text) {
+    setHighlightedText(documentRef, element, text, []);
+  }
+
   function createTradeActionLabel(documentRef, action) {
     const element = documentRef.createElement("span");
     const side = normalizeTradeSide(action);
@@ -112,11 +116,34 @@
 
   function setHighlightedText(documentRef, element, text, markers) {
     const value = typeof text === "string" ? text : String(text ?? "");
-    const matches = markers.map((marker) => {
+    const feeMarkers = Array.from(
+      value.matchAll(/\bFees?:\s*-?€[\d,.]+/gi),
+      (match) => ({
+        text: match[0],
+        start: match.index,
+        valueTone: "warning"
+      })
+    );
+    const pnlMarkers = Array.from(
+      value.matchAll(/\b(?:(?:Net|Total|Realized|Unrealized)\s+)?P&L:?\s*([+-]?)€([\d,]+(?:\.\d+)?)(?:\s*\([+-]?[\d,.]+%\))?/gi),
+      (match) => {
+        const amount = Number(match[2].replace(/,/g, ""));
+        return amount === 0
+          ? null
+          : {
+            text: match[0],
+            start: match.index,
+            valueTone: match[1] === "-" ? "negative" : "positive"
+          };
+      }
+    ).filter(Boolean);
+    const matches = [...markers, ...feeMarkers, ...pnlMarkers].map((marker) => {
       const markerText = typeof marker.text === "string" ? marker.text : "";
-      const index = markerText
-        ? value.toUpperCase().indexOf(markerText.toUpperCase())
-        : -1;
+      const index = Number.isInteger(marker.start)
+        ? marker.start
+        : markerText
+          ? value.toUpperCase().indexOf(markerText.toUpperCase())
+          : -1;
       return index < 0
         ? null
         : { ...marker, index, value: value.slice(index, index + markerText.length) };
@@ -139,8 +166,13 @@
       }
       element.append(value.slice(position, match.index));
       const highlighted = documentRef.createElement("span");
-      highlighted.className = match.className;
+      if (match.className) {
+        highlighted.className = match.className;
+      }
       highlighted.textContent = match.value;
+      if (match.valueTone) {
+        highlighted.dataset.valueTone = match.valueTone;
+      }
       element.append(highlighted);
       position = match.index + match.value.length;
     }
@@ -356,6 +388,7 @@
     setMarketSymbolText,
     setTradeActionText,
     setMarketAndTradeText,
+    setTradeDetailsText,
     createTradeActionLabel
   };
 });

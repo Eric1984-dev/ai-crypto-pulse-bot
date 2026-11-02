@@ -232,6 +232,8 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Use gray legend swatches in the Dashboard portfolio chart without changing dataset line colors
 - [x] Use neutral gray Dashboard KPI info icons while retaining a visible blue keyboard-focus indicator
 - [x] Color BUY actions green and SELL actions red across trade, scanner, and Analytics displays
+- [x] Highlight fee labels and amounts with the existing yellow warning tone across trade views
+- [x] Show positive P&L in green and negative P&L in red across position and trade summaries
 - [x] Add a small visual gap between the AI Brain and live backend status
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari

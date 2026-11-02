@@ -431,6 +431,8 @@ test("trade history renders all required fields as text and treats buys as unrea
       "Total Cost: €1,002.50"
     ]
   );
+  assert.equal(rows.children[0].children[5].children[0].children[1].dataset.valueTone, "warning");
+  assert.equal(rows.children[0].children[6].dataset.valueTone, "warning");
   assert.deepEqual(
     rows.children[1].children[5].children[0].children.map((line) => line.textContent),
     [

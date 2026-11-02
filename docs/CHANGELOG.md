@@ -9,6 +9,8 @@ All notable project changes should be documented here.
 ### Market display refinements
 
 - Use the shared blue accent for market symbols across Dashboard, Portfolio, Trade History, Market Scanner, and Analytics
+- Highlight fee labels and amounts in Portfolio and Trade History with the existing yellow warning tone
+- Show positive P&L in green and negative P&L in red in position and activity details
 - Use neutral gray Dashboard chart legend icons while preserving dataset line colors
 - Use neutral gray Dashboard KPI info icons while retaining a visible blue keyboard-focus indicator
 - Color BUY actions green and SELL actions red across trade, scanner, and Analytics displays

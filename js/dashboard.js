@@ -336,7 +336,7 @@
         if (tradeAction) {
           formatters.setTradeActionText(documentRef, secondary, secondaryText, tradeAction);
         } else {
-          secondary.textContent = secondaryText;
+          formatters.setTradeDetailsText(documentRef, secondary, secondaryText);
         }
         row.append(primary, secondary);
         list.append(row);

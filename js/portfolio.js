@@ -242,7 +242,7 @@
       } else {
         title.textContent = primaryText;
       }
-      details.textContent = secondaryText;
+      formatters.setTradeDetailsText(documentRef, details, secondaryText);
       row.append(title, details);
       list.append(row);
     }

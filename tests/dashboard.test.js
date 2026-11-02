@@ -451,18 +451,28 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
       winRate: 50
     },
     openPositions: {
-      count: 1,
-      items: [{
-        symbol: "<img src=x>",
-        amount: 0.01,
-        entry_price: 0.00453954,
-        current_price: 0.05671234,
-        unrealized_pnl: 100,
-        created_at: "2026-03-20T10:00:00.000Z"
-      }]
+      count: 2,
+      items: [
+        {
+          symbol: "<img src=x>",
+          amount: 0.01,
+          entry_price: 0.00453954,
+          current_price: 0.05671234,
+          unrealized_pnl: 100,
+          created_at: "2026-03-20T10:00:00.000Z"
+        },
+        {
+          symbol: "BEAM-EUR",
+          amount: 220837,
+          entry_price: 0.00454,
+          current_price: 0.00397,
+          unrealized_pnl: -125.78,
+          created_at: "2026-03-20T09:00:00.000Z"
+        }
+      ]
     },
     recentTrades: {
-      count: 2,
+      count: 3,
       items: [
         {
           side: "SELL",
@@ -484,6 +494,15 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
             entry_price: "0.00006123",
             current_market_price: "0.000067"
           }
+        },
+        {
+          side: "SELL",
+          symbol: "BEAM-EUR",
+          quantity: 220837,
+          price: 0.00397,
+          fees: 0.22,
+          realized_pnl: -125.78,
+          created_at: generatedAt.toISOString()
         }
       ]
     },
@@ -509,8 +528,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
 
   assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /1,100/);
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].dataset.valueTone, "negative");
-  assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "1");
-  assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "1");
+  assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "2");
+  assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "2");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
   assert.equal(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, "20/03/2026, 12:55");
@@ -525,6 +544,14 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
     /Entry €\s?0\.00454 · Current €\s?0\.05671 · P&L €\s?100\.00 · Opened .*11:00/
   );
+  assert.ok(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "positive"
+      && child.textContent === "P&L €100.00"
+  )));
+  assert.ok(elements.get("[data-dashboard-list=\"positions\"]")[0].children[1].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "negative"
+      && child.textContent === "P&L -€125.78"
+  )));
   assert.match(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].textContent,
     /SELL · Quantity: 1.*Exit: €\s?1,124\.00.*\+€118\.69 \(\+11\.84%\).*13:00.*Status: CLOSED/s
@@ -545,6 +572,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[1].children[1].className,
     "trade-action-buy"
   );
+  assert.ok(elements.get("[data-dashboard-list=\"trades\"]")[0].children[2].children[1].children.some((child) => (
+    child && child.dataset && child.dataset.valueTone === "negative"
+      && child.textContent.startsWith("P&L: -€125.78")
+  )));
   assert.match(
     elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,
     /Recorded .*13:00 · No action/

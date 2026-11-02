@@ -12,6 +12,7 @@ const {
   formatTradeValueDetails,
   getClosedTradeMetrics,
   getOpenPositionMetrics,
+  setTradeDetailsText,
   setValueTone
 } = require("../js/formatters.js");
 
@@ -86,6 +87,39 @@ test("trade value details display BUY cost and SELL proceeds from stored executi
   ]);
   assert.equal(formatCurrency(null), "—");
   assert.equal(formatSignedCurrency(-4.5), "-€4.50");
+});
+
+test("fee and P&L values use their existing warning and directional tones in trade text", () => {
+  const documentRef = {
+    createElement() {
+      return { dataset: {}, textContent: "" };
+    }
+  };
+  const element = {
+    children: [],
+    append(...children) {
+      this.children.push(...children);
+    }
+  };
+
+  setTradeDetailsText(
+    documentRef,
+    element,
+    "Fee: €1.00 · Fees: €2.49 · P&L €4.72 · P&L: -€125.78 (-12.55%) · P&L: €0.00"
+  );
+
+  const highlightedValues = element.children.filter((child) => (
+    child && typeof child === "object" && child.dataset.valueTone
+  ));
+  assert.deepEqual(highlightedValues.map((child) => [
+    child.textContent,
+    child.dataset.valueTone
+  ]), [
+    ["Fee: €1.00", "warning"],
+    ["Fees: €2.49", "warning"],
+    ["P&L €4.72", "positive"],
+    ["P&L: -€125.78 (-12.55%)", "negative"]
+  ]);
 });
 
 test("signed value tone updates between positive, negative, and neutral values", () => {
