@@ -39,7 +39,7 @@ Registration, login, logout, password-reset email, and password updates use the 
 
 Authentication is required. The endpoint reads the `cp_access_token` HttpOnly cookie, verifies it with Supabase Auth, and sends the verified user's JWT together with the public anon key on read-only PostgREST requests. Supabase RLS scopes user-owned rows. It does not use a service-role key and does not write data.
 
-The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, and up to 100 persisted portfolio snapshots. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
+The endpoint returns current agent status and emergency state, portfolio count and aggregate values, open-position summary, recent trade summary, enabled watched markets, recent AI decisions, and up to 100 persisted portfolio snapshots. Open positions include the latest available `current_market_price` and its `current_market_captured_at`; when no market snapshot is available, the stored position price is used. A matching recent BUY trade includes the same position data as `openPosition`. The exact record counts are RLS-filtered. Portfolio history contains only stored snapshots; no chart data is fabricated.
 
 Timestamp fields are returned as UTC values and remain unchanged by the API. Browser clients use the shared formatter to display those instants in `Europe/Brussels`; date filters and daily P&L boundaries remain UTC.
 
@@ -90,7 +90,7 @@ The existing `GET /api/dashboard-data` function also serves the authenticated tr
 - `period`: `all`, `24h`, `7d`, or `30d`; the shorter periods use a rolling UTC cutoff.
 - `sort`: `newest`, `oldest`, `market`, `action`, `price-high`, `price-low`, `quantity-high`, `quantity-low`, `fees-high`, `fees-low`, `pnl-high`, or `pnl-low`.
 
-The database count and the selected page use the caller's verified JWT and existing trade-table RLS policy. No trade rows are loaded into the browser except the requested page. The response includes the filtered exact count, page metadata, and the selected rows (`id`, `symbol`, `side`, `price`, `quantity`, `fees`, `realized_pnl`, and `created_at`).
+The database count and the selected page use the caller's verified JWT and existing trade-table RLS policy. No trade rows are loaded into the browser except the requested page. The response includes the filtered exact count, page metadata, and the selected execution fields (`id`, `symbol`, `side`, `price`, `quantity`, `fees`, `realized_pnl`, and `created_at`). A BUY matching an open position also includes `openPosition` with its amount, entry price, latest market price, and snapshot timestamp.
 
 Success response:
 
@@ -126,7 +126,7 @@ Success response:
 }
 ```
 
-Statistics are all-time and intentionally independent of the current list filters/page. The `AI_Crypto_Bot_Trade_History_Stats()` stable `SECURITY INVOKER` RPC aggregates only the caller's RLS-visible stored SELL executions: profitable/losing counts use realized P&L above/below zero, averages include only positive or negative values respectively, and best/worst use the maximum/minimum realized P&L. Breakeven SELLs count as closed but neither winning nor losing. BUY rows show no realized P&L because their stored zero is not a realized result. Every persisted trade is shown with status `Uitgevoerd · paper`; the trades table has no separate status column.
+Statistics are all-time and intentionally independent of the current list filters/page. The `AI_Crypto_Bot_Trade_History_Stats()` stable `SECURITY INVOKER` RPC aggregates only the caller's RLS-visible stored SELL executions: profitable/losing counts use realized P&L above/below zero, averages include only positive or negative values respectively, and best/worst use the maximum/minimum realized P&L. Breakeven SELLs count as closed but neither winning nor losing. BUY rows show no realized P&L unless they match an open position, in which case the page displays unrealized P&L and return percentage. SELL rows display derived entry/exit prices and realized return percentage. These are presentation-only calculations from existing fields; no database or trading calculation is changed. The Status column shows `OPEN` for active BUY positions, `CLOSED · Paper Trade` for SELL executions, and `Executed · Paper Trade` otherwise.
 
 The page uses the existing 30-second visible-tab refresh cadence, with same-origin credentials and `no-store` requests. An empty result is a successful empty page, not an API error. Invalid view/filter values return `400`; unauthenticated sessions return `401`; missing permissions, migration, configuration, or database availability fail closed with the existing generic `503` dashboard response. Every persisted trade is shown with status `Executed · Paper Trade`; the trades table has no separate status column.
 

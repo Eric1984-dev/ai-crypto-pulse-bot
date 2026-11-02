@@ -55,12 +55,21 @@
     setText(documentRef, "openPositions", formatCount(data.openPositions.count));
     setText(documentRef, "paperTrades", formatCount(data.recentTrades.count));
 
-    renderCollection(documentRef, "positions", data.openPositions.items, (item) => [
-      `${item.symbol || "—"} · ${formatNumber(item.amount)} units`,
-      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
-    ]);
+    renderCollection(documentRef, "positions", data.openPositions.items, (item) => {
+      const currentPrice = item.current_market_price === undefined
+        ? item.current_price
+        : item.current_market_price;
+      const metrics = item.current_market_price === undefined
+        ? null
+        : formatters.getOpenPositionMetrics(item);
+      const unrealizedPnl = metrics ? metrics.unrealizedPnl : item.unrealized_pnl;
+      return [
+        `${item.symbol || "—"} · ${formatters.formatQuantity(item.amount)} units`,
+        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
+      ];
+    });
     renderCollection(documentRef, "trades", data.recentTrades.items, (item) => [
-      `${item.side || "—"} ${item.symbol || "—"} · ${formatNumber(item.quantity)} units`,
+      `${item.side || "—"} ${item.symbol || "—"} · ${formatters.formatQuantity(item.quantity)} units`,
       `Price ${formatters.formatPrice(item.price)} · ${formatters.formatTradeValueDetails(item).join(" · ")} · Executed ${formatters.formatTimestamp(item.created_at)}`
     ]);
   }
@@ -220,11 +229,6 @@
 
   function formatCurrency(value) {
     return formatters.formatCurrency(value);
-  }
-
-  function formatNumber(value) {
-    const number = numericValue(value);
-    return number === null ? "—" : numberFormat.format(number);
   }
 
   function formatPercent(value) {

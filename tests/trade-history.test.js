@@ -51,7 +51,14 @@ function createResponse(statusCode, body, contentRange = null) {
   };
 }
 
-function createSupabaseFetch({ totalCount = 1, items = [], stats = statsRow, calls = [] } = {}) {
+function createSupabaseFetch({
+  totalCount = 1,
+  items = [],
+  positions = [],
+  marketData = [],
+  stats = statsRow,
+  calls = []
+} = {}) {
   return async (url, options) => {
     const parsedUrl = new URL(url);
     const table = parsedUrl.pathname.split("/").pop();
@@ -64,6 +71,16 @@ function createSupabaseFetch({ totalCount = 1, items = [], stats = statsRow, cal
       return response;
     }
 
+    if (table === "AI_Crypto_Bot_Positions") {
+      const response = createResponse(200, positions);
+      response.headers = response.headersObject;
+      return response;
+    }
+    if (table === "AI_Crypto_Bot_Market_Data") {
+      const response = createResponse(200, marketData);
+      response.headers = response.headersObject;
+      return response;
+    }
     if (query.get("select") === "id") {
       const response = createResponse(200, [], `0-0/${totalCount}`);
       response.headers = response.headersObject;
@@ -140,13 +157,58 @@ test("trade history uses the existing authenticated dashboard API with server-si
   assert.equal(pageRequest.query.get("offset"), "25");
   assert.equal(pageRequest.query.get("limit"), "25");
   assert.equal(pageRequest.query.get("order"), "realized_pnl.desc,created_at.desc,id.desc");
-  assert.equal(pageRequest.query.get("select"), "id,symbol,side,price,quantity,fees,realized_pnl,created_at");
+  assert.equal(pageRequest.query.get("select"), "id,portfolio_id,symbol,side,price,quantity,fees,realized_pnl,created_at");
 
   const statsRequest = calls.find((call) => call.url.pathname.endsWith("/rpc/AI_Crypto_Bot_Trade_History_Stats"));
   assert.ok(statsRequest);
   assert.equal(statsRequest.options.headers.authorization, "Bearer header.payload.signature");
   assert.equal(statsRequest.options.headers.apikey, authEnv.SUPABASE_ANON_KEY);
   assert.equal(statsRequest.options.cache, "no-store");
+});
+
+test("trade history enriches an open BUY with its latest market snapshot", async () => {
+  const trade = createTradeRow({
+    portfolio_id: "portfolio-1",
+    symbol: "WIN-EUR",
+    side: "BUY",
+    price: "0.000061",
+    quantity: "1000000",
+    fees: "15.25",
+    realized_pnl: "0",
+    created_at: "2026-03-20T11:00:00.000Z"
+  });
+  const position = {
+    portfolio_id: "portfolio-1",
+    symbol: "WIN-EUR",
+    amount: "1000000",
+    entry_price: "0.00006123",
+    current_price: "0.000062",
+    created_at: trade.created_at
+  };
+  const calls = [];
+  const response = await requestApi(
+    "/api/dashboard-data?view=trade-history",
+    createSupabaseFetch({
+      items: [trade],
+      positions: [position],
+      marketData: [{
+        symbol: "WIN-EUR",
+        price: "0.000067",
+        captured_at: "2026-03-20T11:59:00.000Z"
+      }],
+      calls
+    })
+  );
+
+  assert.equal(response.statusCode, 200);
+  const { data } = JSON.parse(response.body);
+  assert.equal(data.items[0].symbol, "WIN-EUR");
+  assert.equal(data.items[0].openPosition.current_market_price, "0.000067");
+  assert.equal(data.items[0].openPosition.current_market_captured_at, "2026-03-20T11:59:00.000Z");
+  assert.equal(data.items[0].openPosition.entry_price, "0.00006123");
+  assert.equal(Object.hasOwn(data.items[0], "portfolio_id"), false);
+  const marketDataRequest = calls.find((call) => call.table === "AI_Crypto_Bot_Market_Data");
+  assert.equal(marketDataRequest.query.get("symbol"), "in.(WIN-EUR)");
 });
 
 test("trade history clamps stale page requests and bounds large datasets to one page", async () => {
@@ -310,7 +372,12 @@ test("trade history renders all required fields as text and treats buys as unrea
         price: "1000",
         quantity: "1",
         fees: "2.5",
-        realized_pnl: "0"
+        realized_pnl: "0",
+        openPosition: {
+          amount: "1",
+          entry_price: "1000",
+          current_market_price: "1100"
+        }
       }),
       createTradeRow({
         id: "trade-2",
@@ -361,9 +428,26 @@ test("trade history renders all required fields as text and treats buys as unrea
       "Realized P&L: +€118.69"
     ]
   );
-  assert.equal(rows.children[0].children[8].textContent, "Executed · Paper Trade");
-  assert.equal(rows.children[0].children[7].textContent, "—");
-  assert.equal(rows.children[1].children[7].textContent, "+€118.69");
+  assert.equal(rows.children[0].children[9].textContent, "OPEN");
+  assert.equal(rows.children[0].children[7].textContent, "+€100.00 (+10.00%)");
+  assert.deepEqual(
+    rows.children[0].children[8].children[0].children.map((line) => line.textContent),
+    [
+      "Entry Price: €1,000.00",
+      "Current Price: €1,100.00",
+      "Unrealized P&L: +€100.00 (+10.00%)"
+    ]
+  );
+  assert.equal(rows.children[1].children[9].textContent, "CLOSED · Paper Trade");
+  assert.equal(rows.children[1].children[7].textContent, "+€118.69 (+11.84%)");
+  assert.deepEqual(
+    rows.children[1].children[8].children[0].children.map((line) => line.textContent),
+    [
+      "Entry Price: €1,002.50",
+      "Exit Price: €1,124.00",
+      "Realized P&L: +€118.69 (+11.84%)"
+    ]
+  );
   assert.equal(previous.disabled, false);
   assert.equal(next.disabled, true);
   assert.equal(elements.get('[data-history-value="pageNumber"]').textContent, "2 / 2");

@@ -347,21 +347,56 @@ async function loadTradeHistory({ config, accessToken, fetchImpl, now, params })
     throw new DashboardDataError("Invalid trade-history clock.");
   }
   const filters = parseTradeHistoryFilters(params, currentTime);
-  const [totalCount, stats] = await Promise.all([
+  const [totalCount, stats, openPositions] = await Promise.all([
     fetchCount(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", filters.query),
-    fetchTradeHistoryStats(config, accessToken, fetchImpl)
+    fetchTradeHistoryStats(config, accessToken, fetchImpl),
+    fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Positions", {
+      select: "portfolio_id,symbol,amount,entry_price,current_price,created_at",
+      status: "eq.OPEN",
+      order: "created_at.desc",
+      limit: String(limits.positions)
+    })
   ]);
   const totalPages = Math.ceil(totalCount / tradeHistoryPageSize);
   const page = totalPages ? Math.min(filters.page, totalPages) : 1;
-  const pageResult = totalCount
-    ? await fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
+  const pageResultRequest = totalCount
+    ? fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Trades", {
       ...filters.query,
-      select: "id,symbol,side,price,quantity,fees,realized_pnl,created_at",
+      select: "id,portfolio_id,symbol,side,price,quantity,fees,realized_pnl,created_at",
       order: tradeHistorySorts[filters.sort],
       limit: String(tradeHistoryPageSize),
       offset: String((page - 1) * tradeHistoryPageSize)
     })
-    : { rows: [] };
+    : Promise.resolve({ rows: [] });
+  const [pageResult, marketDataBySymbol] = await Promise.all([
+    pageResultRequest,
+    loadMarketDataForPositions({ config, accessToken, fetchImpl }, openPositions.rows)
+  ]);
+  const positionItems = openPositions.rows.map((position) => (
+    addCurrentMarketPrice(position, marketDataBySymbol)
+  ));
+  const openPositionsByTradeKey = new Map(
+    positionItems.map((position) => [getPositionTradeKey(position), position])
+  );
+  const items = pageResult.rows.map((trade) => {
+    const position = trade.side === "BUY"
+      ? openPositionsByTradeKey.get(getPositionTradeKey(trade))
+      : null;
+    const publicTrade = Object.fromEntries(
+      Object.entries(trade).filter(([field]) => field !== "portfolio_id")
+    );
+    return position
+      ? {
+        ...publicTrade,
+        openPosition: {
+          amount: position.amount,
+          entry_price: position.entry_price,
+          current_market_price: position.current_market_price,
+          current_market_captured_at: position.current_market_captured_at
+        }
+      }
+      : publicTrade;
+  });
 
   return {
     page,
@@ -374,9 +409,47 @@ async function loadTradeHistory({ config, accessToken, fetchImpl, now, params })
       side: filters.side,
       period: filters.period
     },
-    items: pageResult.rows,
+    items,
     stats
   };
+}
+
+async function loadMarketDataForPositions({ config, accessToken, fetchImpl }, positions) {
+  const symbols = [...new Set(positions.map((position) => position.symbol))];
+  if (!symbols.length) {
+    return new Map();
+  }
+  if (symbols.some((symbol) => typeof symbol !== "string" || !/^[A-Z0-9._-]{1,32}$/.test(symbol))) {
+    throw new DashboardDataError("Supabase returned an invalid open-position symbol.");
+  }
+
+  const marketData = await fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Market_Data", {
+    select: "symbol,price,captured_at",
+    symbol: `in.(${symbols.join(",")})`,
+    limit: String(symbols.length)
+  });
+  return new Map(marketData.rows.map((row) => [row.symbol, row]));
+}
+
+function addCurrentMarketPrice(position, marketDataBySymbol) {
+  const snapshot = marketDataBySymbol.get(position.symbol);
+  return {
+    ...position,
+    current_market_price: snapshot ? snapshot.price : position.current_price,
+    current_market_captured_at: snapshot ? snapshot.captured_at : null
+  };
+}
+
+function getPositionTradeKey(position) {
+  if (
+    !position
+    || typeof position.portfolio_id !== "string"
+    || typeof position.symbol !== "string"
+    || typeof position.created_at !== "string"
+  ) {
+    return null;
+  }
+  return `${position.portfolio_id}\u0000${position.symbol}\u0000${position.created_at}`;
 }
 
 function parseTradeHistoryFilters(params, currentTime) {
@@ -570,6 +643,22 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
   if (portfolios.count > portfolios.rows.length) {
     throw new DashboardDataError("Portfolio summary exceeded the supported page size.");
   }
+  const marketDataBySymbol = await loadMarketDataForPositions(
+    { config, accessToken, fetchImpl },
+    openPositions.rows
+  );
+  const positionItems = openPositions.rows.map((position) => (
+    addCurrentMarketPrice(position, marketDataBySymbol)
+  ));
+  const openPositionsByTradeKey = new Map(
+    positionItems.map((position) => [getPositionTradeKey(position), position])
+  );
+  const recentTradeItems = recentTrades.rows.map((trade) => {
+    const position = trade.side === "BUY"
+      ? openPositionsByTradeKey.get(getPositionTradeKey(trade))
+      : null;
+    return position ? { ...trade, openPosition: position } : trade;
+  });
 
   const portfolioSummary = createPortfolioSummary(
     portfolios.rows,
@@ -586,11 +675,11 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     portfolio: portfolioSummary,
     openPositions: {
       count: openPositions.count,
-      items: openPositions.rows
+      items: positionItems
     },
     recentTrades: {
       count: recentTrades.count,
-      items: recentTrades.rows
+      items: recentTradeItems
     },
     watchedMarkets: {
       count: watchedMarkets.count,

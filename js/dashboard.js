@@ -127,13 +127,22 @@
     setStatus(documentRef, "emergency", view.emergencyState && view.emergencyState.status);
     setText(documentRef, "portfolioCount", formatCount(portfolio.count || 0));
 
-    renderCollection(documentRef, "positions", openPositions.items, (item) => [
-      `${item.symbol || "—"} · ${formatQuantity(item.amount)} units`,
-      `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(item.current_price)} · P&L ${formatCurrency(item.unrealized_pnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
-    ]);
+    renderCollection(documentRef, "positions", openPositions.items, (item) => {
+      const currentPrice = item.current_market_price === undefined
+        ? item.current_price
+        : item.current_market_price;
+      const metrics = item.current_market_price === undefined
+        ? null
+        : formatters.getOpenPositionMetrics(item);
+      const unrealizedPnl = metrics ? metrics.unrealizedPnl : item.unrealized_pnl;
+      return [
+        `${item.symbol || "—"} · ${formatters.formatQuantity(item.amount)} units`,
+        `Entry ${formatters.formatPrice(item.entry_price)} · Current ${formatters.formatPrice(currentPrice)} · P&L ${formatCurrency(unrealizedPnl)} · Opened ${formatters.formatTimestamp(item.created_at)}`
+      ];
+    });
     renderCollection(documentRef, "trades", recentTrades.items, (item) => [
-      `${item.side || "—"} ${item.symbol || "—"} · ${formatQuantity(item.quantity)} units`,
-      `${formatters.formatPrice(item.price)} · ${formatters.formatTimestamp(item.created_at)}`
+      item.symbol || "—",
+      describeRecentTrade(item)
     ]);
     renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
       item.symbol || "—",
@@ -316,11 +325,50 @@
     return number === null ? "0" : numberFormat.format(number);
   }
 
-  function formatQuantity(value) {
-    const number = numericValue(value);
-    return number === null
-      ? "—"
-      : new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 }).format(number);
+  function describeRecentTrade(trade) {
+    const side = typeof trade.side === "string" ? trade.side.toUpperCase() : "—";
+    const details = [
+      `${side} · Quantity: ${formatters.formatQuantity(trade.quantity)}`
+    ];
+    if (side === "BUY" && trade.openPosition) {
+      const metrics = formatters.getOpenPositionMetrics(trade.openPosition);
+      details.push(
+        `Entry: ${formatters.formatPrice(trade.openPosition.entry_price)}`,
+        `Current: ${formatters.formatPrice(trade.openPosition.current_market_price)}`,
+        `P&L: ${formatPnlSummary(
+          metrics ? metrics.unrealizedPnl : null,
+          metrics ? metrics.unrealizedPnlPercent : null
+        )}`,
+        `Date: ${formatters.formatTimestamp(trade.created_at)}`,
+        "Status: OPEN"
+      );
+    } else if (side === "SELL") {
+      const metrics = formatters.getClosedTradeMetrics(trade);
+      details.push(
+        `Entry: ${formatters.formatPrice(metrics ? metrics.entryPrice : null)}`,
+        `Exit: ${formatters.formatPrice(trade.price)}`,
+        `P&L: ${formatPnlSummary(
+          trade.realized_pnl,
+          metrics ? metrics.realizedPnlPercent : null
+        )}`,
+        `Date: ${formatters.formatTimestamp(trade.created_at)}`,
+        "Status: CLOSED"
+      );
+    } else {
+      details.push(
+        `Execution: ${formatters.formatPrice(trade.price)}`,
+        `Date: ${formatters.formatTimestamp(trade.created_at)}`,
+        "Status: Executed · Paper Trade"
+      );
+    }
+    return details.join("\n");
+  }
+
+  function formatPnlSummary(amount, percentage) {
+    const formattedAmount = formatters.formatSignedCurrency(amount);
+    return percentage === null || percentage === undefined
+      ? formattedAmount
+      : `${formattedAmount} (${formatters.formatSignedPercent(percentage)})`;
   }
 
   function numericValue(value) {

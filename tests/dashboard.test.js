@@ -104,7 +104,12 @@ function buildDashboardRows() {
     AI_Crypto_Bot_Portfolio_Snapshots: [
       { portfolio_id: "portfolio-1", portfolio_value: "1050", captured_at: "2026-03-20T10:00:00.000Z" },
       { portfolio_id: "portfolio-1", portfolio_value: "1100", captured_at: "2026-03-20T11:00:00.000Z" }
-    ]
+    ],
+    AI_Crypto_Bot_Market_Data: [{
+      symbol: "BTC-EUR",
+      price: "105000",
+      captured_at: "2026-03-20T11:59:00.000Z"
+    }]
   };
 }
 
@@ -246,6 +251,39 @@ test("dashboard API rejects anonymous requests without querying Supabase", async
   assert.equal(verifyCalls, 0);
   assert.equal(dataCalls, 0);
   assert.match(res.headers["set-cookie"], /Max-Age=0/);
+});
+
+test("dashboard API enriches open positions and matching recent BUY trades with current snapshots", async () => {
+  const module = await dashboardDataModule;
+  const rows = buildDashboardRows();
+  rows.AI_Crypto_Bot_Trades.push({
+    id: "trade-open-buy",
+    portfolio_id: "portfolio-1",
+    symbol: "BTC-EUR",
+    side: "BUY",
+    price: "90000",
+    quantity: "0.01",
+    fees: "2.25",
+    slippage: "0.1",
+    realized_pnl: "0",
+    created_at: "2026-03-20T10:00:00.000Z"
+  });
+  rows.AI_Crypto_Bot_Market_Data[0].price = "105000";
+  const handler = module.createHandler({
+    env: authEnv,
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({ rows }),
+    now: () => generatedAt
+  });
+  const res = createResponse();
+
+  await handler({ method: "GET", headers: { cookie: sessionCookie } }, res);
+
+  const { data } = JSON.parse(res.body);
+  assert.equal(data.openPositions.items[0].current_market_price, "105000");
+  assert.equal(data.openPositions.items[0].current_market_captured_at, "2026-03-20T11:59:00.000Z");
+  const recentBuy = data.recentTrades.items.find((trade) => trade.id === "trade-open-buy");
+  assert.equal(recentBuy.openPosition.current_market_price, "105000");
 });
 
 test("dashboard API fails closed when session verification or database reads fail", async () => {
@@ -409,7 +447,32 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
         created_at: "2026-03-20T10:00:00.000Z"
       }]
     },
-    recentTrades: { count: 2, items: [{ side: "SELL", symbol: "BTC-EUR", quantity: 0.001, price: 0.98123456, created_at: generatedAt }] },
+    recentTrades: {
+      count: 2,
+      items: [
+        {
+          side: "SELL",
+          symbol: "BTC-EUR",
+          quantity: 1,
+          price: 1124,
+          fees: 2.81,
+          realized_pnl: 118.69,
+          created_at: generatedAt
+        },
+        {
+          side: "BUY",
+          symbol: "WIN-EUR",
+          quantity: "16348102.95927201",
+          price: "0.000061",
+          created_at: generatedAt,
+          openPosition: {
+            amount: "16348102.95927201",
+            entry_price: "0.00006123",
+            current_market_price: "0.000067"
+          }
+        }
+      ]
+    },
     watchedMarkets: { count: 1, items: [{ symbol: "BTC-EUR", priority: 1 }] },
     aiDecisions: {
       count: 1,
@@ -441,7 +504,15 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   );
   assert.match(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].textContent,
-    /€\s?0\.98123.*13:00/
+    /SELL · Quantity: 1.*Exit: €\s?1,124\.00.*\+€118\.69 \(\+11\.84%\).*13:00.*Status: CLOSED/s
+  );
+  assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[0].textContent,
+    "WIN-EUR"
+  );
+  assert.match(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[1].textContent,
+    /BUY · Quantity: 16\.35M.*Entry: €\s?0\.00006123.*Current: €\s?0\.000067.*P&L: \+€.*\(\+9\.42%\).*Status: OPEN/s
   );
   assert.match(
     elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,

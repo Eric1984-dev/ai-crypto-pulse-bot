@@ -212,6 +212,8 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Extend neuron paths to trace endpoints, delay fading until near arrival, and illuminate terminal pads in sync
 - [x] Pulse intermediate circular pads during ANALYZING
 - [x] Subdue the static circuit glow and strengthen neuron halos so status activity remains easy to distinguish
+- [x] Show current market prices and unrealized returns for open trades; show entry/exit prices and realized return percentages for closed trades
+- [x] Improve Dashboard Recent Trades with position status and EUR P&L details; compact large quantities and preserve precision for micro-priced assets
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist

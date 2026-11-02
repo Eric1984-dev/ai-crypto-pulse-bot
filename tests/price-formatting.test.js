@@ -5,18 +5,53 @@ const test = require("node:test");
 const {
   formatCurrency,
   formatPrice,
+  formatQuantity,
+  formatSignedPercent,
   formatSignedCurrency,
   formatTimestamp,
-  formatTradeValueDetails
+  formatTradeValueDetails,
+  getClosedTradeMetrics,
+  getOpenPositionMetrics
 } = require("../js/formatters.js");
 
 test("price formatting preserves five decimals below one euro and two decimals from one euro", () => {
   assert.match(formatPrice(0.00453954), /0\.00454$/);
   assert.match(formatPrice(0.05671234), /0\.05671$/);
   assert.match(formatPrice(0.98123456), /0\.98123$/);
+  assert.match(formatPrice(0.00006123), /0\.00006123$/);
   assert.match(formatPrice(12.3456), /12\.35$/);
   assert.match(formatPrice(69421.22), /69,421\.22$/);
   assert.match(formatPrice(1), /1\.00$/);
+});
+
+test("quantity formatting removes precision noise and compacts very large amounts", () => {
+  assert.equal(formatQuantity("16348102.95927201"), "16.35M");
+  assert.equal(formatQuantity("220837.14636271"), "220,837");
+  assert.equal(formatQuantity("0.000123456789"), "0.00012346");
+  assert.equal(formatQuantity(null), "—");
+});
+
+test("position and closed-trade return metrics derive from stored execution data", () => {
+  const openMetrics = getOpenPositionMetrics({
+    amount: "1000",
+    entry_price: "1",
+    current_market_price: "1.1"
+  });
+  assert.ok(Math.abs(openMetrics.unrealizedPnl - 100) < 1e-10);
+  assert.ok(Math.abs(openMetrics.unrealizedPnlPercent - 10) < 1e-10);
+  assert.equal(openMetrics.currentPrice, 1.1);
+
+  const closedMetrics = getClosedTradeMetrics({
+    side: "SELL",
+    price: "1124",
+    quantity: "1",
+    fees: "2.81",
+    realized_pnl: "118.69"
+  });
+  assert.equal(closedMetrics.entryPrice, 1002.5);
+  assert.equal(closedMetrics.exitPrice, 1124);
+  assert.equal(closedMetrics.realizedPnl, 118.69);
+  assert.match(formatSignedPercent(closedMetrics.realizedPnlPercent), /^\+11\.84%$/);
 });
 
 test("price formatting returns the existing empty marker for absent or invalid values", () => {

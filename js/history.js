@@ -12,7 +12,7 @@
 })(globalThis, function createTradeHistoryApi(formatters) {
   const pageSize = 25;
   const refreshIntervalMs = 30000;
-  const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
+  const numberFormat = new Intl.NumberFormat("en-GB");
   function buildTradeHistoryUrl({
     page = 1,
     search = "",
@@ -123,16 +123,44 @@
 
   function createTradeRow(documentRef, trade) {
     const row = documentRef.createElement("tr");
+    const openPositionMetrics = trade.side === "BUY" && trade.openPosition
+      ? formatters.getOpenPositionMetrics(trade.openPosition)
+      : null;
+    const closedTradeMetrics = trade.side === "SELL"
+      ? formatters.getClosedTradeMetrics(trade)
+      : null;
+    const positionDetails = openPositionMetrics
+      ? [
+        `Entry Price: ${formatters.formatPrice(trade.openPosition.entry_price)}`,
+        `Current Price: ${formatters.formatPrice(openPositionMetrics.currentPrice)}`,
+        `Unrealized P&L: ${formatPnlSummary(openPositionMetrics.unrealizedPnl, openPositionMetrics.unrealizedPnlPercent)}`
+      ]
+      : trade.side === "SELL"
+        ? [
+          `Entry Price: ${formatters.formatPrice(closedTradeMetrics ? closedTradeMetrics.entryPrice : null)}`,
+          `Exit Price: ${formatters.formatPrice(trade.price)}`,
+          `Realized P&L: ${formatPnlSummary(trade.realized_pnl, closedTradeMetrics ? closedTradeMetrics.realizedPnlPercent : null)}`
+        ]
+        : [];
     const values = [
       formatters.formatTimestamp(trade.created_at, "medium"),
       trade.symbol,
       trade.side,
       formatters.formatPrice(trade.price),
-      formatNumber(trade.quantity),
+      formatters.formatQuantity(trade.quantity),
       formatters.formatTradeValueDetails(trade),
       formatCurrency(trade.fees),
-      trade.side === "SELL" ? formatters.formatSignedCurrency(trade.realized_pnl) : "—",
-      "Executed · Paper Trade"
+      openPositionMetrics
+        ? formatPnlSummary(openPositionMetrics.unrealizedPnl, openPositionMetrics.unrealizedPnlPercent)
+        : trade.side === "SELL"
+          ? formatPnlSummary(trade.realized_pnl, closedTradeMetrics ? closedTradeMetrics.realizedPnlPercent : null)
+          : "—",
+      positionDetails,
+      trade.side === "BUY" && trade.openPosition
+        ? "OPEN"
+        : trade.side === "SELL"
+          ? "CLOSED · Paper Trade"
+          : "Executed · Paper Trade"
     ];
     for (const [index, value] of values.entries()) {
       const cell = documentRef.createElement("td");
@@ -146,12 +174,33 @@
           breakdown.append(line);
         }
         cell.append(breakdown);
+      } else if (index === 8) {
+        cell.className = "trade-position-cell";
+        if (value.length) {
+          const breakdown = documentRef.createElement("div");
+          breakdown.className = "trade-position-breakdown";
+          for (const detail of value) {
+            const line = documentRef.createElement("span");
+            line.textContent = detail;
+            breakdown.append(line);
+          }
+          cell.append(breakdown);
+        } else {
+          cell.textContent = "—";
+        }
       } else {
         cell.textContent = value === null || value === undefined ? "—" : value;
       }
       row.append(cell);
     }
     return row;
+  }
+
+  function formatPnlSummary(amount, percentage) {
+    const formattedAmount = formatters.formatSignedCurrency(amount);
+    return percentage === null || percentage === undefined
+      ? formattedAmount
+      : `${formattedAmount} (${formatters.formatSignedPercent(percentage)})`;
   }
 
   function startTradeHistory({
@@ -349,11 +398,6 @@
 
   function formatCurrency(value) {
     return formatters.formatCurrency(value);
-  }
-
-  function formatNumber(value) {
-    const number = numericValue(value);
-    return number === null ? "—" : numberFormat.format(number);
   }
 
   function formatCount(value) {

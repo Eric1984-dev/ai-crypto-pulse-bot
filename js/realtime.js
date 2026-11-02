@@ -24,7 +24,8 @@
       { table: "AI_Crypto_Bot_Trades" }
     ],
     history: [
-      { table: "AI_Crypto_Bot_Trades" }
+      { table: "AI_Crypto_Bot_Trades" },
+      { table: "AI_Crypto_Bot_Market_Data" }
     ],
     scanner: [
       { table: "AI_Crypto_Bot_AI_Decisions" },

@@ -171,6 +171,24 @@ test("recommendations subscribe to analytics source tables only", () => {
   unsubscribe();
 });
 
+test("trade history refreshes for execution and market-price updates", () => {
+  const client = createClient();
+  const environment = createBrowserEnvironment();
+  let updates = 0;
+  const unsubscribe = subscribe(client, environment, "history", () => {
+    updates += 1;
+  });
+
+  assert.deepEqual(
+    client.channels[0].bindings.map((binding) => binding.filter.table).sort(),
+    ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Trades"].sort()
+  );
+  client.channels[0].emit("AI_Crypto_Bot_Market_Data");
+  environment.flushTimers();
+  assert.equal(updates, 1);
+  unsubscribe();
+});
+
 test("recovers after a Realtime connection error and reports state", () => {
   const client = createClient();
   const environment = createBrowserEnvironment();

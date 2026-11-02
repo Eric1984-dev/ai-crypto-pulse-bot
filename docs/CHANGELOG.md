@@ -6,6 +6,13 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Trade History and Dashboard trade visibility
+
+- Enriched open BUY executions with the latest available market snapshot, current unrealized EUR P&L, and return percentage; SELL executions now show derived entry price and realized return percentage
+- Expanded Dashboard Recent Trades with entry/exit prices, position P&L, timestamps, and OPEN/CLOSED status while retaining concise quantity formatting
+- Preserved micro-priced asset precision and refreshed Trade History on Market Data Realtime updates
+- Kept execution records, paper-trading logic, database calculations, API routes, and Vercel Function count unchanged
+
 ### AI Analysis logging optimization
 
 - Replaced start and per-market informational events with one completion summary per successful run, including market and decision counts, candle reads, failed reads, runtime, and stage timings

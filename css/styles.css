@@ -15,6 +15,19 @@
   --accent-hover: #24543a;
 }
 
+.trade-position-breakdown {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.trade-position-breakdown span {
+  white-space: nowrap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1003,6 +1016,10 @@ a:focus-visible {
   line-height: 1.5;
 }
 
+.dashboard-list[data-dashboard-list="trades"] .dashboard-row-secondary {
+  white-space: pre-line;
+}
+
 .dashboard-error {
   margin-top: 14px;
   padding: 13px 15px;
@@ -1152,7 +1169,7 @@ a:focus-visible {
 
 .history-table {
   width: 100%;
-  min-width: 1000px;
+  min-width: 1180px;
   border-collapse: collapse;
   font-size: 12px;
   text-align: left;
@@ -1184,6 +1201,11 @@ a:focus-visible {
 }
 
 .history-table td.trade-value-cell {
+  white-space: normal;
+}
+
+.history-table td.trade-position-cell {
+  min-width: 210px;
   white-space: normal;
 }
 
