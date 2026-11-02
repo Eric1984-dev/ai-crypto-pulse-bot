@@ -509,9 +509,9 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "1");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
-  assert.match(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, /12:55/);
-  assert.match(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, /12:59/);
-  assert.match(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, /13:00/);
+  assert.equal(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, "20/03/2026, 12:55");
+  assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "20/03/2026, 12:59");
+  assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "20/03/2026, 13:00");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0.01 units");
   assert.match(
     elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[1].textContent,
@@ -638,6 +638,41 @@ test("dashboard collapses portfolio metrics after Win Rate by default", () => {
   assert.match(html, /<details class="dashboard-extra-metrics">\s*<summary>Show additional metrics<\/summary>/);
   assert.doesNotMatch(html, /<details class="dashboard-extra-metrics" open>/);
   assert.match(html, /<details class="dashboard-extra-metrics">[\s\S]*data-dashboard-value="openPositions"/);
+});
+
+test("dashboard list panels start collapsed and the activity strip uses the five requested sources", () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+  const listSection = html.match(
+    /<section class="dashboard-grid dashboard-grid-lists"[^>]*>([\s\S]*?)<\/section>/
+  );
+  const panels = listSection
+    ? [...listSection[1].matchAll(/<details class="dashboard-panel dashboard-list-panel">([\s\S]*?)<\/details>/g)]
+    : [];
+  assert.equal(panels.length, 4);
+  assert.deepEqual(panels.map(([, panel]) => panel.match(/<p class="eyebrow">([^<]+)<\/p>/)[1]), [
+    "Portfolio",
+    "Activity",
+    "Market universe",
+    "Agent log"
+  ]);
+  assert.doesNotMatch(listSection[1], /<details\b[^>]*\bopen(?:\s|>)/);
+  for (const listName of ["positions", "trades", "markets", "decisions"]) {
+    assert.match(listSection[1], new RegExp(`data-dashboard-list="${listName}"`));
+  }
+  assert.match(listSection[1], /href="\/history\.html">View history<\/a>/);
+
+  const activityStrip = html.match(/<dl class="activity-strip">([\s\S]*?)<\/dl>/);
+  assert.ok(activityStrip);
+  assert.match(activityStrip[1], /Bot run[\s\S]*data-dashboard-activity="bot-run"/);
+  assert.match(activityStrip[1], /Market data[\s\S]*data-dashboard-activity="market-data"/);
+  assert.match(activityStrip[1], /Paper trade[\s\S]*data-dashboard-activity="paper-trade"/);
+  assert.match(activityStrip[1], /Analytics[\s\S]*On demand[\s\S]*Market scan[\s\S]*On demand/);
+  assert.match(
+    styles,
+    /\.activity-strip\s*\{[^}]*background:\s*linear-gradient\(105deg,\s*#193a31,\s*var\(--positive-dark\)\s+58%,\s*#193a31\);/s
+  );
+  assert.match(styles, /\.activity-strip dt\s*\{[^}]*color:\s*var\(--positive\);/s);
 });
 
 test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {

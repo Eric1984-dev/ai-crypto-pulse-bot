@@ -254,6 +254,28 @@ test("dashboard uses the header paper-mode badge without the redundant paper-mod
   assert.doesNotMatch(html, /Status wordt gelezen uit AI_Crypto_Bot_Status|Visualisatie van de actuele status uit AI_Crypto_Bot_Status/);
 });
 
+test("navigation uses a yellow paper-mode badge, blue hover glow, and overlays sticky tables", () => {
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+  const badgeStyles = styles.match(/\.paper-mode-badge\s*\{([^}]+)\}/);
+  const badgeDotStyles = styles.match(/\.paper-mode-badge::before\s*\{([^}]+)\}/);
+  const menuHoverStyles = styles.match(/\.primary-nav \.nav-menu a:hover\s*\{([^}]+)\}/);
+  const headerStyles = styles.match(/\.site-header\s*\{([^}]+)\}/);
+  const stickyHeaderStyles = styles.match(/\.history-table thead th\s*\{([^}]+)\}/);
+
+  assert.ok(badgeStyles);
+  assert.match(badgeStyles[1], /border:\s*1px solid #9c7435;/);
+  assert.match(badgeStyles[1], /color:\s*var\(--warning\);/);
+  assert.ok(badgeDotStyles);
+  assert.match(badgeDotStyles[1], /background:\s*var\(--warning\);/);
+  assert.ok(menuHoverStyles);
+  assert.match(menuHoverStyles[1], /box-shadow:\s*inset 0 0 0 1px var\(--accent-border\), 0 0 18px rgb\(91 156 255 \/ 15%\);/);
+  assert.ok(headerStyles);
+  assert.ok(stickyHeaderStyles);
+  const headerZIndex = Number(headerStyles[1].match(/z-index:\s*(\d+)/)[1]);
+  const stickyHeaderZIndex = Number(stickyHeaderStyles[1].match(/z-index:\s*(\d+)/)[1]);
+  assert.ok(headerZIndex > stickyHeaderZIndex);
+});
+
 test("environment template keeps live trading disabled", () => {
   const envExample = fs.readFileSync(path.join(rootDirectory, ".env.example"), "utf8");
   assert.match(envExample, /^ENABLE_LIVE_TRADING=false$/m);

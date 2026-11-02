@@ -249,41 +249,41 @@
       </section>
 
       <section class="dashboard-grid dashboard-grid-lists" aria-label="Portfolio and agent summaries">
-        <article class="dashboard-panel">
-          <div class="panel-heading">
+        <details class="dashboard-panel dashboard-list-panel">
+          <summary class="panel-heading">
             <div><p class="eyebrow">Portfolio</p><h2>Open Positions</h2></div>
             <span class="count-pill" data-dashboard-value="openPositions">0</span>
-          </div>
+          </summary>
           <ul class="dashboard-list" data-dashboard-list="positions" hidden></ul>
           <p class="dashboard-empty" data-dashboard-empty="positions">No open positions.</p>
-        </article>
-        <article class="dashboard-panel">
-          <div class="panel-heading">
+        </details>
+        <details class="dashboard-panel dashboard-list-panel">
+          <summary class="panel-heading">
             <div><p class="eyebrow">Activity</p><h2>Recent Trades</h2></div>
-            <div class="trade-history-dashboard-actions">
-              <span class="count-pill" data-dashboard-value="paperTrades">0</span>
-              <a class="dashboard-link" href="/history.html">View history</a>
-            </div>
+            <span class="count-pill" data-dashboard-value="paperTrades">0</span>
+          </summary>
+          <div class="dashboard-list-panel-actions">
+            <a class="dashboard-link" href="/history.html">View history</a>
           </div>
           <ul class="dashboard-list" data-dashboard-list="trades" hidden></ul>
           <p class="dashboard-empty" data-dashboard-empty="trades">No paper trades recorded.</p>
-        </article>
-        <article class="dashboard-panel">
-          <div class="panel-heading">
+        </details>
+        <details class="dashboard-panel dashboard-list-panel">
+          <summary class="panel-heading">
             <div><p class="eyebrow">Market universe</p><h2>Watched Markets</h2></div>
             <span class="count-pill" data-dashboard-value="trackedMarkets">0</span>
-          </div>
+          </summary>
           <ul class="dashboard-list" data-dashboard-list="markets" hidden></ul>
           <p class="dashboard-empty" data-dashboard-empty="markets">No enabled markets found.</p>
-        </article>
-        <article class="dashboard-panel">
-          <div class="panel-heading">
+        </details>
+        <details class="dashboard-panel dashboard-list-panel">
+          <summary class="panel-heading">
             <div><p class="eyebrow">Agent log</p><h2>Recent AI Decisions</h2></div>
             <span class="count-pill" data-dashboard-value="aiDecisions">0</span>
-          </div>
+          </summary>
           <ul class="dashboard-list" data-dashboard-list="decisions" hidden></ul>
           <p class="dashboard-empty" data-dashboard-empty="decisions">No AI decisions recorded.</p>
-        </article>
+        </details>
       </section>
 
       <section class="dashboard-grid dashboard-grid-risk" aria-label="Risk control">

@@ -200,6 +200,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Use the frame-free green circuit-board artwork as the compact Agent Status visual and overlay status-driven glowing neuron signals along its routes
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
+- [x] Collapse Dashboard Portfolio, Activity, Market universe, and Agent log panels by default
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
@@ -207,6 +208,8 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
 - [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
+- [x] Show persisted run times in a green dashboard activity strip, keep Analytics/Market Scan on-demand, and use a yellow PAPER MODE badge
+- [x] Add blue menu-item hover glow and keep the open navigation above sticky Analytics table headings
 - [x] Recolor the Agent Status circuit and active signals blue while retaining red error and static gray stopped/unknown states
 - [x] Use blue AI-brain artwork inspired by the supplied reference beneath the route-masked moving neuron signals
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
@@ -224,7 +227,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
 
-Status: Local interface refinements, responsive viewport checks, accessibility fixes, 237 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 AI Recommendations follows this phase; no Phase 16 work has started.
+Status: Local interface refinements, responsive viewport checks, accessibility fixes, 240 automated tests, and static/database build validation pass. Phase 14 remains in progress pending Lighthouse, hosted production smoke tests, supported-browser checks, and physical-device verification. See [the final release report](docs/reports/FINAL_RELEASE_REPORT.md). Phase 15 AI Recommendations follows this phase; no Phase 16 work has started.
 
 ---
 

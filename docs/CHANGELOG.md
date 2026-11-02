@@ -10,15 +10,17 @@ All notable project changes should be documented here.
 
 - Restyled the page background in neutral charcoal, with dark slate cards and blue accents
 - Highlighted positive and negative financial values in green and red without changing labels or trading behavior
-- Added a subtle recent-activity strip with stored bot-run, market-data, and paper-trade timestamps; Analytics and Market Scan are marked on-demand because their run history is not persisted
+- Added a green activity strip with full local bot-run, market-data, and paper-trade timestamps; Analytics and Market Scan remain on-demand because their run history is not persisted
 - Added soft blue glow accents to cards, the app icon, export controls, and Agent Status chip
 - Replaced the green circuit board with blue AI-brain artwork inspired by the supplied reference; aligned all 32 animated routes and 24 pulsing pads to its visible traces, with signal fades just inside the artwork edges
 - Recolored ACTIVE/ANALYZING/IDLE signals blue while retaining red ERROR and gray STOPPED/UNKNOWN states
 
 ### Paper-mode header and navigation
 
-- Replaced the Dashboard's full-width paper-trading notice with a compact PAPER MODE badge beside the app icon
+- Replaced the Dashboard's full-width paper-trading notice with a compact yellow PAPER MODE badge beside the app icon
 - Pinned Dashboard to the top of each application menu, separated the remaining alphabetically sorted links with a divider, and kept account actions at the bottom
+- Added blue hover glows to menu links and stacked the open menu above sticky Analytics table headers
+- Collapsed Dashboard Portfolio, Activity, Market universe, and Agent log panels by default
 
 ### Exports date filters
 
