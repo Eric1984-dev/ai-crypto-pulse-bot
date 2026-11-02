@@ -18,7 +18,7 @@ function createContainer() {
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
   const expectedStates = {
     ACTIVE: { signalCount: 12, color: "#65dc92", signalDuration: 3.2 },
-    ANALYZING: { signalCount: 24, color: "#9dffbd", signalDuration: 1.25 },
+    ANALYZING: { signalCount: 24, color: "#9dffbd", signalDuration: 2.6 },
     IDLE: { signalCount: 2, color: "#67866f", signalDuration: 7.5 },
     STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
     ERROR: { signalCount: 6, color: "#ff6478", signalDuration: 2.4 },
@@ -59,12 +59,16 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
-  assert.match(container.innerHTML, /<animate attributeName="opacity" values="1;1;0" keyTimes="0;0\.72;1"/);
+  assert.match(container.innerHTML, /<animate attributeName="opacity" values="1;1;0" keyTimes="0;0\.88;1"/);
+  assert.match(
+    container.innerHTML,
+    /class="circuit-neuron-terminal"[^>]+filter="url\(#circuit-neuron-glow\)">\s*<animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0\.84;0\.9;0\.98;1"/
+  );
   assert.match(container.innerHTML, /class="circuit-neuron-halo" r="22"/);
   assert.match(container.innerHTML, /class="circuit-neuron-core" r="8"/);
   assert.equal(agentBrain.signalRoutes.length, 32);
   assert.equal(new Set(agentBrain.signalRoutes).size, 32);
-  assert.ok(agentBrain.signalRoutes.every((route) => /^M\d+ \d+[HV]\d+$/.test(route)));
+  assert.ok(agentBrain.signalRoutes.every((route) => /^M\d+ \d+(?=[VHL])(?:(?:V|H)\d+|L\d+ \d+)+$/.test(route)));
   assert.match(container.innerHTML, /<mask id="circuit-trace-mask"[^>]+mask-type="luminance">/);
   assert.match(container.innerHTML, /mask="url\(#circuit-trace-mask\)"/);
   assert.equal((container.innerHTML.match(/<mask id="circuit-neuron-route-\d+"/g) || []).length, 32);
@@ -72,7 +76,8 @@ test("circuit SVG uses the green board and boundary-origin moving signals", () =
     (container.innerHTML.match(/class="circuit-neuron-track" mask="url\(#circuit-neuron-route-\d+\)"/g) || []).length,
     44
   );
-  assert.match(container.innerHTML, /<path d="M\d+ \d+[HV]\d+" fill="none" stroke="white" stroke-width="18"/);
+  assert.equal((container.innerHTML.match(/class="circuit-neuron-terminal"/g) || []).length, 44);
+  assert.match(container.innerHTML, /<path d="M\d+ \d+[VHL]/);
   const circuitArtwork = fs.readFileSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png"));
   assert.ok(circuitArtwork.length > 100000);
   assert.equal(circuitArtwork.readUInt32BE(16), 1254);

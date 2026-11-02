@@ -209,6 +209,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add a subtle chip-edge glow only during ANALYZING
 - [x] Expand neuron routing across 32 distinct circuit traces while keeping the ANALYZING signal count unchanged
 - [x] Keep each neuron masked to its assigned trace segment so it cannot jump to a neighboring lane at crossings
+- [x] Extend neuron paths to trace endpoints, delay fading until near arrival, and illuminate terminal pads in sync
 - [x] Subdue the static circuit glow and strengthen neuron halos so status activity remains easy to distinguish
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
