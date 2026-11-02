@@ -10,19 +10,19 @@
   const statusMap = Object.freeze({
     ACTIVE: Object.freeze({
       status: "ACTIVE",
-      color: "#65dc92",
+      color: "#5b9cff",
       signalCount: 12,
       signalDuration: 3.2
     }),
     ANALYZING: Object.freeze({
       status: "ANALYZING",
-      color: "#9dffbd",
+      color: "#a8d0ff",
       signalCount: 32,
       signalDuration: 2.6
     }),
     IDLE: Object.freeze({
       status: "IDLE",
-      color: "#67866f",
+      color: "#7188a6",
       signalCount: 2,
       signalDuration: 7.5
     }),

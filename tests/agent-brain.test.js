@@ -17,9 +17,9 @@ function createContainer() {
 
 test("Agent Status maps known and unknown states to explicit circuit activity", () => {
   const expectedStates = {
-    ACTIVE: { signalCount: 12, color: "#65dc92", signalDuration: 3.2 },
-    ANALYZING: { signalCount: 32, color: "#9dffbd", signalDuration: 2.6 },
-    IDLE: { signalCount: 2, color: "#67866f", signalDuration: 7.5 },
+    ACTIVE: { signalCount: 12, color: "#5b9cff", signalDuration: 3.2 },
+    ANALYZING: { signalCount: 32, color: "#a8d0ff", signalDuration: 2.6 },
+    IDLE: { signalCount: 2, color: "#7188a6", signalDuration: 7.5 },
     STOPPED: { signalCount: 0, color: "#75808d", signalDuration: 0 },
     ERROR: { signalCount: 6, color: "#ff6478", signalDuration: 2.4 },
     UNKNOWN: { signalCount: 0, color: "#75808d", signalDuration: 0 }
@@ -37,7 +37,7 @@ test("Agent Status maps known and unknown states to explicit circuit activity", 
   assert.equal(agentBrain.mapAgentStatus(null).status, "UNKNOWN");
 });
 
-test("circuit SVG uses the green board and boundary-origin moving signals", () => {
+test("circuit SVG uses a blue-tinted board and boundary-origin moving signals", () => {
   const container = createContainer();
   const stateElement = { dataset: {} };
   const circuit = agentBrain.createAgentBrain({
@@ -189,14 +189,15 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
 
   assert.ok(boardImage);
   assert.match(boardImage[1], /opacity:\s*0\.45;/);
+  assert.match(boardImage[1], /hue-rotate\(95deg\)/);
   assert.ok(chipGlow);
   assert.match(chipGlow[1], /opacity:\s*0\.18;/);
   assert.ok(signalHalo);
   assert.match(signalHalo[1], /opacity:\s*1;/);
-  assert.match(signalHalo[1], /drop-shadow\(0 0 18px #78ffad\)/);
-  assert.match(signalHalo[1], /drop-shadow\(0 0 40px rgb\(75 255 145 \/ 96%\)\)/);
+  assert.match(signalHalo[1], /drop-shadow\(0 0 18px #7cb7ff\)/);
+  assert.match(signalHalo[1], /drop-shadow\(0 0 40px rgb\(91 156 255 \/ 96%\)\)/);
   assert.ok(analyzingHalo);
-  assert.match(analyzingHalo[1], /drop-shadow\(0 0 48px rgb\(75 255 145 \/ 100%\)\)/);
+  assert.match(analyzingHalo[1], /drop-shadow\(0 0 48px rgb\(91 156 255 \/ 100%\)\)/);
   assert.ok(errorHalo);
   assert.match(errorHalo[1], /drop-shadow\(0 0 36px rgb\(255 100 120 \/ 94%\)\)/);
   assert.match(brainSource, /feGaussianBlur stdDeviation="10" result="blur"/);

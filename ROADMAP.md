@@ -207,6 +207,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
 - [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
+- [x] Recolor the Agent Status circuit and active signals blue while retaining red error and static gray stopped/unknown states
 - [x] Keep the circuit artwork frame-free; fill the available mobile width, cap desktop width at 440px, and preserve fading neuron motion along visible traces
 - [x] Strengthen the chip-edge glow during ANALYZING
 - [x] Expand neuron routing across 32 distinct traces and activate 32 neurons during ANALYZING
