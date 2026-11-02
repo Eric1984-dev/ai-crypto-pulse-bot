@@ -27,6 +27,7 @@ All notable project changes should be documented here.
 ### Paper-mode header and navigation
 
 - Replaced the Dashboard's full-width paper-trading notice with a compact yellow PAPER MODE badge beside the app icon
+- Removed redundant PAPER ACTIVE banners and auth-footer notices across app pages; the shared header remains the visible mode indicator
 - Pinned Dashboard to the top of each application menu, separated the remaining alphabetically sorted links with a divider, and kept account actions at the bottom
 - Added blue hover glows to menu links and stacked the open menu above sticky Analytics table headers
 - Collapsed Dashboard Portfolio, Activity, Market universe, and Agent log panels by default

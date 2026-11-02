@@ -269,6 +269,15 @@ test("dashboard uses the header paper-mode badge without the redundant paper-mod
   assert.doesNotMatch(html, /Status wordt gelezen uit AI_Crypto_Bot_Status|Visualisatie van de actuele status uit AI_Crypto_Bot_Status/);
 });
 
+test("application pages use the shared paper-mode header without duplicate notices", () => {
+  for (const page of requiredPages) {
+    const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
+
+    assert.match(html, /class="paper-mode-badge">PAPER MODE<\/span>/, `${page} should show the shared mode badge`);
+    assert.doesNotMatch(html, /PAPER ACTIVE|class="mode-banner"|class="mode-dot"/, `${page} should not repeat paper-mode messaging`);
+  }
+});
+
 test("navigation uses a yellow paper-mode badge, blue hover glow, and overlays sticky tables", () => {
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   const badgeStyles = styles.match(/\.paper-mode-badge\s*\{([^}]+)\}/);

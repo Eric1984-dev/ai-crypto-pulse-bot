@@ -210,6 +210,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately
 - [x] Show persisted run times in a green dashboard activity strip, keep Analytics/Market Scan on-demand, and use a yellow PAPER MODE badge
+- [x] Remove redundant PAPER ACTIVE banners and footer notices from app pages
 - [x] Add blue menu-item hover glow and keep the open navigation above sticky Analytics table headings
 - [x] Recolor the Agent Status circuit and active signals blue while retaining red error and static gray stopped/unknown states
 - [x] Use blue AI-brain artwork inspired by the supplied reference beneath the route-masked moving neuron signals

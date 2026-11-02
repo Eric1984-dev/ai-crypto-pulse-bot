@@ -277,31 +277,11 @@ h2 {
   border: 0;
 }
 
-.mode-banner,
 .placeholder-card,
 .intro-card {
   border: 1px solid var(--border);
   border-radius: 16px;
   background: linear-gradient(145deg, var(--surface-raised), var(--surface));
-}
-
-.mode-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 22px;
-  padding: 13px 16px;
-  color: #dce3ee;
-  font-size: 13px;
-}
-
-.mode-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--positive);
-  box-shadow: 0 0 14px rgb(52 211 153 / 55%);
 }
 
 .placeholder-card,
