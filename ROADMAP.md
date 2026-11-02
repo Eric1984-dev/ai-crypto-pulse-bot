@@ -205,7 +205,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
 - [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a purple background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Apply a subdued purple theme with a darker purple-to-black page background and soft fades behind cards; retain existing card surfaces, charts, browser chrome, and status-driven circuit colors
-- [x] Fill the available mobile width with the square circuit visual (bounded by 90vh); start signals at the chip edge, route them in different directions, and clip them inside the board border
+- [x] Fill the available mobile width with the square circuit visual (bounded by 90vh); start signals at the chip edge, route them in different directions, and fade them before the rounded board border
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [ ] Complete the full Lighthouse and production release checklist

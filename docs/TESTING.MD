@@ -54,7 +54,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-The SVG overlay is rendered once over the purple circuit-board image and uses the existing 15-second agent-status refresh to switch activity groups. ACTIVE displays 12 moderate purple signals, ANALYZING 24 brighter, faster purple signals, IDLE two dim violet signals, ERROR six red signals, and STOPPED/UNKNOWN none. Signals begin at the chip perimeter, travel in multiple directions along the board traces, and are clipped inside the blue border. The square board fills the available mobile width and is bounded by 90vh; `prefers-reduced-motion` hides all moving signal groups while retaining the artwork and accessible status label. No WebGL renderer or animation-frame loop is used; physical-device visual checks remain a separate deployment validation.
+The SVG overlay is rendered once over the purple circuit-board image and uses the existing 15-second agent-status refresh to switch activity groups. ACTIVE displays 12 moderate purple signals, ANALYZING 24 brighter, faster purple signals, IDLE two dim violet signals, ERROR six red signals, and STOPPED/UNKNOWN none. Signals begin at the chip perimeter, travel in multiple directions along the board traces, are clipped to the rounded inner border, and fade out as they approach its edge. The square board fills the available mobile width and is bounded by 90vh; `prefers-reduced-motion` hides all moving signal groups while retaining the artwork and accessible status label. No WebGL renderer or animation-frame loop is used; physical-device visual checks remain a separate deployment validation.
 
 ## Phase 06 Bitvavo market-data validation
 

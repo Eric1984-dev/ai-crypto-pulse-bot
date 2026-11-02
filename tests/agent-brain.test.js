@@ -58,23 +58,43 @@ test("circuit SVG uses the purple board and boundary-origin moving signals", () 
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
+  assert.match(container.innerHTML, /<animate attributeName="opacity" values="1;1;0" keyTimes="0;0\.72;1"/);
   assert.equal(agentBrain.signalRoutes.length, 52);
   assert.match(container.innerHTML, /clip-path="url\(#circuit-board-clip\)"/);
-  assert.match(container.innerHTML, /<clipPath id="circuit-board-clip">\s*<rect x="22" y="22" width="956" height="956" rx="76"\/>/);
+  assert.match(container.innerHTML, /<clipPath id="circuit-board-clip">\s*<rect x="52" y="52" width="896" height="896" rx="188"\/>/);
   assert.ok(fs.statSync(path.join(__dirname, "..", "assets", "agent-circuit-board.png")).size > 100000);
   const routeStarts = agentBrain.signalRoutes.map((route) => {
     const [, x, y] = route.match(/^M([\d.]+)\s([\d.]+)/);
     return { x: Number(x), y: Number(y) };
   });
   assert.ok(routeStarts.every(({ x, y }) => Math.max(Math.abs(x - 500), Math.abs(y - 500)) >= 130));
-  assert.ok(agentBrain.signalRoutes.every((route) =>
-    route.match(/[\d.]+/g).every((coordinate) => Number(coordinate) >= 22 && Number(coordinate) <= 978)
-  ));
+  const routePointsStayInsideRoundedBorder = agentBrain.signalRoutes.every((route) => {
+    const tokens = route.match(/[MHV]|[\d.]+/g);
+    let x = 0;
+    let y = 0;
+    while (tokens.length) {
+      const command = tokens.shift();
+      if (command === "M") {
+        x = Number(tokens.shift());
+        y = Number(tokens.shift());
+      } else if (command === "H") {
+        x = Number(tokens.shift());
+      } else {
+        y = Number(tokens.shift());
+      }
+
+      const nearestX = Math.max(240, Math.min(760, x));
+      const nearestY = Math.max(240, Math.min(760, y));
+      if (Math.hypot(x - nearestX, y - nearestY) > 188) return false;
+    }
+    return true;
+  });
+  assert.ok(routePointsStayInsideRoundedBorder, "signal routes must stay inside the rounded board border");
   assert.deepEqual(new Set(agentBrain.signalRoutes.map((route) => {
-    if (route.endsWith("V36")) return "up";
-    if (route.endsWith("V964")) return "down";
-    if (route.endsWith("H36")) return "left";
-    if (route.endsWith("H964")) return "right";
+    if (route.endsWith("V70")) return "up";
+    if (route.endsWith("V930")) return "down";
+    if (route.endsWith("H70")) return "left";
+    if (route.endsWith("H930")) return "right";
     return "diagonal";
   })), new Set(["up", "down", "left", "right", "diagonal"]));
   for (const [status, expectedCount] of Object.entries({

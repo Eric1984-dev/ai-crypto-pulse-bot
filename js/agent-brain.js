@@ -52,13 +52,13 @@
     const routes = [];
     for (let index = 0; index < 12; index += 1) {
       const pin = 382 + index * 21.5;
-      const edge = 36 + index * 84;
+      const edge = 212 + index * 52;
       const topElbow = 280 + (index % 4) * 22;
       const sideElbow = 280 + ((index + 2) % 4) * 22;
-      routes.push(`M${pin} 370V${topElbow}H${edge}V36`);
-      routes.push(`M${pin} 630V${1000 - topElbow}H${1000 - edge}V964`);
-      routes.push(`M370 ${pin}H${sideElbow}V${edge}H36`);
-      routes.push(`M630 ${pin}H${1000 - sideElbow}V${1000 - edge}H964`);
+      routes.push(`M${pin} 370V${topElbow}H${edge}V70`);
+      routes.push(`M${pin} 630V${1000 - topElbow}H${1000 - edge}V930`);
+      routes.push(`M370 ${pin}H${sideElbow}V${edge}H70`);
+      routes.push(`M630 ${pin}H${1000 - sideElbow}V${1000 - edge}H930`);
     }
 
     routes.push(
@@ -86,6 +86,7 @@
         <circle class="circuit-neuron-halo" r="${index % 5 === 0 ? 11 : 8}" fill="${config.color}"/>
         <circle class="circuit-neuron-core" r="${index % 5 === 0 ? 3.2 : 2.4}"/>
         <animateMotion dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite" path="${route}"/>
+        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.72;1" dur="${duration.toFixed(2)}s" begin="-${startOffset.toFixed(2)}s" repeatCount="indefinite"/>
       </g>`);
     }
     return `<g class="circuit-flow circuit-flow--${statusClass}" aria-hidden="true">${signals.join("")}</g>`;
@@ -103,7 +104,7 @@
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <clipPath id="circuit-board-clip">
-          <rect x="22" y="22" width="956" height="956" rx="76"/>
+          <rect x="52" y="52" width="896" height="896" rx="188"/>
         </clipPath>
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet"/>
