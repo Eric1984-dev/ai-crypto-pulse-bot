@@ -204,7 +204,7 @@ Status: The AI-decision 416 pagination fix and requested boundary regressions ar
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
 - [x] Add standalone home-screen app metadata; document that Safari/in-app browser chrome is controlled by iOS
-- [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark green background and make the AI Crypto Bot brand link to Dashboard on every page
+- [x] Replace the C brand mark with the Bitcoin-in-hands app icon on a dark blue background and make the AI Crypto Bot brand link to Dashboard on every page
 - [x] Restore the original green theme across page surfaces, chart accents, browser chrome, and status-driven circuit colors while preserving the existing layout
 - [x] Use a neutral charcoal page background with dark slate surfaces and blue accents; color positive/negative financial values without changing labels or trading behavior
 - [x] Add subtle blue glow to panels, app icon, and Agent Status chip; surface only persisted run timestamps and identify on-demand views accurately

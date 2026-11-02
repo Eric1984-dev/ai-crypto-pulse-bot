@@ -6,6 +6,10 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### iPhone home-screen icon
+
+- Changed the shared 180×180 app icon background from dark green to deep blue while preserving the existing Bitcoin-and-hands artwork
+
 ### Charcoal visual theme and P&L tones
 
 - Restyled the page background in neutral charcoal, with dark slate cards and blue accents

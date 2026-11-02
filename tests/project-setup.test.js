@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
+const zlib = require("node:zlib");
 const {
   requiredDirectories,
   requiredPages,
@@ -90,7 +91,7 @@ test("all pages use a dropdown for their top navigation", () => {
   }
 });
 
-test("all page brands use the green icon and link to the dashboard", () => {
+test("all page brands use the shared home-screen icon and link to the dashboard", () => {
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     const brand = html.match(/<a class="brand"[\s\S]*?<\/a>/);
@@ -104,6 +105,20 @@ test("all page brands use the green icon and link to the dashboard", () => {
   assert.equal(icon.toString("ascii", 1, 4), "PNG");
   assert.equal(icon.readUInt32BE(16), 180);
   assert.equal(icon.readUInt32BE(20), 180);
+  assert.equal(icon[24], 8);
+  assert.equal(icon[25], 6);
+  const imageData = [];
+  for (let offset = 8; offset < icon.length;) {
+    const length = icon.readUInt32BE(offset);
+    const type = icon.toString("ascii", offset + 4, offset + 8);
+    if (type === "IDAT") imageData.push(icon.subarray(offset + 8, offset + 8 + length));
+    offset += length + 12;
+    if (type === "IEND") break;
+  }
+  const firstScanline = zlib.inflateSync(Buffer.concat(imageData));
+  const background = firstScanline.subarray(1, 4);
+  assert.ok(background[2] > background[0], "the home-screen icon background should be blue, not green");
+  assert.ok(background[2] >= background[1] * 1.5, "the home-screen icon background should remain distinctly blue");
 });
 
 test("all pages enable standalone home-screen app mode", () => {
