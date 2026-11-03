@@ -341,7 +341,7 @@ Stored data:
 - Reason
 - Decision
 
-The Dashboard shows the latest stored decision for each open-position market, including its Market Strength-derived view, confidence, current unrealized P&L, and decision timestamp. The global AI Decisions KPI remains separate. Phase 07 ends at decision persistence and dashboard display. The AI Engine never writes portfolio, position, or trade records; Phase 08 consumes its stored decisions through a separate risk-managed executor.
+The Dashboard shows the latest stored decision for each open-position market, a human-readable Market View and decision-aware commentary, current unrealized EUR P&L with percentage return, and the decision timestamp. Raw confidence and Market Strength remain available in the data response but are not shown in these cards; the global AI Decisions KPI remains separate. Phase 07 ends at decision persistence and dashboard display. The AI Engine never writes portfolio, position, or trade records; Phase 08 consumes its stored decisions through a separate risk-managed executor.
 
 ---
 

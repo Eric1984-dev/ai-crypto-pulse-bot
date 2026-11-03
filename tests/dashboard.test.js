@@ -610,11 +610,11 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
         },
         {
           symbol: "WIN-EUR",
-          amount: 100,
-          entry_price: 0.00006,
-          current_price: 0.00007,
-          current_market_price: 0.00007,
-          unrealized_pnl: 0.001,
+          amount: 1000,
+          entry_price: 1,
+          current_price: 1.03452,
+          current_market_price: 1.03452,
+          unrealized_pnl: 34.52,
           latestAiDecision: null
         }
       ]
@@ -727,10 +727,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"openPositionAiStatus\"]")[0].textContent, "2");
   const statusCards = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children;
   assert.equal(statusCards.length, 2);
-  assert.match(statusCards[0].textContent, /BEAM-EUR.*Latest AI DecisionHOLD.*Market ViewNeutral/s);
-  assert.match(statusCards[0].textContent, /Confidence55\.55%.*Current Unrealized P&L-€125\.78.*Decision Timestamp20\/03\/2026, 12:01/s);
+  assert.match(statusCards[0].textContent, /BEAM-EUR.*DecisionHOLD.*Market ViewNeutral.*AI CommentaryNo strong bullish or bearish trend detected\..*Current Unrealized P&L-€125\.78 \(-12\.58%\).*Updated20\/03\/2026, 12:01/s);
   assert.equal(statusCards[0].children[1].children[3].children[1].dataset.valueTone, "negative");
-  assert.match(statusCards[1].textContent, /WIN-EUR.*Latest AI DecisionNo decision.*Market ViewUnavailable.*Confidence—/s);
+  assert.doesNotMatch(statusCards[0].textContent, /Confidence|55\.55|-7\.59/);
+  assert.match(statusCards[1].textContent, /WIN-EUR.*DecisionNo decision.*Market ViewUnavailable.*AI CommentaryNo recent AI decision is available for this market\..*Current Unrealized P&L\+€34\.52 \(\+3\.45%\).*Updated—/s);
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
   assert.match(
@@ -779,6 +779,44 @@ test("dashboard maps market-strength boundaries to the requested market views", 
   assert.deepEqual(cards.map((card) => (
     card.children[1].children[1].children[1].textContent
   )), expectedViews);
+});
+
+test("dashboard AI commentary is short, decision-aware, and adapts HOLD to market view", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const cases = [
+    ["BUY", 40, "Bullish trend detected. AI currently favors upward continuation."],
+    ["SELL", -40, "Bearish trend detected. Downside risk currently outweighs upside potential."],
+    ["WAIT", null, "Insufficient or unreliable data. AI is waiting for better market conditions."],
+    ["HOLD", 0, "No strong bullish or bearish trend detected."],
+    ["HOLD", 20, "Bullish conditions are present, but the AI currently recommends holding."],
+    ["HOLD", -20, "Bearish pressure is present, but the AI currently recommends holding."],
+    ["HOLD", null, "Market conditions are unavailable; the AI currently recommends holding."]
+  ];
+
+  dashboard.renderDashboard({
+    openPositionAiStatus: {
+      count: cases.length,
+      items: cases.map(([decision, marketStrength], index) => ({
+        symbol: `TEST${index}-EUR`,
+        amount: 1,
+        entry_price: 1,
+        current_market_price: 1,
+        latestAiDecision: {
+          decision,
+          confidence: 83.25,
+          marketStrength
+        }
+      }))
+    }
+  }, dashboardDocument, null);
+
+  const cards = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children;
+  assert.deepEqual(cards.map((card) => card.children[1].children[2].children[1].textContent), (
+    cases.map(([, , commentary]) => commentary)
+  ));
+  for (const card of cards) {
+    assert.doesNotMatch(card.textContent, /Confidence|83\.25|Market Strength|(?:^|\s)(?:40|-40|20|-20)(?:\s|$)/);
+  }
 });
 
 test("dashboard omits all scanner content and uses only its watched-market summary", () => {

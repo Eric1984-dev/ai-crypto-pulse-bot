@@ -369,34 +369,39 @@
         symbol.textContent = item.symbol || "—";
         details.className = "position-ai-status-details";
 
-        appendPositionAiField(documentRef, details, "decision", "Latest AI Decision", decision);
+        const marketStrength = latestDecision && latestDecision.marketStrength;
+        const marketView = describeMarketView(marketStrength);
+        appendPositionAiField(documentRef, details, "decision", "Decision", decision);
         appendPositionAiField(
           documentRef,
           details,
           "marketView",
           "Market View",
-          describeMarketView(latestDecision && latestDecision.marketStrength)
+          marketView
         );
         appendPositionAiField(
           documentRef,
           details,
-          "confidence",
-          "Confidence",
-          formatPercent(latestDecision && latestDecision.confidence)
+          "aiCommentary",
+          "AI Commentary",
+          describeAiCommentary(latestDecision && latestDecision.decision, marketView)
         );
         appendPositionAiField(
           documentRef,
           details,
           "unrealizedPnl",
           "Current Unrealized P&L",
-          formatCurrency(unrealizedPnl),
+          formatPnlSummary(
+            unrealizedPnl,
+            metrics ? metrics.unrealizedPnlPercent : null
+          ),
           unrealizedPnl
         );
         appendPositionAiField(
           documentRef,
           details,
           "decisionTimestamp",
-          "Decision Timestamp",
+          "Updated",
           latestDecision && latestDecision.created_at
             ? formatters.formatTimestamp(latestDecision.created_at)
             : "—"
@@ -415,11 +420,13 @@
     const field = documentRef.createElement("div");
     const term = documentRef.createElement("dt");
     const value = documentRef.createElement("dd");
-    field.className = "position-ai-status-field";
+    field.className = name === "aiCommentary"
+      ? "position-ai-status-field position-ai-status-commentary"
+      : "position-ai-status-field";
     term.textContent = label;
     value.dataset.positionAiField = name;
     value.textContent = text;
-    if (arguments.length > 5) {
+    if (toneValue !== undefined) {
       formatters.setValueTone(value, toneValue);
     }
     field.append(term, value);
@@ -446,6 +453,32 @@
       return "Bullish";
     }
     return "Strong Bullish";
+  }
+
+  function describeAiCommentary(decision, marketView) {
+    const normalizedDecision = typeof decision === "string" ? decision.toUpperCase() : "";
+    if (normalizedDecision === "BUY") {
+      return "Bullish trend detected. AI currently favors upward continuation.";
+    }
+    if (normalizedDecision === "SELL") {
+      return "Bearish trend detected. Downside risk currently outweighs upside potential.";
+    }
+    if (normalizedDecision === "WAIT") {
+      return "Insufficient or unreliable data. AI is waiting for better market conditions.";
+    }
+    if (normalizedDecision === "HOLD") {
+      if (marketView === "Bullish" || marketView === "Strong Bullish") {
+        return "Bullish conditions are present, but the AI currently recommends holding.";
+      }
+      if (marketView === "Bearish" || marketView === "Strong Bearish") {
+        return "Bearish pressure is present, but the AI currently recommends holding.";
+      }
+      if (marketView === "Neutral") {
+        return "No strong bullish or bearish trend detected.";
+      }
+      return "Market conditions are unavailable; the AI currently recommends holding.";
+    }
+    return "No recent AI decision is available for this market.";
   }
 
   function renderActivityTimestamps(documentRef, view, recentTrades) {

@@ -8,9 +8,10 @@ All notable project changes should be documented here.
 
 ### Open Position AI Status
 
-- Replace the Dashboard's global Recent AI Decisions list with per-open-position cards showing the latest stored decision, mapped Market View, confidence, current unrealized P&L, and decision timestamp
-- Enrich the existing dashboard-data response with the latest decision for each open-position market; keep the AI Decisions KPI and existing route, Realtime, and polling behavior
-- Add responsive status-card styling and tests for per-market decision selection, missing data, P&L, and Market Strength thresholds
+- Show concise decision-aware AI commentary and signed EUR P&L with percentage return on each open-position status card
+- Hide raw confidence and Market Strength values from the Dashboard cards while retaining them in the existing data response
+- Keep the existing dashboard-data route, AI Decisions KPI, Realtime, polling, AI calculations, and trading behavior unchanged
+- Add responsive status-card styling and tests for decision commentary, Market Strength boundaries, and positive/negative P&L formatting
 
 ### Phase 07 candle freshness protection
 

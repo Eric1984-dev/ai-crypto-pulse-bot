@@ -226,6 +226,7 @@ Status: A subsequent `416/PGRST103` range now terminates pagination for every An
 - [x] Add a subtle always-on chip glow and substantially stronger neuron halos while preserving status colors and reduced-motion behavior
 - [x] Show current market prices and unrealized returns for open trades; show entry/exit prices and realized return percentages for closed trades
 - [x] Improve Dashboard Recent Trades with position status and EUR P&L details; compact large quantities and preserve precision for micro-priced assets
+- [x] Refine Open Position AI Status with decision-aware commentary, signed EUR/percentage P&L, and hidden raw confidence/strength values
 - [x] Audit all 12 pages at 320px, 768px, and 1280px in Chromium; remove the global minimum width that caused horizontal overflow at 320px
 - [x] Add accessible captions and explicit column-header scopes to all Analytics tables
 - [x] Separate core data exports from Analytics and Recommendation reports; group Trade and Position exports together
