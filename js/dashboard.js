@@ -104,6 +104,7 @@
     const view = data || emptyDashboardData();
     const portfolio = view.portfolio || emptyDashboardData().portfolio;
     const openPositions = view.openPositions || { count: 0, items: [] };
+    const openPositionAiStatus = view.openPositionAiStatus || { count: 0, items: [] };
     const recentTrades = view.recentTrades || { count: 0, items: [] };
     const watchedMarkets = view.watchedMarkets || { count: 0, items: [] };
     const aiDecisions = view.aiDecisions || { count: 0, items: [] };
@@ -115,6 +116,7 @@
     setText(documentRef, "dailyPnl", formatCurrency(portfolio.dailyPnl), portfolio.dailyPnl);
     setText(documentRef, "winRate", formatPercent(portfolio.winRate));
     setText(documentRef, "openPositions", formatCount(openPositions.count));
+    setText(documentRef, "openPositionAiStatus", formatCount(openPositionAiStatus.count));
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
     setText(documentRef, "aiDecisions", formatCount(aiDecisions.count));
     setText(documentRef, "paperTrades", formatCount(recentTrades.count));
@@ -154,12 +156,7 @@
       `Priority ${formatCount(item.priority)}`,
       item.symbol
     ]);
-    renderCollection(documentRef, "decisions", aiDecisions.items, (item) => [
-      `${item.decision || "—"} · ${item.symbol || "—"} · ${formatPercent(item.confidence)}`,
-      `Recorded ${formatters.formatTimestamp(item.created_at)} · ${item.reason || "No decision reason recorded."}`,
-      item.symbol,
-      item.decision
-    ]);
+    renderPositionAiStatus(documentRef, openPositionAiStatus.items);
     const chart = renderPortfolioChart(
       documentRef,
       view.portfolioSnapshots || [],
@@ -345,6 +342,110 @@
     if (emptyState) {
       emptyState.hidden = safeItems.length > 0;
     }
+  }
+
+  function renderPositionAiStatus(documentRef, items) {
+    const list = documentRef.querySelector('[data-dashboard-list="position-ai-status"]');
+    const emptyState = documentRef.querySelector('[data-dashboard-empty="position-ai-status"]');
+    const safeItems = Array.isArray(items) ? items : [];
+
+    if (list) {
+      list.replaceChildren();
+      list.hidden = safeItems.length === 0;
+      for (const item of safeItems) {
+        const latestDecision = item.latestAiDecision || null;
+        const decision = typeof latestDecision?.decision === "string"
+          ? latestDecision.decision.toUpperCase()
+          : "No decision";
+        const metrics = item.current_market_price === undefined
+          ? null
+          : formatters.getOpenPositionMetrics(item);
+        const unrealizedPnl = metrics ? metrics.unrealizedPnl : item.unrealized_pnl;
+        const card = documentRef.createElement("li");
+        const symbol = documentRef.createElement("h3");
+        const details = documentRef.createElement("dl");
+        card.className = "position-ai-status-card";
+        symbol.className = "position-ai-status-symbol";
+        symbol.textContent = item.symbol || "—";
+        details.className = "position-ai-status-details";
+
+        appendPositionAiField(documentRef, details, "decision", "Latest AI Decision", decision);
+        appendPositionAiField(
+          documentRef,
+          details,
+          "marketView",
+          "Market View",
+          describeMarketView(latestDecision && latestDecision.marketStrength)
+        );
+        appendPositionAiField(
+          documentRef,
+          details,
+          "confidence",
+          "Confidence",
+          formatPercent(latestDecision && latestDecision.confidence)
+        );
+        appendPositionAiField(
+          documentRef,
+          details,
+          "unrealizedPnl",
+          "Current Unrealized P&L",
+          formatCurrency(unrealizedPnl),
+          unrealizedPnl
+        );
+        appendPositionAiField(
+          documentRef,
+          details,
+          "decisionTimestamp",
+          "Decision Timestamp",
+          latestDecision && latestDecision.created_at
+            ? formatters.formatTimestamp(latestDecision.created_at)
+            : "—"
+        );
+        card.append(symbol, details);
+        list.append(card);
+      }
+    }
+
+    if (emptyState) {
+      emptyState.hidden = safeItems.length > 0;
+    }
+  }
+
+  function appendPositionAiField(documentRef, details, name, label, text, toneValue) {
+    const field = documentRef.createElement("div");
+    const term = documentRef.createElement("dt");
+    const value = documentRef.createElement("dd");
+    field.className = "position-ai-status-field";
+    term.textContent = label;
+    value.dataset.positionAiField = name;
+    value.textContent = text;
+    if (arguments.length > 5) {
+      formatters.setValueTone(value, toneValue);
+    }
+    field.append(term, value);
+    details.append(field);
+  }
+
+  function describeMarketView(value) {
+    const strength = value === null || value === undefined
+      ? null
+      : typeof value === "number" ? value : Number(value);
+    if (strength === null || !Number.isFinite(strength)) {
+      return "Unavailable";
+    }
+    if (strength <= -40) {
+      return "Strong Bearish";
+    }
+    if (strength <= -20) {
+      return "Bearish";
+    }
+    if (strength < 20) {
+      return "Neutral";
+    }
+    if (strength < 40) {
+      return "Bullish";
+    }
+    return "Strong Bullish";
   }
 
   function renderActivityTimestamps(documentRef, view, recentTrades) {

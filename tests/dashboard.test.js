@@ -96,6 +96,7 @@ function buildDashboardRows() {
       symbol: "BTC-EUR",
       decision: "HOLD",
       confidence: "80",
+      indicators: { marketStrength: 12.5 },
       reason: "Risk limits prevent opening a new paper position.",
       strategy_name: null,
       strategy_version: null,
@@ -161,6 +162,21 @@ function createSupabaseFetch({ rows = buildDashboardRows(), failTable = null, ca
     } else if (isSellCount) {
       responseRows = [];
       exactCount = 2;
+    } else if (table === "AI_Crypto_Bot_AI_Decisions") {
+      const symbolFilter = query.get("symbol");
+      if (symbolFilter && symbolFilter.startsWith("eq.")) {
+        responseRows = responseRows.filter((row) => row.symbol === symbolFilter.slice(3));
+      }
+      if (query.get("order") === "created_at.desc,id.desc") {
+        responseRows.sort((left, right) => (
+          Date.parse(right.created_at) - Date.parse(left.created_at)
+          || String(right.id).localeCompare(String(left.id))
+        ));
+      }
+      if (query.has("limit")) {
+        responseRows = responseRows.slice(0, Number(query.get("limit")));
+      }
+      exactCount = responseRows.length;
     }
 
     const countHeader = options.headers.prefer
@@ -229,6 +245,13 @@ test("authenticated dashboard API returns real table data and computed summaries
   assert.equal(data.recentTrades.count, 2);
   assert.equal(data.watchedMarkets.count, 1);
   assert.equal(data.aiDecisions.count, 1);
+  assert.equal(data.openPositionAiStatus.count, 1);
+  assert.deepEqual(data.openPositionAiStatus.items[0].latestAiDecision, {
+    decision: "HOLD",
+    confidence: 80,
+    marketStrength: 12.5,
+    created_at: "2026-03-20T11:45:00.000Z"
+  });
   assert.equal(data.lastMarketDataAt, "2026-03-20T11:59:00.000Z");
   assert.ok(calls.some(({ table, query }) => (
     table === "AI_Crypto_Bot_Market_Data"
@@ -290,6 +313,102 @@ test("dashboard API enriches open positions and matching recent BUY trades with 
   assert.equal(data.openPositions.items[0].current_market_captured_at, "2026-03-20T11:59:00.000Z");
   const recentBuy = data.recentTrades.items.find((trade) => trade.id === "trade-open-buy");
   assert.equal(recentBuy.openPosition.current_market_price, "105000");
+});
+
+test("dashboard API selects the latest AI decision for each open-position market", async () => {
+  const module = await dashboardDataModule;
+  const rows = buildDashboardRows();
+  rows.AI_Crypto_Bot_Positions.push(
+    {
+      id: "position-2",
+      portfolio_id: "portfolio-1",
+      symbol: "ETH-EUR",
+      amount: "1",
+      entry_price: "1900",
+      current_price: "2000",
+      unrealized_pnl: "100",
+      status: "OPEN",
+      created_at: "2026-03-20T09:00:00.000Z"
+    },
+    {
+      id: "position-3",
+      portfolio_id: "portfolio-1",
+      symbol: "SOL-EUR",
+      amount: "1",
+      entry_price: "100",
+      current_price: "90",
+      unrealized_pnl: "-10",
+      status: "OPEN",
+      created_at: "2026-03-20T08:00:00.000Z"
+    }
+  );
+  rows.AI_Crypto_Bot_AI_Decisions.push(
+    {
+      id: "decision-old",
+      symbol: "BTC-EUR",
+      decision: "BUY",
+      confidence: "60",
+      indicators: { marketStrength: 45 },
+      created_at: "2026-03-20T11:30:00.000Z"
+    },
+    {
+      id: "decision-new",
+      symbol: "BTC-EUR",
+      decision: "SELL",
+      confidence: "72",
+      indicators: { marketStrength: -42 },
+      created_at: "2026-03-20T11:50:00.000Z"
+    },
+    {
+      id: "decision-eth",
+      symbol: "ETH-EUR",
+      decision: "HOLD",
+      confidence: "55",
+      indicators: { marketStrength: -25 },
+      created_at: "2026-03-20T11:40:00.000Z"
+    }
+  );
+  const calls = [];
+  const handler = module.createHandler({
+    env: authEnv,
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({ rows, calls }),
+    now: () => generatedAt
+  });
+  const res = createResponse();
+
+  await handler({ method: "GET", headers: { cookie: sessionCookie } }, res);
+
+  const { data } = JSON.parse(res.body);
+  const statusesBySymbol = new Map(
+    data.openPositionAiStatus.items.map((item) => [item.symbol, item.latestAiDecision])
+  );
+  assert.deepEqual(statusesBySymbol.get("BTC-EUR"), {
+    decision: "SELL",
+    confidence: 72,
+    marketStrength: -42,
+    created_at: "2026-03-20T11:50:00.000Z"
+  });
+  assert.deepEqual(statusesBySymbol.get("ETH-EUR"), {
+    decision: "HOLD",
+    confidence: 55,
+    marketStrength: -25,
+    created_at: "2026-03-20T11:40:00.000Z"
+  });
+  assert.equal(statusesBySymbol.get("SOL-EUR"), null);
+  assert.deepEqual(
+    calls
+      .filter(({ table, query }) => (
+        table === "AI_Crypto_Bot_AI_Decisions" && query.has("symbol")
+      ))
+      .map(({ query }) => [query.get("symbol"), query.get("limit"), query.get("order")])
+      .sort(),
+    [
+      ["eq.BTC-EUR", "1", "created_at.desc,id.desc"],
+      ["eq.ETH-EUR", "1", "created_at.desc,id.desc"],
+      ["eq.SOL-EUR", "1", "created_at.desc,id.desc"]
+    ]
+  );
 });
 
 test("dashboard API fails closed when session verification or database reads fail", async () => {
@@ -371,6 +490,7 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"dailyPnl\"]",
     "[data-dashboard-value=\"winRate\"]",
     "[data-dashboard-value=\"openPositions\"]",
+    "[data-dashboard-value=\"openPositionAiStatus\"]",
     "[data-dashboard-value=\"availableBalance\"]",
     "[data-dashboard-value=\"aiDecisions\"]",
     "[data-dashboard-value=\"paperTrades\"]",
@@ -384,11 +504,11 @@ function createDashboardDocument() {
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"markets\"]",
-    "[data-dashboard-list=\"decisions\"]",
+    "[data-dashboard-list=\"position-ai-status\"]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"markets\"]",
-    "[data-dashboard-empty=\"decisions\"]",
+    "[data-dashboard-empty=\"position-ai-status\"]",
     "[data-portfolio-chart]",
     "[data-dashboard-chart-empty]",
     "[data-dashboard-loading]",
@@ -468,6 +588,34 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
           current_price: 0.00397,
           unrealized_pnl: -125.78,
           created_at: "2026-03-20T09:00:00.000Z"
+        }
+      ]
+    },
+    openPositionAiStatus: {
+      count: 2,
+      items: [
+        {
+          symbol: "BEAM-EUR",
+          amount: 1000,
+          entry_price: 1,
+          current_price: 0.87422,
+          current_market_price: 0.87422,
+          unrealized_pnl: -125.78,
+          latestAiDecision: {
+            decision: "HOLD",
+            confidence: 55.55,
+            marketStrength: -7.59,
+            created_at: "2026-03-20T11:01:00.000Z"
+          }
+        },
+        {
+          symbol: "WIN-EUR",
+          amount: 100,
+          entry_price: 0.00006,
+          current_price: 0.00007,
+          current_market_price: 0.00007,
+          unrealized_pnl: 0.001,
+          latestAiDecision: null
         }
       ]
     },
@@ -576,10 +724,13 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     child && child.dataset && child.dataset.valueTone === "negative"
       && child.textContent.startsWith("P&L: -€125.78")
   )));
-  assert.match(
-    elements.get("[data-dashboard-list=\"decisions\"]")[0].children[0].children[1].textContent,
-    /Recorded .*13:00 · No action/
-  );
+  assert.equal(elements.get("[data-dashboard-value=\"openPositionAiStatus\"]")[0].textContent, "2");
+  const statusCards = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children;
+  assert.equal(statusCards.length, 2);
+  assert.match(statusCards[0].textContent, /BEAM-EUR.*Latest AI DecisionHOLD.*Market ViewNeutral/s);
+  assert.match(statusCards[0].textContent, /Confidence55\.55%.*Current Unrealized P&L-€125\.78.*Decision Timestamp20\/03\/2026, 12:01/s);
+  assert.equal(statusCards[0].children[1].children[3].children[1].dataset.valueTone, "negative");
+  assert.match(statusCards[1].textContent, /WIN-EUR.*Latest AI DecisionNo decision.*Market ViewUnavailable.*Confidence—/s);
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
   assert.match(
@@ -589,6 +740,45 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
+});
+
+test("dashboard maps market-strength boundaries to the requested market views", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const strengths = [-40, -39.99, -20, -19.99, 19.99, 20, 39.99, 40];
+  const expectedViews = [
+    "Strong Bearish",
+    "Bearish",
+    "Bearish",
+    "Neutral",
+    "Neutral",
+    "Bullish",
+    "Bullish",
+    "Strong Bullish"
+  ];
+
+  dashboard.renderDashboard({
+    openPositionAiStatus: {
+      count: strengths.length,
+      items: strengths.map((marketStrength, index) => ({
+        symbol: `TEST${index}-EUR`,
+        amount: 1,
+        entry_price: 1,
+        current_price: 1,
+        unrealized_pnl: 0,
+        latestAiDecision: {
+          decision: "HOLD",
+          confidence: 50,
+          marketStrength,
+          created_at: generatedAt.toISOString()
+        }
+      }))
+    }
+  }, dashboardDocument, null);
+
+  const cards = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children;
+  assert.deepEqual(cards.map((card) => (
+    card.children[1].children[1].children[1].textContent
+  )), expectedViews);
 });
 
 test("dashboard omits all scanner content and uses only its watched-market summary", () => {
@@ -609,7 +799,7 @@ test("Agent Status uses a full-width circuit panel with Emergency State at the d
   const agentStatus = html.indexOf("<h2>Agent Status</h2>", statusPanel);
   const brain = html.indexOf('data-agent-brain-stage', agentStatus);
   const portfolioChart = html.indexOf('class="dashboard-panel chart-panel"');
-  const lastDashboardList = html.indexOf('data-dashboard-list="decisions"');
+  const lastDashboardList = html.indexOf('data-dashboard-list="position-ai-status"');
   const emergencyState = html.indexOf('class="dashboard-panel emergency-panel"');
   const mainEnd = html.indexOf("</main>");
   const portfolioSummary = html.indexOf('id="summary-heading"');
@@ -741,7 +931,7 @@ test("dashboard collapses portfolio metrics after Win Rate by default", () => {
   assert.match(html, /<details class="dashboard-extra-metrics">[\s\S]*data-dashboard-value="openPositions"/);
 });
 
-test("dashboard list panels start collapsed and the activity strip uses the five requested sources", () => {
+test("dashboard list panels start collapsed and prioritize open-position AI status", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   const listSection = html.match(
@@ -755,14 +945,14 @@ test("dashboard list panels start collapsed and the activity strip uses the five
     "Portfolio",
     "Activity",
     "Market universe",
-    "Agent log"
+    "Position monitoring"
   ]);
   assert.doesNotMatch(listSection[1], /<details\b[^>]*\bopen(?:\s|>)/);
   for (const [title, value] of [
     ["Open Positions", "openPositions"],
     ["Recent Trades", "paperTrades"],
     ["Watched Markets", "trackedMarkets"],
-    ["Recent AI Decisions", "aiDecisions"]
+    ["Open Position AI Status", "openPositionAiStatus"]
   ]) {
     assert.match(
       listSection[1],
@@ -771,9 +961,10 @@ test("dashboard list panels start collapsed and the activity strip uses the five
   }
   assert.doesNotMatch(listSection[1], /class="count-pill"/);
   assert.match(styles, /\.dashboard-shell\s*\{[^}]*padding-block:\s*16px 64px;/s);
-  for (const listName of ["positions", "trades", "markets", "decisions"]) {
+  for (const listName of ["positions", "trades", "markets", "position-ai-status"]) {
     assert.match(listSection[1], new RegExp(`data-dashboard-list="${listName}"`));
   }
+  assert.doesNotMatch(listSection[1], /Recent AI Decisions/);
   assert.match(listSection[1], /href="\/history\.html">View history<\/a>/);
 
   const activityStrip = html.match(/<dl class="activity-strip">([\s\S]*?)<\/dl>/);

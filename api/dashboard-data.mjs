@@ -415,12 +415,9 @@ async function loadTradeHistory({ config, accessToken, fetchImpl, now, params })
 }
 
 async function loadMarketDataForPositions({ config, accessToken, fetchImpl }, positions) {
-  const symbols = [...new Set(positions.map((position) => position.symbol))];
+  const symbols = getOpenPositionSymbols(positions);
   if (!symbols.length) {
     return new Map();
-  }
-  if (symbols.some((symbol) => typeof symbol !== "string" || !/^[A-Z0-9._-]{1,32}$/.test(symbol))) {
-    throw new DashboardDataError("Supabase returned an invalid open-position symbol.");
   }
 
   const marketData = await fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Market_Data", {
@@ -429,6 +426,38 @@ async function loadMarketDataForPositions({ config, accessToken, fetchImpl }, po
     limit: String(symbols.length)
   });
   return new Map(marketData.rows.map((row) => [row.symbol, row]));
+}
+
+async function loadLatestAiDecisionsForPositions({ config, accessToken, fetchImpl }, positions) {
+  const symbols = getOpenPositionSymbols(positions);
+  const decisions = await Promise.all(symbols.map(async (symbol) => {
+    const result = await fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_AI_Decisions", {
+      select: "symbol,decision,confidence,indicators,created_at",
+      symbol: `eq.${symbol}`,
+      order: "created_at.desc,id.desc",
+      limit: "1"
+    });
+    const row = result.rows[0];
+    return [symbol, row
+      ? {
+          decision: row.decision,
+          confidence: row.confidence === null || row.confidence === undefined
+            ? null
+            : toFiniteNumber(row.confidence, "decision confidence"),
+          marketStrength: readMarketStrength(row.indicators),
+          created_at: row.created_at
+        }
+      : null];
+  }));
+  return new Map(decisions);
+}
+
+function getOpenPositionSymbols(positions) {
+  const symbols = [...new Set(positions.map((position) => position.symbol))];
+  if (symbols.some((symbol) => typeof symbol !== "string" || !/^[A-Z0-9._-]{1,32}$/.test(symbol))) {
+    throw new DashboardDataError("Supabase returned an invalid open-position symbol.");
+  }
+  return symbols;
 }
 
 function addCurrentMarketPrice(position, marketDataBySymbol) {
@@ -559,6 +588,16 @@ function readNullableNumber(value, field) {
   return value === null ? null : toFiniteNumber(value, field);
 }
 
+function readMarketStrength(indicators) {
+  if (!indicators || typeof indicators !== "object" || Array.isArray(indicators)) {
+    return null;
+  }
+  const value = indicators.marketStrength;
+  return value === null || value === undefined
+    ? null
+    : toFiniteNumber(value, "market strength");
+}
+
 async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
   const currentTime = now();
   if (!(currentTime instanceof Date) || !Number.isFinite(currentTime.getTime())) {
@@ -649,13 +688,18 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
   if (portfolios.count > portfolios.rows.length) {
     throw new DashboardDataError("Portfolio summary exceeded the supported page size.");
   }
-  const marketDataBySymbol = await loadMarketDataForPositions(
-    { config, accessToken, fetchImpl },
-    openPositions.rows
-  );
+  const positionDataArgs = { config, accessToken, fetchImpl };
+  const [marketDataBySymbol, latestAiDecisionsBySymbol] = await Promise.all([
+    loadMarketDataForPositions(positionDataArgs, openPositions.rows),
+    loadLatestAiDecisionsForPositions(positionDataArgs, openPositions.rows)
+  ]);
   const positionItems = openPositions.rows.map((position) => (
     addCurrentMarketPrice(position, marketDataBySymbol)
   ));
+  const openPositionAiStatusItems = positionItems.map((position) => ({
+    ...position,
+    latestAiDecision: latestAiDecisionsBySymbol.get(position.symbol) || null
+  }));
   const openPositionsByTradeKey = new Map(
     positionItems.map((position) => [getPositionTradeKey(position), position])
   );
@@ -685,6 +729,10 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     openPositions: {
       count: openPositions.count,
       items: positionItems
+    },
+    openPositionAiStatus: {
+      count: openPositions.count,
+      items: openPositionAiStatusItems
     },
     recentTrades: {
       count: recentTrades.count,

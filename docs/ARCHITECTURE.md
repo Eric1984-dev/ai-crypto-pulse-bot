@@ -325,7 +325,7 @@ Deterministic Indicators and Confidence Model
 ↓
 AI_Crypto_Bot_AI_Decisions
 ↓
-Existing Dashboard Recent AI Decisions
+Existing Dashboard Open Position AI Status
 
 Every AI decision must be recorded in:
 
@@ -341,7 +341,7 @@ Stored data:
 - Reason
 - Decision
 
-Phase 07 ends at decision persistence and dashboard display. The AI Engine never writes portfolio, position, or trade records; Phase 08 consumes its stored decisions through a separate risk-managed executor.
+The Dashboard shows the latest stored decision for each open-position market, including its Market Strength-derived view, confidence, current unrealized P&L, and decision timestamp. The global AI Decisions KPI remains separate. Phase 07 ends at decision persistence and dashboard display. The AI Engine never writes portfolio, position, or trade records; Phase 08 consumes its stored decisions through a separate risk-managed executor.
 
 ---
 

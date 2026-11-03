@@ -1187,6 +1187,62 @@ a:focus-visible {
   white-space: pre-line;
 }
 
+.dashboard-list[data-dashboard-list="position-ai-status"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+
+.dashboard-list[data-dashboard-list="position-ai-status"] li {
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.position-ai-status-symbol {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #edf1f7;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.position-ai-status-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr));
+  gap: 10px 12px;
+  margin: 0;
+}
+
+.position-ai-status-field {
+  min-width: 0;
+}
+
+.position-ai-status-field dt {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.position-ai-status-field dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #edf1f7;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.position-ai-status-field dd[data-value-tone="positive"] {
+  color: var(--positive);
+}
+
+.position-ai-status-field dd[data-value-tone="negative"] {
+  color: var(--negative);
+}
+
 .dashboard-error {
   margin-top: 14px;
   padding: 13px 15px;

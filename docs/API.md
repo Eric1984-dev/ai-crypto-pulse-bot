@@ -69,6 +69,7 @@ Success response:
       "winRateTradeCount": 0
     },
     "openPositions": { "count": 0, "items": [] },
+    "openPositionAiStatus": { "count": 0, "items": [] },
     "recentTrades": { "count": 0, "items": [] },
     "watchedMarkets": { "count": 0, "items": [] },
     "aiDecisions": { "count": 0, "items": [] },
@@ -76,6 +77,8 @@ Success response:
   }
 }
 ```
+
+`openPositionAiStatus.items` contains one item per returned open position, enriched with `latestAiDecision` for that position's market. The decision is selected by descending `created_at` and `id` and includes `decision`, `confidence`, `marketStrength` (from the stored `indicators` object), and `created_at`; missing decisions or market strength remain `null`. The Dashboard maps Market Strength using the documented five-band UI mapping and derives current unrealized P&L from the same market snapshot used for open-position display. This does not change the global `aiDecisions` count/KPI, AI calculations, risk management, paper trading, or the existing 30-second and Realtime refresh mechanisms. No endpoint or Vercel Function was added.
 
 Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configuration, unavailable Supabase, or invalid database responses: `503`. The endpoint sets `Cache-Control: no-store`; it returns no provider credentials or raw database errors.
 
