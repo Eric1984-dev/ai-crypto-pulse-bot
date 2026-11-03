@@ -54,3 +54,22 @@ Inspect the JSON status and the `paperTradingDurationMs`, `portfoliosProcessed`,
 ## Future scheduled work
 
 Market scanning, portfolio strategy evaluation, market ranking, backtesting, and live trading remain unimplemented. Future scheduled jobs must be idempotent, retry-safe, and duplicate-safe. Duplicate executions may never create duplicate trades or strategy changes. Vercel Cron Jobs, external schedulers, and scheduled functions are possible execution providers; the application endpoint should remain scheduler-independent.
+
+## Future Improvement: Staggered Batch Scheduling
+
+**Status: Proposed — not approved or implemented.**
+
+The candle-refresh scheduler has separate jobs for each interval and market batch. The current high-frequency schedules align the batch jobs for an interval, so all of that interval's batches are due together. For 102 eligible markets, this can mean 21 requests starting in the same scheduling window. Existing per-batch offsets on other intervals, including the daily schedule, should be preserved unless separately reviewed.
+
+For example, aligned jobs can create:
+
+- A burst of 21 requests every five minutes for `1m`.
+- A burst of 21 requests every 15 minutes for `5m`.
+- A burst of 21 requests every 30 minutes for `15m`.
+- Larger overlapping bursts when interval schedules coincide, such as at an hourly boundary.
+
+Staggering would distribute those requests over each interval's existing cadence without changing the interval, endpoint, batch membership, or total scheduled work. Expected benefits include smoother request rates to Vercel, Supabase, and Bitvavo, fewer simultaneous provider/database operations, and easier diagnosis of localized failures. It is not expected to reduce total daily invocations or candle writes by itself.
+
+Potential risks include delayed batch completion, missed or disabled jobs leaving part of the market universe stale, accidental overlap between scheduling cycles, timezone or daylight-saving errors, and cron-expression interpretation differences. If a batch runs late or fails, the AI Engine may exclude an interval under its existing freshness safeguards; staggering must not weaken those safeguards or change indicator calculations.
+
+Any future rollout should preserve every required interval/batch combination and its current cadence, verify saved schedules and next-execution times, and monitor batch coverage, candle advancement, partial/failure responses, and stale-market counts. To roll back, restore the verified common schedule for each affected interval (for example, `*/5`, `*/15`, and `*/30` for the current `1m`, `5m`, and `15m` cadences), preserve the existing schedules for other intervals, and verify that every required batch is enabled. No scheduler configuration has been changed by this proposal.
