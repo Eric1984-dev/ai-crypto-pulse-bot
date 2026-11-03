@@ -72,6 +72,8 @@ npm.cmd run build
 
 AI engine tests use deterministic candle/snapshot fixtures and a mocked PostgREST boundary. They cover bullish/bearish/neutral decisions; EMA, RSI, MACD, momentum, volume, and volatility indicators; confidence bounds and reduced confidence for partial inputs; missing/stale market data; invalid candle handling; database decision inserts and status PATCH updates; STOPPED and empty-market behavior; database failures; scheduler authorization/configuration; and generic endpoint failures. Existing dashboard tests verify persisted decisions remain present in the authenticated dashboard response and are rendered as recent decisions.
 
+Freshness regression tests cover all six interval limits at the inclusive boundary and one millisecond beyond it, verify freshness is determined by the latest candle while older lookback rows are retained, and confirm stale intervals are excluded. Fewer than two sufficiently populated fresh intervals must produce `WAIT` with reason `STALE_CANDLE_DATA`; sufficient fresh intervals must retain the existing indicator, decision, and confidence calculations.
+
 ```powershell
 node --test tests/ai-engine.test.mjs tests/dashboard.test.js
 npm.cmd test

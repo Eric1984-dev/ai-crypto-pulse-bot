@@ -94,6 +94,7 @@ Status: Completed
 
 - [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
 - [x] Batch candle queries by interval, paginate PostgREST responses, and preserve the latest 1,000 candles per market/interval
+- [x] Exclude intervals whose latest candle exceeds its freshness limit; return `WAIT` with `STALE_CANDLE_DATA` when fewer than two sufficiently populated fresh intervals remain
 - [x] Confidence-weighted BUY, SELL, HOLD, and WAIT decisions from real watched-market snapshots and candles
 - [x] Persist decisions and status transitions through existing `AI_Crypto_Bot_*` tables only
 - [x] Graceful handling for missing, stale, partial, and invalid market data

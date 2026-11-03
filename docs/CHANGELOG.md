@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Phase 07 candle freshness protection
+
+- Enforce per-interval maximum age for the latest candle and exclude stale intervals from technical analysis
+- Store `WAIT` with reason `STALE_CANDLE_DATA` when fewer than two sufficiently populated fresh intervals remain
+- Preserve historical indicator lookback candles when an interval's latest candle is fresh; keep snapshot freshness independent
+
 ### AI candle query batching
 
 - Batch up to four markets per candle-interval request and paginate PostgREST responses while preserving each market's latest 1,000 candles

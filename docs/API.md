@@ -324,6 +324,8 @@ Invalid interval/batch input: `400`; missing cron authorization: `401`; missing 
 
 ## Phase 07 AI analysis
 
+Each candle interval is accepted only when its latest valid candle is not future-dated and is within its freshness limit: `1m` 30 minutes, `5m` 2 hours, `15m` 6 hours, `1h` 12 hours, `4h` 24 hours, and `1d` 72 hours. A stale interval is excluded as a whole; when fewer than two intervals with at least 26 valid candles remain, the engine stores `WAIT` with reason `STALE_CANDLE_DATA`. Older historical candles remain available for indicator lookback when that interval's latest candle is fresh. The market snapshot retains its independent 15-minute freshness check.
+
 ### POST /api/ai-analysis
 
 Runs deterministic analysis over enabled rows in `AI_Crypto_Bot_Watched_Markets`, using only persisted `AI_Crypto_Bot_Market_Data` snapshots and `AI_Crypto_Bot_Candles`. Candle rows are queried separately for each supported interval, with a per-interval limit, so a global PostgREST response cap cannot starve later intervals. It stores one decision per analyzed market in `AI_Crypto_Bot_AI_Decisions` and updates the existing singleton `AI_Crypto_Bot_Status`. It uses EMA, RSI, MACD, momentum, volume, and volatility indicators. The existing dashboard reads and renders the stored decisions.

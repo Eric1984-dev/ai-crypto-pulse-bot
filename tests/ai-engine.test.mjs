@@ -48,6 +48,14 @@ function buildCandles(direction = "up", now = fixedNow, intervals = ["5m", "15m"
   return intervals.flatMap((interval) => createCandles("BTC-EUR", interval, 60, direction, now));
 }
 
+function setLatestCandleAge(candles, ageMs) {
+  const latestTimestamp = fixedNow.getTime() - ageMs;
+  return candles.map((candle, index) => ({
+    ...candle,
+    timestamp: new Date(latestTimestamp - (candles.length - index - 1) * 60_000).toISOString()
+  }));
+}
+
 function jsonResponse(body, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -328,6 +336,113 @@ test("stale snapshots and invalid candle records cannot produce directional sign
   });
   assert.equal(missingSnapshotResult.decision, "WAIT");
   assert.equal(invalidResult.indicators.dataQuality.invalidCandlesIgnored, 1);
+});
+
+test("candle freshness thresholds are inclusive and apply to the latest candle per timeframe", () => {
+  const maxAgeByInterval = {
+    "1m": 30 * 60 * 1000,
+    "5m": 2 * 60 * 60 * 1000,
+    "15m": 6 * 60 * 60 * 1000,
+    "1h": 12 * 60 * 60 * 1000,
+    "4h": 24 * 60 * 60 * 1000,
+    "1d": 72 * 60 * 60 * 1000
+  };
+
+  for (const [interval, maxAgeMs] of Object.entries(maxAgeByInterval)) {
+    const candles = createCandles("BTC-EUR", interval);
+    const freshResult = analyzeMarket({
+      symbol: "BTC-EUR",
+      marketData: createSnapshot(),
+      candles: setLatestCandleAge(candles, maxAgeMs),
+      now: fixedNow
+    });
+    const staleResult = analyzeMarket({
+      symbol: "BTC-EUR",
+      marketData: createSnapshot(),
+      candles: setLatestCandleAge(candles, maxAgeMs + 1),
+      now: fixedNow
+    });
+
+    assert.deepEqual(
+      freshResult.indicators.dataQuality.candleIntervalsAvailable,
+      [interval],
+      `${interval} should be fresh at its maximum age`
+    );
+    assert.deepEqual(freshResult.indicators.dataQuality.staleCandleIntervals, []);
+    assert.equal(freshResult.indicators.timeframes[interval].analyzedCandleCount, 60);
+    assert.deepEqual(
+      staleResult.indicators.dataQuality.candleIntervalsAvailable,
+      [],
+      `${interval} should be stale one millisecond beyond its maximum age`
+    );
+    assert.deepEqual(staleResult.indicators.dataQuality.staleCandleIntervals, [interval]);
+    assert.equal(staleResult.indicators.timeframes[interval].analyzedCandleCount, 0);
+    assert.equal(staleResult.indicators.dataQuality.staleCandlesIgnored, 60);
+    assert.equal(staleResult.decision, "WAIT");
+    assert.equal(staleResult.reason, "STALE_CANDLE_DATA");
+  }
+
+  const recentOneMinuteRows = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: createCandles("BTC-EUR", "1m"),
+    now: fixedNow
+  });
+  assert.equal(recentOneMinuteRows.indicators.timeframes["1m"].candleCount, 60);
+  assert.equal(recentOneMinuteRows.indicators.timeframes["1m"].analyzedCandleCount, 60);
+  assert.equal(recentOneMinuteRows.indicators.timeframes["1m"].stale, false);
+});
+
+test("stale timeframes are excluded while sufficient fresh timeframes retain existing calculations", () => {
+  const freshCandles = buildCandles();
+  const staleMinuteCandles = setLatestCandleAge(
+    createCandles("BTC-EUR", "1m"),
+    30 * 60 * 1000 + 1
+  );
+  const baseline = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: freshCandles,
+    now: fixedNow
+  });
+  const withStaleTimeframe = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: [...freshCandles, ...staleMinuteCandles],
+    now: fixedNow
+  });
+
+  assert.equal(withStaleTimeframe.decision, baseline.decision);
+  assert.equal(withStaleTimeframe.confidence, baseline.confidence);
+  assert.equal(withStaleTimeframe.indicators.marketStrength, baseline.indicators.marketStrength);
+  assert.deepEqual(withStaleTimeframe.indicators.dataQuality.candleIntervalsAvailable, [
+    "5m", "15m", "1h", "4h"
+  ]);
+  assert.deepEqual(withStaleTimeframe.indicators.dataQuality.staleCandleIntervals, ["1m"]);
+  assert.equal(withStaleTimeframe.indicators.timeframes["1m"].stale, true);
+  assert.equal(withStaleTimeframe.indicators.timeframes["1m"].analyzedCandleCount, 0);
+});
+
+test("insufficient fresh timeframes wait with the stale candle reason", () => {
+  const freshFiveMinuteCandles = setLatestCandleAge(
+    createCandles("BTC-EUR", "5m"),
+    60_000
+  );
+  const staleFifteenMinuteCandles = setLatestCandleAge(
+    createCandles("BTC-EUR", "15m"),
+    6 * 60 * 60 * 1000 + 1
+  );
+  const result = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: [...freshFiveMinuteCandles, ...staleFifteenMinuteCandles],
+    now: fixedNow
+  });
+
+  assert.equal(result.decision, "WAIT");
+  assert.equal(result.reason, "STALE_CANDLE_DATA");
+  assert.deepEqual(result.indicators.dataQuality.candleIntervalsAvailable, ["5m"]);
+  assert.deepEqual(result.indicators.dataQuality.staleCandleIntervals, ["15m"]);
 });
 
 test("analysis batches candle reads per interval and preserves each market's candle history", async () => {
