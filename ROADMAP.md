@@ -186,12 +186,13 @@ Status: Validation audit complete; production readiness WARNING (50%). Hosted pr
 - [x] Paginate existing data reads, bound rendered time series, and test empty and large datasets
 - [x] Bound historical Analytics to selectable rolling 30-, 90-, and 365-day ranges (default 30 days), while retaining current position and account metrics
 - [x] Prefetch no more than four 500-row pages per source, validate exact RLS-visible counts, and log exact dataset/query/status/Supabase error diagnostics on failures; include diagnostics in development responses only
-- [x] Treat HTTP 416 on the AI-decision page as end-of-results, stop at the terminal range, and ignore later prefetched ranges
+- [x] Treat HTTP 416/PGRST103 on a subsequent Analytics source page as end-of-results, preserve earlier pages, and ignore later prefetched ranges; keep first-page and other errors fail-closed
 - [x] Add pagination regressions for 0, 1, 723, 999, 1000, 1001, and 19,380 AI decisions
+- [x] Add a portfolio-snapshot regression for a later-range 416 and verify a first-page 416 still fails
 - [x] Validate 100,001 AI decisions, 100,001 snapshots, and 10,001 trades without loading full source histories into browser memory
 - [x] Add analytics calculations, API, UI, export, performance, testing, and function-count documentation
 
-Status: The AI-decision 416 pagination fix and requested boundary regressions are implemented. The supplied production log identifies page 3 (`1000-1499`) and `PGRST103`; that range now terminates the stream rather than failing Analytics or Analytics Exports. The four Analytics CSV reports each have an independent date range. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 UI polish is in progress.
+Status: A subsequent `416/PGRST103` range now terminates pagination for every Analytics source, including portfolio snapshots; earlier pages are retained and later prefetched pages are ignored. First-page errors and other failure codes still fail closed. AI-decision boundary and snapshot regressions cover the behavior. The four Analytics CSV reports each have an independent date range. Full test/build and function-count results are recorded in [the pagination fix report](docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md). Production resolution remains pending deployment and smoke testing. No new database objects or Vercel Functions were added; Phase 14 UI polish is in progress.
 
 ---
 

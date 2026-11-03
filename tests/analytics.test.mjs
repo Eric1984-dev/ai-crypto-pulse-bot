@@ -912,6 +912,91 @@ test("AI-decision HTTP 416 ends pagination and ignores later prefetched ranges",
   assert.ok(Number.isInteger(JSON.parse(exportCountResponse.body).data.recordCount));
 });
 
+test("portfolio snapshot HTTP 416/PGRST103 ends later-range pagination and ignores later prefetched pages", async () => {
+  const snapshots = Array.from({ length: 1201 }, (_, index) => ({
+    id: `snapshot-${String(index).padStart(4, "0")}`,
+    portfolio_id: "portfolio-1",
+    portfolio_value: String(1000 + index),
+    captured_at: new Date(Date.parse("2026-03-01T00:00:00.000Z") + index * 60_000).toISOString()
+  }));
+  const calls = [];
+  const logs = [];
+  const handler = createHandler({
+    env: {
+      NODE_ENV: "development",
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey
+    },
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({
+      calls,
+      rows: { ...createAnalyticsRows(), AI_Crypto_Bot_Portfolio_Snapshots: snapshots },
+      failTable: "AI_Crypto_Bot_Portfolio_Snapshots",
+      failMethod: "GET",
+      failRange: "500-999",
+      failStatus: 416,
+      failCode: "PGRST103",
+      failMessage: "Requested range not satisfiable",
+      failDetails: "Limit should be greater than or equal to zero."
+    }),
+    now: () => now,
+    logger: { error: (message) => logs.push(message) }
+  });
+  const response = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=analytics&period=90d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(JSON.parse(response.body).data.portfolio.snapshotCount, 500);
+  assert.deepEqual(logs, []);
+  const requestedRanges = calls
+    .filter((call) => call.table === "AI_Crypto_Bot_Portfolio_Snapshots" && call.options.method === "GET")
+    .map((call) => call.options.headers.range);
+  assert.deepEqual(requestedRanges, ["0-499", "500-999", "1000-1499"]);
+});
+
+test("first-page portfolio snapshot HTTP 416 remains an analytics failure", async () => {
+  const snapshots = Array.from({ length: 1201 }, (_, index) => ({
+    id: `snapshot-${String(index).padStart(4, "0")}`,
+    portfolio_id: "portfolio-1",
+    portfolio_value: String(1000 + index),
+    captured_at: new Date(Date.parse("2026-03-01T00:00:00.000Z") + index * 60_000).toISOString()
+  }));
+  const handler = createHandler({
+    env: {
+      NODE_ENV: "development",
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey
+    },
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({
+      rows: { ...createAnalyticsRows(), AI_Crypto_Bot_Portfolio_Snapshots: snapshots },
+      failTable: "AI_Crypto_Bot_Portfolio_Snapshots",
+      failMethod: "GET",
+      failRange: "0-499",
+      failStatus: 416,
+      failCode: "PGRST103",
+      failMessage: "Requested range not satisfiable",
+      failDetails: "Limit should be greater than or equal to zero."
+    }),
+    now: () => now,
+    logger: { error() {} }
+  });
+  const response = createResponse();
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=analytics&period=90d",
+    headers: { cookie: `cp_access_token=${accessToken}` }
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(JSON.parse(response.body).error.diagnostics.supabaseCode, "PGRST103");
+  assert.equal(JSON.parse(response.body).error.diagnostics.queryName, "analytics.portfolio-snapshots");
+});
+
 test("expired analytics database sessions remain authentication failures", async () => {
   const logs = [];
   const handler = createHandler({

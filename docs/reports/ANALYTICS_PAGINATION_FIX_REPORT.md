@@ -4,14 +4,14 @@
 
 The production failure was an HTTP `416` (`PGRST103`) on `analytics.ai-decisions`, requesting rows `1000-1499`. The shared Analytics reader treated that response as a fatal data error, causing Analytics and Analytics Export requests to return `503 DASHBOARD_DATA_UNAVAILABLE`.
 
-The reader now treats HTTP `416` for the AI-decision query as end-of-results. It retains successfully fetched earlier pages and ignores results or errors from prefetched ranges after the terminal range. Other query failures and incomplete successful pages continue to fail closed. Analytics calculations, date filters, trade logic, and database behavior are unchanged.
+The reader treats HTTP `416` for the AI-decision query as end-of-results and now also handles PostgREST `416/PGRST103` on a subsequent range for any Analytics source. It retains successfully fetched earlier pages and ignores results or errors from prefetched ranges after the terminal range. First-page failures, other `416` codes, and other query failures continue to fail closed. Analytics calculations, date filters, trade logic, and database behavior are unchanged.
 
 ## Architecture
 
 - `lib/analytics.mjs` still loads the existing RLS-visible portfolio, position, trade, AI-decision, and portfolio-snapshot data.
-- `lib/exports.mjs` remains the shared 500-row pagination utility. The terminal-page behavior is narrowly scoped to the `analytics.ai-decisions` query.
+- `lib/exports.mjs` remains the shared 500-row pagination utility. The generalized terminal-page behavior is scoped to subsequent ranges for Analytics query names; the original AI-decision `416` handling is preserved.
 - Analytics and Analytics CSV counts/downloads reuse the same Analytics service through the existing authenticated `api/dashboard-data.mjs` function.
-- Pagination still uses exact counts and prefetches at most four pages per source. When an AI-decision page returns HTTP `416`, the iterator stops and does not consume any later prefetched pages.
+- Pagination still uses exact counts and prefetches at most four pages per source. When a subsequent Analytics range returns `416/PGRST103`, the iterator stops and does not consume any later prefetched pages.
 
 ## Pagination Behavior
 
@@ -33,15 +33,18 @@ For the reported 416 case, the regression simulates a failure on `1000-1499` wit
 
 No analytics formulas or source mappings changed. Win/loss rates, P&L, drawdown, confidence buckets, action attribution, portfolio trends, and export rows are calculated as before from rows delivered by the shared iterator. The 30-, 90-, and 365-day filters, RLS-scoped count query, sorting, page size, and bounded series are unchanged.
 
-If a 416 occurs before the exact count indicates the end of the dataset, the iterator intentionally treats it as terminal and metrics use the successful rows received before that range. Other source queries do not receive this special treatment.
+Any later `416/PGRST103` range is terminal even when the preceding exact count expected more rows; the iterator uses only the successfully fetched earlier pages. A first-page 416, a 416 with a different code, or another response failure remains an error.
+
+The follow-up regression simulates `416/PGRST103` on the portfolio-snapshot range `500-999`, with a later range already prefetched. Analytics completes using the 500 earlier snapshots and ignores the later range. A separate regression verifies that a first-page snapshot 416 remains a failure.
 
 ## Tests and Validation
 
-- Focused Analytics tests: `node --test tests/analytics.test.mjs` — 19 passed, 0 failed.
-- Required full test suite: `npm.cmd test` — 206 passed, 0 failed.
+- Focused Analytics/export tests: `node --test tests/analytics.test.mjs tests/exports.test.mjs` — 30 passed, 0 failed.
+- Required full test suite after the follow-up fix: `npm.cmd test` — 254 passed, 0 failed.
 - Required build: `npm.cmd run build` — passed static project validation and database migration validation (16 prefixed tables, RLS coverage, initial seed consistency).
 - Regression sizes: 0, 1, 723, 999, 1,000, 1,001, and 19,380 AI decisions.
-- Terminal-range regression: HTTP 416 on page 3 completes Analytics and Analytics Export count without consuming later prefetched results.
+- Terminal-range regressions: AI-decision HTTP 416 and snapshot `416/PGRST103` on a later page complete Analytics without consuming later prefetched results; a first-page snapshot 416 remains an error.
+- `git diff --check` — passed.
 
 Tests use mocked Supabase/PostgREST responses. They do not prove hosted Supabase behavior or production deployment status.
 
@@ -51,7 +54,7 @@ Tests use mocked Supabase/PostgREST responses. They do not prove hosted Supabase
 - New API endpoints or Vercel Functions: none.
 - Database schema or migrations changed: none.
 - Paper-trading logic or database calculations changed: none.
-- Phase 14 started: no.
+- Phase 14 started: yes; UI polish remains in progress.
 - Production verification: pending deployment and smoke testing of Analytics and Analytics Exports.
 
 ## Files Changed
