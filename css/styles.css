@@ -1153,7 +1153,7 @@ a:focus-visible {
 }
 
 .dashboard-list[data-scrollable="true"] {
-  max-height: 200px;
+  max-height: var(--dashboard-list-max-height, 200px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -1199,7 +1199,7 @@ a:focus-visible {
 
 .dashboard-list[data-dashboard-list="position-ai-status"][data-scrollable="true"] {
   grid-template-columns: 1fr;
-  max-height: 520px;
+  max-height: var(--dashboard-list-max-height, 520px);
 }
 
 .dashboard-list[data-dashboard-list="position-ai-status"] li {
@@ -1209,12 +1209,6 @@ a:focus-visible {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-raised);
-}
-
-@media (max-width: 700px) {
-  .dashboard-list[data-dashboard-list="position-ai-status"][data-scrollable="true"] {
-    max-height: 720px;
-  }
 }
 
 .position-ai-status-symbol {

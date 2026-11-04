@@ -20,7 +20,8 @@
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
-  const dashboardListScrollThreshold = 3;
+  const dashboardListVisibleItemCount = 2;
+  const dashboardListNames = ["positions", "trades", "position-ai-status"];
 
   function emptyDashboardData() {
     return {
@@ -308,7 +309,7 @@
     if (list) {
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
-      list.dataset.scrollable = String(safeItems.length > dashboardListScrollThreshold);
+      list.dataset.scrollable = String(safeItems.length > dashboardListVisibleItemCount);
       for (const item of safeItems) {
         const [primaryText, secondaryText, marketSymbol, tradeAction] = describeItem(item);
         const row = documentRef.createElement("li");
@@ -335,6 +336,7 @@
         row.append(primary, secondary);
         list.append(row);
       }
+      updateDashboardListViewport(list);
     }
     if (emptyState) {
       emptyState.hidden = safeItems.length > 0;
@@ -349,7 +351,7 @@
     if (list) {
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
-      list.dataset.scrollable = String(safeItems.length > dashboardListScrollThreshold);
+      list.dataset.scrollable = String(safeItems.length > dashboardListVisibleItemCount);
       for (const item of safeItems) {
         const latestDecision = item.latestAiDecision || null;
         const decision = typeof latestDecision?.decision === "string"
@@ -407,10 +409,52 @@
         card.append(symbol, details);
         list.append(card);
       }
+      updateDashboardListViewport(list);
     }
 
     if (emptyState) {
       emptyState.hidden = safeItems.length > 0;
+    }
+  }
+
+  function updateDashboardListViewport(list) {
+    if (!list || !list.style) {
+      return;
+    }
+
+    if (list.dataset.scrollable !== "true") {
+      list.style.removeProperty("--dashboard-list-max-height");
+      return;
+    }
+
+    if (!list.dataset.scrollToggleBound) {
+      const panel = typeof list.closest === "function" ? list.closest("details") : null;
+      if (panel && typeof panel.addEventListener === "function") {
+        panel.addEventListener("toggle", () => updateDashboardListViewport(list));
+        list.dataset.scrollToggleBound = "true";
+      }
+    }
+
+    const visibleItems = Array.from(list.children).slice(0, dashboardListVisibleItemCount);
+    if (visibleItems.length !== dashboardListVisibleItemCount
+      || typeof list.getBoundingClientRect !== "function"
+      || typeof visibleItems[1].getBoundingClientRect !== "function") {
+      return;
+    }
+
+    const listTop = list.getBoundingClientRect().top;
+    const lastVisibleItemBottom = visibleItems[1].getBoundingClientRect().bottom;
+    const maxHeight = lastVisibleItemBottom - listTop + (list.scrollTop || 0);
+    if (Number.isFinite(maxHeight) && maxHeight > 0) {
+      list.style.setProperty("--dashboard-list-max-height", `${maxHeight}px`);
+    }
+  }
+
+  function updateDashboardListViewports(documentRef) {
+    for (const name of dashboardListNames) {
+      updateDashboardListViewport(
+        documentRef.querySelector(`[data-dashboard-list="${name}"]`)
+      );
     }
   }
 
@@ -676,6 +720,7 @@
     let currentAgentStatus = null;
     let disposed = false;
     let realtimeCleanup = null;
+    const onDashboardResize = () => updateDashboardListViewports(documentRef);
     const loading = documentRef.querySelector("[data-dashboard-loading]");
     const errorBanner = documentRef.querySelector("[data-dashboard-error]");
     const retryButton = documentRef.querySelector("[data-dashboard-retry]");
@@ -995,6 +1040,7 @@
       if (typeof windowRef.removeEventListener === "function") {
         windowRef.removeEventListener("pagehide", onPageHide);
         windowRef.removeEventListener("pageshow", onPageShow);
+        windowRef.removeEventListener("resize", onDashboardResize);
       }
       if (brain && typeof brain.dispose === "function") {
         brain.dispose();
@@ -1008,6 +1054,7 @@
     documentRef.addEventListener?.("visibilitychange", onVisibilityChange);
     windowRef.addEventListener?.("pagehide", onPageHide);
     windowRef.addEventListener?.("pageshow", onPageShow);
+    windowRef.addEventListener?.("resize", onDashboardResize);
     const authReady = windowRef.CryptoPulseAuthReady;
     if (authReady && typeof authReady.then === "function") {
       authReady.then(async () => {

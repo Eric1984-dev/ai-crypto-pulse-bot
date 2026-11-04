@@ -450,19 +450,46 @@ test("dashboard API rejects unsupported methods and missing configuration", asyn
 });
 
 function createElement() {
+  const styleProperties = new Map();
   return {
     textContent: "",
     hidden: false,
     disabled: false,
     dataset: {},
+    style: {
+      setProperty(name, value) {
+        styleProperties.set(name, value);
+      },
+      getPropertyValue(name) {
+        return styleProperties.get(name) || "";
+      },
+      removeProperty(name) {
+        styleProperties.delete(name);
+      }
+    },
     children: [],
     listeners: {},
     classList: { contains: () => false },
+    getBoundingClientRect() {
+      if (!this.parentNode) {
+        return { top: 100, bottom: 100 };
+      }
+      const index = this.parentNode.children.indexOf(this);
+      const itemHeight = this.className === "position-ai-status-card" ? 80 : 40;
+      const gap = Number(this.parentNode.dataset.mockRowGap || 0);
+      const top = 100 + index * (itemHeight + gap) - (this.parentNode.scrollTop || 0);
+      return { top, bottom: top + itemHeight };
+    },
     replaceChildren() {
       this.children = [];
       this.textContent = "";
     },
     append(...children) {
+      for (const child of children) {
+        if (typeof child !== "string" && child) {
+          child.parentNode = this;
+        }
+      }
       this.children.push(...children);
       this.textContent += children.map((child) => (
         typeof child === "string" ? child : child && child.textContent || ""
@@ -910,7 +937,7 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /first database snapshot/);
 });
 
-test("dashboard summary lists become scrollable only when they contain more than three items", () => {
+test("dashboard summary lists show two complete items and scroll for the rest", () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const data = dashboard.emptyDashboardData();
   const createdAt = generatedAt.toISOString();
@@ -939,9 +966,11 @@ test("dashboard summary lists become scrollable only when they contain more than
     latestAiDecision: null
   }));
 
-  data.openPositions = { count: 3, items: positions(3) };
-  data.recentTrades = { count: 3, items: trades(3) };
-  data.openPositionAiStatus = { count: 3, items: monitoredPositions(3) };
+  const positionMonitoringList = elements.get('[data-dashboard-list="position-ai-status"]')[0];
+  positionMonitoringList.dataset.mockRowGap = "12";
+  data.openPositions = { count: 2, items: positions(2) };
+  data.recentTrades = { count: 2, items: trades(2) };
+  data.openPositionAiStatus = { count: 2, items: monitoredPositions(2) };
   dashboard.renderDashboard(data, dashboardDocument, null);
 
   const lists = [
@@ -951,29 +980,36 @@ test("dashboard summary lists become scrollable only when they contain more than
   ];
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
 
-  data.openPositions = { count: 4, items: positions(4) };
-  data.recentTrades = { count: 4, items: trades(4) };
-  data.openPositionAiStatus = { count: 4, items: monitoredPositions(4) };
+  data.openPositions = { count: 3, items: positions(3) };
+  data.recentTrades = { count: 3, items: trades(3) };
+  data.openPositionAiStatus = { count: 3, items: monitoredPositions(3) };
   dashboard.renderDashboard(data, dashboardDocument, null);
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["true", "true", "true"]);
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   assert.match(
     styles,
-    /\.dashboard-list\[data-scrollable="true"\]\s*\{[^}]*max-height:\s*200px;[^}]*overflow-y:\s*auto;/s
+    /\.dashboard-list\[data-scrollable="true"\]\s*\{[^}]*max-height:\s*var\(--dashboard-list-max-height,\s*200px\);[^}]*overflow-y:\s*auto;/s
   );
   assert.match(
     styles,
-    /\.dashboard-list\[data-dashboard-list="position-ai-status"\]\[data-scrollable="true"\]\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*max-height:\s*520px;/s
+    /\.dashboard-list\[data-dashboard-list="position-ai-status"\]\[data-scrollable="true"\]\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*max-height:\s*var\(--dashboard-list-max-height,\s*520px\);/s
   );
   for (const listName of ["positions", "trades", "position-ai-status"]) {
-    assert.equal(elements.get(`[data-dashboard-list="${listName}"]`)[0].children.length, 4);
+    assert.equal(elements.get(`[data-dashboard-list="${listName}"]`)[0].children.length, 3);
   }
+  assert.equal(lists[0].style.getPropertyValue("--dashboard-list-max-height"), "80px");
+  assert.equal(lists[1].style.getPropertyValue("--dashboard-list-max-height"), "80px");
+  assert.equal(lists[2].style.getPropertyValue("--dashboard-list-max-height"), "172px");
 
-  data.openPositions = { count: 3, items: positions(3) };
-  data.recentTrades = { count: 3, items: trades(3) };
-  data.openPositionAiStatus = { count: 3, items: monitoredPositions(3) };
+  data.openPositions = { count: 2, items: positions(2) };
+  data.recentTrades = { count: 2, items: trades(2) };
+  data.openPositionAiStatus = { count: 2, items: monitoredPositions(2) };
   dashboard.renderDashboard(data, dashboardDocument, null);
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
+  assert.deepEqual(
+    lists.map((list) => list.style.getPropertyValue("--dashboard-list-max-height")),
+    ["", "", ""]
+  );
 });
 
 test("dashboard KPI information is accessible, English-only, and covers all portfolio metrics", () => {
