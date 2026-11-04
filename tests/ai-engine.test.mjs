@@ -469,7 +469,7 @@ test("analysis batches candle reads per interval and preserves each market's can
     "1m", "5m", "15m", "1h", "4h", "1d"
   ]);
   for (const [interval, count] of Object.entries(candleCounts)) {
-    assert.equal(decision.indicators.timeframes[interval].candleCount, count);
+    assert.equal(decision.indicators.timeframes[interval].candleCount, Math.min(count, 150));
   }
   assert.equal(candleRequests.length, 6);
   assert.deepEqual(
@@ -483,7 +483,7 @@ test("analysis batches candle reads per interval and preserves each market's can
   ));
 });
 
-test("analysis paginates batched candle reads without dropping rows across markets", async () => {
+test("analysis paginates batched candle reads with a 1000-row page and retains 150 latest rows per market", async () => {
   const markets = ["ALPHA-EUR", "BETA-EUR", "GAMMA-EUR", "DELTA-EUR"].map((symbol, index) => ({
     symbol,
     enabled: true,
@@ -518,17 +518,25 @@ test("analysis paginates batched candle reads without dropping rows across marke
   assert.equal(candleRequests.length, 2);
   assert.deepEqual(
     candleRequests.map((url) => url.searchParams.get("offset")),
-    ["0", "1000"]
+    ["0", "100"]
+  );
+  assert.ok(candleRequests.every((url) => url.searchParams.get("limit") === "1000"));
+  assert.deepEqual(
+    candleRequests.map((url) => url.searchParams.get("symbol")),
+    [
+      "in.(ALPHA-EUR,BETA-EUR,GAMMA-EUR,DELTA-EUR)",
+      "in.(GAMMA-EUR)"
+    ]
   );
   assert.deepEqual(
     decisions.map(({ indicators }) => indicators.timeframes["1m"].candleCount),
-    [300, 300, 300, 300]
+    [150, 150, 150, 150]
   );
   assert.equal(logEntries[0].fields.candleReads, 24);
   assert.equal(logEntries[0].fields.candleQueries, 7);
 });
 
-test("analysis caps each batched market at its latest 1000 candles", async () => {
+test("analysis caps each batched market at its latest 150 candles", async () => {
   const candleCounts = {
     "ALPHA-EUR": 1205,
     "BETA-EUR": 20,
@@ -556,7 +564,7 @@ test("analysis caps each batched market at its latest 1000 candles", async () =>
     const marketCandles = candles
       .filter((candle) => candle.symbol === symbol)
       .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
-      .slice(0, 1000);
+      .slice(0, 150);
     return analyzeMarket({
       symbol,
       marketData: marketData.find((row) => row.symbol === symbol),
@@ -570,15 +578,64 @@ test("analysis caps each batched market at its latest 1000 candles", async () =>
     .map(({ url }) => new URL(url));
 
   assert.equal(candleRequests.length, 2);
+  assert.ok(candleRequests.every((url) => url.searchParams.get("limit") === "1000"));
   assert.deepEqual(
     candleRequests.map((url) => url.searchParams.get("symbol")),
     ["in.(ALPHA-EUR,BETA-EUR,DELTA-EUR,GAMMA-EUR)", "in.(BETA-EUR,DELTA-EUR,GAMMA-EUR)"]
   );
   assert.deepEqual(
     decisions.map(({ indicators }) => indicators.timeframes["1m"].candleCount),
-    [1000, 20, 10, 40]
+    [150, 20, 10, 40]
   );
   assert.equal(JSON.stringify(decisions), JSON.stringify(expectedDecisions));
+});
+
+test("150-row cap preserves latest-candle freshness classification", async () => {
+  const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
+  const candles = intervals.flatMap((interval) => {
+    const intervalCandles = createCandles("BTC-EUR", interval, 200);
+    return interval === "1m"
+      ? setLatestCandleAge(intervalCandles, 30 * 60 * 1000 + 1)
+      : intervalCandles;
+  });
+  const marketData = createSnapshot();
+  const expectedFullHistory = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData,
+    candles,
+    now: fixedNow
+  });
+  const harness = createEngineHarness({ candles });
+  await harness.service.runAnalysis({ config, serviceRoleKey });
+
+  const decision = harness.writes
+    .find(({ table }) => table === "AI_Crypto_Bot_AI_Decisions").body[0];
+  const expectedLatestHistory = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData,
+    candles: intervals.flatMap((interval) => candles
+      .filter((candle) => candle.interval === interval)
+      .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp)
+        || left.symbol.localeCompare(right.symbol))
+      .slice(0, 150)),
+    now: fixedNow
+  });
+
+  assert.deepEqual(
+    decision.indicators.dataQuality.staleCandleIntervals,
+    expectedFullHistory.indicators.dataQuality.staleCandleIntervals
+  );
+  assert.deepEqual(
+    decision.indicators.dataQuality.candleIntervalsAvailable,
+    expectedFullHistory.indicators.dataQuality.candleIntervalsAvailable
+  );
+  assert.equal(decision.indicators.timeframes["1m"].stale, true);
+  assert.equal(decision.indicators.timeframes["1m"].analyzedCandleCount, 0);
+  for (const interval of intervals.filter((value) => value !== "1m")) {
+    assert.equal(decision.indicators.timeframes[interval].stale, false);
+    assert.equal(decision.indicators.timeframes[interval].candleCount, 150);
+  }
+  assert.equal(JSON.stringify(decision), JSON.stringify(expectedLatestHistory));
 });
 
 test("analysis uses bounded candle workers and preserves every market decision", async () => {

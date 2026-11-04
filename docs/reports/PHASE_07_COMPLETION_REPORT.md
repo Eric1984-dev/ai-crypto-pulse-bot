@@ -20,7 +20,7 @@ External scheduler
   -> existing authenticated dashboard
 ```
 
-The endpoint uses the server-only service role for database reads and writes. The service uses a bounded 24-worker queue for candle reads and per-request timeouts. It reads each market/interval combination separately, with a 1,000-row limit per interval, so a global PostgREST response cap cannot starve the later intervals. It logs analysis start, each analyzed market and generated decision/confidence, completion timings, and failures without logging credentials or raw provider errors.
+The endpoint uses the server-only service role for database reads and writes. The service uses a bounded 24-worker queue for candle reads and per-request timeouts. It reads each market/interval combination separately, with a 1,000-row REST page size and a 150-candle per-market history cap, so a global PostgREST response cap cannot starve the later intervals. It logs analysis start, each analyzed market and generated decision/confidence, completion timings, and failures without logging credentials or raw provider errors.
 
 ## Decision logic and confidence model
 
@@ -81,7 +81,7 @@ Modified:
 
 ## Tests and validation
 
-Added AI engine and API tests covering indicator outputs, bullish/bearish/neutral decisions, confidence bounds and partial-data reduction, missing/stale/invalid inputs, decision persistence, status PATCH behavior, STOPPED/empty-market behavior, database failures, scheduler authorization/configuration, and generic failure responses. The candle query regression simulates the PostgREST 1,000-row cap and verifies all six intervals reach the persisted decision. Existing dashboard tests cover the authenticated AI decision response and recent-decision rendering.
+Added AI engine and API tests covering indicator outputs, bullish/bearish/neutral decisions, confidence bounds and partial-data reduction, missing/stale/invalid inputs, decision persistence, status PATCH behavior, STOPPED/empty-market behavior, database failures, scheduler authorization/configuration, and generic failure responses. Candle query regressions verify the 1,000-row page size, 150-candle per-market cap, latest-row selection, grouped pagination, freshness preservation, and all six intervals reaching the persisted decision. Existing dashboard tests cover the authenticated AI decision response and recent-decision rendering.
 
 | Command | Result |
 |---|---|
@@ -106,3 +106,7 @@ Phase 07 is complete and the existing dashboard can display the persisted decisi
 ## Follow-up: interval-aware candle retrieval
 
 The original multi-interval query applied one row limit to all intervals combined. With intervals sorted alphabetically and rows ordered newest-first within each interval, the 1,000-row PostgREST response cap could fill with `15m` and `1d` rows before the other intervals were returned. The engine now requests each supported interval independently, retaining the existing analysis, confidence model, tables, and schema. Regression coverage verifies that all six intervals are represented when the stored counts exceed the former combined-query cap. See [the candle query fix report](./PHASE_07_CANDLE_QUERY_FIX_REPORT.md) for the follow-up validation results.
+
+## Follow-up: bounded per-market history
+
+The AI Engine now retains at most the latest 150 candles per market and interval while keeping the PostgREST page size at 1,000 rows. The independent limits preserve the grouped pagination behavior and the newest candle used by freshness checks. This implementation changes the quantity of historical indicator input; it does not change indicator, confidence, decision, threshold, risk-control, or scheduler logic. The change is documented and validated separately in [the history cap implementation report](./HISTORY_CAP_IMPLEMENTATION_REPORT.md). It was not deployed to production as part of this code change.
