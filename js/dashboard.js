@@ -20,7 +20,7 @@
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
-  const dashboardListScrollThreshold = 5;
+  const dashboardListScrollThreshold = 3;
 
   function emptyDashboardData() {
     return {

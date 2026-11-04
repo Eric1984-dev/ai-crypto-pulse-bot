@@ -910,7 +910,7 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /first database snapshot/);
 });
 
-test("dashboard summary lists become scrollable only when they contain more than five items", () => {
+test("dashboard summary lists become scrollable only when they contain more than three items", () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const data = dashboard.emptyDashboardData();
   const createdAt = generatedAt.toISOString();
@@ -939,9 +939,9 @@ test("dashboard summary lists become scrollable only when they contain more than
     latestAiDecision: null
   }));
 
-  data.openPositions = { count: 5, items: positions(5) };
-  data.recentTrades = { count: 5, items: trades(5) };
-  data.openPositionAiStatus = { count: 5, items: monitoredPositions(5) };
+  data.openPositions = { count: 3, items: positions(3) };
+  data.recentTrades = { count: 3, items: trades(3) };
+  data.openPositionAiStatus = { count: 3, items: monitoredPositions(3) };
   dashboard.renderDashboard(data, dashboardDocument, null);
 
   const lists = [
@@ -951,23 +951,27 @@ test("dashboard summary lists become scrollable only when they contain more than
   ];
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
 
-  data.openPositions = { count: 6, items: positions(6) };
-  data.recentTrades = { count: 6, items: trades(6) };
-  data.openPositionAiStatus = { count: 6, items: monitoredPositions(6) };
+  data.openPositions = { count: 4, items: positions(4) };
+  data.recentTrades = { count: 4, items: trades(4) };
+  data.openPositionAiStatus = { count: 4, items: monitoredPositions(4) };
   dashboard.renderDashboard(data, dashboardDocument, null);
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["true", "true", "true"]);
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   assert.match(
     styles,
-    /\.dashboard-list\[data-scrollable="true"\]\s*\{[^}]*max-height:\s*360px;[^}]*overflow-y:\s*auto;/s
+    /\.dashboard-list\[data-scrollable="true"\]\s*\{[^}]*max-height:\s*200px;[^}]*overflow-y:\s*auto;/s
+  );
+  assert.match(
+    styles,
+    /\.dashboard-list\[data-dashboard-list="position-ai-status"\]\[data-scrollable="true"\]\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*max-height:\s*520px;/s
   );
   for (const listName of ["positions", "trades", "position-ai-status"]) {
-    assert.equal(elements.get(`[data-dashboard-list="${listName}"]`)[0].children.length, 6);
+    assert.equal(elements.get(`[data-dashboard-list="${listName}"]`)[0].children.length, 4);
   }
 
-  data.openPositions = { count: 5, items: positions(5) };
-  data.recentTrades = { count: 5, items: trades(5) };
-  data.openPositionAiStatus = { count: 5, items: monitoredPositions(5) };
+  data.openPositions = { count: 3, items: positions(3) };
+  data.recentTrades = { count: 3, items: trades(3) };
+  data.openPositionAiStatus = { count: 3, items: monitoredPositions(3) };
   dashboard.renderDashboard(data, dashboardDocument, null);
   assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
 });

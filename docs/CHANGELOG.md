@@ -8,8 +8,8 @@ All notable project changes should be documented here.
 
 ### Dashboard summary list scrolling
 
-- Add a bounded scrollbar to Open Positions, Activity, and Position Monitoring lists only when they contain more than five items
-- Remove the scroll limit automatically when the list returns to five items or fewer
+- Add an internal scrollbar to Open Positions, Activity, and Position Monitoring when they contain more than three items
+- Keep all items rendered and reachable within each panel; remove the scroll limit when the list returns to three items or fewer
 
 ### Dashboard risk controls placement
 
