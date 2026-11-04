@@ -826,27 +826,31 @@ test("dashboard omits all scanner content and uses only its watched-market summa
   assert.match(html, /data-portfolio-chart/);
 });
 
-test("Agent Status uses a full-width circuit panel with Emergency State at the dashboard bottom", () => {
+test("Agent Status spans the dashboard while Risk Control sits beside Position Monitoring", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
   const statusPanel = html.indexOf('class="dashboard-panel status-panel"');
   const agentStatus = html.indexOf("<h2>Agent Status</h2>", statusPanel);
   const brain = html.indexOf('data-agent-brain-stage', agentStatus);
   const portfolioChart = html.indexOf('class="dashboard-panel chart-panel"');
-  const lastDashboardList = html.indexOf('data-dashboard-list="position-ai-status"');
-  const emergencyState = html.indexOf('class="dashboard-panel emergency-panel"');
-  const mainEnd = html.indexOf("</main>");
   const portfolioSummary = html.indexOf('id="summary-heading"');
+  const summaries = html.match(
+    /<section class="dashboard-grid dashboard-grid-lists"[^>]*>([\s\S]*?)<\/section>/
+  );
+  const riskControl = summaries && summaries[1].indexOf('class="dashboard-panel emergency-panel"');
+  const positionMonitoring = summaries && summaries[1].indexOf('data-dashboard-list="position-ai-status"');
 
   assert.ok(statusPanel >= 0);
   assert.ok(agentStatus > statusPanel);
   assert.ok(brain > agentStatus && brain < portfolioChart);
-  assert.ok(lastDashboardList < emergencyState && emergencyState < mainEnd);
+  assert.ok(summaries);
+  assert.ok(positionMonitoring >= 0 && riskControl > positionMonitoring);
+  assert.doesNotMatch(html, /dashboard-grid-risk/);
   assert.ok(portfolioSummary < statusPanel);
   assert.match(html, /class="agent-status-monitor"[\s\S]*Live backend signal[\s\S]*status-wave/);
   assert.match(html, /Agent circuit visualization; status UNKNOWN/);
   assert.match(html, /Circuit visualization unavailable/);
-  assert.match(styles, /\.dashboard-grid-status,\s*\.dashboard-grid-risk\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(styles, /\.dashboard-grid-lists\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
   assert.match(styles, /\.agent-brain-stage\s*\{[^}]*width:\s*min\(100%,\s*90vh\);[^}]*aspect-ratio:\s*1;/s);
   assert.match(styles, /\.agent-status-monitor\s*\{[^}]*margin-top:\s*8px;/s);
   assert.match(styles, /\.circuit-board-image\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s);

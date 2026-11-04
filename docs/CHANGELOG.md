@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Dashboard risk controls placement
+
+- Place Emergency State / Risk Control beside Open Position AI Status in the dashboard summary grid
+- Keep the panels side by side on wider screens and stacked on narrow screens without changing emergency-state behavior
+
 ### Dashboard market list placement
 
 - Remove the watched-market list from the Dashboard while retaining its Tracked Markets KPI

@@ -796,8 +796,7 @@ a:focus-visible {
   gap: 14px;
 }
 
-.dashboard-grid-status,
-.dashboard-grid-risk {
+.dashboard-grid-status {
   grid-template-columns: minmax(0, 1fr);
 }
 

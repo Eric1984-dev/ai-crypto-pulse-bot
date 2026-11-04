@@ -46,7 +46,7 @@ Runtime database APIs, market-data ingestion, and trading behavior remain out of
 - [x] KPI cards with accessible explanations and portfolio history chart from actual database snapshots
 - [x] Mobile-first responsive layout and empty/error states
 - [x] Refresh complete dashboard data every 30 seconds and immediately on return to the foreground
-- [x] Use a full-width Agent Status panel with an enlarged brain visualization and move Emergency State / Risk Control to the bottom of the dashboard
+- [x] Use a full-width Agent Status panel with an enlarged brain visualization and place Emergency State / Risk Control beside Open Position AI Status
 - [x] Authenticated read-only API, tests, and documentation
 
 Status: Completed
