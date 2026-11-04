@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Dashboard market list placement
+
+- Remove the watched-market list from the Dashboard while retaining its Tracked Markets KPI
+- Show the complete prioritized active-market list on Market Scanner through the existing `/api/market-summary` endpoint
+- Add UI and response-validation regression coverage without adding an API function or database schema
+
 ### AI candle history cap
 
 - Retain each market's latest 150 candles per interval while keeping PostgREST request pages at 1,000 rows

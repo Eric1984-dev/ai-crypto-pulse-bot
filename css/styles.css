@@ -1784,6 +1784,40 @@ a:focus-visible {
   grid-column: 1 / -1;
 }
 
+.scanner-market-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scanner-market-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.scanner-market-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgb(17 20 24 / 65%);
+  font-size: 12px;
+}
+
+.scanner-market-priority {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .text-link {
   color: var(--accent);
   font-size: 13px;

@@ -35,6 +35,7 @@ function createSummary() {
   return {
     generatedAt: "2026-03-20T12:00:00.000Z",
     activeMarkets: 1,
+    watchedMarkets: [{ symbol: "BTC-EUR", priority: 1 }],
     marketsWithFreshData: 1,
     marketsWithDecisions: 1,
     timeframes
@@ -77,6 +78,9 @@ function createScannerDocument() {
   }
   selectors.set("[data-scanner-status]", element());
   selectors.set("[data-scanner-refresh]", element());
+  selectors.set("[data-scanner-watched-markets]", element());
+  selectors.set("[data-scanner-watched-empty]", element());
+  selectors.set("[data-scanner-watched-count]", element());
   const timeframeButtons = ["24h", "7d", "30d"].map((timeframe) =>
     element({ scannerTimeframe: timeframe })
   );
@@ -169,6 +173,9 @@ test("scanner deduplicates requests and safely renders selected timeframe rankin
     /^Recorded .*13:00 · Momentum is positive\.$/
   );
   assert.match(selectors.get("[data-scanner-status]").textContent, /Updated 13:00/);
+  assert.equal(selectors.get("[data-scanner-watched-count]").textContent, "1");
+  assert.equal(selectors.get("[data-scanner-watched-markets]").children[0].children[0].textContent, "BTC-EUR");
+  assert.equal(selectors.get("[data-scanner-watched-markets]").children[0].children[1].textContent, "Priority 1");
 
   timeframeButtons[1].listeners.click();
   assert.equal(timeframeButtons[1].attributes["aria-pressed"], "true");
@@ -197,5 +204,13 @@ test("scanner rejects malformed and unauthenticated responses explicitly", async
       json: async () => ({})
     })),
     (error) => error.status === 401
+  );
+  await assert.rejects(
+    scanner.requestMarketScannerSummary(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { scanner: { ...createSummary(), watchedMarkets: [{ symbol: "<img>", priority: 1 }] } } })
+    })),
+    /response is invalid/
   );
 });

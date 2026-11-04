@@ -96,6 +96,16 @@
           </article>
         </div>
       </section>
+      <section class="scanner-panel" aria-labelledby="watched-markets-heading">
+        <div class="scanner-toolbar">
+          <div>
+            <h2 id="watched-markets-heading">Watched Markets <span class="dashboard-panel-count">(<span data-scanner-watched-count>0</span>)</span></h2>
+            <p class="card-description">Enabled markets ordered by priority. Price rankings above include markets with fresh snapshots.</p>
+          </div>
+        </div>
+        <ul class="scanner-market-list" data-scanner-watched-markets aria-label="Enabled watched markets" tabindex="0" hidden></ul>
+        <p class="dashboard-empty" data-scanner-watched-empty>No active watched markets.</p>
+      </section>
     </main>
     <footer class="site-footer">
       <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>

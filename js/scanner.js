@@ -44,7 +44,13 @@
     }
     const summary = result && result.data && result.data.scanner;
     if (!summary || !summary.timeframes || !Number.isInteger(summary.activeMarkets)
-      || !Number.isInteger(summary.marketsWithFreshData)) {
+      || !Number.isInteger(summary.marketsWithFreshData)
+      || !Array.isArray(summary.watchedMarkets)
+      || summary.watchedMarkets.length !== summary.activeMarkets
+      || summary.watchedMarkets.some((market) => !market
+        || typeof market.symbol !== "string"
+        || !/^[A-Z0-9]+-EUR$/.test(market.symbol)
+        || !Number.isFinite(market.priority))) {
       throw new Error("Market scanner response is invalid.");
     }
     for (const timeframe of timeframes) {
@@ -94,6 +100,31 @@
       if (empty) {
         empty.hidden = items.length > 0;
       }
+    }
+
+    const watchedMarketList = documentRef.querySelector("[data-scanner-watched-markets]");
+    const watchedMarketEmpty = documentRef.querySelector("[data-scanner-watched-empty]");
+    const watchedMarketCount = documentRef.querySelector("[data-scanner-watched-count]");
+    if (watchedMarketCount) {
+      watchedMarketCount.textContent = numberFormat.format(summary.watchedMarkets.length);
+    }
+    if (watchedMarketList) {
+      watchedMarketList.replaceChildren();
+      watchedMarketList.hidden = summary.watchedMarkets.length === 0;
+      for (const market of summary.watchedMarkets) {
+        const row = documentRef.createElement("li");
+        const symbol = documentRef.createElement("span");
+        const priority = documentRef.createElement("span");
+        symbol.className = "market-symbol";
+        symbol.textContent = market.symbol;
+        priority.className = "scanner-market-priority";
+        priority.textContent = `Priority ${numberFormat.format(market.priority)}`;
+        row.append(symbol, priority);
+        watchedMarketList.append(row);
+      }
+    }
+    if (watchedMarketEmpty) {
+      watchedMarketEmpty.hidden = summary.watchedMarkets.length > 0;
     }
   }
 

@@ -151,11 +151,6 @@
       item.symbol,
       item.side
     ]);
-    renderCollection(documentRef, "markets", watchedMarkets.items, (item) => [
-      item.symbol || "—",
-      `Priority ${formatCount(item.priority)}`,
-      item.symbol
-    ]);
     renderPositionAiStatus(documentRef, openPositionAiStatus.items);
     const chart = renderPortfolioChart(
       documentRef,

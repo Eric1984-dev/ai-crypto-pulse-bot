@@ -126,6 +126,11 @@ test("scanner excludes disabled markets, stale snapshots, and decisions outside 
   const summary = buildMarketScannerSummary(input);
 
   assert.equal(summary.activeMarkets, 3);
+  assert.deepEqual(summary.watchedMarkets, [
+    { symbol: "BTC-EUR", priority: 1 },
+    { symbol: "ETH-EUR", priority: 2 },
+    { symbol: "SOL-EUR", priority: 3 }
+  ]);
   assert.equal(summary.marketsWithFreshData, 2);
   assert.equal(summary.timeframes["24h"].topGainers.some(({ symbol }) => symbol === "BTC-EUR"), false);
   assert.equal(summary.timeframes["30d"].aiOpportunities.some(({ reason }) => reason === "Outside range."), false);
@@ -148,6 +153,7 @@ test("scanner returns safe empty rankings when no active data is available", () 
     assert.deepEqual(timeframe.strongestMomentum, []);
     assert.deepEqual(timeframe.aiOpportunities, []);
   }
+  assert.deepEqual(summary.watchedMarkets, []);
 });
 
 test("scanner handles large active-market datasets with bounded ranked results", () => {
@@ -177,6 +183,7 @@ test("scanner handles large active-market datasets with bounded ranked results",
   });
 
   assert.equal(summary.activeMarkets, 1500);
+  assert.equal(summary.watchedMarkets.length, 1500);
   assert.equal(summary.marketsWithFreshData, 1500);
   assert.equal(summary.timeframes["24h"].topGainers.length, 10);
   assert.equal(summary.timeframes["24h"].topLosers.length, 10);

@@ -503,11 +503,9 @@ function createDashboardDocument() {
     "[data-dashboard-status=\"emergency\"]",
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
-    "[data-dashboard-list=\"markets\"]",
     "[data-dashboard-list=\"position-ai-status\"]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
-    "[data-dashboard-empty=\"markets\"]",
     "[data-dashboard-empty=\"position-ai-status\"]",
     "[data-portfolio-chart]",
     "[data-dashboard-chart-empty]",
@@ -733,10 +731,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.match(statusCards[1].textContent, /WIN-EUR.*DecisionNo decision.*Market ViewUnavailable.*AI CommentaryNo recent AI decision is available for this market\..*Current Unrealized P&L\+€34\.52 \(\+3\.45%\).*Updated—/s);
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
-  assert.match(
-    elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent,
-    /^Priority 1$/
-  );
+  assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "1");
+  assert.equal(elements.has("[data-dashboard-list=\"markets\"]"), false);
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
@@ -986,18 +982,17 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   const panels = listSection
     ? [...listSection[1].matchAll(/<details class="dashboard-panel dashboard-list-panel">([\s\S]*?)<\/details>/g)]
     : [];
-  assert.equal(panels.length, 4);
+  assert.equal(panels.length, 3);
   assert.deepEqual(panels.map(([, panel]) => panel.match(/<p class="eyebrow">([^<]+)<\/p>/)[1]), [
     "Portfolio",
     "Activity",
-    "Market universe",
     "Position monitoring"
   ]);
+  assert.doesNotMatch(html, /Market universe|data-dashboard-list="markets"/);
   assert.doesNotMatch(listSection[1], /<details\b[^>]*\bopen(?:\s|>)/);
   for (const [title, value] of [
     ["Open Positions", "openPositions"],
     ["Recent Trades", "paperTrades"],
-    ["Watched Markets", "trackedMarkets"],
     ["Open Position AI Status", "openPositionAiStatus"]
   ]) {
     assert.match(
@@ -1007,7 +1002,7 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   }
   assert.doesNotMatch(listSection[1], /class="count-pill"/);
   assert.match(styles, /\.dashboard-shell\s*\{[^}]*padding-block:\s*16px 64px;/s);
-  for (const listName of ["positions", "trades", "markets", "position-ai-status"]) {
+  for (const listName of ["positions", "trades", "position-ai-status"]) {
     assert.match(listSection[1], new RegExp(`data-dashboard-list="${listName}"`));
   }
   assert.doesNotMatch(listSection[1], /Recent AI Decisions/);
@@ -1208,7 +1203,7 @@ test("dashboard waits for authentication and offers retry after a load error", a
   assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
 });
 
-test("dashboard displays tracked markets without requesting scanner data", async () => {
+test("dashboard keeps the tracked-markets KPI without displaying the market list", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   const dashboardData = dashboard.emptyDashboardData();
   dashboardData.watchedMarkets = {
@@ -1243,7 +1238,7 @@ test("dashboard displays tracked markets without requesting scanner data", async
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "1");
-  assert.equal(elements.get("[data-dashboard-list=\"markets\"]")[0].children[0].children[1].textContent, "Priority 1");
+  assert.equal(elements.has("[data-dashboard-list=\"markets\"]"), false);
   controller.dispose();
 });
 

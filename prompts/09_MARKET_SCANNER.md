@@ -62,7 +62,7 @@ Tests
 
 ---
 
-Dashboard integratie verplicht.
+De Dashboard Tracked Markets-KPI blijft behouden. Toon de volledige actieve watched-marketlijst op de Market Scanner; dupliceer de lijst niet op het Dashboard.
 
 No new API endpoints unless absolutely necessary.
 

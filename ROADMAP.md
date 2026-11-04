@@ -129,7 +129,7 @@ Phase 08 gebruikt uitsluitend paper trading; Phase 09 is niet gestart. De code g
 - [x] Highest Volume and Strongest Momentum rankings
 - [x] AI Opportunities from the latest stored decisions, including symbol, confidence, decision, and reason
 - [x] Rank enabled watched markets using stored snapshots and OHLCV candles
-- [x] Reuse `/api/market-summary` for scanner rankings and dashboard tracked-market details; add no Vercel Function or database schema
+- [x] Reuse `/api/market-summary` for scanner rankings and the full prioritized watched-market list; keep the Dashboard Tracked Markets KPI without duplicating the list
 - [x] Dedicated responsive scanner page, refresh behavior, tests, documentation, and completion report
 - [x] Production-safe market-summary storage failure logs identify query, table, operation, page/range, HTTP status, Supabase code, and failure category without changing the public response
 - [x] Treat PostgREST `416/PGRST103` on a subsequent generated scanner page as end-of-pagination while preserving fetched rows
@@ -202,7 +202,7 @@ Status: A subsequent `416/PGRST103` range now terminates pagination for every An
 - [x] Use the frame-free green circuit-board artwork as the compact Agent Status visual and overlay status-driven glowing neuron signals along its routes
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
-- [x] Collapse Dashboard Portfolio, Activity, Market universe, and Agent log panels by default
+- [x] Collapse Dashboard Portfolio, Activity, and Agent log panels by default; show the full watched-market list on Market Scanner
 - [x] Reduce whitespace above the Dashboard Overview and show list counts inline with their panel titles
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration
