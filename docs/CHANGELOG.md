@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Candle refresh checkpoint lookup
+
+- Replace the capped historical-row scan and per-symbol fallback reads with a read-only RPC that returns each requested symbol's latest candle timestamp
+- Restrict RPC execution to `service_role` and use the existing `(symbol, interval, timestamp)` index without changing refresh, overlap, freshness, or bootstrap behavior
+- Add migration, RPC permission/result, history-depth, failure, and provider-range regression coverage
+
 ### Open Position AI Status
 
 - Show concise decision-aware AI commentary and signed EUR P&L with percentage return on each open-position status card

@@ -79,7 +79,7 @@ Status: Completed (2026-10-31)
 - [x] Cache public Bitvavo market/ticker/candle responses for 60 seconds and preserve stored-data fallbacks
 - [x] Persist validated 24-hour market snapshots and OHLCV candles in existing tables
 - [x] Refresh ticker snapshots separately from candle ingestion
-- [x] Incrementally refresh all six OHLCV intervals through bounded, five-market candle batches using each market/interval's latest stored candle; bootstrap only missing histories and expose runtime metrics
+- [x] Incrementally refresh all six OHLCV intervals through bounded, five-market candle batches using the service-role-only latest-candle checkpoint RPC; bootstrap only missing histories and expose runtime metrics
 - [x] Log invalid markets, missing data, provider failures, and refresh failures in `AI_Crypto_Bot_Scanner_Events`
 - [x] Add authenticated market and market-summary APIs with dashboard integration
 - [x] Expose separately authenticated market-snapshot and bounded candle-refresh endpoints for external schedulers

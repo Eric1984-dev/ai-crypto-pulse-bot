@@ -51,6 +51,7 @@ function createHarness({
 } = {}) {
   const writes = [];
   const providerCalls = [];
+  const rpcCalls = [];
   const clock = { value: fixedNow };
   let activeCandleRequests = 0;
   let maxConcurrentCandleRequests = 0;
@@ -103,7 +104,38 @@ function createHarness({
       throw new Error(`Unexpected Bitvavo URL: ${url.pathname}`);
     }
 
-    const table = decodeURIComponent(url.pathname.split("/").pop());
+    const rpcFunction = url.pathname.startsWith("/rest/v1/rpc/")
+      ? decodeURIComponent(url.pathname.slice("/rest/v1/rpc/".length))
+      : null;
+    const table = rpcFunction || decodeURIComponent(url.pathname.split("/").pop());
+    if (rpcFunction) {
+      databaseCalls.push({ table, url, options });
+      rpcCalls.push({ functionName: rpcFunction, url, options });
+      if (typeof failRead === "function") {
+        const failure = failRead({ table, url, options });
+        if (failure) {
+          return failure.response || jsonResponse(failure.body || {}, failure.status || 500);
+        }
+      }
+      if (rpcFunction !== "AI_Crypto_Bot_Get_Latest_Candle_Checkpoints") {
+        throw new Error(`Unexpected Supabase RPC: ${rpcFunction}`);
+      }
+      const { p_symbols: symbols, p_interval: interval } = JSON.parse(options.body);
+      const latestBySymbol = new Map();
+      for (const candle of database["AI_Crypto_Bot_Candles"]) {
+        if (!symbols.includes(candle.symbol) || candle.interval !== interval) {
+          continue;
+        }
+        const current = latestBySymbol.get(candle.symbol);
+        if (!current || Date.parse(candle.timestamp) > Date.parse(current)) {
+          latestBySymbol.set(candle.symbol, candle.timestamp);
+        }
+      }
+      return jsonResponse([...latestBySymbol].map(([symbol, latest_timestamp]) => ({
+        symbol,
+        latest_timestamp
+      })));
+    }
     if (!database[table]) {
       throw new Error(`Unexpected Supabase table: ${table}`);
     }
@@ -202,6 +234,7 @@ function createHarness({
     writes,
     providerCalls,
     databaseCalls,
+    rpcCalls,
     database,
     clock,
     getMaxConcurrentCandleRequests: () => maxConcurrentCandleRequests
@@ -984,6 +1017,168 @@ test("scheduled candle refresh uses bounded market batches and reuses the 60-sec
   assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, candleCalls);
 });
 
+test("scheduled candle checkpoint RPC preserves latest-candle parity with the previous lookup", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const storedCandles = [
+    { symbol: "BTC-EUR", interval: "1m", timestamp: new Date(fixedNow.getTime() - 9 * 60_000).toISOString() },
+    { symbol: "BTC-EUR", interval: "1m", timestamp: new Date(fixedNow.getTime() - 2 * 60_000).toISOString() },
+    { symbol: "ETH-EUR", interval: "1m", timestamp: new Date(fixedNow.getTime() - 4 * 60_000).toISOString() }
+  ];
+  const symbols = ["BTC-EUR", "ETH-EUR"];
+  const limitedRows = [...storedCandles]
+    .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+    .slice(0, 2000);
+  const previousLookup = new Map();
+  for (const { symbol, timestamp } of limitedRows) {
+    const key = `${symbol}:1m`;
+    const parsedTimestamp = Date.parse(timestamp);
+    if (!previousLookup.has(key) || parsedTimestamp > previousLookup.get(key)) {
+      previousLookup.set(key, parsedTimestamp);
+    }
+  }
+  for (const symbol of symbols.filter((item) => !previousLookup.has(`${item}:1m`))) {
+    const latest = storedCandles
+      .filter((candle) => candle.symbol === symbol && candle.interval === "1m")
+      .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))[0];
+    if (latest) {
+      previousLookup.set(`${symbol}:1m`, Date.parse(latest.timestamp));
+    }
+  }
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candles: storedCandles
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const requests = harness.providerCalls
+    .filter((path) => path.includes("/candles"))
+    .map((path) => new URL(path, "https://api.bitvavo.com"));
+
+  assert.equal(result.attempted, 2);
+  assert.equal(harness.rpcCalls.length, 1);
+  assert.equal(harness.rpcCalls[0].functionName, "AI_Crypto_Bot_Get_Latest_Candle_Checkpoints");
+  assert.equal(harness.rpcCalls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(harness.rpcCalls[0].options.body), {
+    p_symbols: symbols,
+    p_interval: "1m"
+  });
+  assert.equal(
+    harness.databaseCalls.filter(({ table, options }) =>
+      table === "AI_Crypto_Bot_Candles" && options.method !== "POST"
+    ).length,
+    0
+  );
+  assert.equal(requests.length, 2);
+  for (const request of requests) {
+    const symbol = request.pathname.split("/")[2];
+    const latestTimestamp = previousLookup.get(`${symbol}:1m`);
+    const expectedLimit = Math.min(
+      500,
+      Math.max(2, Math.floor((fixedNow.getTime() - latestTimestamp) / 60_000) + 1)
+    );
+    assert.equal(request.searchParams.get("start"), String(latestTimestamp));
+    assert.equal(request.searchParams.get("limit"), String(expectedLimit));
+  }
+});
+
+test("scheduled candle checkpoint RPC bootstraps markets with no stored history", async () => {
+  const harness = createHarness({
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
+  });
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const request = new URL(
+    harness.providerCalls.find((path) => path.includes("/candles")),
+    "https://api.bitvavo.com"
+  );
+
+  assert.equal(result.refreshed, 1);
+  assert.equal(harness.rpcCalls.length, 1);
+  assert.equal(request.searchParams.has("start"), false);
+  assert.equal(request.searchParams.get("limit"), "500");
+});
+
+test("scheduled candle refresh skips checkpoint RPC for an empty batch", async () => {
+  const harness = createHarness({
+    watched: [{ ...watchedMarket, enabled: false }]
+  });
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+
+  assert.equal(result.status, "no-markets");
+  assert.equal(harness.rpcCalls.length, 0);
+  assert.equal(harness.providerCalls.some((path) => path.includes("/candles")), false);
+});
+
+test("scheduled candle checkpoint RPC handles histories beyond the old 2000-row query limit", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const storedCandles = Array.from({ length: 2001 }, (_, index) => ({
+    symbol: "BTC-EUR",
+    interval: "1m",
+    timestamp: new Date(fixedNow.getTime() - (index + 2) * 60_000).toISOString()
+  }));
+  const ethTimestamp = new Date(fixedNow.getTime() - 7 * 60_000).toISOString();
+  storedCandles.push({ symbol: "ETH-EUR", interval: "1m", timestamp: ethTimestamp });
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candles: storedCandles
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const requests = harness.providerCalls
+    .filter((path) => path.includes("/candles"))
+    .map((path) => new URL(path, "https://api.bitvavo.com"));
+
+  assert.equal(result.attempted, 2);
+  assert.equal(harness.rpcCalls.length, 1);
+  assert.equal(requests.length, 2);
+  const ethRequest = requests.find((request) => request.pathname.includes("/ETH-EUR/"));
+  assert.equal(ethRequest.searchParams.get("start"), String(Date.parse(ethTimestamp)));
+  assert.equal(ethRequest.searchParams.get("limit"), "8");
+});
+
+test("checkpoint RPC failures skip provider requests and candle writes", async () => {
+  const harness = createHarness({
+    failRead: ({ table }) => table === "AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"
+      ? { status: 500, body: { code: "XX000" } }
+      : null
+  });
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+
+  assert.equal(result.status, "storage-unavailable");
+  assert.equal(result.failed, 1);
+  assert.equal(result.skipped, 1);
+  assert.equal(harness.providerCalls.some((path) => path.includes("/candles")), false);
+  assert.equal(harness.writes.some(({ table }) => table === "AI_Crypto_Bot_Candles"), false);
+});
+
 test("scheduled candle refresh requests only the incremental range for its requested interval", async () => {
   const intervalMs = 60_000;
   const latestTimestamp = Math.floor(fixedNow.getTime() / intervalMs) * intervalMs - intervalMs * 2;
@@ -997,7 +1192,7 @@ test("scheduled candle refresh requests only the incremental range for its reque
     volume: 25,
     timestamp: new Date(latestTimestamp).toISOString()
   }];
-  const { service, providerCalls, database } = createHarness({
+  const { service, providerCalls, database, rpcCalls } = createHarness({
     candles: storedCandles,
     candleRows(url) {
       const start = Number(url.searchParams.get("start"));
@@ -1022,6 +1217,8 @@ test("scheduled candle refresh requests only the incremental range for its reque
   assert.equal(candleRequests[0].searchParams.get("interval"), "1m");
   assert.equal(candleRequests[0].searchParams.get("start"), String(Date.parse(storedCandles[0].timestamp)));
   assert.equal(candleRequests[0].searchParams.get("limit"), "3");
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(JSON.parse(rpcCalls[0].options.body).p_interval, "1m");
   assert.equal(result.candlesUpserted, 2);
   assert.equal(result.metrics.recordsProcessed.candles, 2);
   assert.equal(database["AI_Crypto_Bot_Candles"].length, 2);

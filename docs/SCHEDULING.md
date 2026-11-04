@@ -24,6 +24,8 @@ The endpoint uses the same `Authorization: Bearer <CRON_SECRET>` header and serv
 
 `/api/market-refresh` reports `marketRefreshDurationMs`, `marketDataRefreshDurationMs`, and market snapshot counts. `/api/candle-refresh` reports candle duration and candle counts independently. Successful HTTP `200` responses may still contain `partial`, `provider-unavailable`, or `storage-unavailable` results; inspect status and failure counts rather than treating HTTP success alone as proof that all data refreshed.
 
+For each non-empty batch, the candle refresh service obtains the latest stored timestamp for every symbol with one read-only, service-role-only `AI_Crypto_Bot_Get_Latest_Candle_Checkpoints` RPC call per interval. This replaces the capped historical-row scan and individual missing-symbol reads; it does not change candle freshness, overlap, bootstrap, or scheduler behavior.
+
 ## Phase 07 AI analysis
 
 The analysis endpoint is available at:

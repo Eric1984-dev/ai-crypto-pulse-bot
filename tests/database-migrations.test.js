@@ -25,6 +25,9 @@ const confidenceThresholdMigration = migrationSql.find((sql) =>
 const tradeHistoryMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Trade_History_Stats"')
 );
+const candleCheckpointMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"')
+);
 const realtimePublicationMigration = migrationSql.find((sql) =>
   sql.includes("ALTER PUBLICATION supabase_realtime")
 );
@@ -59,6 +62,7 @@ async function createDatabase() {
   await database.exec(paperTradingMigration);
   await database.exec(confidenceThresholdMigration);
   await database.exec(tradeHistoryMigration);
+  await database.exec(candleCheckpointMigration);
   return database;
 }
 
@@ -219,6 +223,103 @@ test("trade-history statistics aggregate stored SELL trades and remain scoped by
       ),
       { code: "42501" }
     );
+  } finally {
+    await database.close();
+  }
+});
+
+test("candle checkpoint RPC is service-role-only and returns each symbol's latest timestamp", async () => {
+  assert.ok(candleCheckpointMigration);
+  assert.match(candleCheckpointMigration, /LANGUAGE plpgsql\s+STABLE\s+SECURITY INVOKER/i);
+  assert.match(candleCheckpointMigration, /SET search_path = ''/i);
+  assert.match(candleCheckpointMigration, /REVOKE ALL ON FUNCTION[\s\S]+FROM PUBLIC, anon, authenticated/i);
+  assert.match(candleCheckpointMigration, /GRANT EXECUTE ON FUNCTION[\s\S]+TO service_role/i);
+
+  const database = await createDatabase();
+  try {
+    const olderTimestamp = "2026-03-20T11:00:00.000Z";
+    const latestTimestamp = "2026-03-20T11:05:00.000Z";
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Candles"
+        (symbol, interval, timestamp, open, high, low, close, volume)
+       VALUES
+        ('BTC-EUR', '1m', $1, 100, 110, 90, 105, 10),
+        ('BTC-EUR', '1m', $2, 105, 115, 100, 112, 12)`,
+      [olderTimestamp, latestTimestamp]
+    );
+
+    const privileges = await database.query(`
+      SELECT
+        has_function_privilege(
+          'service_role',
+          'public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(text[],text)',
+          'EXECUTE'
+        ) AS service_role_can_execute,
+        has_function_privilege(
+          'anon',
+          'public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(text[],text)',
+          'EXECUTE'
+        ) AS anon_can_execute,
+        has_function_privilege(
+          'authenticated',
+          'public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(text[],text)',
+          'EXECUTE'
+        ) AS authenticated_can_execute
+    `);
+    assert.deepEqual(privileges.rows[0], {
+      service_role_can_execute: true,
+      anon_can_execute: false,
+      authenticated_can_execute: false
+    });
+
+    const checkpoints = await database.query(
+      `SELECT symbol, latest_timestamp
+       FROM public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(
+         ARRAY['BTC-EUR', 'ETH-EUR', 'BTC-EUR'],
+         '1m'
+       )`
+    );
+    assert.deepEqual(checkpoints.rows, [{
+      symbol: "BTC-EUR",
+      latest_timestamp: new Date(latestTimestamp)
+    }]);
+
+    await assert.rejects(
+      database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(
+          ARRAY['BTC-EUR'],
+          '2m'
+        )`
+      ),
+      { code: "22023" }
+    );
+    await assert.rejects(
+      withRole(database, "anon", () =>
+        database.query(
+          `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(
+            ARRAY['BTC-EUR'],
+            '1m'
+          )`
+        )
+      ),
+      { code: "42501" }
+    );
+    await assert.rejects(
+      withRole(database, "authenticated", () =>
+        database.query(
+          `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"(
+            ARRAY['BTC-EUR'],
+            '1m'
+          )`
+        )
+      ),
+      { code: "42501" }
+    );
+
+    const candleCount = await database.query(
+      `SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Candles"`
+    );
+    assert.equal(candleCount.rows[0].count, 2);
   } finally {
     await database.close();
   }
