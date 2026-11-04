@@ -1152,6 +1152,12 @@ a:focus-visible {
   list-style: none;
 }
 
+.dashboard-list[data-scrollable="true"] {
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .dashboard-list[hidden],
 .chart-frame canvas[hidden],
 .dashboard-error[hidden],

@@ -910,6 +910,68 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /first database snapshot/);
 });
 
+test("dashboard summary lists become scrollable only when they contain more than five items", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const data = dashboard.emptyDashboardData();
+  const createdAt = generatedAt.toISOString();
+  const positions = (count) => Array.from({ length: count }, (_, index) => ({
+    symbol: `M${index}-EUR`,
+    amount: 1,
+    entry_price: 1,
+    current_price: 1,
+    unrealized_pnl: 0,
+    created_at: createdAt
+  }));
+  const trades = (count) => Array.from({ length: count }, (_, index) => ({
+    side: "BUY",
+    symbol: `M${index}-EUR`,
+    quantity: 1,
+    price: 1,
+    created_at: createdAt
+  }));
+  const monitoredPositions = (count) => Array.from({ length: count }, (_, index) => ({
+    symbol: `M${index}-EUR`,
+    amount: 1,
+    entry_price: 1,
+    current_price: 1,
+    unrealized_pnl: 0,
+    created_at: createdAt,
+    latestAiDecision: null
+  }));
+
+  data.openPositions = { count: 5, items: positions(5) };
+  data.recentTrades = { count: 5, items: trades(5) };
+  data.openPositionAiStatus = { count: 5, items: monitoredPositions(5) };
+  dashboard.renderDashboard(data, dashboardDocument, null);
+
+  const lists = [
+    elements.get('[data-dashboard-list="positions"]')[0],
+    elements.get('[data-dashboard-list="trades"]')[0],
+    elements.get('[data-dashboard-list="position-ai-status"]')[0]
+  ];
+  assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
+
+  data.openPositions = { count: 6, items: positions(6) };
+  data.recentTrades = { count: 6, items: trades(6) };
+  data.openPositionAiStatus = { count: 6, items: monitoredPositions(6) };
+  dashboard.renderDashboard(data, dashboardDocument, null);
+  assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["true", "true", "true"]);
+  const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");
+  assert.match(
+    styles,
+    /\.dashboard-list\[data-scrollable="true"\]\s*\{[^}]*max-height:\s*360px;[^}]*overflow-y:\s*auto;/s
+  );
+  for (const listName of ["positions", "trades", "position-ai-status"]) {
+    assert.equal(elements.get(`[data-dashboard-list="${listName}"]`)[0].children.length, 6);
+  }
+
+  data.openPositions = { count: 5, items: positions(5) };
+  data.recentTrades = { count: 5, items: trades(5) };
+  data.openPositionAiStatus = { count: 5, items: monitoredPositions(5) };
+  dashboard.renderDashboard(data, dashboardDocument, null);
+  assert.deepEqual(lists.map(({ dataset }) => dataset.scrollable), ["false", "false", "false"]);
+});
+
 test("dashboard KPI information is accessible, English-only, and covers all portfolio metrics", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const requiredKpis = [

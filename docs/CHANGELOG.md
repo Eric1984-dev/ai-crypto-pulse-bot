@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Dashboard summary list scrolling
+
+- Add a bounded scrollbar to Open Positions, Activity, and Position Monitoring lists only when they contain more than five items
+- Remove the scroll limit automatically when the list returns to five items or fewer
+
 ### Dashboard risk controls placement
 
 - Place Emergency State / Risk Control beside Open Position AI Status in the dashboard summary grid

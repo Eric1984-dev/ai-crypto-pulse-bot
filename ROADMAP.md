@@ -203,6 +203,7 @@ Status: A subsequent `416/PGRST103` range now terminates pagination for every An
 - [x] Map signal density, color, and speed to live agent status; keep STOPPED/UNKNOWN static and respect reduced-motion preferences
 - [x] Collapse dashboard summary metrics after Win Rate by default
 - [x] Collapse Dashboard Portfolio, Activity, and Agent log panels by default; show the full watched-market list on Market Scanner
+- [x] Add conditional scrollbars to Open Positions, Activity, and Position Monitoring lists after five items
 - [x] Reduce whitespace above the Dashboard Overview and show list counts inline with their panel titles
 - [x] Collapse Trade History search and filters by default; add a bounded, sticky-header scrolling table
 - [x] Reset internal navigation destinations to the top on mobile without changing browser back/forward scroll restoration

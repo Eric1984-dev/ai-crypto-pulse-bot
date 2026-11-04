@@ -20,6 +20,7 @@
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
+  const dashboardListScrollThreshold = 5;
 
   function emptyDashboardData() {
     return {
@@ -307,6 +308,7 @@
     if (list) {
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
+      list.dataset.scrollable = String(safeItems.length > dashboardListScrollThreshold);
       for (const item of safeItems) {
         const [primaryText, secondaryText, marketSymbol, tradeAction] = describeItem(item);
         const row = documentRef.createElement("li");
@@ -347,6 +349,7 @@
     if (list) {
       list.replaceChildren();
       list.hidden = safeItems.length === 0;
+      list.dataset.scrollable = String(safeItems.length > dashboardListScrollThreshold);
       for (const item of safeItems) {
         const latestDecision = item.latestAiDecision || null;
         const decision = typeof latestDecision?.decision === "string"
