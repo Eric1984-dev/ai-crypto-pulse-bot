@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Dashboard P&L clarity
+
+- Rename the unrealized P&L KPI to “Open Positions Gain/Loss” and clarify that it is an estimate on positions still held, not realized profit or loss from a completed sale
+- Update the KPI information button's accessible label and regression coverage
+
 ### Candle refresh checkpoint lookup
 
 - Replace the capped historical-row scan and per-symbol fallback reads with a read-only RPC that returns each requested symbol's latest candle timestamp

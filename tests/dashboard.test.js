@@ -916,7 +916,7 @@ test("dashboard KPI information is accessible, English-only, and covers all port
     ["portfolio-value", "Portfolio Value"],
     ["total-pnl", "Total P&amp;L"],
     ["realized-pnl", "Realized P&amp;L"],
-    ["unrealized-pnl", "Unrealized P&amp;L"],
+    ["unrealized-pnl", "Open Positions Gain/Loss", "Explain gain or loss on open positions"],
     ["daily-pnl", "Daily P&amp;L"],
     ["win-rate", "Win Rate"],
     ["open-positions", "Open Positions"],
@@ -928,12 +928,20 @@ test("dashboard KPI information is accessible, English-only, and covers all port
 
   assert.match(html, /<html lang="en"/);
   assert.equal((html.match(/data-dashboard-kpi-info/g) || []).length, requiredKpis.length);
-  for (const [id, label] of requiredKpis) {
-    assert.match(html, new RegExp(`aria-label="Explain ${label}"`));
+  for (const [id, label, ariaLabel = `Explain ${label}`] of requiredKpis) {
+    assert.match(html, new RegExp(`aria-label="${ariaLabel}"`));
     assert.match(html, new RegExp(`aria-controls="kpi-info-${id}"`));
     assert.match(html, new RegExp(`aria-describedby="kpi-info-${id}"`));
     assert.match(html, new RegExp(`id="kpi-info-${id}" role="tooltip" hidden`));
   }
+  assert.match(
+    html,
+    /<span class="metric-label">Open Positions Gain\/Loss<\/span>/
+  );
+  assert.match(
+    html,
+    /id="kpi-info-unrealized-pnl" role="tooltip" hidden>Estimated gain or loss on positions you still hold, based on current prices\. It is not realized profit or loss from a completed sale\./
+  );
   assert.doesNotMatch(html, /Hoofdnavigatie|Instellingen|Uitloggen|Alle bedragen|Databasegegevens|Opnieuw proberen|Overzicht|afzonderlijk|Geen echte orders/i);
 });
 
