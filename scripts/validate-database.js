@@ -27,7 +27,8 @@ const requiredTables = [
   "AI_Crypto_Bot_Shadow_Exit_Events"
 ];
 const requiredFunctions = [
-  "AI_Crypto_Bot_Get_Latest_AI_Candles"
+  "AI_Crypto_Bot_Get_Latest_AI_Candles",
+  "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"
 ];
 
 function validateDatabase() {

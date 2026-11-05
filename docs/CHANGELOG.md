@@ -9,10 +9,11 @@ All notable project changes should be documented here.
 ### Bounded AI candle reads
 
 - Replace paginated 1,000-row PostgREST candle reads with a service-role-only RPC that returns at most 150 latest candles per enabled market and interval
+- Add `AI_Crypto_Bot_Get_Latest_AI_Candles_Compact` with per-symbol arrays of all six original values, reducing its PostgREST result to at most four top-level rows per interval while retaining the legacy function for staged rollout
 - Preserve the six interval semantics, market order, freshness checks, indicator inputs, decisions, and existing AI-analysis endpoint
 - Enforce uppercase enabled EUR symbols in SQL, validate RPC bounds and grants, and request exact PostgREST counts so incomplete responses fail closed
 - Compare every candle field against the former REST selection across two markets and all six intervals; no API route or table was added
-- Require confirmation that the intended production project's `max_rows` is at least 600; no production setting was verified or changed and the migration was not applied
+- Require confirmation that the intended production project's `max_rows` is at least 4 for the compact RPC; retain 600 for legacy callers. No production setting was verified or changed and the compact-response migration was not applied
 - Compare legacy REST and RPC request/row counts on deterministic fixtures without claiming deployed egress savings
 
 ### Prospective shadow exit scenarios

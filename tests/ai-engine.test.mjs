@@ -10,7 +10,7 @@ const config = {
 };
 const serviceRoleKey = "test-service-role-key";
 const activeMarket = { symbol: "BTC-EUR", enabled: true, priority: 1 };
-const latestCandlesRpc = "AI_Crypto_Bot_Get_Latest_AI_Candles";
+const latestCandlesRpc = "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact";
 
 function createCandles(symbol, interval, count = 60, direction = "up", now = fixedNow) {
   return Array.from({ length: count }, (_, index) => {
@@ -116,6 +116,7 @@ function createEngineHarness({
   candleDelayMs = 0,
   postgrestMaxRows = Number.POSITIVE_INFINITY,
   includeCandleContentRange = true,
+  candleResponseTransform = (groups) => groups,
   logger = { info() {}, error() {} }
 } = {}) {
   let statusRow = { status };
@@ -151,21 +152,26 @@ function createEngineHarness({
       }
       if (method === "POST" && table === latestCandlesRpc) {
         const { p_symbols: symbols, p_interval: interval } = JSON.parse(options.body);
-        const rows = symbols.flatMap((symbol) => candles
-          .filter((candle) => candle.symbol === symbol && candle.interval === interval)
-          .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
-          .slice(0, 150));
-        const responseRows = rows.slice(0, postgrestMaxRows);
-        request.responseRows = responseRows.length;
+        const groups = symbols.map((symbol) => ({
+          symbol,
+          candles: candles
+            .filter((candle) => candle.symbol === symbol && candle.interval === interval)
+            .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+            .slice(0, 150)
+            .map(({ timestamp, open, high, low, close, volume }) =>
+              [timestamp, open, high, low, close, volume])
+        }));
+        const responseGroups = candleResponseTransform(groups.slice(0, postgrestMaxRows));
+        request.responseGroups = Array.isArray(responseGroups) ? responseGroups.length : null;
+        request.responseCandleRows = Array.isArray(responseGroups)
+          ? responseGroups.reduce((total, group) =>
+            total + (Array.isArray(group && group.candles) ? group.candles.length : 0), 0)
+          : null;
         const headers = includeCandleContentRange
-          ? {
-            "content-range": rows.length === 0
-              ? "*/0"
-              : `0-${responseRows.length - 1}/${rows.length}`
-          }
+          ? { "content-range": `0-${responseGroups.length - 1}/${groups.length}` }
           : {};
-        const status = responseRows.length < rows.length ? 206 : 200;
-        return jsonResponse(responseRows, status, headers);
+        const status = responseGroups.length < groups.length ? 206 : 200;
+        return jsonResponse(responseGroups, status, headers);
       }
       if (method === "GET") {
         if (table === "AI_Crypto_Bot_Status") {
@@ -505,7 +511,8 @@ test("AI candle RPC reads every interval without PostgREST global-row truncation
   assert.ok(candleRequests.every(({ body }) => (
     JSON.stringify(JSON.parse(body).p_symbols) === JSON.stringify(["BTC-EUR"])
   )));
-  assert.equal(candleRequests.reduce((total, { responseRows }) => total + responseRows, 0), 900);
+  assert.equal(candleRequests.reduce((total, { responseCandleRows }) =>
+    total + responseCandleRows, 0), 900);
   const legacyMetrics = Object.keys(candleCounts).reduce((total, interval) => {
     const intervalMetrics = simulateLegacyCandleReads(candles, ["BTC-EUR"], interval);
     return {
@@ -532,7 +539,7 @@ test("AI candle RPC requests exact counts and rejects incomplete or uncounted re
     markets,
     marketData,
     candles,
-    postgrestMaxRows: 500
+    postgrestMaxRows: 2
   });
 
   await assert.rejects(
@@ -541,7 +548,8 @@ test("AI candle RPC requests exact counts and rejects incomplete or uncounted re
   );
   const candleRequest = truncatedHarness.requests.find(({ table }) => table === latestCandlesRpc);
   assert.equal(candleRequest.headers.prefer, "count=exact");
-  assert.equal(candleRequest.responseRows, 500);
+  assert.equal(candleRequest.responseGroups, 2);
+  assert.equal(candleRequest.responseCandleRows, 300);
   assert.equal(
     truncatedHarness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"),
     false
@@ -557,6 +565,37 @@ test("AI candle RPC requests exact counts and rejects incomplete or uncounted re
   assert.equal(
     uncountedHarness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"),
     false
+  );
+});
+
+test("AI candle RPC rejects malformed compact groups and candle tuples", async () => {
+  const malformedHarness = createEngineHarness({
+    candleResponseTransform(groups) {
+      return groups.map((group) => ({
+        ...group,
+        candles: group.candles.map((candle) => candle.slice(0, 5))
+      }));
+    }
+  });
+  await assert.rejects(
+    malformedHarness.service.runAnalysis({ config, serviceRoleKey }),
+    { code: "INVALID_DATABASE_RESPONSE" }
+  );
+  assert.equal(
+    malformedHarness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"),
+    false
+  );
+
+  const mismatchedSymbolHarness = createEngineHarness({
+    candleResponseTransform(groups) {
+      return groups.map((group, index) => index === 0
+        ? { ...group, symbol: "ETH-EUR" }
+        : group);
+    }
+  });
+  await assert.rejects(
+    mismatchedSymbolHarness.service.runAnalysis({ config, serviceRoleKey }),
+    { code: "INVALID_DATABASE_RESPONSE" }
   );
 });
 
@@ -596,7 +635,8 @@ test("AI candle RPC returns no more than 150 latest rows for each requested mark
     p_symbols: ["ALPHA-EUR", "BETA-EUR", "GAMMA-EUR", "DELTA-EUR"],
     p_interval: "1m"
   });
-  assert.equal(candleRequests[0].responseRows, 600);
+  assert.equal(candleRequests[0].responseGroups, 4);
+  assert.equal(candleRequests[0].responseCandleRows, 600);
   assert.deepEqual(
     simulateLegacyCandleReads(candles, markets.map(({ symbol }) => symbol), "1m"),
     { requests: 2, returnedRows: 1200 }
@@ -656,7 +696,8 @@ test("analysis caps each batched market at its latest 150 candles", async () => 
     p_symbols: ["ALPHA-EUR", "BETA-EUR", "DELTA-EUR", "GAMMA-EUR"],
     p_interval: "1m"
   });
-  assert.equal(candleRequests[0].responseRows, 220);
+  assert.equal(candleRequests[0].responseGroups, 4);
+  assert.equal(candleRequests[0].responseCandleRows, 220);
   assert.deepEqual(
     simulateLegacyCandleReads(candles, markets.map(({ symbol }) => symbol), "1m"),
     { requests: 2, returnedRows: 1070 }

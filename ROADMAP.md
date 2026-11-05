@@ -93,9 +93,9 @@ Status: Completed
 ## Phase 07 - AI Engine
 
 - [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
-- [x] Read the latest 150 candles per market and interval through a bounded service-role RPC, with no global PostgREST row cap or pagination
+- [x] Read the latest 150 candles per market and interval through a bounded service-role RPC, grouped into at most four PostgREST rows per interval
 - [x] Enforce enabled EUR-market membership in SQL and reject incomplete exact-count PostgREST responses
-- [ ] Confirm the intended production project's identity and `max_rows >= 600` before migration or deployment
+- [ ] Confirm the intended production project's identity; retain `max_rows >= 600` for the legacy caller until the compact caller is deployed (`max_rows >= 4` is sufficient for the new RPC)
 - [x] Exclude intervals whose latest candle exceeds its freshness limit; return `WAIT` with `STALE_CANDLE_DATA` when fewer than two sufficiently populated fresh intervals remain
 - [x] Confidence-weighted BUY, SELL, HOLD, and WAIT decisions from real watched-market snapshots and candles
 - [x] Persist decisions and status transitions through existing `AI_Crypto_Bot_*` tables only

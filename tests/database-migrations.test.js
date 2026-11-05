@@ -31,6 +31,9 @@ const candleCheckpointMigration = migrationSql.find((sql) =>
 const aiCandleHistoryMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_AI_Candles"')
 );
+const compactAiCandleMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"')
+);
 const shadowExitMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
 );
@@ -71,6 +74,7 @@ async function createDatabase() {
   await database.exec(candleCheckpointMigration);
   await database.exec(shadowExitMigration);
   await database.exec(aiCandleHistoryMigration);
+  await database.exec(compactAiCandleMigration);
   return database;
 }
 
@@ -1198,7 +1202,7 @@ test("AI candle history RPC matches legacy candle selection across markets and a
       CROSS JOIN generate_series(1, 200) AS series(n)
     `);
 
-    const symbols = ["BTC-EUR", "ETH-EUR"];
+    const symbols = ["ETH-EUR", "BTC-EUR"];
     const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
     const fields = 'symbol, "interval", open, high, low, close, volume, "timestamp"';
     for (const interval of intervals) {
@@ -1213,43 +1217,71 @@ test("AI candle history RPC matches legacy candle selection across markets and a
       );
       const rpc = await withRole(database, "service_role", () =>
         database.query(
-          `SELECT ${fields}
-           FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"($1::text[], $2)`,
+          `SELECT symbol, candles
+           FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"($1::text[], $2)`,
           [symbols, interval]
         )
       );
 
-      assert.equal(rpc.rows.length, 300);
-      for (const symbol of symbols) {
-        const expected = legacy.rows.filter((row) => row.symbol === symbol).slice(0, 150);
-        const actual = rpc.rows.filter((row) => row.symbol === symbol);
-        assert.equal(actual.length, 150);
-        assert.deepEqual(actual, expected);
-        assert.equal(new Set(actual.map((row) => new Date(row.timestamp).toISOString())).size, 150);
-        assert.ok(actual.every((row, index) => (
-          index === 0 || Date.parse(actual[index - 1].timestamp) >= Date.parse(row.timestamp)
+      assert.equal(rpc.rows.length, symbols.length);
+      assert.deepEqual(rpc.rows.map(({ symbol }) => symbol), symbols);
+      const decodedRows = rpc.rows.flatMap(({ symbol, candles }) => {
+        assert.ok(Array.isArray(candles));
+        assert.equal(candles.length, 150);
+        assert.ok(candles.every((candle) => Array.isArray(candle) && candle.length === 6));
+        assert.ok(candles.every((candle, index) => (
+          index === 0 || Date.parse(candles[index - 1][0]) >= Date.parse(candle[0])
         )));
+        return candles.map(([timestamp, open, high, low, close, volume]) => ({
+          symbol,
+          interval,
+          open: Number(open),
+          high: Number(high),
+          low: Number(low),
+          close: Number(close),
+          volume: Number(volume),
+          timestamp: new Date(timestamp).toISOString()
+        }));
+      });
+      const expectedRows = symbols.flatMap((symbol) => legacy.rows
+        .filter((row) => row.symbol === symbol)
+        .slice(0, 150)
+        .map((row) => ({
+          symbol: row.symbol,
+          interval: row.interval,
+          open: Number(row.open),
+          high: Number(row.high),
+          low: Number(row.low),
+          close: Number(row.close),
+          volume: Number(row.volume),
+          timestamp: new Date(row.timestamp).toISOString()
+        })));
+      assert.deepEqual(decodedRows, expectedRows);
+      for (const symbol of symbols) {
+        const actual = decodedRows.filter((row) => row.symbol === symbol);
+        assert.equal(actual.length, 150);
+        assert.equal(new Set(actual.map((row) => row.timestamp)).size, 150);
       }
       assert.notEqual(
-        rpc.rows.find((row) => row.symbol === symbols[0]).close,
-        rpc.rows.find((row) => row.symbol === symbols[1]).close
+        decodedRows.find((row) => row.symbol === symbols[0]).close,
+        decodedRows.find((row) => row.symbol === symbols[1]).close
       );
     }
 
     const emptyResult = await withRole(database, "service_role", () =>
       database.query(
-        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"(
           ARRAY['SOL-EUR']::text[],
           '1m'
         )`
       )
     );
-    assert.deepEqual(emptyResult.rows, []);
+    assert.deepEqual(emptyResult.rows, [{ symbol: "SOL-EUR", candles: [] }]);
 
     async function callRpc(symbolExpression, intervalExpression = "'1m'") {
       return withRole(database, "service_role", () =>
         database.query(
-          `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+          `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"(
             ${symbolExpression},
             ${intervalExpression}
           )`
@@ -1281,9 +1313,11 @@ test("AI candle history RPC matches legacy candle selection across markets and a
     );
     await assert.rejects(callRpc("ARRAY['SOL-EUR']::text[]"), { code: "22023" });
 
-    assert.match(aiCandleHistoryMigration, /SECURITY INVOKER/i);
-    assert.match(aiCandleHistoryMigration, /SET search_path = ''/i);
-    assert.match(aiCandleHistoryMigration, /LIMIT 150/i);
+    assert.match(compactAiCandleMigration, /SECURITY INVOKER/i);
+    assert.match(compactAiCandleMigration, /SET search_path = ''/i);
+    assert.match(compactAiCandleMigration, /LIMIT 150/i);
+    assert.match(compactAiCandleMigration, /jsonb_build_array/i);
+    assert.match(compactAiCandleMigration, /ORDER BY latest\.timestamp DESC/i);
   } finally {
     await database.close();
   }
@@ -1292,40 +1326,45 @@ test("AI candle history RPC matches legacy candle selection across markets and a
 test("AI candle history RPC denies PUBLIC, anon, and authenticated and grants service_role", async () => {
   const database = await createDatabase();
   try {
-    const publicPrivilege = await database.query(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS proc
-        CROSS JOIN LATERAL pg_catalog.aclexplode(proc.proacl) AS acl_entry
-        WHERE proc.pronamespace = 'public'::regnamespace
-          AND proc.proname = 'AI_Crypto_Bot_Get_Latest_AI_Candles'
-          AND acl_entry.grantee = 0
-          AND acl_entry.privilege_type = 'EXECUTE'
-      ) AS public_can_execute
-    `);
-    assert.equal(publicPrivilege.rows[0].public_can_execute, false);
+    for (const functionName of [
+      "AI_Crypto_Bot_Get_Latest_AI_Candles",
+      "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"
+    ]) {
+      const publicPrivilege = await database.query(`
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_catalog.pg_proc AS proc
+          CROSS JOIN LATERAL pg_catalog.aclexplode(proc.proacl) AS acl_entry
+          WHERE proc.pronamespace = 'public'::regnamespace
+            AND proc.proname = $1
+            AND acl_entry.grantee = 0
+            AND acl_entry.privilege_type = 'EXECUTE'
+        ) AS public_can_execute
+      `, [functionName]);
+      assert.equal(publicPrivilege.rows[0].public_can_execute, false);
 
-    for (const role of ["anon", "authenticated"]) {
-      await assert.rejects(
-        withRole(database, role, () =>
-          database.query(
-            `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
-              ARRAY['BTC-EUR']::text[],
-              '1m'
-            )`
-          )
-        ),
-        { code: "42501" }
+      for (const role of ["anon", "authenticated"]) {
+        await assert.rejects(
+          withRole(database, role, () =>
+            database.query(
+              `SELECT * FROM public."${functionName}"(
+                ARRAY['BTC-EUR']::text[],
+                '1m'
+              )`
+            )
+          ),
+          { code: "42501" }
+        );
+      }
+      await withRole(database, "service_role", () =>
+        database.query(
+          `SELECT * FROM public."${functionName}"(
+            ARRAY['BTC-EUR']::text[],
+            '1m'
+          )`
+        )
       );
     }
-    await withRole(database, "service_role", () =>
-      database.query(
-        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
-          ARRAY['BTC-EUR']::text[],
-          '1m'
-        )`
-      )
-    );
   } finally {
     await database.close();
   }
