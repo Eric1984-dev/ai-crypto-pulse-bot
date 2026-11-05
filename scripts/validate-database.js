@@ -22,7 +22,12 @@ const requiredTables = [
   "AI_Crypto_Bot_Backtests",
   "AI_Crypto_Bot_Portfolio_Snapshots",
   "AI_Crypto_Bot_Scanner_Events",
-  "AI_Crypto_Bot_Emergency_State"
+  "AI_Crypto_Bot_Emergency_State",
+  "AI_Crypto_Bot_Shadow_Exit_Scenarios",
+  "AI_Crypto_Bot_Shadow_Exit_Events"
+];
+const requiredFunctions = [
+  "AI_Crypto_Bot_Get_Latest_AI_Candles"
 ];
 
 function validateDatabase() {
@@ -46,6 +51,15 @@ function validateDatabase() {
   const migrationSql = migrationFiles
     .map((file) => fs.readFileSync(path.join(migrationsDirectory, file), "utf8"))
     .join("\n");
+  const createdFunctions = new Set(
+    [...migrationSql.matchAll(/CREATE FUNCTION public\."([^"]+)"/g)]
+      .map((match) => match[1])
+  );
+  for (const functionName of requiredFunctions) {
+    if (!createdFunctions.has(functionName)) {
+      errors.push(`Missing required database function: ${functionName}.`);
+    }
+  }
   const createdTables = [...migrationSql.matchAll(/CREATE TABLE public\."([^"]+)"/g)]
     .map((match) => match[1]);
   const actualTableSet = new Set(createdTables);
@@ -136,7 +150,7 @@ if (require.main === module) {
     console.error(`Database migration validation failed:\n- ${errors.join("\n- ")}`);
     process.exitCode = 1;
   } else {
-    console.log("Database migration validation passed (16 prefixed tables, RLS coverage, initial seed consistency).");
+    console.log("Database migration validation passed (18 prefixed tables, RLS coverage, initial seed consistency).");
   }
 }
 

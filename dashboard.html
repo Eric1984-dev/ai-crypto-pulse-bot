@@ -284,6 +284,24 @@
           <p class="card-description">Emergency State is stored separately and does not change Agent Status.</p>
         </article>
       </section>
+
+      <section class="dashboard-panel shadow-exit-panel" aria-labelledby="shadow-exits-heading">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Experimental · Monitoring only</p>
+            <h2 id="shadow-exits-heading">Shadow Exit Scenarios</h2>
+          </div>
+        </div>
+        <p class="shadow-exit-disclaimer">
+          These versioned scenarios are simulations only. They never place trades or change actual positions,
+          decisions, balances, risk checks, or portfolio metrics. Tracking starts with the first fresh observed
+          market mark; historical candles and intrabar highs or lows are not used.
+        </p>
+        <p class="shadow-exit-status" data-shadow-exit-status role="status" aria-live="polite" hidden></p>
+        <ul class="shadow-exit-position-list" data-shadow-exit-list aria-label="Shadow exit scenarios by position" hidden></ul>
+        <p class="dashboard-empty" data-shadow-exit-empty>No open positions or recently closed tracked scenarios.</p>
+      </section>
+
     </main>
     <footer class="site-footer">
       <div class="footer-inner"><p>CryptoPulse AI Agent · <span data-current-year></span></p><p>No real orders.</p></div>

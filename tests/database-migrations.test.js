@@ -28,6 +28,12 @@ const tradeHistoryMigration = migrationSql.find((sql) =>
 const candleCheckpointMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"')
 );
+const aiCandleHistoryMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_AI_Candles"')
+);
+const shadowExitMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
+);
 const realtimePublicationMigration = migrationSql.find((sql) =>
   sql.includes("ALTER PUBLICATION supabase_realtime")
 );
@@ -63,6 +69,8 @@ async function createDatabase() {
   await database.exec(confidenceThresholdMigration);
   await database.exec(tradeHistoryMigration);
   await database.exec(candleCheckpointMigration);
+  await database.exec(shadowExitMigration);
+  await database.exec(aiCandleHistoryMigration);
   return database;
 }
 
@@ -126,6 +134,20 @@ async function setMarketPrice(database, symbol, price) {
   );
 }
 
+async function setMarketPriceAt(database, symbol, price, capturedAt) {
+  await database.query(
+    `INSERT INTO public."AI_Crypto_Bot_Market_Data"
+      (symbol, price, high_24h, low_24h, captured_at)
+     VALUES ($1, $2, $2, $2, $3)
+     ON CONFLICT (symbol) DO UPDATE
+       SET price = EXCLUDED.price,
+           high_24h = EXCLUDED.high_24h,
+           low_24h = EXCLUDED.low_24h,
+           captured_at = EXCLUDED.captured_at`,
+    [symbol, price, capturedAt]
+  );
+}
+
 async function addDecision(database, symbol, decision, confidence = 80) {
   return database.query(
     `INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
@@ -136,6 +158,20 @@ async function addDecision(database, symbol, decision, confidence = 80) {
   );
 }
 
+async function addOpenPosition(database, portfolioId, symbol = "BTC-EUR", {
+  amount = 1,
+  entryPrice = 100
+} = {}) {
+  const result = await database.query(
+    `INSERT INTO public."AI_Crypto_Bot_Positions"
+      (portfolio_id, symbol, amount, entry_price, current_price)
+     VALUES ($1, $2, $3, $4, $4)
+     RETURNING id`,
+    [portfolioId, symbol, amount, entryPrice]
+  );
+  return result.rows[0].id;
+}
+
 async function runPaperTrading(database) {
   const result = await database.query(
     `SELECT public."AI_Crypto_Bot_Run_Paper_Trading"() AS result`
@@ -143,9 +179,16 @@ async function runPaperTrading(database) {
   return result.rows[0].result;
 }
 
+async function runShadowEvaluation(database) {
+  const result = await database.query(
+    `SELECT public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"() AS result`
+  );
+  return result.rows[0].result;
+}
+
 test("database migration contract covers all prefixed tables, RLS policies, and seed configuration", () => {
   assert.deepEqual(validateDatabase(), []);
-  assert.equal(requiredTables.length, 16);
+  assert.equal(requiredTables.length, 18);
   assert.deepEqual(markets.slice(0, 5).map(({ symbol }) => symbol), [
     "BTC-EUR",
     "ETH-EUR",
@@ -154,6 +197,429 @@ test("database migration contract covers all prefixed tables, RLS policies, and 
     "ADA-EUR"
   ]);
   assert.equal(new Set(markets.map(({ symbol }) => symbol)).size, markets.length);
+});
+
+test("shadow exit migration adds prefixed, constrained, indexed, RLS-protected state and service RPC", async () => {
+  assert.ok(shadowExitMigration);
+  assert.match(shadowExitMigration, /AI_Crypto_Bot_Shadow_Exit_Scenarios_rule_key/);
+  assert.match(shadowExitMigration, /AI_Crypto_Bot_Shadow_Exit_Scenarios_select_own/);
+  assert.match(shadowExitMigration, /AI_Crypto_Bot_Shadow_Exit_Events_select_own/);
+  assert.match(shadowExitMigration, /REVOKE ALL ON FUNCTION[\s\S]+FROM PUBLIC, anon, authenticated/);
+  assert.match(shadowExitMigration, /GRANT EXECUTE ON FUNCTION[\s\S]+TO service_role/);
+  assert.match(shadowExitMigration, /pg_try_advisory_xact_lock\(882018082\)/);
+
+  const database = await createDatabase();
+  try {
+    const ownerId = "10000000-0000-4000-8000-000000000001";
+    const otherId = "20000000-0000-4000-8000-000000000002";
+    const ownerPortfolioId = await getInitialPortfolio(database);
+    await database.query(
+      "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+      [otherId, "other@example.test"]
+    );
+    const otherPortfolioId = await getInitialPortfolioForUser(database, otherId);
+    const positionId = await addOpenPosition(database, ownerPortfolioId);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await runShadowEvaluation(database);
+
+    const privileges = await database.query(`
+      SELECT
+        has_function_privilege(
+          'service_role',
+          'public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"()',
+          'EXECUTE'
+        ) AS service_role_can_execute,
+        has_function_privilege(
+          'authenticated',
+          'public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"()',
+          'EXECUTE'
+        ) AS authenticated_can_execute,
+        (
+          SELECT relrowsecurity
+          FROM pg_catalog.pg_class
+          WHERE oid = 'public."AI_Crypto_Bot_Shadow_Exit_Scenarios"'::regclass
+        ) AS scenario_rls,
+        (
+          SELECT relrowsecurity
+          FROM pg_catalog.pg_class
+          WHERE oid = 'public."AI_Crypto_Bot_Shadow_Exit_Events"'::regclass
+        ) AS event_rls
+    `);
+    assert.deepEqual(privileges.rows[0], {
+      service_role_can_execute: true,
+      authenticated_can_execute: false,
+      scenario_rls: true,
+      event_rls: true
+    });
+
+    const ownerRows = await withRole(database, "authenticated", async () => {
+      await database.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [ownerId]);
+      const scenarios = await database.query(
+        `SELECT position_id, rule_id
+         FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+         ORDER BY rule_id`
+      );
+      const events = await database.query(
+        `SELECT event_type FROM public."AI_Crypto_Bot_Shadow_Exit_Events"`
+      );
+      return { scenarios, events };
+    });
+    assert.equal(ownerRows.scenarios.rows.length, 7);
+    assert.deepEqual(ownerRows.scenarios.rows.map(({ rule_id }) => rule_id).sort(), [
+      "fixed_tp_10",
+      "fixed_tp_15",
+      "fixed_tp_20",
+      "fixed_tp_5",
+      "trailing_stop_10",
+      "trailing_stop_15",
+      "trailing_stop_5"
+    ]);
+    assert.ok(ownerRows.scenarios.rows.every(({ position_id }) => position_id === positionId));
+    assert.equal(ownerRows.events.rows.length, 7);
+
+    const otherRows = await withRole(database, "authenticated", async () => {
+      await database.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [otherId]);
+      return database.query(
+        `SELECT id FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"`
+      );
+    });
+    assert.deepEqual(otherRows.rows, []);
+    assert.equal(otherPortfolioId !== ownerPortfolioId, true);
+
+    await assert.rejects(
+      withRole(database, "anon", () =>
+        database.query(`SELECT id FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"`)
+      ),
+      { code: "42501" }
+    );
+    await assert.rejects(
+      withRole(database, "authenticated", () =>
+        database.query(
+          `INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Events" (event_type, dedupe_key)
+           VALUES ('EVALUATION_FAILED', 'client-write')`
+        )
+      ),
+      { code: "42501" }
+    );
+    await assert.rejects(
+      database.query(
+        `INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+          (position_id, portfolio_id, symbol, position_opened_at, amount, entry_price,
+           rule_id, rule_version, parameters)
+         VALUES ($1, $2, 'BTC-EUR', now(), 1, 100, 'unknown_rule', '1.0.0', '{}'::jsonb)`,
+        [positionId, ownerPortfolioId]
+      ),
+      { code: "23514" }
+    );
+    const indexes = await database.query(`
+      SELECT indexname
+      FROM pg_catalog.pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname LIKE 'AI_Crypto_Bot_Shadow_Exit_%'
+      ORDER BY indexname
+    `);
+    assert.deepEqual(indexes.rows.map(({ indexname }) => indexname), [
+      "AI_Crypto_Bot_Shadow_Exit_Events_dedupe_key_key",
+      "AI_Crypto_Bot_Shadow_Exit_Events_pkey",
+      "AI_Crypto_Bot_Shadow_Exit_Events_position_event_idx",
+      "AI_Crypto_Bot_Shadow_Exit_Events_scenario_event_idx",
+      "AI_Crypto_Bot_Shadow_Exit_Scenarios_pkey",
+      "AI_Crypto_Bot_Shadow_Exit_Scenarios_recent_closed_idx",
+      "AI_Crypto_Bot_Shadow_Exit_Scenarios_rule_key"
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
+test("shadow fixed targets trigger only on a fresh observed mark and never mutate trading records", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    const positionId = await addOpenPosition(database, portfolioId);
+    const baseTime = new Date(Date.now() - 60_000);
+    await setMarketPriceAt(database, "BTC-EUR", 104.5, baseTime);
+    const before = await database.query(
+      `SELECT available_balance, portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolios" WHERE id = $1`,
+      [portfolioId]
+    );
+
+    const initialized = await runShadowEvaluation(database);
+    assert.equal(initialized.status, "COMPLETED");
+    let scenarios = await database.query(
+      `SELECT rule_id, status, tracking_started_at, last_mark, modeled_net_pnl
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 ORDER BY rule_id`,
+      [positionId]
+    );
+    assert.equal(scenarios.rows.length, 7);
+    assert.ok(scenarios.rows.every(({ status }) => status === "TRACKING"));
+    assert.ok(scenarios.rows.every(({ tracking_started_at }) => (
+      new Date(tracking_started_at).getTime() === baseTime.getTime()
+    )));
+
+    const nextMarkAt = new Date(baseTime.getTime() + 1000);
+    await setMarketPriceAt(database, "BTC-EUR", 106, nextMarkAt);
+    await runShadowEvaluation(database);
+    scenarios = await database.query(
+      `SELECT rule_id, status, triggered_at, trigger_mark, modeled_net_pnl
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 ORDER BY rule_id`,
+      [positionId]
+    );
+    const fixedFive = scenarios.rows.find(({ rule_id }) => rule_id === "fixed_tp_5");
+    assert.equal(fixedFive.status, "TRIGGERED");
+    assert.equal(new Date(fixedFive.triggered_at).getTime(), nextMarkAt.getTime());
+    assert.equal(Number(fixedFive.trigger_mark), 106);
+    assert.ok(Math.abs(Number(fixedFive.modeled_net_pnl) - 5.629265) < 0.000001);
+    assert.equal(
+      scenarios.rows.find(({ rule_id }) => rule_id === "fixed_tp_10").status,
+      "TRACKING"
+    );
+    assert.equal(
+      scenarios.rows.find(({ rule_id }) => rule_id === "trailing_stop_5").status,
+      "TRACKING"
+    );
+
+    const [trades, position, after] = await Promise.all([
+      database.query(`SELECT count(*)::integer AS count FROM public."AI_Crypto_Bot_Trades"`),
+      database.query(
+        `SELECT status FROM public."AI_Crypto_Bot_Positions" WHERE id = $1`,
+        [positionId]
+      ),
+      database.query(
+        `SELECT available_balance, portfolio_value
+         FROM public."AI_Crypto_Bot_Portfolios" WHERE id = $1`,
+        [portfolioId]
+      )
+    ]);
+    assert.equal(trades.rows[0].count, 0);
+    assert.equal(position.rows[0].status, "OPEN");
+    assert.deepEqual(after.rows, before.rows);
+  } finally {
+    await database.close();
+  }
+});
+
+test("shadow trailing rules persist high-water marks and arm before testing retracements", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    const positionId = await addOpenPosition(database, portfolioId);
+    const baseTime = new Date(Date.now() - 60_000);
+    await setMarketPriceAt(database, "BTC-EUR", 100, baseTime);
+    await runShadowEvaluation(database);
+
+    await setMarketPriceAt(database, "BTC-EUR", 106, new Date(baseTime.getTime() + 1000));
+    await runShadowEvaluation(database);
+    let trailing = await database.query(
+      `SELECT rule_id, trailing_armed, activated_at, high_water_mark
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 AND rule_id LIKE 'trailing_stop_%'
+       ORDER BY rule_id`,
+      [positionId]
+    );
+    assert.equal(trailing.rows.length, 3);
+    assert.ok(trailing.rows.every(({ trailing_armed, high_water_mark }) => (
+      trailing_armed && Number(high_water_mark) === 106
+    )));
+    assert.ok(trailing.rows.every(({ activated_at }) => activated_at !== null));
+
+    await setMarketPriceAt(database, "BTC-EUR", 110, new Date(baseTime.getTime() + 2000));
+    await runShadowEvaluation(database);
+    trailing = await database.query(
+      `SELECT rule_id, status, high_water_mark
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 AND rule_id LIKE 'trailing_stop_%'
+       ORDER BY rule_id`,
+      [positionId]
+    );
+    assert.ok(trailing.rows.every(({ high_water_mark }) => Number(high_water_mark) === 110));
+
+    await setMarketPriceAt(database, "BTC-EUR", 101, new Date(baseTime.getTime() + 3000));
+    await runShadowEvaluation(database);
+    trailing = await database.query(
+      `SELECT rule_id, status, high_water_mark
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 AND rule_id LIKE 'trailing_stop_%'
+       ORDER BY rule_id`,
+      [positionId]
+    );
+    assert.equal(trailing.rows.find(({ rule_id }) => rule_id === "trailing_stop_5").status, "TRIGGERED");
+    assert.equal(trailing.rows.find(({ rule_id }) => rule_id === "trailing_stop_10").status, "TRACKING");
+    assert.equal(trailing.rows.find(({ rule_id }) => rule_id === "trailing_stop_15").status, "TRACKING");
+    assert.ok(trailing.rows.every(({ high_water_mark }) => Number(high_water_mark) === 110));
+  } finally {
+    await database.close();
+  }
+});
+
+test("shadow tracking for pre-existing positions starts at the first fresh mark and stale or future marks cannot trigger", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    const positionId = await addOpenPosition(database, portfolioId);
+    const staleAt = new Date(Date.now() - 16 * 60_000);
+    await setMarketPriceAt(database, "BTC-EUR", 130, staleAt);
+    await runShadowEvaluation(database);
+
+    let scenarios = await database.query(
+      `SELECT status, tracking_started_at, last_mark, data_quality_status
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1`,
+      [positionId]
+    );
+    assert.equal(scenarios.rows.length, 7);
+    assert.ok(scenarios.rows.every(({ status, tracking_started_at, last_mark, data_quality_status }) => (
+      status === "TRACKING"
+      && tracking_started_at === null
+      && last_mark === null
+      && data_quality_status === "STALE"
+    )));
+
+    const futureAt = new Date(Date.now() + 2 * 60_000);
+    await setMarketPriceAt(database, "BTC-EUR", 130, futureAt);
+    await runShadowEvaluation(database);
+    scenarios = await database.query(
+      `SELECT status, tracking_started_at, last_mark, data_quality_status
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1`,
+      [positionId]
+    );
+    assert.ok(scenarios.rows.every(({ status, tracking_started_at, last_mark, data_quality_status }) => (
+      status === "TRACKING"
+      && tracking_started_at === null
+      && last_mark === null
+      && data_quality_status === "INVALID"
+    )));
+
+    const freshAt = new Date(Date.now() - 1000);
+    await setMarketPriceAt(database, "BTC-EUR", 130, freshAt);
+    await runShadowEvaluation(database);
+    scenarios = await database.query(
+      `SELECT rule_id, status, tracking_started_at, triggered_at, last_mark_captured_at
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1 ORDER BY rule_id`,
+      [positionId]
+    );
+    const fixedFive = scenarios.rows.find(({ rule_id }) => rule_id === "fixed_tp_5");
+    assert.equal(fixedFive.status, "TRIGGERED");
+    assert.equal(new Date(fixedFive.tracking_started_at).getTime(), freshAt.getTime());
+    assert.equal(new Date(fixedFive.triggered_at).getTime(), freshAt.getTime());
+    assert.equal(new Date(fixedFive.last_mark_captured_at).getTime(), freshAt.getTime());
+    const events = await database.query(
+      `SELECT event_type, event_at
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Events"
+       WHERE position_id = $1 AND event_type = 'HYPOTHETICAL_TRIGGERED'`,
+      [positionId]
+    );
+    assert.ok(events.rows.every(({ event_at }) => new Date(event_at).getTime() >= freshAt.getTime()));
+  } finally {
+    await database.close();
+  }
+});
+
+test("shadow retries and overlapping evaluations do not duplicate scenarios or transition events", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    const positionId = await addOpenPosition(database, portfolioId);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await runShadowEvaluation(database);
+    await runShadowEvaluation(database);
+    await Promise.all([runShadowEvaluation(database), runShadowEvaluation(database)]);
+
+    const scenarios = await database.query(
+      `SELECT count(*)::integer AS count
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       WHERE position_id = $1`,
+      [positionId]
+    );
+    const events = await database.query(
+      `SELECT event_type, count(*)::integer AS count
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Events"
+       WHERE position_id = $1
+       GROUP BY event_type`,
+      [positionId]
+    );
+    assert.equal(scenarios.rows[0].count, 7);
+    assert.deepEqual(events.rows, [{ event_type: "TRACKING_STARTED", count: 7 }]);
+  } finally {
+    await database.close();
+  }
+});
+
+test("actual paper SELL finalizes shadow scenarios without changing trades or balances", async () => {
+  const database = await createDatabase();
+  try {
+    const portfolioId = await getInitialPortfolio(database);
+    await setMarketPrice(database, "BTC-EUR", 100);
+    await addDecision(database, "BTC-EUR", "BUY", 80);
+    await runPaperTrading(database);
+    await runShadowEvaluation(database);
+
+    await setMarketPrice(database, "BTC-EUR", 110);
+    await runShadowEvaluation(database);
+    await addDecision(database, "BTC-EUR", "SELL", 80);
+    await runPaperTrading(database);
+    const beforeFinalize = await database.query(
+      `SELECT side, price, quantity, fees, slippage, realized_pnl, created_at
+       FROM public."AI_Crypto_Bot_Trades"
+       WHERE portfolio_id = $1 ORDER BY created_at, id`,
+      [portfolioId]
+    );
+    const portfolioBeforeFinalize = await database.query(
+      `SELECT available_balance, portfolio_value
+       FROM public."AI_Crypto_Bot_Portfolios" WHERE id = $1`,
+      [portfolioId]
+    );
+    await runShadowEvaluation(database);
+
+    const sellTrade = beforeFinalize.rows.find(({ side }) => side === "SELL");
+    assert.ok(sellTrade);
+    const scenarios = await database.query(
+      `SELECT rule_id, status, actual_closed_at, actual_close_price, actual_net_pnl, actual_trade_id
+       FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+       ORDER BY rule_id`
+    );
+    assert.equal(scenarios.rows.length, 7);
+    assert.equal(
+      scenarios.rows.find(({ rule_id }) => rule_id === "fixed_tp_5").status,
+      "TRIGGERED"
+    );
+    assert.ok(scenarios.rows
+      .filter(({ rule_id }) => rule_id !== "fixed_tp_5")
+      .every(({ status }) => status === "CLOSED_WITHOUT_TRIGGER"));
+    assert.ok(scenarios.rows.every(({ actual_closed_at }) => (
+      new Date(actual_closed_at).getTime() === new Date(sellTrade.created_at).getTime()
+    )));
+    assert.ok(scenarios.rows.every(({ actual_close_price }) => (
+      Number(actual_close_price) === Number(sellTrade.price)
+    )));
+    assert.ok(scenarios.rows.every(({ actual_net_pnl }) => (
+      Number(actual_net_pnl) === Number(sellTrade.realized_pnl)
+    )));
+    assert.ok(scenarios.rows.every(({ actual_trade_id }) => actual_trade_id !== null));
+
+    const [tradesAfterFinalize, portfolioAfterFinalize] = await Promise.all([
+      database.query(
+        `SELECT side, price, quantity, fees, slippage, realized_pnl, created_at
+         FROM public."AI_Crypto_Bot_Trades"
+         WHERE portfolio_id = $1 ORDER BY created_at, id`,
+        [portfolioId]
+      ),
+      database.query(
+        `SELECT available_balance, portfolio_value
+         FROM public."AI_Crypto_Bot_Portfolios" WHERE id = $1`,
+        [portfolioId]
+      )
+    ]);
+    assert.deepEqual(tradesAfterFinalize.rows, beforeFinalize.rows);
+    assert.deepEqual(portfolioAfterFinalize.rows, portfolioBeforeFinalize.rows);
+  } finally {
+    await database.close();
+  }
 });
 
 test("trade-history statistics aggregate stored SELL trades and remain scoped by RLS", async () => {
@@ -700,6 +1166,165 @@ test("paper-trading RPC is service-role-only and internal execution functions st
         )
       ),
       { code: "42501" }
+    );
+  } finally {
+    await database.close();
+  }
+});
+
+test("AI candle history RPC matches legacy candle selection across markets and all intervals", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Candles"
+        (symbol, interval, open, high, low, close, volume, timestamp)
+      SELECT markets.symbol,
+             intervals.interval,
+             series.n + markets.market_offset + intervals.interval_offset + 100,
+             series.n + markets.market_offset + intervals.interval_offset + 102,
+             series.n + markets.market_offset + intervals.interval_offset + 99,
+             series.n + markets.market_offset + intervals.interval_offset + 101,
+             (series.n + markets.market_offset + intervals.interval_offset + 100) * 10,
+             now() - (180 - series.n) * interval '1 minute'
+      FROM (VALUES ('BTC-EUR', 1000), ('ETH-EUR', 2000)) AS markets(symbol, market_offset)
+      CROSS JOIN (VALUES
+        ('1m', 0),
+        ('5m', 10000),
+        ('15m', 20000),
+        ('1h', 30000),
+        ('4h', 40000),
+        ('1d', 50000)
+      ) AS intervals(interval, interval_offset)
+      CROSS JOIN generate_series(1, 200) AS series(n)
+    `);
+
+    const symbols = ["BTC-EUR", "ETH-EUR"];
+    const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
+    const fields = 'symbol, "interval", open, high, low, close, volume, "timestamp"';
+    for (const interval of intervals) {
+      const legacy = await withRole(database, "service_role", () =>
+        database.query(
+          `SELECT ${fields}
+           FROM public."AI_Crypto_Bot_Candles"
+           WHERE symbol = ANY($1::text[]) AND "interval" = $2
+           ORDER BY symbol ASC, "timestamp" DESC`,
+          [symbols, interval]
+        )
+      );
+      const rpc = await withRole(database, "service_role", () =>
+        database.query(
+          `SELECT ${fields}
+           FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"($1::text[], $2)`,
+          [symbols, interval]
+        )
+      );
+
+      assert.equal(rpc.rows.length, 300);
+      for (const symbol of symbols) {
+        const expected = legacy.rows.filter((row) => row.symbol === symbol).slice(0, 150);
+        const actual = rpc.rows.filter((row) => row.symbol === symbol);
+        assert.equal(actual.length, 150);
+        assert.deepEqual(actual, expected);
+        assert.equal(new Set(actual.map((row) => new Date(row.timestamp).toISOString())).size, 150);
+        assert.ok(actual.every((row, index) => (
+          index === 0 || Date.parse(actual[index - 1].timestamp) >= Date.parse(row.timestamp)
+        )));
+      }
+      assert.notEqual(
+        rpc.rows.find((row) => row.symbol === symbols[0]).close,
+        rpc.rows.find((row) => row.symbol === symbols[1]).close
+      );
+    }
+
+    const emptyResult = await withRole(database, "service_role", () =>
+      database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+          ARRAY['SOL-EUR']::text[],
+          '1m'
+        )`
+      )
+    );
+    assert.deepEqual(emptyResult.rows, []);
+
+    async function callRpc(symbolExpression, intervalExpression = "'1m'") {
+      return withRole(database, "service_role", () =>
+        database.query(
+          `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+            ${symbolExpression},
+            ${intervalExpression}
+          )`
+        )
+      );
+    }
+
+    const invalidCalls = [
+      ["NULL::text[]", "'1m'"],
+      ["ARRAY[NULL]::text[]", "'1m'"],
+      ["ARRAY[]::text[]", "'1m'"],
+      ["ARRAY['  ']::text[]", "'1m'"],
+      ["ARRAY['BTC-EUR', 'BTC-EUR']::text[]", "'1m'"],
+      ["ARRAY['btc-eur']::text[]", "'1m'"],
+      ["ARRAY['BTC_USD']::text[]", "'1m'"],
+      ["ARRAY['UNKNOWN-EUR']::text[]", "'1m'"],
+      ["ARRAY['BTC-EUR', 'ETH-EUR', 'SOL-EUR', 'XRP-EUR', 'ADA-EUR']::text[]", "'1m'"],
+      ["ARRAY['BTC-EUR']::text[]", "'2m'"],
+      ["ARRAY['BTC-EUR']::text[]", "NULL::text"]
+    ];
+    for (const [symbolExpression, intervalExpression] of invalidCalls) {
+      await assert.rejects(callRpc(symbolExpression, intervalExpression), { code: "22023" });
+    }
+
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Watched_Markets"
+       SET enabled = false
+       WHERE symbol = 'SOL-EUR'`
+    );
+    await assert.rejects(callRpc("ARRAY['SOL-EUR']::text[]"), { code: "22023" });
+
+    assert.match(aiCandleHistoryMigration, /SECURITY INVOKER/i);
+    assert.match(aiCandleHistoryMigration, /SET search_path = ''/i);
+    assert.match(aiCandleHistoryMigration, /LIMIT 150/i);
+  } finally {
+    await database.close();
+  }
+});
+
+test("AI candle history RPC denies PUBLIC, anon, and authenticated and grants service_role", async () => {
+  const database = await createDatabase();
+  try {
+    const publicPrivilege = await database.query(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_proc AS proc
+        CROSS JOIN LATERAL pg_catalog.aclexplode(proc.proacl) AS acl_entry
+        WHERE proc.pronamespace = 'public'::regnamespace
+          AND proc.proname = 'AI_Crypto_Bot_Get_Latest_AI_Candles'
+          AND acl_entry.grantee = 0
+          AND acl_entry.privilege_type = 'EXECUTE'
+      ) AS public_can_execute
+    `);
+    assert.equal(publicPrivilege.rows[0].public_can_execute, false);
+
+    for (const role of ["anon", "authenticated"]) {
+      await assert.rejects(
+        withRole(database, role, () =>
+          database.query(
+            `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+              ARRAY['BTC-EUR']::text[],
+              '1m'
+            )`
+          )
+        ),
+        { code: "42501" }
+      );
+    }
+    await withRole(database, "service_role", () =>
+      database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Get_Latest_AI_Candles"(
+          ARRAY['BTC-EUR']::text[],
+          '1m'
+        )`
+      )
     );
   } finally {
     await database.close();

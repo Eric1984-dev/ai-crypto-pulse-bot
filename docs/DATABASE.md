@@ -2,7 +2,7 @@
 
 ## Phase 03 schema and Phase 08 runtime usage
 
-Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. Phase 06 consumes the existing market tables for public data ingestion; Phase 07 reads those tables and writes analysis decisions/status. Phase 08 uses the existing portfolio, position, trade, snapshot, decision, market-data, and status tables; it adds an auditable decision reference to trades and server-only functions/triggers, but no new table. Browser writes remain prohibited.
+Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. Phase 06 consumes the existing market tables for public data ingestion; Phase 07 reads those tables and writes analysis decisions/status. Phase 08 uses the existing portfolio, position, trade, snapshot, decision, market-data, and status tables; it adds an auditable decision reference to trades and server-only functions/triggers, but no new table. A separate prospective Shadow Exit Scenarios feature adds two prefixed tables for simulation state and meaningful events. Browser writes remain prohibited.
 
 The application is installed in an existing Supabase database. The migrations create only the prefixed CryptoPulse objects and reference Supabase's managed `auth.users` table. They deliberately do not use `IF NOT EXISTS`: a conflicting object must stop the migration for review instead of hiding a schema mismatch.
 
@@ -32,6 +32,8 @@ The objects live in the `public` schema. Supabase-managed objects such as `auth.
 | `AI_Crypto_Bot_Portfolio_Snapshots` | User-owned portfolio history, scoped through its portfolio. |
 | `AI_Crypto_Bot_Scanner_Events` | Server-managed scanner history; authenticated users may read it. |
 | `AI_Crypto_Bot_Emergency_State` | Server-managed emergency-state event history. |
+| `AI_Crypto_Bot_Shadow_Exit_Scenarios` | Per-position, per-rule durable state for hypothetical exit scenarios; no trading authority. |
+| `AI_Crypto_Bot_Shadow_Exit_Events` | Append-only activation, trigger, data-quality/failure, and actual-close comparison events. |
 
 ### User, portfolio, and trading tables
 
@@ -88,7 +90,7 @@ The migration backfills profiles for existing Auth users and installs prefixed t
 
 Phase 02's Auth client and HttpOnly cookie continue to protect page delivery. The Phase 04 dashboard API and Phase 05 Agent Status API separately verify the access token and preserve the caller's JWT when querying through PostgREST, allowing RLS to remain authoritative. Phase 06 market APIs likewise verify the session and use the caller JWT for RLS reads. The scheduled refresh and server-side writes use `SUPABASE_SERVICE_ROLE_KEY`, which must remain server-only.
 
-Phase 07's scheduler-protected AI analysis service reads enabled watched markets, stored market snapshots, candles, and the current agent status using the server-side service role. Candle reads are scoped to one market and one interval per request, with a bounded per-interval limit, so a PostgREST response cap cannot exclude other intervals. It inserts only generated rows into `AI_Crypto_Bot_AI_Decisions` and updates the singleton `AI_Crypto_Bot_Status` row, including `updated_at`. It does not write market data, candles, portfolios, positions, trades, or other tables. No migration or RLS policy change was required.
+Phase 07's scheduler-protected AI analysis service reads enabled watched markets, stored market snapshots, candles, and the current agent status using the server-side service role. The `20261105120000_ai_candle_history_rpc.sql` migration adds the read-only, service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles` function. It accepts one supported interval and one to four unique uppercase `*-EUR` symbols, and the SQL function itself rejects symbols that are not enabled in `AI_Crypto_Bot_Watched_Markets`. A disable between the caller's market read and RPC call therefore fails closed. The RPC uses the existing candle uniqueness index to return at most the newest 150 rows per symbol. The caller requests `count=exact` and validates `Content-Range`; missing or partial range metadata is treated as an invalid response rather than accepted as a complete result. With four markets, the endpoint can return 600 rows, so controlled rollout requires confirming that the intended hosted project's PostgREST `max_rows` is at least 600. The local `supabase/config.toml` does not set `max_rows`, and the hosted value/project identity remain unverified. The RPC adds no table or RLS policy. The analysis service inserts only generated rows into `AI_Crypto_Bot_AI_Decisions` and updates the singleton `AI_Crypto_Bot_Status` row, including `updated_at`; it does not write market data, candles, portfolios, positions, trades, or other tables.
 
 ## Row Level Security and grants
 
@@ -139,15 +141,27 @@ Migration files are stored in `supabase/migrations/` and run in timestamp order:
 2. `20261031190100_seed_initial_data.sql` inserts default markets and initial agent/emergency states.
 3. `20261101154600_phase08_paper_trading.sql` adds the trade-to-decision reference, provisions paper portfolios, and installs service-role-only valuation, risk, and execution functions.
 4. `20261102120000_trade_history_stats.sql` adds the authenticated, RLS-preserving aggregate function for all-time stored SELL-trade statistics.
+5. `20261102130000_phase11_realtime_publication.sql` adds the required existing-table membership to the Supabase Realtime publication.
+6. `20261102140000_paper_trading_confidence_experiment.sql` adjusts only the BUY-entry confidence threshold.
+7. `20261102150000_candle_checkpoint_rpc.sql` adds the service-role-only latest-candle checkpoint lookup.
+8. `20261105104400_shadow_exit_scenarios.sql` adds the shadow scenario/event tables, constraints, indexes, RLS policies, and a service-role-only evaluator. It does not modify the paper-trading executor or actual trading records.
 
 For local Supabase development, install the Supabase CLI and Docker, then run `supabase start` and `supabase db reset`. A linked project can apply reviewed pending migrations with `supabase db push`. Do not run remote migrations until the target database has been inspected for existing objects using this prefix and a backup/restore plan is available. The migrations fail on naming collisions rather than silently accepting an unknown schema.
 
 Migrations are append-only. Corrective schema changes must use a new reviewed migration; do not edit an already-applied migration or modify production tables outside the migration history. Restoring a prior database state requires the approved backup/restore procedure.
 
-The automated database suite executes all four SQL migrations and exercises them in an embedded PostgreSQL engine. It covers RLS ownership, role grants, Auth/profile/portfolio provisioning, seed idempotency, trade idempotency and aggregate-statistics isolation, real-decision execution, position limits, fees, slippage, cooldown, valuation, drawdowns, and emergency stop. It does not connect to a Supabase project. Local Supabase CLI reset/push and remote provider checks must be run separately where the CLI, Docker, and project access are available.
+The automated database suite executes the tracked SQL migrations and exercises them in an embedded PostgreSQL engine. It covers RLS ownership, role grants, Auth/profile/portfolio provisioning, seed idempotency, trade idempotency and aggregate-statistics isolation, real-decision execution, position limits, fees, slippage, cooldown, valuation, drawdowns, emergency stop, shadow-rule state/transition constraints, stale and invalid marks, retries, and actual-close finalization. It does not connect to a Supabase project. Local Supabase CLI reset/push and remote provider checks must be run separately where the CLI, Docker, and project access are available.
 
 ## Phase 08 paper-trading transaction
 
 `AI_Crypto_Bot_Run_Paper_Trading()` is the only public RPC in the paper-trading migration and is executable only by `service_role`. It serializes scheduled invocations with a transaction-scoped advisory lock, selects the newest stored decision for each enabled market, and applies it to each user portfolio inside the database. Per-portfolio row locks protect risk checks and balance changes; the unique trade idempotency key protects retries. Internal valuation and decision functions are not executable by `anon` or `authenticated`.
 
 The process reads `AI_Crypto_Bot_Market_Data` and `AI_Crypto_Bot_AI_Decisions`; stale or missing inputs are rejected. Buys debit simulated notional plus fees, store execution slippage, and open positions with fee-inclusive cost basis. Sells close all open positions for that market and credit proceeds after fees; realized P&L includes the entry cost basis and exit costs. Portfolio value is available balance plus the stored-market-price value of open positions. Every refresh/trade writes a real portfolio snapshot. No exchange order, account balance, private API, or live-trading permission is used.
+
+## Prospective shadow exit evaluation
+
+The `20261105104400_shadow_exit_scenarios.sql` migration adds seven pre-registered version `1.0.0` scenarios per tracked position: fixed take-profit at +5%, +10%, +15%, and +20%, and trailing stops armed at +5% with 5%, 10%, and 15% drawdown from the observed high-water mark. The evaluator uses only fresh, valid stored market marks; it does not use candle highs/lows or reconstruct history before tracking starts. Existing open positions begin tracking at their first fresh evaluation.
+
+`AI_Crypto_Bot_Shadow_Exit_Scenarios` stores compact per-rule state, including position/rule identity, tracking and evaluation times, last valid mark, trailing activation/high-water state, hypothetical trigger/fill estimate, data quality, and actual-close comparison. `AI_Crypto_Bot_Shadow_Exit_Events` stores meaningful append-only transitions rather than one event per dashboard poll. A separate advisory lock serializes evaluation; stable scenario/event idempotency keys protect retries. Authenticated users can read only rows visible through their owned portfolios. Only `service_role` can call the evaluator; the dashboard never writes shadow data.
+
+The modeled hypothetical sell applies adverse 0.10% exit slippage to the observed trigger mark and a 0.25% exit fee; net outcome includes the position's fee-inclusive entry basis. Historical bid/ask spread is unavailable, so this is not a guaranteed executable fill or a complete spread-aware simulation. These prospective scenarios are not risk controls and cannot execute SELLs or alter positions, trades, balances, or portfolio snapshots.

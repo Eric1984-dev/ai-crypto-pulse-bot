@@ -87,3 +87,7 @@ Existing positions remain visible and can still be closed by a fresh, stored SEL
 The Risk Manager always has final authority. No paper-trading control enables or routes to live trading; `ENABLE_LIVE_TRADING=false` remains the required environment default.
 
 The AI Agent may not bypass risk controls.
+
+## Shadow Exit Scenarios
+
+The dashboard's Shadow Exit Scenarios are prospective simulations, not risk controls or executable orders. Their experimental take-profit/trailing-stop rules cannot invoke the AI SELL path or paper-trading executor and do not change positions, actual trades, balances, risk checks, or portfolio metrics. They use only fresh stored market marks; stale or invalid marks cannot trigger a scenario. The observed mark-based fill estimate applies the configured 0.10% adverse slippage and 0.25% exit fee, but historical bid/ask spread is unavailable and the estimate is not a guaranteed fill. No shadow candidate is selected or recommended from these outcomes.

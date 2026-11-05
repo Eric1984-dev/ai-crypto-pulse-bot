@@ -114,6 +114,45 @@ function buildDashboardRows() {
   };
 }
 
+function buildShadowScenarioRow(positionId, overrides = {}) {
+  return {
+    id: "60000000-0000-4000-8000-000000000006",
+    position_id: positionId,
+    portfolio_id: "70000000-0000-4000-8000-000000000007",
+    symbol: "BTC-EUR",
+    position_opened_at: "2026-03-20T10:00:00.000Z",
+    amount: "0.01",
+    entry_price: "90000",
+    rule_id: "fixed_tp_5",
+    rule_version: "1.0.0",
+    parameters: {
+      targetGainPct: 5,
+      sellSlippageRate: 0.001,
+      exitFeeRate: 0.0025,
+      fillConvention: "observed-last-price"
+    },
+    status: "TRIGGERED",
+    data_quality_status: "FRESH",
+    tracking_started_at: "2026-03-20T10:01:00.000Z",
+    last_evaluated_at: "2026-03-20T10:20:00.000Z",
+    last_mark: "95000",
+    last_mark_captured_at: "2026-03-20T10:20:00.000Z",
+    high_water_mark: "95000",
+    trailing_armed: false,
+    activated_at: null,
+    triggered_at: "2026-03-20T10:20:00.000Z",
+    trigger_mark: "95000",
+    modeled_exit_price: "94905",
+    modeled_net_pnl: "41.45",
+    actual_trade_id: null,
+    actual_closed_at: null,
+    actual_close_price: null,
+    actual_net_pnl: null,
+    finalized_at: null,
+    ...overrides
+  };
+}
+
 function createSupabaseFetch({ rows = buildDashboardRows(), failTable = null, calls = [] } = {}) {
   return async (url, options) => {
     const parsedUrl = new URL(url);
@@ -172,6 +211,20 @@ function createSupabaseFetch({ rows = buildDashboardRows(), failTable = null, ca
           Date.parse(right.created_at) - Date.parse(left.created_at)
           || String(right.id).localeCompare(String(left.id))
         ));
+      }
+      if (query.has("limit")) {
+        responseRows = responseRows.slice(0, Number(query.get("limit")));
+      }
+      exactCount = responseRows.length;
+    } else if (table === "AI_Crypto_Bot_Shadow_Exit_Scenarios") {
+      const positionFilter = query.get("position_id");
+      const actualClosedFilter = query.get("actual_closed_at");
+      if (positionFilter && positionFilter.startsWith("in.(")) {
+        const ids = positionFilter.slice(4, -1).split(",");
+        responseRows = responseRows.filter((row) => ids.includes(row.position_id));
+      }
+      if (actualClosedFilter === "not.is.null") {
+        responseRows = responseRows.filter((row) => row.actual_closed_at !== null);
       }
       if (query.has("limit")) {
         responseRows = responseRows.slice(0, Number(query.get("limit")));
@@ -260,6 +313,82 @@ test("authenticated dashboard API returns real table data and computed summaries
   )));
   assert.deepEqual(data.portfolioSnapshots.map((snapshot) => snapshot.portfolio_value), ["1050", "1100"]);
   assert.equal(data.generatedAt, generatedAt.toISOString());
+});
+
+test("dashboard API serializes separate shadow outcomes without changing actual portfolio metrics", async () => {
+  const module = await dashboardDataModule;
+  const rows = buildDashboardRows();
+  const positionId = "30000000-0000-4000-8000-000000000003";
+  rows.AI_Crypto_Bot_Positions[0].id = positionId;
+  rows.AI_Crypto_Bot_Shadow_Exit_Scenarios = [
+    buildShadowScenarioRow(positionId)
+  ];
+  const handler = module.createHandler({
+    env: authEnv,
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({ rows }),
+    now: () => generatedAt,
+    logger: { error() {} }
+  });
+  const res = createResponse();
+
+  await handler({ method: "GET", headers: { cookie: sessionCookie } }, res);
+
+  assert.equal(res.statusCode, 200);
+  const { data } = JSON.parse(res.body);
+  assert.deepEqual(data.portfolio, {
+    count: 1,
+    portfolioValue: 1100,
+    totalPnl: 100,
+    realizedPnl: 20,
+    realizedPnlTradeCount: 2,
+    unrealizedPnl: 100,
+    availableBalance: 800,
+    dailyPnl: 20,
+    dailyPnlTradeCount: 2,
+    winRate: 50,
+    winRateTradeCount: 2
+  });
+  assert.equal(data.openPositions.items[0].unrealized_pnl, "100");
+  assert.equal(data.shadowExitScenarios.status, "AVAILABLE");
+  assert.equal(data.shadowExitScenarios.positions.length, 1);
+  assert.equal(data.shadowExitScenarios.positions[0].positionId, positionId);
+  assert.equal(data.shadowExitScenarios.positions[0].scenarios.length, 7);
+  const fixedFive = data.shadowExitScenarios.positions[0].scenarios.find(
+    ({ rule_id }) => rule_id === "fixed_tp_5"
+  );
+  assert.equal(fixedFive.status, "TRIGGERED_HYPOTHETICALLY");
+  assert.equal(fixedFive.modeled_net_pnl, 41.45);
+  assert.equal(fixedFive.rule_name, "Fixed take-profit · +5%");
+  assert.equal(
+    data.shadowExitScenarios.positions[0].scenarios
+      .find(({ rule_id }) => rule_id === "fixed_tp_10").status,
+    "WAITING_FOR_FRESH_DATA"
+  );
+});
+
+test("shadow data read failures are isolated from dashboard portfolio data", async () => {
+  const module = await dashboardDataModule;
+  const errors = [];
+  const handler = module.createHandler({
+    env: authEnv,
+    verify: async () => true,
+    fetchImpl: createSupabaseFetch({
+      failTable: "AI_Crypto_Bot_Shadow_Exit_Scenarios"
+    }),
+    now: () => generatedAt,
+    logger: { error: (...args) => errors.push(args) }
+  });
+  const res = createResponse();
+
+  await handler({ method: "GET", headers: { cookie: sessionCookie } }, res);
+
+  assert.equal(res.statusCode, 200);
+  const { data } = JSON.parse(res.body);
+  assert.equal(data.shadowExitScenarios.status, "UNAVAILABLE");
+  assert.equal(data.portfolio.portfolioValue, 1100);
+  assert.equal(data.portfolio.totalPnl, 100);
+  assert.deepEqual(errors, [["Shadow exit dashboard data unavailable.", "Error"]]);
 });
 
 test("dashboard API rejects anonymous requests without querying Supabase", async () => {
@@ -531,6 +660,9 @@ function createDashboardDocument() {
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"position-ai-status\"]",
+    "[data-shadow-exit-list]",
+    "[data-shadow-exit-status]",
+    "[data-shadow-exit-empty]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"position-ai-status\"]",
@@ -763,6 +895,99 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
+});
+
+test("dashboard displays prospective shadow rule outcomes separately from actual P&L", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const data = dashboard.emptyDashboardData();
+  data.portfolio.totalPnl = 12.34;
+  data.shadowExitScenarios = {
+    status: "AVAILABLE",
+    positions: [
+      {
+        positionId: "open-position",
+        symbol: "BTC-EUR",
+        positionOpenedAt: "2026-03-20T10:00:00.000Z",
+        isOpen: true,
+        scenarios: [
+          {
+            rule_id: "fixed_tp_5",
+            rule_name: "Fixed take-profit · +5%",
+            rule_version: "1.0.0",
+            parameters: { targetGainPct: 5 },
+            status: "TRIGGERED_HYPOTHETICALLY",
+            tracking_started_at: "2026-03-20T10:01:00.000Z",
+            triggered_at: "2026-03-20T10:20:00.000Z",
+            trigger_mark: 95,
+            modeled_net_pnl: 4.25,
+            data_quality_status: "FRESH"
+          },
+          {
+            rule_id: "trailing_stop_5",
+            rule_name: "Trailing stop · arm +5%, retrace 5%",
+            rule_version: "1.0.0",
+            parameters: { armGainPct: 5, drawdownPct: 5 },
+            status: "WAITING_FOR_FRESH_DATA",
+            tracking_started_at: "2026-03-20T10:01:00.000Z",
+            last_mark: 94,
+            last_mark_captured_at: "2026-03-20T10:19:00.000Z",
+            data_quality_status: "STALE"
+          }
+        ]
+      },
+      {
+        positionId: "closed-position",
+        symbol: "ETH-EUR",
+        positionOpenedAt: "2026-03-19T10:00:00.000Z",
+        isOpen: false,
+        actualClosedAt: "2026-03-20T09:30:00.000Z",
+        actualClosePrice: 2100,
+        actualNetPnl: -8.5,
+        scenarios: [{
+          rule_id: "fixed_tp_5",
+          rule_name: "Fixed take-profit · +5%",
+          rule_version: "1.0.0",
+          parameters: { targetGainPct: 5 },
+          status: "CLOSED_WITHOUT_TRIGGER",
+          tracking_started_at: "2026-03-19T10:01:00.000Z",
+          modeled_net_pnl: null,
+          data_quality_status: "FRESH"
+        }]
+      }
+    ]
+  };
+
+  dashboard.renderDashboard(data, dashboardDocument, null);
+
+  const positionCards = elements.get("[data-shadow-exit-list]")[0].children;
+  assert.equal(positionCards.length, 2);
+  assert.match(positionCards[0].textContent, /Fixed take-profit · \+5%.*Triggered hypothetically · no trade placed.*\+€4\.25/);
+  assert.match(positionCards[0].textContent, /last valid state retained.*€94\.00/);
+  assert.match(positionCards[1].textContent, /Actual close time.*Actual SELL execution price.*Actual net P&L.*-€8\.50/);
+  assert.equal(
+    positionCards[1].children[1].children[3].children[1].dataset.valueTone,
+    "negative"
+  );
+  assert.match(positionCards[1].textContent, /Closed without trigger/);
+  assert.equal(data.portfolio.totalPnl, 12.34);
+  assert.match(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, /12\.34/);
+});
+
+test("dashboard reports unavailable shadow data without hiding actual portfolio content", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  const data = dashboard.emptyDashboardData();
+  data.portfolio.portfolioValue = 10000;
+  data.shadowExitScenarios = { status: "UNAVAILABLE", positions: [] };
+
+  dashboard.renderDashboard(data, dashboardDocument, null);
+
+  assert.equal(elements.get("[data-shadow-exit-status]")[0].hidden, false);
+  assert.match(
+    elements.get("[data-shadow-exit-status]")[0].textContent,
+    /Actual trading and portfolio data are unaffected\./i
+  );
+  assert.equal(elements.get("[data-shadow-exit-list]")[0].hidden, true);
+  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /10,000/);
 });
 
 test("dashboard maps market-strength boundaries to the requested market views", () => {
@@ -1125,6 +1350,16 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
     /\.activity-strip\s*\{[^}]*background:\s*linear-gradient\(105deg,\s*#193a31,\s*var\(--positive-dark\)\s+58%,\s*#193a31\);/s
   );
   assert.match(styles, /\.activity-strip dt\s*\{[^}]*color:\s*var\(--positive\);/s);
+
+  const shadowSection = html.match(
+    /<section class="dashboard-panel shadow-exit-panel"[^>]*>([\s\S]*?)<\/section>/
+  );
+  assert.ok(shadowSection);
+  assert.match(shadowSection[0], /aria-labelledby="shadow-exits-heading"/);
+  assert.match(shadowSection[0], /data-shadow-exit-list[^>]*aria-label=/);
+  assert.match(shadowSection[0], /data-shadow-exit-status role="status" aria-live="polite"/);
+  assert.match(shadowSection[0], /simulations only[\s\S]*never place trades[\s\S]*historical candles and intrabar highs or lows are not used/i);
+  assert.match(styles, /\.shadow-exit-rule-list\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,/s);
 });
 
 test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {

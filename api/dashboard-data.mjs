@@ -17,6 +17,7 @@ import {
   isAnalyticsExportType
 } from "../lib/analytics-exports.mjs";
 import { generateRecommendations } from "../lib/recommendations.mjs";
+import { SHADOW_EXIT_RULES } from "../lib/shadow-exits.mjs";
 
 const {
   clearSessionCookie,
@@ -173,7 +174,7 @@ export function createHandler({
         });
         data = generateRecommendations(analytics);
       } else {
-        data = await loadDashboardData({ config, accessToken, fetchImpl, now });
+        data = await loadDashboardData({ config, accessToken, fetchImpl, now, logger });
       }
       sendJson(res, 200, { data });
     } catch (error) {
@@ -598,7 +599,7 @@ function readMarketStrength(indicators) {
     : toFiniteNumber(value, "market strength");
 }
 
-async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
+async function loadDashboardData({ config, accessToken, fetchImpl, now, logger }) {
   const currentTime = now();
   if (!(currentTime instanceof Date) || !Number.isFinite(currentTime.getTime())) {
     throw new DashboardDataError("Invalid dashboard clock.");
@@ -689,9 +690,16 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
     throw new DashboardDataError("Portfolio summary exceeded the supported page size.");
   }
   const positionDataArgs = { config, accessToken, fetchImpl };
-  const [marketDataBySymbol, latestAiDecisionsBySymbol] = await Promise.all([
+  const [marketDataBySymbol, latestAiDecisionsBySymbol, shadowExitScenarios] = await Promise.all([
     loadMarketDataForPositions(positionDataArgs, openPositions.rows),
-    loadLatestAiDecisionsForPositions(positionDataArgs, openPositions.rows)
+    loadLatestAiDecisionsForPositions(positionDataArgs, openPositions.rows),
+    loadShadowExitScenarios({
+      config,
+      accessToken,
+      fetchImpl,
+      openPositions: openPositions.rows,
+      logger
+    })
   ]);
   const positionItems = openPositions.rows.map((position) => (
     addCurrentMarketPrice(position, marketDataBySymbol)
@@ -734,6 +742,7 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
       count: openPositions.count,
       items: openPositionAiStatusItems
     },
+    shadowExitScenarios,
     recentTrades: {
       count: recentTrades.count,
       items: recentTradeItems
@@ -747,6 +756,233 @@ async function loadDashboardData({ config, accessToken, fetchImpl, now }) {
       items: aiDecisions.rows
     },
     portfolioSnapshots: portfolioSnapshots.rows.reverse()
+  };
+}
+
+async function loadShadowExitScenarios({
+  config,
+  accessToken,
+  fetchImpl,
+  openPositions,
+  logger
+}) {
+  const columns = [
+    "id",
+    "position_id",
+    "portfolio_id",
+    "symbol",
+    "position_opened_at",
+    "amount",
+    "entry_price",
+    "rule_id",
+    "rule_version",
+    "parameters",
+    "status",
+    "data_quality_status",
+    "tracking_started_at",
+    "last_evaluated_at",
+    "last_mark",
+    "last_mark_captured_at",
+    "high_water_mark",
+    "trailing_armed",
+    "activated_at",
+    "triggered_at",
+    "trigger_mark",
+    "modeled_exit_price",
+    "modeled_net_pnl",
+    "actual_trade_id",
+    "actual_closed_at",
+    "actual_close_price",
+    "actual_net_pnl",
+    "finalized_at"
+  ].join(",");
+  const validOpenPositions = openPositions.filter((position) => (
+    typeof position.id === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(position.id)
+  ));
+  const openPositionIds = validOpenPositions.map(({ id }) => id);
+
+  try {
+    const [openRows, closedRows] = await Promise.all([
+      openPositionIds.length
+        ? fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Shadow_Exit_Scenarios", {
+          select: columns,
+          position_id: `in.(${openPositionIds.join(",")})`,
+          order: "position_id.asc,rule_id.asc",
+          limit: String(openPositionIds.length * SHADOW_EXIT_RULES.length)
+        })
+        : Promise.resolve({ rows: [], count: 0 }),
+      fetchRows(config, accessToken, fetchImpl, "AI_Crypto_Bot_Shadow_Exit_Scenarios", {
+        select: columns,
+        actual_closed_at: "not.is.null",
+        order: "actual_closed_at.desc,position_id.asc,rule_id.asc",
+        limit: String(5 * SHADOW_EXIT_RULES.length)
+      })
+    ]);
+    const openScenarios = openRows.rows.map(normalizeShadowExitScenario);
+    const closedScenarios = closedRows.rows.map(normalizeShadowExitScenario);
+    const openByPosition = new Map();
+    const closedByPosition = new Map();
+    for (const scenario of openScenarios) {
+      addShadowScenario(openByPosition, scenario);
+    }
+    for (const scenario of closedScenarios) {
+      addShadowScenario(closedByPosition, scenario);
+    }
+
+    const positions = validOpenPositions.map((position) => ({
+      positionId: position.id,
+      symbol: position.symbol,
+      positionOpenedAt: position.created_at,
+      isOpen: true,
+      actualClosedAt: null,
+      actualClosePrice: null,
+      actualNetPnl: null,
+      scenarios: SHADOW_EXIT_RULES.map((rule) => (
+        openByPosition.get(position.id)?.get(rule.id)
+          || createUninitializedShadowScenario(position, rule)
+      ))
+    }));
+
+    for (const [positionId, scenariosByRule] of closedByPosition) {
+      const firstScenario = scenariosByRule.values().next().value;
+      if (!firstScenario) {
+        continue;
+      }
+      positions.push({
+        positionId,
+        symbol: firstScenario.symbol,
+        positionOpenedAt: firstScenario.position_opened_at,
+        isOpen: false,
+        actualClosedAt: firstScenario.actual_closed_at,
+        actualClosePrice: firstScenario.actual_close_price,
+        actualNetPnl: firstScenario.actual_net_pnl,
+        scenarios: SHADOW_EXIT_RULES
+          .map(({ id }) => scenariosByRule.get(id))
+          .filter(Boolean)
+      });
+    }
+
+    return { status: "AVAILABLE", positions };
+  } catch (error) {
+    if (logger && typeof logger.error === "function") {
+      logger.error(
+        "Shadow exit dashboard data unavailable.",
+        error instanceof Error ? error.name : "UnknownError"
+      );
+    }
+    return { status: "UNAVAILABLE", positions: [] };
+  }
+}
+
+function addShadowScenario(positionMap, scenario) {
+  let scenarios = positionMap.get(scenario.position_id);
+  if (!scenarios) {
+    scenarios = new Map();
+    positionMap.set(scenario.position_id, scenarios);
+  }
+  scenarios.set(scenario.rule_id, scenario);
+}
+
+function normalizeShadowExitScenario(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)
+    || typeof row.id !== "string"
+    || typeof row.position_id !== "string"
+    || typeof row.symbol !== "string"
+    || typeof row.rule_id !== "string"
+    || typeof row.rule_version !== "string"
+    || !SHADOW_EXIT_RULES.some((rule) => rule.id === row.rule_id)
+    || !row.parameters
+    || typeof row.parameters !== "object"
+    || Array.isArray(row.parameters)
+    || !["TRACKING", "TRIGGERED", "CLOSED_WITHOUT_TRIGGER"].includes(row.status)
+    || !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+      .includes(row.data_quality_status)) {
+    throw new DashboardDataError("Supabase returned invalid shadow exit scenario data.");
+  }
+
+  const status = row.status === "TRIGGERED"
+    ? "TRIGGERED_HYPOTHETICALLY"
+    : row.status === "CLOSED_WITHOUT_TRIGGER"
+      ? "CLOSED_WITHOUT_TRIGGER"
+      : row.data_quality_status === "FRESH"
+        ? "TRACKING"
+        : "WAITING_FOR_FRESH_DATA";
+
+  return {
+    id: row.id,
+    position_id: row.position_id,
+    portfolio_id: row.portfolio_id,
+    symbol: row.symbol,
+    position_opened_at: readShadowTimestamp(row.position_opened_at, "position opened"),
+    amount: readNullableNumber(row.amount, "shadow position amount"),
+    entry_price: readNullableNumber(row.entry_price, "shadow entry price"),
+    rule_id: row.rule_id,
+    rule_name: SHADOW_EXIT_RULES.find((rule) => rule.id === row.rule_id).name,
+    rule_version: row.rule_version,
+    parameters: row.parameters,
+    status,
+    data_quality_status: row.data_quality_status,
+    tracking_started_at: readShadowTimestamp(row.tracking_started_at, "tracking start"),
+    last_evaluated_at: readShadowTimestamp(row.last_evaluated_at, "last evaluation"),
+    last_mark: readNullableNumber(row.last_mark, "last mark"),
+    last_mark_captured_at: readShadowTimestamp(row.last_mark_captured_at, "last mark timestamp"),
+    high_water_mark: readNullableNumber(row.high_water_mark, "high-water mark"),
+    trailing_armed: row.trailing_armed === true,
+    activated_at: readShadowTimestamp(row.activated_at, "trailing activation"),
+    triggered_at: readShadowTimestamp(row.triggered_at, "hypothetical trigger"),
+    trigger_mark: readNullableNumber(row.trigger_mark, "hypothetical trigger mark"),
+    modeled_exit_price: readNullableNumber(row.modeled_exit_price, "modeled exit price"),
+    modeled_net_pnl: readNullableNumber(row.modeled_net_pnl, "modeled net P&L"),
+    actual_trade_id: row.actual_trade_id,
+    actual_closed_at: readShadowTimestamp(row.actual_closed_at, "actual close"),
+    actual_close_price: readNullableNumber(row.actual_close_price, "actual close price"),
+    actual_net_pnl: readNullableNumber(row.actual_net_pnl, "actual net P&L"),
+    finalized_at: readShadowTimestamp(row.finalized_at, "scenario finalization")
+  };
+}
+
+function readShadowTimestamp(value, field) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) {
+    throw new DashboardDataError(`Invalid shadow exit timestamp: ${field}.`);
+  }
+  return value;
+}
+
+function createUninitializedShadowScenario(position, rule) {
+  return {
+    id: null,
+    position_id: position.id,
+    portfolio_id: position.portfolio_id,
+    symbol: position.symbol,
+    position_opened_at: position.created_at,
+    amount: readNullableNumber(position.amount, "position amount"),
+    entry_price: readNullableNumber(position.entry_price, "position entry price"),
+    rule_id: rule.id,
+    rule_name: rule.name,
+    rule_version: rule.version,
+    parameters: rule.parameters,
+    status: "WAITING_FOR_FRESH_DATA",
+    data_quality_status: "AWAITING_FIRST_FRESH_MARK",
+    tracking_started_at: null,
+    last_evaluated_at: null,
+    last_mark: null,
+    last_mark_captured_at: null,
+    high_water_mark: null,
+    trailing_armed: false,
+    activated_at: null,
+    triggered_at: null,
+    trigger_mark: null,
+    modeled_exit_price: null,
+    modeled_net_pnl: null,
+    actual_trade_id: null,
+    actual_closed_at: null,
+    actual_close_price: null,
+    actual_net_pnl: null,
+    finalized_at: null
   };
 }
 

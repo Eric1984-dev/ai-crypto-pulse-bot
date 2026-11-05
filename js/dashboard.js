@@ -39,6 +39,7 @@
         winRate: null
       },
       openPositions: { count: 0, items: [] },
+      shadowExitScenarios: { status: "AVAILABLE", positions: [] },
       recentTrades: { count: 0, items: [] },
       watchedMarkets: { count: 0, items: [] },
       aiDecisions: { count: 0, items: [] },
@@ -154,6 +155,7 @@
       item.side
     ]);
     renderPositionAiStatus(documentRef, openPositionAiStatus.items);
+    renderShadowExitScenarios(documentRef, view.shadowExitScenarios);
     const chart = renderPortfolioChart(
       documentRef,
       view.portfolioSnapshots || [],
@@ -415,6 +417,194 @@
     if (emptyState) {
       emptyState.hidden = safeItems.length > 0;
     }
+  }
+
+  function renderShadowExitScenarios(documentRef, shadowExitScenarios) {
+    const list = documentRef.querySelector("[data-shadow-exit-list]");
+    const emptyState = documentRef.querySelector("[data-shadow-exit-empty]");
+    const statusMessage = documentRef.querySelector("[data-shadow-exit-status]");
+    const available = !shadowExitScenarios || shadowExitScenarios.status === "AVAILABLE";
+    const positions = available
+      && shadowExitScenarios
+      && Array.isArray(shadowExitScenarios.positions)
+      ? shadowExitScenarios.positions
+      : [];
+
+    if (statusMessage) {
+      statusMessage.hidden = available;
+      statusMessage.dataset.state = available ? "available" : "unavailable";
+      statusMessage.textContent = available
+        ? ""
+        : "Shadow scenario data is temporarily unavailable. Actual trading and portfolio data are unaffected.";
+    }
+
+    if (list) {
+      list.replaceChildren();
+      list.hidden = positions.length === 0;
+      for (const position of positions) {
+        const positionItem = documentRef.createElement("li");
+        const heading = documentRef.createElement("h3");
+        const positionDetails = documentRef.createElement("dl");
+        const ruleList = documentRef.createElement("ul");
+        positionItem.className = "shadow-exit-position";
+        heading.className = "shadow-exit-position-heading";
+        heading.textContent = `${position.symbol || "—"} · ${position.isOpen ? "Open position" : "Closed position"}`;
+        positionDetails.className = "shadow-exit-position-details";
+        ruleList.className = "shadow-exit-rule-list";
+        ruleList.setAttribute("aria-label", `Shadow exit rules for ${position.symbol || "position"}`);
+
+        appendShadowExitField(
+          documentRef,
+          positionDetails,
+          "positionOpenedAt",
+          "Position opened",
+          formatShadowTimestamp(position.positionOpenedAt)
+        );
+        if (!position.isOpen) {
+          appendShadowExitField(
+            documentRef,
+            positionDetails,
+            "actualClosedAt",
+            "Actual close time",
+            formatShadowTimestamp(position.actualClosedAt)
+          );
+          appendShadowExitField(
+            documentRef,
+            positionDetails,
+            "actualClosePrice",
+            "Actual SELL execution price",
+            formatters.formatPrice(position.actualClosePrice)
+          );
+          appendShadowExitField(
+            documentRef,
+            positionDetails,
+            "actualNetPnl",
+            "Actual net P&L",
+            formatters.formatSignedCurrency(position.actualNetPnl),
+            position.actualNetPnl
+          );
+        }
+
+        for (const scenario of Array.isArray(position.scenarios) ? position.scenarios : []) {
+          const ruleItem = documentRef.createElement("li");
+          const ruleHeading = documentRef.createElement("h4");
+          const parameters = documentRef.createElement("p");
+          const version = documentRef.createElement("p");
+          const details = documentRef.createElement("dl");
+          ruleItem.className = "shadow-exit-rule";
+          ruleHeading.className = "shadow-exit-rule-heading";
+          ruleHeading.textContent = scenario.rule_name || scenario.rule_id || "Shadow rule";
+          parameters.className = "shadow-exit-rule-parameters";
+          parameters.textContent = describeShadowRuleParameters(scenario);
+          version.className = "shadow-exit-rule-version";
+          version.textContent = `Rule version ${scenario.rule_version || "unknown"}`;
+          details.className = "shadow-exit-rule-details";
+
+          appendShadowExitField(
+            documentRef,
+            details,
+            "trackingStartedAt",
+            "Tracking started",
+            scenario.tracking_started_at
+              ? formatShadowTimestamp(scenario.tracking_started_at)
+              : "Awaiting first fresh mark"
+          );
+          appendShadowExitField(
+            documentRef,
+            details,
+            "status",
+            "Scenario status",
+            describeShadowScenarioStatus(scenario)
+          );
+          appendShadowExitField(
+            documentRef,
+            details,
+            "hypotheticalTrigger",
+            "Hypothetical trigger",
+            scenario.triggered_at
+              ? `${formatShadowTimestamp(scenario.triggered_at)} · observed mark ${formatters.formatPrice(scenario.trigger_mark)}`
+              : "No hypothetical trigger recorded"
+          );
+          appendShadowExitField(
+            documentRef,
+            details,
+            "estimatedNetPnl",
+            "Estimated net P&L",
+            formatters.formatSignedCurrency(scenario.modeled_net_pnl),
+            scenario.modeled_net_pnl
+          );
+          if (scenario.status === "WAITING_FOR_FRESH_DATA" && scenario.last_mark !== null) {
+            appendShadowExitField(
+              documentRef,
+              details,
+              "lastValidMark",
+              "Last valid mark",
+              `${formatters.formatPrice(scenario.last_mark)} · ${formatShadowTimestamp(scenario.last_mark_captured_at)}`
+            );
+          }
+
+          ruleItem.append(ruleHeading, parameters, version, details);
+          ruleList.append(ruleItem);
+        }
+
+        positionItem.append(heading, positionDetails, ruleList);
+        list.append(positionItem);
+      }
+    }
+
+    if (emptyState) {
+      emptyState.hidden = !available || positions.length > 0;
+      if (!available) {
+        emptyState.textContent = "";
+      } else {
+        emptyState.textContent = "No open positions or recently closed tracked scenarios.";
+      }
+    }
+  }
+
+  function appendShadowExitField(documentRef, details, name, label, text, toneValue) {
+    const field = documentRef.createElement("div");
+    const term = documentRef.createElement("dt");
+    const value = documentRef.createElement("dd");
+    field.className = "shadow-exit-field";
+    term.textContent = label;
+    value.dataset.shadowExitField = name;
+    value.textContent = text;
+    if (toneValue !== undefined) {
+      formatters.setValueTone(value, toneValue);
+    }
+    field.append(term, value);
+    details.append(field);
+  }
+
+  function describeShadowRuleParameters(scenario) {
+    const parameters = scenario.parameters || {};
+    if (typeof parameters.targetGainPct === "number") {
+      return `Target gain +${parameters.targetGainPct}%`;
+    }
+    if (typeof parameters.armGainPct === "number" && typeof parameters.drawdownPct === "number") {
+      return `Arm after +${parameters.armGainPct}% gain; trigger after a ${parameters.drawdownPct}% fall from the observed high-water mark`;
+    }
+    return "Rule parameters unavailable";
+  }
+
+  function describeShadowScenarioStatus(scenario) {
+    if (scenario.status === "TRIGGERED_HYPOTHETICALLY") {
+      return "Triggered hypothetically · no trade placed";
+    }
+    if (scenario.status === "CLOSED_WITHOUT_TRIGGER") {
+      return "Closed without trigger";
+    }
+    if (scenario.status === "WAITING_FOR_FRESH_DATA") {
+      return scenario.tracking_started_at
+        ? "Waiting for fresh data · last valid state retained"
+        : "Waiting for first fresh mark · tracking not started";
+    }
+    return "Tracking";
+  }
+
+  function formatShadowTimestamp(value) {
+    return value ? formatters.formatTimestamp(value) : "—";
   }
 
   function updateDashboardListViewport(list) {

@@ -47,6 +47,10 @@ function createHarness({
   failCandleInterval = null,
   failCandleIntervalStatus = 503,
   failCandleStorage = false,
+  failCandleSymbol = null,
+  failCandleWriteSymbols = [],
+  failBulkCandleStorage = false,
+  applyBulkCandleStorageBeforeFailure = false,
   providerDelayMs = 0
 } = {}) {
   const writes = [];
@@ -63,6 +67,24 @@ function createHarness({
     "AI_Crypto_Bot_Scanner_Events": []
   };
   const databaseCalls = [];
+  function persistRows(table, rows) {
+    for (const row of rows) {
+      const key = table === "AI_Crypto_Bot_Candles"
+        ? `${row.symbol}:${row.interval}:${row.timestamp}`
+        : row.symbol || row.event_type;
+      const existingIndex = database[table].findIndex((item) => {
+        const itemKey = table === "AI_Crypto_Bot_Candles"
+          ? `${item.symbol}:${item.interval}:${item.timestamp}`
+          : item.symbol || item.event_type;
+        return itemKey === key;
+      });
+      if (existingIndex < 0) {
+        database[table].push(row);
+      } else {
+        database[table][existingIndex] = { ...database[table][existingIndex], ...row };
+      }
+    }
+  }
   const fetchImpl = async (input, options = {}) => {
     const url = new URL(input);
     if (url.hostname === "api.bitvavo.com") {
@@ -94,6 +116,9 @@ function createHarness({
             await new Promise((resolve) => setTimeout(resolve, providerDelayMs));
           }
           if (failCandleInterval === url.searchParams.get("interval")) {
+            return jsonResponse({}, failCandleIntervalStatus);
+          }
+          if (failCandleSymbol && url.pathname === `/v2/${failCandleSymbol}/candles`) {
             return jsonResponse({}, failCandleIntervalStatus);
           }
           return jsonResponse(typeof candleRows === "function" ? candleRows(url) : candleRows);
@@ -149,22 +174,19 @@ function createHarness({
       if (table === "AI_Crypto_Bot_Candles" && failCandleStorage) {
         return jsonResponse({}, 500);
       }
-      for (const row of rows) {
-        const key = table === "AI_Crypto_Bot_Candles"
-          ? `${row.symbol}:${row.interval}:${row.timestamp}`
-          : row.symbol || row.event_type;
-        const existingIndex = database[table].findIndex((item) => {
-          const itemKey = table === "AI_Crypto_Bot_Candles"
-            ? `${item.symbol}:${item.interval}:${item.timestamp}`
-            : item.symbol || item.event_type;
-          return itemKey === key;
-        });
-        if (existingIndex < 0) {
-          database[table].push(row);
-        } else {
-          database[table][existingIndex] = { ...database[table][existingIndex], ...row };
+      if (table === "AI_Crypto_Bot_Candles") {
+        const hasFailingMarket = rows.some(({ symbol }) => failCandleWriteSymbols.includes(symbol));
+        if (failBulkCandleStorage && new Set(rows.map(({ symbol }) => symbol)).size > 1) {
+          if (applyBulkCandleStorageBeforeFailure) {
+            persistRows(table, rows);
+          }
+          return jsonResponse({}, 500);
+        }
+        if (hasFailingMarket) {
+          return jsonResponse({}, 500);
         }
       }
+      persistRows(table, rows);
       return jsonResponse({}, 201);
     }
     if (typeof failRead === "function") {
@@ -1015,6 +1037,198 @@ test("scheduled candle refresh uses bounded market batches and reuses the 60-sec
   assert.equal(second.cached, 2);
   assert.equal(second.unchanged, 0);
   assert.equal(providerCalls.filter((path) => path.includes("/candles")).length, candleCalls);
+});
+
+test("scheduled candle refresh bulk upserts validated candles once with per-market and aggregate metrics", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleWrites = harness.writes.filter(({ table }) => table === "AI_Crypto_Bot_Candles");
+  const candleWriteCalls = harness.databaseCalls.filter(({ table, options }) =>
+    table === "AI_Crypto_Bot_Candles" && options.method === "POST"
+  );
+
+  assert.equal(candleWrites.length, 1);
+  assert.equal(candleWrites[0].rows.length, 2);
+  assert.equal(candleWriteCalls[0].url.searchParams.get("on_conflict"), "symbol,interval,timestamp");
+  assert.equal(candleWriteCalls[0].options.headers.prefer, "resolution=merge-duplicates,return=minimal");
+  assert.equal(result.refreshed, 2);
+  assert.equal(result.failed, 0);
+  assert.equal(result.candlesUpserted, 2);
+  assert.equal(result.metrics.recordsProcessed.candles, 2);
+  assert.equal(result.metrics.candleWriteRequests, 1);
+  assert.equal(result.metrics.candleWriteFallbacks, 0);
+  assert.deepEqual(result.marketOutcomes, [
+    { symbol: "BTC-EUR", status: "refreshed", candlesUpserted: 1 },
+    { symbol: "ETH-EUR", status: "refreshed", candlesUpserted: 1 }
+  ]);
+});
+
+test("scheduled candle refresh persists successful markets when another provider request fails", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    failCandleSymbol: "ETH-EUR",
+    failCandleIntervalStatus: 404
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleWrites = harness.writes.filter(({ table }) => table === "AI_Crypto_Bot_Candles");
+
+  assert.equal(result.status, "partial");
+  assert.equal(result.attempted, 2);
+  assert.equal(result.refreshed, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(result.candlesUpserted, 1);
+  assert.equal(candleWrites.length, 1);
+  assert.deepEqual(candleWrites[0].rows.map(({ symbol }) => symbol), ["BTC-EUR"]);
+  assert.deepEqual(result.marketOutcomes.map(({ symbol, status }) => ({ symbol, status })), [
+    { symbol: "BTC-EUR", status: "refreshed" },
+    { symbol: "ETH-EUR", status: "failed" }
+  ]);
+});
+
+test("scheduled candle refresh retries a failed bulk upsert idempotently per market", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const intervalMs = 60_000;
+  const latestTimestamp = fixedNow.getTime() - 2 * intervalMs;
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candles: [{
+      symbol: "BTC-EUR",
+      interval: "1m",
+      open: 100,
+      high: 120,
+      low: 90,
+      close: 110,
+      volume: 25,
+      timestamp: new Date(latestTimestamp).toISOString()
+    }],
+    candleRows(url) {
+      if (url.pathname === "/v2/BTC-EUR/candles") {
+        const start = Number(url.searchParams.get("start"));
+        return [
+          [start, "100", "120", "90", "111", "25"],
+          [start + intervalMs, "100", "120", "90", "112", "25"]
+        ];
+      }
+      return [[fixedNow.getTime(), "50", "60", "45", "55", "12"]];
+    },
+    failBulkCandleStorage: true,
+    applyBulkCandleStorageBeforeFailure: true
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleWrites = harness.writes.filter(({ table }) => table === "AI_Crypto_Bot_Candles");
+  const bitcoinLatest = harness.database["AI_Crypto_Bot_Candles"].find(({ symbol, timestamp }) =>
+    symbol === "BTC-EUR" && timestamp === new Date(latestTimestamp).toISOString()
+  );
+
+  assert.equal(candleWrites.length, 3);
+  assert.equal(candleWrites[0].rows.length, 3);
+  assert.ok(harness.databaseCalls
+    .filter(({ table, options }) => table === "AI_Crypto_Bot_Candles" && options.method === "POST")
+    .every(({ options }) => options.headers.prefer === "resolution=merge-duplicates,return=minimal"));
+  assert.equal(result.status, "refreshed");
+  assert.equal(result.refreshed, 2);
+  assert.equal(result.failed, 0);
+  assert.equal(result.candlesUpserted, 3);
+  assert.equal(result.metrics.recordsProcessed.candles, 3);
+  assert.equal(result.metrics.candleWriteRequests, 3);
+  assert.equal(result.metrics.candleWriteFallbacks, 2);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].length, 3);
+  assert.equal(bitcoinLatest.close, 111);
+  assert.equal(harness.database["AI_Crypto_Bot_Candles"].filter(({ symbol, timestamp }) =>
+    symbol === "BTC-EUR" && timestamp === new Date(latestTimestamp).toISOString()
+  ).length, 1);
+});
+
+test("a persistently failing market does not block fallback writes for other markets", async () => {
+  const secondMarket = { market: "ETH-EUR", status: "trading", quote: "EUR" };
+  const secondWatchedMarket = { symbol: "ETH-EUR", enabled: true, priority: 2 };
+  const harness = createHarness({
+    watched: [watchedMarket, secondWatchedMarket],
+    catalog: [validMarket, secondMarket],
+    candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]],
+    failCandleWriteSymbols: ["ETH-EUR"]
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleWrites = harness.writes.filter(({ table }) => table === "AI_Crypto_Bot_Candles");
+
+  assert.equal(result.status, "storage-unavailable");
+  assert.equal(result.refreshed, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(result.candlesUpserted, 1);
+  assert.equal(result.metrics.recordsProcessed.candles, 1);
+  assert.equal(result.metrics.candleWriteRequests, 3);
+  assert.equal(result.metrics.candleWriteFallbacks, 2);
+  assert.deepEqual(candleWrites.slice(1).map(({ rows }) => rows[0].symbol).sort(), ["BTC-EUR", "ETH-EUR"]);
+  assert.deepEqual(result.marketOutcomes.map(({ symbol, status }) => ({ symbol, status })), [
+    { symbol: "BTC-EUR", status: "refreshed" },
+    { symbol: "ETH-EUR", status: "failed" }
+  ]);
+  assert.ok(harness.writes.some(({ table, rows }) =>
+    table === "AI_Crypto_Bot_Scanner_Events"
+      && rows.some(({ symbol, event_type }) =>
+        symbol === "ETH-EUR" && event_type === "CANDLE_DATA_STORAGE_ERROR"
+      )
+  ));
+});
+
+test("scheduled candle refresh excludes invalid provider candles from the bulk payload", async () => {
+  const harness = createHarness({
+    candleRows: [
+      [fixedNow.getTime(), "100", "120", "90", "110", "25"],
+      [fixedNow.getTime() + 60_000, "100", "120", "90", "130", "25"],
+      [fixedNow.getTime() + 120_000, "100", "120", "90", "110", "-1"]
+    ]
+  });
+
+  const result = await harness.service.refreshScheduledCandleBatch({
+    config,
+    serviceRoleKey,
+    interval: "1m",
+    batch: 0
+  });
+  const candleWrite = harness.writes.find(({ table }) => table === "AI_Crypto_Bot_Candles");
+
+  assert.equal(result.refreshed, 1);
+  assert.equal(result.candlesUpserted, 1);
+  assert.equal(candleWrite.rows.length, 1);
+  assert.equal(candleWrite.rows[0].close, 110);
+  assert.equal(result.marketOutcomes[0].candlesUpserted, 1);
 });
 
 test("scheduled candle checkpoint RPC preserves latest-candle parity with the previous lookup", async () => {

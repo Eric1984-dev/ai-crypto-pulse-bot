@@ -10,6 +10,7 @@ const config = {
 };
 const serviceRoleKey = "test-service-role-key";
 const activeMarket = { symbol: "BTC-EUR", enabled: true, priority: 1 };
+const latestCandlesRpc = "AI_Crypto_Bot_Get_Latest_AI_Candles";
 
 function createCandles(symbol, interval, count = 60, direction = "up", now = fixedNow) {
   return Array.from({ length: count }, (_, index) => {
@@ -56,10 +57,50 @@ function setLatestCandleAge(candles, ageMs) {
   }));
 }
 
-function jsonResponse(body, status = 200) {
+function simulateLegacyCandleReads(candles, symbols, interval) {
+  const marketCounts = new Map(symbols.map((symbol) => [symbol, 0]));
+  let activeSymbols = [...symbols];
+  let offset = 0;
+  let requests = 0;
+  let returnedRows = 0;
+
+  while (activeSymbols.length) {
+    requests += 1;
+    const rows = candles
+      .filter((candle) => activeSymbols.includes(candle.symbol) && candle.interval === interval)
+      .sort((left, right) => left.symbol.localeCompare(right.symbol)
+        || Date.parse(right.timestamp) - Date.parse(left.timestamp))
+      .slice(offset, offset + 1000);
+    returnedRows += rows.length;
+    for (const row of rows) {
+      if (marketCounts.get(row.symbol) < 150) {
+        marketCounts.set(row.symbol, marketCounts.get(row.symbol) + 1);
+      }
+    }
+
+    if (rows.length < 1000) {
+      break;
+    }
+    const incompleteSymbols = activeSymbols.filter((symbol) => marketCounts.get(symbol) < 150);
+    if (incompleteSymbols.length === activeSymbols.length) {
+      offset += rows.length;
+    } else {
+      activeSymbols = incompleteSymbols;
+      offset = activeSymbols.reduce((total, symbol) => total + marketCounts.get(symbol), 0);
+    }
+  }
+  return { requests, returnedRows };
+}
+
+function jsonResponse(body, status = 200, headers = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: {
+      get(name) {
+        return headers[name.toLowerCase()] || null;
+      }
+    },
     async json() {
       return body;
     }
@@ -71,9 +112,10 @@ function createEngineHarness({
   markets = [activeMarket],
   marketData = [createSnapshot()],
   candles = buildCandles(),
-  postgrestMaxRows = 1000,
   failReadTable = null,
   candleDelayMs = 0,
+  postgrestMaxRows = Number.POSITIVE_INFINITY,
+  includeCandleContentRange = true,
   logger = { info() {}, error() {} }
 } = {}) {
   let statusRow = { status };
@@ -85,9 +127,16 @@ function createEngineHarness({
     const url = new URL(input);
     const table = decodeURIComponent(url.pathname.split("/").pop());
     const method = options.method || "GET";
-    requests.push({ table, method, url: url.toString() });
+    const request = {
+      table,
+      method,
+      url: url.toString(),
+      body: options.body,
+      headers: options.headers
+    };
+    requests.push(request);
 
-    const isCandleRead = method === "GET" && table === "AI_Crypto_Bot_Candles";
+    const isCandleRead = method === "POST" && table === latestCandlesRpc;
     if (isCandleRead) {
       activeCandleRequests += 1;
       maxActiveCandleRequests = Math.max(maxActiveCandleRequests, activeCandleRequests);
@@ -97,10 +146,28 @@ function createEngineHarness({
     }
 
     try {
+      if (table === failReadTable) {
+        return jsonResponse({ message: "provider detail must not be exposed" }, 503);
+      }
+      if (method === "POST" && table === latestCandlesRpc) {
+        const { p_symbols: symbols, p_interval: interval } = JSON.parse(options.body);
+        const rows = symbols.flatMap((symbol) => candles
+          .filter((candle) => candle.symbol === symbol && candle.interval === interval)
+          .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+          .slice(0, 150));
+        const responseRows = rows.slice(0, postgrestMaxRows);
+        request.responseRows = responseRows.length;
+        const headers = includeCandleContentRange
+          ? {
+            "content-range": rows.length === 0
+              ? "*/0"
+              : `0-${responseRows.length - 1}/${rows.length}`
+          }
+          : {};
+        const status = responseRows.length < rows.length ? 206 : 200;
+        return jsonResponse(responseRows, status, headers);
+      }
       if (method === "GET") {
-        if (table === failReadTable) {
-          return jsonResponse({ message: "provider detail must not be exposed" }, 503);
-        }
         if (table === "AI_Crypto_Bot_Status") {
           return jsonResponse([statusRow]);
         }
@@ -109,46 +176,6 @@ function createEngineHarness({
         }
         if (table === "AI_Crypto_Bot_Market_Data") {
           return jsonResponse(marketData);
-        }
-        if (table === "AI_Crypto_Bot_Candles") {
-          const symbolFilter = url.searchParams.get("symbol");
-          const symbols = symbolFilter?.startsWith("eq.")
-            ? [symbolFilter.slice(3)]
-            : symbolFilter?.startsWith("in.(")
-              ? symbolFilter.slice(4, -1).split(",")
-              : null;
-          const intervalFilter = url.searchParams.get("interval");
-          const intervals = intervalFilter?.startsWith("eq.")
-            ? [intervalFilter.slice(3)]
-            : intervalFilter?.startsWith("in.(")
-              ? intervalFilter.slice(4, -1).split(",")
-              : null;
-          let rows = candles.filter((candle) =>
-            (!symbols || symbols.includes(candle.symbol))
-            && (!intervals || intervals.includes(candle.interval))
-          );
-          const order = url.searchParams.get("order");
-          if (order === "symbol.asc,timestamp.desc") {
-            rows.sort((left, right) => left.symbol.localeCompare(right.symbol)
-              || Date.parse(right.timestamp) - Date.parse(left.timestamp));
-          } else if (order === "interval.asc,timestamp.desc") {
-            rows.sort((left, right) => left.interval < right.interval
-              ? -1
-              : left.interval > right.interval
-                ? 1
-                : Date.parse(right.timestamp) - Date.parse(left.timestamp));
-          } else if (order === "timestamp.desc") {
-            rows.sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
-          }
-          const requestLimit = Number(url.searchParams.get("limit"));
-          if (Number.isSafeInteger(requestLimit) && requestLimit >= 0) {
-            const requestOffset = Number(url.searchParams.get("offset")) || 0;
-            rows = rows.slice(
-              requestOffset,
-              requestOffset + Math.min(requestLimit, postgrestMaxRows)
-            );
-          }
-          return jsonResponse(rows);
         }
         throw new Error(`Unexpected read table: ${table}`);
       }
@@ -445,7 +472,7 @@ test("insufficient fresh timeframes wait with the stale candle reason", () => {
   assert.deepEqual(result.indicators.dataQuality.staleCandleIntervals, ["15m"]);
 });
 
-test("analysis batches candle reads per interval and preserves each market's candle history", async () => {
+test("AI candle RPC reads every interval without PostgREST global-row truncation", async () => {
   const candleCounts = {
     "1m": 549,
     "5m": 510,
@@ -457,13 +484,12 @@ test("analysis batches candle reads per interval and preserves each market's can
   const candles = Object.entries(candleCounts).flatMap(([interval, count]) =>
     createCandles("BTC-EUR", interval, count)
   );
-  const harness = createEngineHarness({ candles, postgrestMaxRows: 1000 });
+  const harness = createEngineHarness({ candles });
   await harness.service.runAnalysis({ config, serviceRoleKey });
 
   const decision = harness.writes.find(({ table }) => table === "AI_Crypto_Bot_AI_Decisions").body[0];
   const candleRequests = harness.requests
-    .filter(({ table }) => table === "AI_Crypto_Bot_Candles")
-    .map(({ url }) => new URL(url));
+    .filter(({ table }) => table === latestCandlesRpc);
 
   assert.deepEqual(decision.indicators.dataQuality.candleIntervalsAvailable, [
     "1m", "5m", "15m", "1h", "4h", "1d"
@@ -473,17 +499,68 @@ test("analysis batches candle reads per interval and preserves each market's can
   }
   assert.equal(candleRequests.length, 6);
   assert.deepEqual(
-    candleRequests.map((url) => url.searchParams.get("interval")).sort(),
-    Object.keys(candleCounts).map((interval) => `eq.${interval}`).sort()
+    candleRequests.map(({ body }) => JSON.parse(body).p_interval).sort(),
+    Object.keys(candleCounts).sort()
   );
-  assert.ok(candleRequests.every((url) =>
-    url.searchParams.get("limit") === "1000"
-      && url.searchParams.get("order") === "symbol.asc,timestamp.desc"
-      && url.searchParams.get("symbol") === "in.(BTC-EUR)"
-  ));
+  assert.ok(candleRequests.every(({ body }) => (
+    JSON.stringify(JSON.parse(body).p_symbols) === JSON.stringify(["BTC-EUR"])
+  )));
+  assert.equal(candleRequests.reduce((total, { responseRows }) => total + responseRows, 0), 900);
+  const legacyMetrics = Object.keys(candleCounts).reduce((total, interval) => {
+    const intervalMetrics = simulateLegacyCandleReads(candles, ["BTC-EUR"], interval);
+    return {
+      requests: total.requests + intervalMetrics.requests,
+      returnedRows: total.returnedRows + intervalMetrics.returnedRows
+    };
+  }, { requests: 0, returnedRows: 0 });
+  assert.deepEqual(legacyMetrics, { requests: 6, returnedRows: 3078 });
+  assert.equal(candleRequests.length, 6);
 });
 
-test("analysis paginates batched candle reads with a 1000-row page and retains 150 latest rows per market", async () => {
+test("AI candle RPC requests exact counts and rejects incomplete or uncounted responses", async () => {
+  const markets = ["ALPHA-EUR", "BETA-EUR", "GAMMA-EUR", "DELTA-EUR"].map((symbol, index) => ({
+    symbol,
+    enabled: true,
+    priority: index + 1
+  }));
+  const marketData = markets.map((market) => ({
+    ...createSnapshot(),
+    symbol: market.symbol
+  }));
+  const candles = markets.flatMap(({ symbol }) => createCandles(symbol, "1m", 150));
+  const truncatedHarness = createEngineHarness({
+    markets,
+    marketData,
+    candles,
+    postgrestMaxRows: 500
+  });
+
+  await assert.rejects(
+    truncatedHarness.service.runAnalysis({ config, serviceRoleKey }),
+    { code: "INVALID_DATABASE_RESPONSE" }
+  );
+  const candleRequest = truncatedHarness.requests.find(({ table }) => table === latestCandlesRpc);
+  assert.equal(candleRequest.headers.prefer, "count=exact");
+  assert.equal(candleRequest.responseRows, 500);
+  assert.equal(
+    truncatedHarness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"),
+    false
+  );
+
+  const uncountedHarness = createEngineHarness({
+    includeCandleContentRange: false
+  });
+  await assert.rejects(
+    uncountedHarness.service.runAnalysis({ config, serviceRoleKey }),
+    { code: "INVALID_DATABASE_RESPONSE" }
+  );
+  assert.equal(
+    uncountedHarness.writes.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"),
+    false
+  );
+});
+
+test("AI candle RPC returns no more than 150 latest rows for each requested market", async () => {
   const markets = ["ALPHA-EUR", "BETA-EUR", "GAMMA-EUR", "DELTA-EUR"].map((symbol, index) => ({
     symbol,
     enabled: true,
@@ -510,30 +587,28 @@ test("analysis paginates batched candle reads with a 1000-row page and retains 1
 
   const decisions = harness.writes
     .find(({ table }) => table === "AI_Crypto_Bot_AI_Decisions").body;
-  const candleRequests = harness.requests
-    .filter(({ table, url }) => table === "AI_Crypto_Bot_Candles"
-      && new URL(url).searchParams.get("interval") === "eq.1m")
-    .map(({ url }) => new URL(url));
+  const candleRequests = harness.requests.filter(({ table, body }) => (
+    table === latestCandlesRpc && JSON.parse(body).p_interval === "1m"
+  ));
 
-  assert.equal(candleRequests.length, 2);
+  assert.equal(candleRequests.length, 1);
+  assert.deepEqual(JSON.parse(candleRequests[0].body), {
+    p_symbols: ["ALPHA-EUR", "BETA-EUR", "GAMMA-EUR", "DELTA-EUR"],
+    p_interval: "1m"
+  });
+  assert.equal(candleRequests[0].responseRows, 600);
   assert.deepEqual(
-    candleRequests.map((url) => url.searchParams.get("offset")),
-    ["0", "100"]
+    simulateLegacyCandleReads(candles, markets.map(({ symbol }) => symbol), "1m"),
+    { requests: 2, returnedRows: 1200 }
   );
-  assert.ok(candleRequests.every((url) => url.searchParams.get("limit") === "1000"));
-  assert.deepEqual(
-    candleRequests.map((url) => url.searchParams.get("symbol")),
-    [
-      "in.(ALPHA-EUR,BETA-EUR,GAMMA-EUR,DELTA-EUR)",
-      "in.(GAMMA-EUR)"
-    ]
-  );
+  assert.equal(decisions.reduce((total, { indicators }) =>
+    total + indicators.timeframes["1m"].candleCount, 0), 600);
   assert.deepEqual(
     decisions.map(({ indicators }) => indicators.timeframes["1m"].candleCount),
     [150, 150, 150, 150]
   );
   assert.equal(logEntries[0].fields.candleReads, 24);
-  assert.equal(logEntries[0].fields.candleQueries, 7);
+  assert.equal(logEntries[0].fields.candleQueries, 6);
 });
 
 test("analysis caps each batched market at its latest 150 candles", async () => {
@@ -573,20 +648,25 @@ test("analysis caps each batched market at its latest 150 candles", async () => 
     });
   });
   const candleRequests = harness.requests
-    .filter(({ table, url }) => table === "AI_Crypto_Bot_Candles"
-      && new URL(url).searchParams.get("interval") === "eq.1m")
-    .map(({ url }) => new URL(url));
+    .filter(({ table, body }) => table === latestCandlesRpc
+      && JSON.parse(body).p_interval === "1m");
 
-  assert.equal(candleRequests.length, 2);
-  assert.ok(candleRequests.every((url) => url.searchParams.get("limit") === "1000"));
+  assert.equal(candleRequests.length, 1);
+  assert.deepEqual(JSON.parse(candleRequests[0].body), {
+    p_symbols: ["ALPHA-EUR", "BETA-EUR", "DELTA-EUR", "GAMMA-EUR"],
+    p_interval: "1m"
+  });
+  assert.equal(candleRequests[0].responseRows, 220);
   assert.deepEqual(
-    candleRequests.map((url) => url.searchParams.get("symbol")),
-    ["in.(ALPHA-EUR,BETA-EUR,DELTA-EUR,GAMMA-EUR)", "in.(BETA-EUR,DELTA-EUR,GAMMA-EUR)"]
+    simulateLegacyCandleReads(candles, markets.map(({ symbol }) => symbol), "1m"),
+    { requests: 2, returnedRows: 1070 }
   );
   assert.deepEqual(
     decisions.map(({ indicators }) => indicators.timeframes["1m"].candleCount),
     [150, 20, 10, 40]
   );
+  assert.equal(decisions.reduce((total, { indicators }) =>
+    total + indicators.timeframes["1m"].candleCount, 0), 220);
   assert.equal(JSON.stringify(decisions), JSON.stringify(expectedDecisions));
 });
 
@@ -676,11 +756,11 @@ test("analysis uses bounded candle workers and preserves every market decision",
     now: fixedNow
   }));
   const candleRequests = harness.requests.filter(({ table }) =>
-    table === "AI_Crypto_Bot_Candles"
+    table === latestCandlesRpc
   );
-  const uniqueCandleQueries = new Set(candleRequests.map(({ url }) => {
-    const query = new URL(url).searchParams;
-    return `${query.get("symbol")}|${query.get("interval")}`;
+  const uniqueCandleQueries = new Set(candleRequests.map(({ body }) => {
+    const request = JSON.parse(body);
+    return `${request.p_symbols.join(",")}|${request.p_interval}`;
   }));
 
   assert.equal(result.analyzedMarkets, markets.length);

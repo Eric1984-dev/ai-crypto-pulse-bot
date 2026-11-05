@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createPaperTradingHandler } from "../api/paper-trading.mjs";
 import { createPaperTradingService, PaperTradingError } from "../lib/paper-trading.mjs";
+import { SHADOW_EXIT_RULES, SHADOW_EXIT_RULE_VERSION } from "../lib/shadow-exits.mjs";
 
 const serviceEnv = {
   SUPABASE_URL: "https://project.supabase.co",
@@ -18,6 +19,42 @@ const runResult = {
   duplicates: 3,
   skipped: 6
 };
+const shadowResult = {
+  status: "COMPLETED",
+  positionsEvaluated: 0,
+  scenariosCreated: 0,
+  scenariosUpdated: 0,
+  scenariosTriggered: 0,
+  positionsFinalized: 0,
+  waitingForFreshData: 0
+};
+
+test("shadow rule registry is the fixed, versioned experimental grid", () => {
+  assert.equal(SHADOW_EXIT_RULE_VERSION, "1.0.0");
+  assert.deepEqual(SHADOW_EXIT_RULES.map(({ id }) => id), [
+    "fixed_tp_5",
+    "fixed_tp_10",
+    "fixed_tp_15",
+    "fixed_tp_20",
+    "trailing_stop_5",
+    "trailing_stop_10",
+    "trailing_stop_15"
+  ]);
+  assert.deepEqual(
+    SHADOW_EXIT_RULES.slice(0, 4).map(({ parameters }) => parameters.targetGainPct),
+    [5, 10, 15, 20]
+  );
+  assert.deepEqual(
+    SHADOW_EXIT_RULES.slice(4).map(({ parameters }) => [
+      parameters.armGainPct,
+      parameters.drawdownPct
+    ]),
+    [[5, 5], [5, 10], [5, 15]]
+  );
+  assert.ok(SHADOW_EXIT_RULES.every(({ parameters }) => (
+    parameters.sellSlippageRate === 0.001 && parameters.exitFeeRate === 0.0025
+  )));
+});
 
 function createResponse() {
   return {
@@ -33,12 +70,17 @@ function createResponse() {
   };
 }
 
-test("paper trading service invokes only the protected Supabase database RPC", async () => {
+test("paper trading service brackets executed trades with the separate protected shadow RPC", async () => {
   const calls = [];
   const service = createPaperTradingService({
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
-      return { ok: true, json: async () => runResult };
+      return {
+        ok: true,
+        json: async () => url.endsWith("AI_Crypto_Bot_Run_Paper_Trading")
+          ? runResult
+          : shadowResult
+      };
     }
   });
 
@@ -48,23 +90,57 @@ test("paper trading service invokes only the protected Supabase database RPC", a
   });
 
   assert.deepEqual(result, runResult);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 3);
   assert.equal(
-    calls[0].url,
+    calls[1].url,
     "https://project.supabase.co/rest/v1/rpc/AI_Crypto_Bot_Run_Paper_Trading"
   );
+  assert.equal(
+    calls[0].url,
+    "https://project.supabase.co/rest/v1/rpc/AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"
+  );
+  assert.equal(calls[2].url, calls[0].url);
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[1].options.headers.authorization, `Bearer ${serviceEnv.SUPABASE_SERVICE_ROLE_KEY}`);
+  assert.equal(calls[1].options.headers.apikey, serviceEnv.SUPABASE_SERVICE_ROLE_KEY);
+  assert.equal(calls[1].options.body, "{}");
+  assert.equal(calls[1].options.cache, "no-store");
+  assert.ok(calls[1].options.signal);
   assert.equal(calls[0].options.method, "POST");
-  assert.equal(calls[0].options.headers.authorization, `Bearer ${serviceEnv.SUPABASE_SERVICE_ROLE_KEY}`);
-  assert.equal(calls[0].options.headers.apikey, serviceEnv.SUPABASE_SERVICE_ROLE_KEY);
   assert.equal(calls[0].options.body, "{}");
-  assert.equal(calls[0].options.cache, "no-store");
-  assert.ok(calls[0].options.signal);
-  assert.doesNotMatch(calls[0].url, /bitvavo|order|balance/i);
+  assert.doesNotMatch(calls[0].url + calls[1].url, /bitvavo|order|balance/i);
+});
+
+test("shadow evaluation failures are logged separately and do not fail a completed paper run", async () => {
+  const errors = [];
+  let shadowCalls = 0;
+  const service = createPaperTradingService({
+    fetchImpl: async (url) => {
+      if (url.endsWith("AI_Crypto_Bot_Run_Paper_Trading")) {
+        return { ok: true, json: async () => runResult };
+      }
+      shadowCalls += 1;
+      return shadowCalls === 1
+        ? { ok: false, status: 500 }
+        : { ok: true, json: async () => shadowResult };
+    },
+    logger: { error: (...args) => errors.push(args) }
+  });
+
+  const result = await service.runPaperTrading({
+    config: { supabaseUrl: serviceEnv.SUPABASE_URL },
+    serviceRoleKey: serviceEnv.SUPABASE_SERVICE_ROLE_KEY
+  });
+
+  assert.deepEqual(result, runResult);
+  assert.deepEqual(errors, [["Shadow exit evaluation failed.", "SHADOW_EXIT_DATABASE_FAILED"]]);
+  assert.equal(shadowCalls, 2);
 });
 
 test("paper trading service rejects unavailable databases and malformed RPC results", async () => {
   const unavailable = createPaperTradingService({
-    fetchImpl: async () => ({ ok: false, status: 500 })
+    fetchImpl: async () => ({ ok: false, status: 500 }),
+    logger: { error() {} }
   });
   await assert.rejects(
     unavailable.runPaperTrading({
@@ -75,7 +151,8 @@ test("paper trading service rejects unavailable databases and malformed RPC resu
   );
 
   const malformed = createPaperTradingService({
-    fetchImpl: async () => ({ ok: true, json: async () => ({ status: "COMPLETED" }) })
+    fetchImpl: async () => ({ ok: true, json: async () => ({ status: "COMPLETED" }) }),
+    logger: { error() {} }
   });
   await assert.rejects(
     malformed.runPaperTrading({

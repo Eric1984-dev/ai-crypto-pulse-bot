@@ -36,7 +36,7 @@ POST /api/ai-analysis
 
 It requires `Authorization: Bearer <CRON_SECRET>` and the Supabase server environment (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`). Configure an external scheduler using the deployed URL and `POST`; do not place the secret in the URL or query string. There is no Vercel Cron declaration, so the endpoint remains compatible with Vercel Hobby.
 
-The endpoint skips runs when the existing agent status is `STOPPED` or `ANALYZING`, and stores decisions only in the existing AI decision table. It does not execute trades or modify portfolios. Candle queries batch up to four markets per interval, use a 1,000-row PostgREST page size, and retain each market's latest 150 candles per interval. A bounded worker pool allows up to 24 requests at once. Each completed run logs logical market/interval `candleReads` separately from actual paginated REST `candleQueries`, alongside analyzed markets, BUY/SELL/HOLD/WAIT counts, failures, runtime, and stage timings; failures retain error-level diagnostics and runtime. Scheduler cadence is an operator choice; monitor HTTP responses and `AI_Crypto_Bot_Status` after configuring it.
+The endpoint skips runs when the existing agent status is `STOPPED` or `ANALYZING`, and stores decisions only in the existing AI decision table. It does not execute trades or modify portfolios. Candle reads use the service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles` RPC, batching up to four enabled markets per interval and returning at most the newest 150 rows for each market. The six supported intervals remain independent, so per-interval freshness and indicator behavior are unchanged. A bounded worker pool allows up to 24 RPC calls at once. Each completed run logs logical market/interval `candleReads` separately from actual RPC `candleQueries`, alongside analyzed markets, BUY/SELL/HOLD/WAIT counts, failures, runtime, and stage timings; failures retain error-level diagnostics and runtime. Scheduler cadence is an operator choice; monitor HTTP responses and `AI_Crypto_Bot_Status` after configuring it.
 
 ## Phase 08 paper-trading execution
 
@@ -52,6 +52,8 @@ Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRO
 Schedule the paper-trading request only after the AI-analysis request completes; do not run them concurrently. Use the same cadence as AI analysis (five minutes is a suitable example when analysis runs every five minutes). The database processes only the newest stored decision per enabled market, serializes overlapping paper jobs, and makes repeated requests idempotent. Running more often does not create repeat trades for the same decision.
 
 Inspect the JSON status and the `paperTradingDurationMs`, `portfoliosProcessed`, `decisionsProcessed`, `tradesExecuted`, `duplicates`, and `skipped` metrics. A skipped run may indicate that analysis is still in progress or another paper-trading invocation holds the database lock. The 15-minute freshness check, confidence/risk checks, and per-market cooldown are enforced in the database. No private Bitvavo endpoint, account credential, or real order is used.
+
+The existing shared service also performs best-effort shadow-exit evaluation; no additional scheduled request, Vercel Function, or scheduler job is required. Shadow errors are logged separately and must not fail the real run. Evaluation calls use their own serialization/idempotency safeguards and cannot create trades or change portfolio state.
 
 ## Future scheduled work
 

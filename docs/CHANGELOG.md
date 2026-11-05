@@ -6,6 +6,23 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Bounded AI candle reads
+
+- Replace paginated 1,000-row PostgREST candle reads with a service-role-only RPC that returns at most 150 latest candles per enabled market and interval
+- Preserve the six interval semantics, market order, freshness checks, indicator inputs, decisions, and existing AI-analysis endpoint
+- Enforce uppercase enabled EUR symbols in SQL, validate RPC bounds and grants, and request exact PostgREST counts so incomplete responses fail closed
+- Compare every candle field against the former REST selection across two markets and all six intervals; no API route or table was added
+- Require confirmation that the intended production project's `max_rows` is at least 600; no production setting was verified or changed and the migration was not applied
+- Compare legacy REST and RPC request/row counts on deterministic fixtures without claiming deployed egress savings
+
+### Prospective shadow exit scenarios
+
+- Add persistent, versioned, simulation-only fixed take-profit and trailing-stop scenarios for open paper positions
+- Evaluate only fresh observed market marks; initialize tracking prospectively and finalize comparisons when an actual SELL closes a position
+- Persist compact scenario state and append-only meaningful events using two prefixed, RLS-protected tables and a service-role-only evaluator
+- Display hypothetical outcomes separately from actual P&L through the existing authenticated dashboard-data route
+- Keep the actual AI SELL path, paper-trading executor, risk checks, portfolio state, endpoints, scheduler, and live-trading configuration unchanged
+
 ### Dashboard summary list scrolling
 
 - Show two complete items in Open Positions, Activity, and Position Monitoring, with an internal scrollbar for additional items
@@ -38,6 +55,13 @@ All notable project changes should be documented here.
 - Replace the capped historical-row scan and per-symbol fallback reads with a read-only RPC that returns each requested symbol's latest candle timestamp
 - Restrict RPC execution to `service_role` and use the existing `(symbol, interval, timestamp)` index without changing refresh, overlap, freshness, or bootstrap behavior
 - Add migration, RPC permission/result, history-depth, failure, and provider-range regression coverage
+
+### Scheduled candle bulk upserts
+
+- Combine validated candle rows from successful markets into one merge-duplicates upsert per scheduled refresh invocation
+- Retry a failed bulk write independently per market so one persistent write failure does not block other markets
+- Preserve forming-candle updates, per-market outcomes, and successful-row metrics; report bulk and fallback POST attempts
+- Add regression coverage for partial provider failures, invalid candles, idempotent retry, market-level fallback failures, and aggregate metrics
 
 ### Open Position AI Status
 

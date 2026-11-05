@@ -33,7 +33,7 @@ Implemented components:
 - Server-side ticker/candle persistence and scanner-event error logging using the existing RLS-protected tables
 - Separate scheduler-protected market-snapshot and bounded candle-refresh endpoints, plus AI analysis; candle work handles one interval and at most five markets per invocation, with external schedulers supported without a Vercel Cron route
 - Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis with confidence-scored decisions persisted to existing decision history
-- Bounded PostgREST candle queries batch up to four markets per interval, use 1,000-row pages, and retain each market's latest 150 candles per interval
+- Bounded AI candle RPC reads batch up to four enabled markets per interval and return at most 150 latest rows per market, avoiding REST overfetch
 - Safe WAIT/HOLD outcomes for missing, stale, partial, or invalid analysis data; no writes to portfolio, position, or trade tables
 - Scheduler-protected Phase 08 paper-trading endpoint backed by service-role-only PostgreSQL functions
 - Stored-decision trade audit links, deterministic idempotency, transaction/advisory locks, and real portfolio snapshots
@@ -327,6 +327,8 @@ AI_Crypto_Bot_AI_Decisions
 ↓
 Existing Dashboard Open Position AI Status
 
+The scheduler-protected engine reads up to four enabled markets for each of the six supported intervals through the service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles` RPC. SQL validates uppercase EUR symbols against enabled watched-market rows and applies a per-market 150-row limit using the existing `(symbol, interval, timestamp)` index, preserving each market's latest-candle freshness and indicator inputs. The caller requests an exact count and checks `Content-Range`, failing closed if PostgREST returns an incomplete or uncounted response. Indicator, confidence, and decision behavior is unchanged. Before rollout, confirm the intended hosted project's `max_rows` is at least 600; the local config has no such value and the hosted setting remains unverified.
+
 Every AI decision must be recorded in:
 
 AI_Crypto_Bot_AI_Decisions
@@ -362,6 +364,12 @@ Position, trade, portfolio balance/value, and snapshot writes in one transaction
 BUY opens long positions only; SELL closes existing positions; HOLD and WAIT do not trade. The executor does not contact Bitvavo or any exchange and cannot place a real order. The service role is used only server-side. The database migration grants the scheduler RPC to `service_role` and revokes execution of its internal helpers from browser roles.
 
 Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than five open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
+
+## Shadow Exit Scenarios
+
+The existing paper-trading service separately evaluates open positions against the fixed, versioned experimental rule grid before execution and, when trades execute, afterward. The evaluator persists state and meaningful events through its own service-role-only RPC and tables. It consumes fresh stored market marks only; stale/invalid input preserves the last valid state and is surfaced as waiting/skipped. It has no call path to the decision executor and does not write decisions, trades, positions, portfolio values, balances, or snapshots. Evaluation errors are isolated and logged separately so the actual paper-trading run can continue.
+
+The existing authenticated `/api/dashboard-data` route reads and serializes the scenarios for the dashboard. Actual P&L and portfolio metrics remain sourced from actual trades, positions, and snapshots; hypothetical outcomes are displayed in a distinct simulation-only section.
 
 ---
 
@@ -576,7 +584,7 @@ Examples:
 - /api/analyze
 - /api/paper-trading
 
-`GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard and portfolio view. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, and up to 100 real portfolio snapshots. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC; realized/unrealized totals are `null` when their bounded source queries are incomplete. Win rate is the share of profitable SELL trades across visible trade history.
+`GET /api/dashboard-data` is an authenticated, read-only endpoint for the dashboard and portfolio view. It returns current agent and emergency states, RLS-filtered portfolio summaries and counts, recent records, up to 100 real portfolio snapshots, and separate shadow-exit scenario summaries. The portfolio chart renders only persisted snapshots; no synthetic history is generated. Portfolio totals are sums across the authenticated user's visible portfolios. Daily P&L is realized SELL P&L since 00:00 UTC; realized/unrealized totals are `null` when their bounded source queries are incomplete. Win rate is the share of profitable SELL trades across visible trade history. Shadow outcomes are not included in these actual metrics.
 
 Database timestamp instants and API values remain UTC. Browser views use the shared `formatTimestamp` utility to display timestamps in `Europe/Brussels`; the IANA timezone rules apply daylight-saving changes automatically. Formatting is presentation-only and does not alter requests, database values, or UTC-based calculations.
 
