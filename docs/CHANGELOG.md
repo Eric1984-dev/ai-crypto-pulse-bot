@@ -8,6 +8,7 @@ All notable project changes should be documented here.
 
 ### Database AI analysis failure diagnostics
 
+- Fix database-mode RPC authentication to use the service-role Bearer token and add a header regression assertion
 - Include the failed database-analysis RPC HTTP status and a strictly validated SQLSTATE/PostgREST code in internal error logs
 - For SQLSTATE `42501`, classify the permission-object type and log a target only when it matches the project's fixed object allowlist
 - Never log the RPC error body, provider message, or request credentials; keep JavaScript as the default and database-mode failure closed

@@ -941,6 +941,8 @@ test("database analysis is opt-in and returns only its validated summary", async
   assert.deepEqual(JSON.parse(databaseRequest.body), {
     p_analysis_time: fixedNow.toISOString()
   });
+  assert.equal(databaseRequest.headers.apikey, serviceRoleKey);
+  assert.equal(databaseRequest.headers.authorization, `Bearer ${serviceRoleKey}`);
   assert.equal(harness.requests.filter(({ table, method }) =>
     method === "GET" && table !== "AI_Crypto_Bot_Status"
   ).length, 0);
