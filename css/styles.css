@@ -1276,6 +1276,35 @@ a:focus-visible {
   line-height: 1.6;
 }
 
+.shadow-exit-legend {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.shadow-exit-legend-heading {
+  margin: 0;
+  color: #edf1f7;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shadow-exit-legend-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 7px 18px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.shadow-exit-legend-list strong {
+  color: #edf1f7;
+}
+
 .shadow-exit-status[data-state="unavailable"] {
   color: var(--negative);
 }
@@ -1291,10 +1320,42 @@ a:focus-visible {
 
 .shadow-exit-position {
   min-width: 0;
-  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-raised);
+}
+
+.shadow-exit-position-summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.shadow-exit-position-summary::-webkit-details-marker {
+  display: none;
+}
+
+.shadow-exit-position-summary::after {
+  flex: 0 0 auto;
+  color: var(--muted);
+  content: "+";
+  font-size: 20px;
+  line-height: 1;
+}
+
+.shadow-exit-position[open] > .shadow-exit-position-summary::after {
+  content: "−";
+}
+
+.shadow-exit-position-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+  border-radius: 10px;
 }
 
 .shadow-exit-position-heading,
@@ -1311,7 +1372,8 @@ a:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 9px 14px;
-  margin: 10px 0 0;
+  margin: 0;
+  padding: 12px 14px 0;
 }
 
 .shadow-exit-field {
@@ -1343,7 +1405,7 @@ a:focus-visible {
 
 .shadow-exit-rule-list {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  margin-top: 12px;
+  margin: 12px 14px 14px;
 }
 
 .shadow-exit-rule {

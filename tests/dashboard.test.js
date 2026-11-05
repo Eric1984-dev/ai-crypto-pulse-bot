@@ -965,7 +965,7 @@ test("dashboard displays prospective shadow rule outcomes separately from actual
   assert.match(positionCards[0].textContent, /last valid state retained.*€94\.00/);
   assert.match(positionCards[1].textContent, /Actual close time.*Actual SELL execution price.*Actual net P&L.*-€8\.50/);
   assert.equal(
-    positionCards[1].children[1].children[3].children[1].dataset.valueTone,
+    positionCards[1].children[0].children[1].children[3].children[1].dataset.valueTone,
     "negative"
   );
   assert.match(positionCards[1].textContent, /Closed without trigger/);

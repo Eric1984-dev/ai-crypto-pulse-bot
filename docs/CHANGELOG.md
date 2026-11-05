@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Shadow exit dashboard guide
+
+- Add a visible dashboard legend explaining fixed take-profit, trailing-stop, tracking/triggered states, and modeled net P&L assumptions
+- Collapse each position's shadow scenarios by default while keeping its market and position status visible
+- Keep all shadow outcomes simulation-only and separate from actual positions, trades, and portfolio metrics
+
 ### Bounded AI candle reads
 
 - Replace paginated 1,000-row PostgREST candle reads with a service-role-only RPC that returns at most 150 latest candles per enabled market and interval

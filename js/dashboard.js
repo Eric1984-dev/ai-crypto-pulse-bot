@@ -443,11 +443,16 @@
       list.hidden = positions.length === 0;
       for (const position of positions) {
         const positionItem = documentRef.createElement("li");
-        const heading = documentRef.createElement("h3");
+        const disclosure = documentRef.createElement("details");
+        const summary = documentRef.createElement("summary");
+        const heading = documentRef.createElement("span");
         const positionDetails = documentRef.createElement("dl");
         const ruleList = documentRef.createElement("ul");
-        positionItem.className = "shadow-exit-position";
+        disclosure.className = "shadow-exit-position";
+        summary.className = "shadow-exit-position-summary";
         heading.className = "shadow-exit-position-heading";
+        heading.setAttribute("role", "heading");
+        heading.setAttribute("aria-level", "3");
         heading.textContent = `${position.symbol || "—"} · ${position.isOpen ? "Open position" : "Closed position"}`;
         positionDetails.className = "shadow-exit-position-details";
         ruleList.className = "shadow-exit-rule-list";
@@ -547,7 +552,9 @@
           ruleList.append(ruleItem);
         }
 
-        positionItem.append(heading, positionDetails, ruleList);
+        summary.append(heading);
+        disclosure.append(summary, positionDetails, ruleList);
+        positionItem.append(disclosure);
         list.append(positionItem);
       }
     }

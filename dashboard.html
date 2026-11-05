@@ -297,6 +297,15 @@
           decisions, balances, risk checks, or portfolio metrics. Tracking starts with the first fresh observed
           market mark; historical candles and intrabar highs or lows are not used.
         </p>
+        <aside class="shadow-exit-legend" aria-label="How to read shadow exit scenarios">
+          <h3 class="shadow-exit-legend-heading">How to read these scenarios</h3>
+          <ul class="shadow-exit-legend-list">
+            <li><strong>Fixed take-profit:</strong> triggers at the first fresh mark meeting its target gain from the fee-inclusive entry basis.</li>
+            <li><strong>Trailing stop:</strong> arms after +5%; triggers when a later fresh mark falls the selected amount from the observed high-water mark.</li>
+            <li><strong>Tracking:</strong> the rule has not triggered. <strong>Triggered hypothetically:</strong> the rule would have exited; no trade was placed.</li>
+            <li><strong>Estimated net P&amp;L:</strong> modeled after 0.10% slippage and a 0.25% exit fee; spread is unavailable, so this is not a guaranteed fill.</li>
+          </ul>
+        </aside>
         <p class="shadow-exit-status" data-shadow-exit-status role="status" aria-live="polite" hidden></p>
         <ul class="shadow-exit-position-list" data-shadow-exit-list aria-label="Shadow exit scenarios by position" hidden></ul>
         <p class="dashboard-empty" data-shadow-exit-empty>No open positions or recently closed tracked scenarios.</p>
