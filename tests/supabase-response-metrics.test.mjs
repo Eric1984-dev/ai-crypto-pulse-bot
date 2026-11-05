@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSupabaseResponseMetrics } from "../lib/supabase-response-metrics.mjs";
+import {
+  createSupabaseResponseMetrics,
+  serializeSupabaseResponseTrafficForLog
+} from "../lib/supabase-response-metrics.mjs";
 
 test("Supabase response metrics group calls by method and pathname without logging query strings", async () => {
   const metrics = createSupabaseResponseMetrics("https://project.supabase.co");
@@ -34,4 +37,20 @@ test("Supabase response metrics ignore non-Supabase API traffic", async () => {
   await measuredFetch("https://api.bitvavo.com/v2/markets", { method: "GET" });
 
   assert.deepEqual(metrics.summary().endpoints, []);
+});
+
+test("Supabase response log serialization preserves endpoint objects as parseable JSON", () => {
+  const summary = {
+    scope: "server-to-Supabase responses for this function invocation",
+    endpoints: [{
+      endpoint: "POST /rest/v1/rpc/read_candles",
+      requests: 156,
+      responsesWithContentLength: 0,
+      contentLengthBytes: 0,
+      jsonResponsesMeasured: 156,
+      jsonBodyBytesEstimate: 12345
+    }]
+  };
+
+  assert.deepEqual(JSON.parse(serializeSupabaseResponseTrafficForLog(summary)), summary);
 });

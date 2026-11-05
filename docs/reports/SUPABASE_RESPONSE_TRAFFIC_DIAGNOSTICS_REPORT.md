@@ -10,6 +10,8 @@ For each Supabase HTTP method and pathname, the summary reports:
 - The sum and count of response `Content-Length` headers exposed to the function.
 - A separate UTF-8 JSON-body size estimate based on re-serializing successfully parsed JSON.
 
+Vercel runtime logs expose this summary in the top-level `supabaseResponseTrafficJson` field. The value is JSON text so endpoint objects remain visible in the log viewer; the existing candle-refresh HTTP response continues to expose the structured `supabaseResponseTraffic.endpoints` array.
+
 Query strings, credentials, headers, request/response contents, and non-Supabase requests such as Bitvavo are excluded. Metrics are not persisted in Supabase. The wrapper filters by the configured Supabase origin.
 
 ## Measurement limits
@@ -38,3 +40,9 @@ Use the Supabase Usage page as the authoritative aggregate egress measurement. T
 - `git diff --check` — passed.
 
 No production calls were made by this implementation task, and no deployment was performed. Vercel logs will contain the new fields only after the code is deployed and the scheduled functions run.
+
+## Vercel log serialization follow-up
+
+The Vercel viewer displayed endpoint entries as `[Object]`, and the candle-refresh log did not show the nested summary. AI-analysis and candle-refresh completion logs now emit a top-level `supabaseResponseTrafficJson` string. This leaves the structured candle-refresh API response unchanged and adds no network calls or database writes.
+
+Validation for this follow-up: focused diagnostics, AI-engine, and market-data tests passed (69); the full test suite exited 0; `npm.cmd run build` passed; and `git diff --check` passed. No deployment was performed. The new field will appear after deploying this code and observing the next scheduled runs.

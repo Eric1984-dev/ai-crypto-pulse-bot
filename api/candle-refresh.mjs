@@ -1,6 +1,7 @@
 import authSession from "../lib/auth-session.js";
 import cronAuth from "../lib/cron-auth.js";
 import { createMarketDataService, SUPPORTED_CANDLE_INTERVALS } from "../lib/market-data.mjs";
+import { serializeSupabaseResponseTrafficForLog } from "../lib/supabase-response-metrics.mjs";
 
 const { getPublicConfig } = authSession;
 const { isAuthorizedCron } = cronAuth;
@@ -101,7 +102,11 @@ function sendJson(res, statusCode, body) {
 
 function logSuccess(logger, metrics) {
   if (logger && typeof logger.info === "function" && metrics) {
-    logger.info("Scheduled candle refresh completed.", metrics);
+    const { supabaseResponseTraffic, ...otherMetrics } = metrics;
+    logger.info("Scheduled candle refresh completed.", {
+      ...otherMetrics,
+      supabaseResponseTrafficJson: serializeSupabaseResponseTrafficForLog(supabaseResponseTraffic)
+    });
   }
 }
 

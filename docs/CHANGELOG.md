@@ -10,6 +10,7 @@ All notable project changes should be documented here.
 
 - Add per-invocation Supabase response metrics to the existing AI analysis and scheduled candle-refresh completion logs
 - Group by HTTP method and pathname; report exposed `Content-Length` bytes and separately labeled re-serialized JSON body-size estimates
+- Emit the summary as top-level JSON text in Vercel logs so endpoint details are visible; preserve the structured metrics in the candle-refresh HTTP response
 - Exclude Bitvavo requests, query strings, headers, credentials, and response contents; do not persist metrics to Supabase or add endpoints
 - Document that these diagnostics compare endpoint payloads but are not exact billed wire-byte attribution and do not cover other functions or browser-direct traffic
 

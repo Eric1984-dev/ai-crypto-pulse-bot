@@ -976,6 +976,48 @@ test("candle refresh requires scheduler authorization and valid bounded request 
   assert.equal(outOfRange.statusCode, 400);
 });
 
+test("candle refresh log exposes Supabase traffic summary as top-level JSON text", async () => {
+  let loggedMetrics;
+  const traffic = {
+    scope: "server-to-Supabase responses for this function invocation",
+    endpoints: [{
+      endpoint: "POST /rest/v1/rpc/AI_Crypto_Bot_Get_Latest_Candle_Checkpoints",
+      requests: 1,
+      responsesWithContentLength: 0,
+      contentLengthBytes: 0,
+      jsonResponsesMeasured: 1,
+      jsonBodyBytesEstimate: 88
+    }]
+  };
+  const handler = createCandleRefreshHandler({
+    env: {
+      SUPABASE_URL: config.supabaseUrl,
+      SUPABASE_ANON_KEY: config.supabaseAnonKey,
+      SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+      CRON_SECRET: "test-cron-secret"
+    },
+    service: {
+      async refreshScheduledCandleBatch() {
+        return { status: "refreshed", metrics: { supabaseResponseTraffic: traffic } };
+      }
+    },
+    logger: {
+      error() {},
+      info(_message, metrics) { loggedMetrics = metrics; }
+    }
+  });
+  const response = responseCapture();
+  await handler({
+    method: "GET",
+    url: "/api/candle-refresh?interval=1m&batch=0",
+    headers: { authorization: "Bearer test-cron-secret" }
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(loggedMetrics.supabaseResponseTrafficJson), traffic);
+  assert.equal("supabaseResponseTraffic" in loggedMetrics, false);
+});
+
 test("scheduled candle refresh refetches a range when an earlier request cached less history", async () => {
   const harness = createHarness({
     candleRows: [[fixedNow.getTime(), "100", "120", "90", "110", "25"]]
