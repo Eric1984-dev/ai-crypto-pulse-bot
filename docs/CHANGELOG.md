@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Database AI analysis failure diagnostics
+
+- Include the failed database-analysis RPC HTTP status and a strictly validated SQLSTATE/PostgREST code in internal error logs
+- Never log the RPC error body, provider message, or request credentials; keep JavaScript as the default and database-mode failure closed
+- Add regression tests for safe recognized and unrecognized error codes
+
 ### Opt-in database-side AI analysis prototype
 
 - Add a service-role-only, additive PostgreSQL AI analysis function using the existing watched markets, snapshots, candles, and decision table

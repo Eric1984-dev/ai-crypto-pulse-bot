@@ -131,6 +131,11 @@ function createEngineHarness({
   candleResponseTransform = (groups) => groups,
   failDecisionWrite = false,
   failDatabaseAnalysis = false,
+  databaseAnalysisFailureStatus = 503,
+  databaseAnalysisFailureBody = {
+    code: "PGRST202",
+    message: "provider detail must not be exposed"
+  },
   databaseAnalysisSummary = {
     analyzed_markets: 1,
     decisions_stored: 1,
@@ -174,7 +179,7 @@ function createEngineHarness({
       }
       if (method === "POST" && table === databaseAiAnalysisRpc) {
         return failDatabaseAnalysis
-          ? jsonResponse({ message: "provider detail must not be exposed" }, 503)
+          ? jsonResponse(databaseAnalysisFailureBody, databaseAnalysisFailureStatus)
           : jsonResponse([databaseAnalysisSummary]);
       }
       if (method === "POST" && table === latestCandlesRpc) {
@@ -947,7 +952,16 @@ test("database analysis is opt-in and returns only its validated summary", async
 });
 
 test("database analysis failure marks ERROR without falling back to JavaScript", async () => {
-  const harness = createEngineHarness({ failDatabaseAnalysis: true });
+  const errorLogs = [];
+  const harness = createEngineHarness({
+    failDatabaseAnalysis: true,
+    logger: {
+      info() {},
+      error(message, fields) {
+        errorLogs.push({ message, fields });
+      }
+    }
+  });
 
   await assert.rejects(
     harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" }),
@@ -959,6 +973,36 @@ test("database analysis failure marks ERROR without falling back to JavaScript",
   assert.equal(harness.requests.some(({ table, method }) =>
     table === "AI_Crypto_Bot_Watched_Markets" && method === "GET"
   ), false);
+  const failureLog = errorLogs.find(({ message }) => message === "AI analysis failed.");
+  assert.equal(failureLog.fields.databaseAnalysisHttpStatus, 503);
+  assert.equal(failureLog.fields.databaseAnalysisErrorCode, "PGRST202");
+  assert.equal(JSON.stringify(failureLog).includes("provider detail"), false);
+});
+
+test("database analysis failure never logs an unrecognized provider error code", async () => {
+  const errorLogs = [];
+  const harness = createEngineHarness({
+    failDatabaseAnalysis: true,
+    databaseAnalysisFailureBody: {
+      code: "provider detail must not be exposed",
+      message: "provider detail must not be exposed"
+    },
+    logger: {
+      info() {},
+      error(message, fields) {
+        errorLogs.push({ message, fields });
+      }
+    }
+  });
+
+  await assert.rejects(
+    harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" }),
+    (error) => error.code === "DATABASE_ANALYSIS_FAILED"
+  );
+  const failureLog = errorLogs.find(({ message }) => message === "AI analysis failed.");
+  assert.equal(failureLog.fields.databaseAnalysisHttpStatus, 503);
+  assert.equal(failureLog.fields.databaseAnalysisErrorCode, null);
+  assert.equal(JSON.stringify(failureLog).includes("provider detail"), false);
 });
 
 test("database analysis rejects inconsistent RPC summaries and marks ERROR", async () => {
