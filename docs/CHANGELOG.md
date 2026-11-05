@@ -6,6 +6,13 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Supabase response-size diagnostics
+
+- Add per-invocation Supabase response metrics to the existing AI analysis and scheduled candle-refresh completion logs
+- Group by HTTP method and pathname; report exposed `Content-Length` bytes and separately labeled re-serialized JSON body-size estimates
+- Exclude Bitvavo requests, query strings, headers, credentials, and response contents; do not persist metrics to Supabase or add endpoints
+- Document that these diagnostics compare endpoint payloads but are not exact billed wire-byte attribution and do not cover other functions or browser-direct traffic
+
 ### Shadow exit dashboard guide
 
 - Add a visible dashboard legend explaining fixed take-profit, trailing-stop, tracking/triggered states, and modeled net P&L assumptions

@@ -828,6 +828,12 @@ test("analysis uses bounded candle workers and preserves every market decision",
   assert.equal(completionLog.fields.candlesLoaded, candles.length);
   assert.ok(completionLog.fields.runtimeMs >= 0);
   assert.ok(completionLog.fields.timingMs.candleLoad >= 0);
+  const candleTraffic = completionLog.fields.supabaseResponseTraffic.endpoints.find(({ endpoint }) =>
+    endpoint === "POST /rest/v1/rpc/AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"
+  );
+  assert.equal(candleTraffic.requests, 156);
+  assert.equal(candleTraffic.jsonResponsesMeasured, 156);
+  assert.ok(candleTraffic.jsonBodyBytesEstimate > 0);
 });
 
 test("analysis persists real decisions and updates status with PATCH", async () => {

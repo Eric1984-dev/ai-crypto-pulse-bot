@@ -1069,6 +1069,13 @@ test("scheduled candle refresh bulk upserts validated candles once with per-mark
   assert.equal(result.metrics.recordsProcessed.candles, 2);
   assert.equal(result.metrics.candleWriteRequests, 1);
   assert.equal(result.metrics.candleWriteFallbacks, 0);
+  const trafficEndpoints = result.metrics.supabaseResponseTraffic.endpoints;
+  assert.ok(trafficEndpoints.some(({ endpoint, requests, jsonResponsesMeasured }) =>
+    endpoint === "POST /rest/v1/rpc/AI_Crypto_Bot_Get_Latest_Candle_Checkpoints"
+      && requests === 1
+      && jsonResponsesMeasured === 1));
+  assert.ok(trafficEndpoints.some(({ endpoint, requests }) =>
+    endpoint === "POST /rest/v1/AI_Crypto_Bot_Candles" && requests === 1));
   assert.deepEqual(result.marketOutcomes, [
     { symbol: "BTC-EUR", status: "refreshed", candlesUpserted: 1 },
     { symbol: "ETH-EUR", status: "refreshed", candlesUpserted: 1 }
