@@ -35,8 +35,11 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
 SUPABASE_SERVICE_ROLE_KEY=server-only-service-role-key
 CRON_SECRET=long-random-cron-secret
+AI_ANALYSIS_MODE=javascript
 ENABLE_LIVE_TRADING=false
 ```
+
+`AI_ANALYSIS_MODE` defaults to `javascript`, which remains the standard engine. The optional `database` value is only for the local database-side prototype and must not be set until migration `20261106120000_ai_analysis_database_mode.sql` has been manually reviewed and applied to the intended Supabase project and the rollout prerequisites in the [prototype report](./reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md) are met. An RPC failure marks agent status `ERROR` and returns an unavailable response; it never falls back to JavaScript.
 
 For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` and serves `/api/*` routes. Opening the HTML files through a static-only server does not run the protected-page functions.
 
@@ -59,6 +62,8 @@ Candle ingestion is isolated at `/api/candle-refresh?interval=<interval>&batch=<
 Use the same protected `Authorization: Bearer <CRON_SECRET>` header. Configure an HTTP timeout of at least 90 seconds and monitor returned `candleRefreshDurationMs`, `recordsProcessed.candles`, `providerRequests`, status, and batch count. Verify actual deployed durations; provider or database outages can still cause partial refreshes. Do not put credentials in the URL or task name.
 
 ### External AI analysis
+
+The JavaScript engine remains the default. Do not opt into database analysis until its additive migration is applied manually, the function grants and signature are verified, and the production rollout is separately approved. The migration adds no tables or Vercel Functions. Local migration/tests do not apply it to Supabase.
 
 Phase 07 exposes `POST /api/ai-analysis` for an external scheduler. Configure the deployed URL and method, then add `Authorization: Bearer <CRON_SECRET>` using the same server-side Vercel environment variable. The function also requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Keep the credentials in protected environment/header settings and never in the request URL. No scheduler cadence is imposed by the application.
 

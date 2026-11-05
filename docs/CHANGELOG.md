@@ -6,6 +6,14 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Opt-in database-side AI analysis prototype
+
+- Add a service-role-only, additive PostgreSQL AI analysis function using the existing watched markets, snapshots, candles, and decision table
+- Preserve JavaScript as the default `AI_ANALYSIS_MODE`; database mode is explicit opt-in and fails closed without JavaScript fallback
+- Keep analysis bounded to 150 candles per market and interval across all six intervals, and return only aggregate counts through PostgREST
+- Add PGlite exact-payload parity, rounding, input-boundary, privilege, and query-plan tests; no production migration or deployment was performed
+- Use `Prefer: return=minimal` for JavaScript AI-decision inserts while preserving status-update representation validation
+
 ### Supabase response-size diagnostics
 
 - Add per-invocation Supabase response metrics to the existing AI analysis and scheduled candle-refresh completion logs

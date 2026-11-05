@@ -43,7 +43,11 @@ export function createAIAnalysisHandler({
     }
 
     try {
-      const data = await service.runAnalysis({ config, serviceRoleKey });
+      const data = await service.runAnalysis({
+        config,
+        serviceRoleKey,
+        analysisMode: env.AI_ANALYSIS_MODE || "javascript"
+      });
       sendJson(res, 200, { data });
     } catch (error) {
       logFailure(logger, "AI analysis request failed.", error);

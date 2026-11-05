@@ -28,7 +28,8 @@ const requiredTables = [
 ];
 const requiredFunctions = [
   "AI_Crypto_Bot_Get_Latest_AI_Candles",
-  "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"
+  "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact",
+  "AI_Crypto_Bot_Run_Database_AI_Analysis"
 ];
 
 function validateDatabase() {

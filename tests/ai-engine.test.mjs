@@ -11,6 +11,7 @@ const config = {
 const serviceRoleKey = "test-service-role-key";
 const activeMarket = { symbol: "BTC-EUR", enabled: true, priority: 1 };
 const latestCandlesRpc = "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact";
+const databaseAiAnalysisRpc = "AI_Crypto_Bot_Run_Database_AI_Analysis";
 
 function createCandles(symbol, interval, count = 60, direction = "up", now = fixedNow) {
   return Array.from({ length: count }, (_, index) => {
@@ -107,6 +108,17 @@ function jsonResponse(body, status = 200, headers = {}) {
   };
 }
 
+function emptyResponse(status = 204) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get() { return null; } },
+    async json() {
+      throw new Error("The empty response body must not be parsed.");
+    }
+  };
+}
+
 function createEngineHarness({
   status = "IDLE",
   markets = [activeMarket],
@@ -117,6 +129,16 @@ function createEngineHarness({
   postgrestMaxRows = Number.POSITIVE_INFINITY,
   includeCandleContentRange = true,
   candleResponseTransform = (groups) => groups,
+  failDecisionWrite = false,
+  failDatabaseAnalysis = false,
+  databaseAnalysisSummary = {
+    analyzed_markets: 1,
+    decisions_stored: 1,
+    buy_count: 1,
+    sell_count: 0,
+    hold_count: 0,
+    wait_count: 0
+  },
   logger = { info() {}, error() {} }
 } = {}) {
   let statusRow = { status };
@@ -149,6 +171,11 @@ function createEngineHarness({
     try {
       if (table === failReadTable) {
         return jsonResponse({ message: "provider detail must not be exposed" }, 503);
+      }
+      if (method === "POST" && table === databaseAiAnalysisRpc) {
+        return failDatabaseAnalysis
+          ? jsonResponse({ message: "provider detail must not be exposed" }, 503)
+          : jsonResponse([databaseAnalysisSummary]);
       }
       if (method === "POST" && table === latestCandlesRpc) {
         const { p_symbols: symbols, p_interval: interval } = JSON.parse(options.body);
@@ -192,9 +219,12 @@ function createEngineHarness({
         return jsonResponse([statusRow]);
       }
       if (table === "AI_Crypto_Bot_AI_Decisions" && method === "POST") {
+        if (failDecisionWrite) {
+          return jsonResponse({ message: "provider detail must not be exposed" }, 503);
+        }
         const body = JSON.parse(options.body);
         writes.push({ table, method, body });
-        return jsonResponse(body);
+        return emptyResponse();
       }
       throw new Error(`Unexpected database operation: ${method} ${table}`);
     } finally {
@@ -849,9 +879,16 @@ test("analysis persists real decisions and updates status with PATCH", async () 
   assert.equal(decisionWrite.method, "POST");
   assert.equal(decisionWrite.body[0].decision, "BUY");
   assert.equal(decisionWrite.body[0].strategy_name, "Deterministic Technical Analysis");
+  const decisionRequest = harness.requests.find(({ table, method }) =>
+    table === "AI_Crypto_Bot_AI_Decisions" && method === "POST"
+  );
+  assert.equal(decisionRequest.headers.prefer, "return=minimal");
   assert.ok(statusWrites.length >= 2);
   assert.ok(statusWrites.every(({ method }) => method === "PATCH"));
   assert.ok(statusWrites.every(({ body }) => body.updated_at));
+  assert.ok(harness.requests
+    .filter(({ table, method }) => table === "AI_Crypto_Bot_Status" && method === "PATCH")
+    .every(({ headers }) => headers.prefer === "return=representation"));
   assert.equal(harness.getStatus().status, "ACTIVE");
   assert.deepEqual(
     harness.writes.map(({ table }) => table).filter((table) =>
@@ -871,6 +908,95 @@ test("analysis stores WAIT decisions when market data exists but candles are abs
   assert.equal(decisionWrite.body[0].decision, "WAIT");
   assert.ok(decisionWrite.body[0].confidence < 50);
   assert.equal(harness.getStatus().status, "ACTIVE");
+});
+
+test("database analysis is opt-in and returns only its validated summary", async () => {
+  const logEntries = [];
+  const harness = createEngineHarness({
+    logger: {
+      info(message, fields) {
+        logEntries.push({ message, fields });
+      },
+      error() {}
+    }
+  });
+  const result = await harness.service.runAnalysis({
+    config,
+    serviceRoleKey,
+    analysisMode: "database"
+  });
+  const databaseRequest = harness.requests.find(({ table }) => table === databaseAiAnalysisRpc);
+
+  assert.deepEqual(result, {
+    status: "ACTIVE",
+    analyzedMarkets: 1,
+    decisionsStored: 1,
+    waitingDecisions: 0
+  });
+  assert.deepEqual(JSON.parse(databaseRequest.body), {
+    p_analysis_time: fixedNow.toISOString()
+  });
+  assert.equal(harness.requests.filter(({ table, method }) =>
+    method === "GET" && table !== "AI_Crypto_Bot_Status"
+  ).length, 0);
+  assert.equal(harness.requests.some(({ table }) => table === latestCandlesRpc), false);
+  assert.equal(harness.requests.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"), false);
+  assert.equal(harness.getStatus().status, "ACTIVE");
+  assert.equal(logEntries[0].message, "AI database analysis completed.");
+  assert.equal(logEntries[0].fields.buyCount, 1);
+});
+
+test("database analysis failure marks ERROR without falling back to JavaScript", async () => {
+  const harness = createEngineHarness({ failDatabaseAnalysis: true });
+
+  await assert.rejects(
+    harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" }),
+    (error) => error.code === "DATABASE_ANALYSIS_FAILED"
+  );
+  assert.equal(harness.getStatus().status, "ERROR");
+  assert.equal(harness.requests.some(({ table }) => table === latestCandlesRpc), false);
+  assert.equal(harness.requests.some(({ table }) => table === "AI_Crypto_Bot_AI_Decisions"), false);
+  assert.equal(harness.requests.some(({ table, method }) =>
+    table === "AI_Crypto_Bot_Watched_Markets" && method === "GET"
+  ), false);
+});
+
+test("database analysis rejects inconsistent RPC summaries and marks ERROR", async () => {
+  const harness = createEngineHarness({
+    databaseAnalysisSummary: {
+      analyzed_markets: 1,
+      decisions_stored: 1,
+      buy_count: 1,
+      sell_count: 1,
+      hold_count: 0,
+      wait_count: 0
+    }
+  });
+
+  await assert.rejects(
+    harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" }),
+    (error) => error.code === "INVALID_DATABASE_RESPONSE"
+  );
+  assert.equal(harness.getStatus().status, "ERROR");
+  assert.equal(harness.requests.some(({ table }) => table === latestCandlesRpc), false);
+});
+
+test("failed minimal AI-decision inserts fail analysis and persist ERROR status", async () => {
+  const harness = createEngineHarness({ failDecisionWrite: true });
+
+  await assert.rejects(
+    harness.service.runAnalysis({ config, serviceRoleKey }),
+    (error) => error.code === "DATABASE_WRITE_FAILED"
+  );
+  assert.equal(harness.getStatus().status, "ERROR");
+  assert.ok(harness.requests.some(({ table, method, headers }) =>
+    table === "AI_Crypto_Bot_AI_Decisions"
+      && method === "POST"
+      && headers.prefer === "return=minimal"
+  ));
+  assert.ok(harness.writes.some(({ table, body }) =>
+    table === "AI_Crypto_Bot_Status" && body.status === "ERROR"
+  ));
 });
 
 test("STOPPED agent status prevents reads and all writes beyond the status check", async () => {
@@ -987,9 +1113,15 @@ test("AI analysis endpoint returns successful data and hides runtime error detai
     SUPABASE_ANON_KEY: config.supabaseAnonKey,
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey
   };
+  let selectedMode;
   const successfulHandler = createAIAnalysisHandler({
     env,
-    service: { async runAnalysis() { return { status: "ACTIVE", analyzedMarkets: 1, decisionsStored: 1 }; } },
+    service: {
+      async runAnalysis({ analysisMode }) {
+        selectedMode = analysisMode;
+        return { status: "ACTIVE", analyzedMarkets: 1, decisionsStored: 1 };
+      }
+    },
     logger: { error() {} }
   });
   const successResponse = createResponse();
@@ -1003,6 +1135,23 @@ test("AI analysis endpoint returns successful data and hides runtime error detai
     analyzedMarkets: 1,
     decisionsStored: 1
   });
+  assert.equal(selectedMode, "javascript");
+
+  const optInHandler = createAIAnalysisHandler({
+    env: { ...env, AI_ANALYSIS_MODE: "database" },
+    service: {
+      async runAnalysis({ analysisMode }) {
+        selectedMode = analysisMode;
+        return { status: "ACTIVE", analyzedMarkets: 1, decisionsStored: 1 };
+      }
+    },
+    logger: { error() {} }
+  });
+  await optInHandler({
+    method: "POST",
+    headers: { authorization: "Bearer test-cron-secret" }
+  }, createResponse());
+  assert.equal(selectedMode, "database");
 
   const failingHandler = createAIAnalysisHandler({
     env,

@@ -34,6 +34,8 @@ For each non-empty batch, the candle refresh service obtains the latest stored t
 
 ## Phase 07 AI analysis
 
+The optional `AI_ANALYSIS_MODE=database` prototype reuses this endpoint and leaves the scheduler unchanged. The default remains `javascript`; database mode must not be selected until its migration is manually applied and rollout separately approved. RPC failures set `AI_Crypto_Bot_Status` to `ERROR`, return an unavailable response, and do not trigger a JavaScript fallback.
+
 The analysis endpoint is available at:
 
 ```text

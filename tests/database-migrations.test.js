@@ -34,6 +34,9 @@ const aiCandleHistoryMigration = migrationSql.find((sql) =>
 const compactAiCandleMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Get_Latest_AI_Candles_Compact"')
 );
+const databaseAiAnalysisMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Run_Database_AI_Analysis"')
+);
 const shadowExitMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
 );
@@ -75,6 +78,7 @@ async function createDatabase() {
   await database.exec(shadowExitMigration);
   await database.exec(aiCandleHistoryMigration);
   await database.exec(compactAiCandleMigration);
+  await database.exec(databaseAiAnalysisMigration);
   return database;
 }
 
@@ -150,6 +154,156 @@ async function setMarketPriceAt(database, symbol, price, capturedAt) {
            captured_at = EXCLUDED.captured_at`,
     [symbol, price, capturedAt]
   );
+}
+
+const analysisIntervals = ["1m", "5m", "15m", "1h", "4h", "1d"];
+
+function createAnalysisCandles(symbol, count, direction, endTime, intervals = analysisIntervals) {
+  return intervals.flatMap((interval) => Array.from({ length: count }, (_, index) => {
+    const close = direction === "up"
+      ? 100 + index * 0.5
+      : direction === "down"
+        ? 130 - index * 0.5
+        : 100;
+    const open = direction === "down" ? close + 0.1 : close - 0.1;
+    return {
+      symbol,
+      interval,
+      open,
+      high: Math.max(open, close) + 0.3,
+      low: Math.min(open, close) - 0.3,
+      close,
+      volume: 100 + index,
+      timestamp: new Date(endTime.getTime() - (count - index) * 60000).toISOString()
+    };
+  }));
+}
+
+async function replaceAnalysisFixture(database, symbol, { marketData, candles }) {
+  await database.query(
+    `UPDATE public."AI_Crypto_Bot_Watched_Markets"
+     SET enabled = (symbol = $1)`,
+    [symbol]
+  );
+  await database.query(
+    `DELETE FROM public."AI_Crypto_Bot_AI_Decisions" WHERE symbol = $1`,
+    [symbol]
+  );
+  await database.query(
+    `DELETE FROM public."AI_Crypto_Bot_Candles" WHERE symbol = $1`,
+    [symbol]
+  );
+  await database.query(
+    `DELETE FROM public."AI_Crypto_Bot_Market_Data" WHERE symbol = $1`,
+    [symbol]
+  );
+  if (marketData) {
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Market_Data"
+        (symbol, price, volume, daily_change, high_24h, low_24h, captured_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        symbol,
+        marketData.price,
+        marketData.volume,
+        marketData.daily_change,
+        marketData.high_24h,
+        marketData.low_24h,
+        marketData.captured_at
+      ]
+    );
+  }
+  if (candles.length) {
+    const parameters = [];
+    const values = candles.map((candle, index) => {
+      const offset = index * 8;
+      parameters.push(
+        candle.symbol,
+        candle.interval,
+        candle.open,
+        candle.high,
+        candle.low,
+        candle.close,
+        candle.volume,
+        candle.timestamp
+      );
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, `
+        + `$${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
+    });
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Candles"
+        (symbol, interval, open, high, low, close, volume, "timestamp")
+       VALUES ${values.join(",")}`,
+      parameters
+    );
+  }
+}
+
+async function readAnalysisFixture(database, symbol) {
+  const marketData = await database.query(
+    `SELECT pg_catalog.to_jsonb(market_data) AS row
+     FROM public."AI_Crypto_Bot_Market_Data" AS market_data
+     WHERE market_data.symbol = $1`,
+    [symbol]
+  );
+  const candles = [];
+  for (const interval of analysisIntervals) {
+    const rows = await database.query(
+      `SELECT pg_catalog.to_jsonb(candle) AS row
+       FROM public."AI_Crypto_Bot_Candles" AS candle
+       WHERE candle.symbol = $1 AND candle.interval = $2
+       ORDER BY candle."timestamp" DESC
+       LIMIT 150`,
+      [symbol, interval]
+    );
+    candles.push(...rows.rows.map(({ row }) => row));
+  }
+  return {
+    marketData: marketData.rows[0] ? marketData.rows[0].row : null,
+    candles
+  };
+}
+
+async function assertDatabaseAnalysisParity(database, symbol, analysisTime) {
+  const { analyzeMarket } = await import("../lib/ai-engine.mjs");
+  const fixture = await readAnalysisFixture(database, symbol);
+  const expected = JSON.parse(JSON.stringify(analyzeMarket({
+    symbol,
+    marketData: fixture.marketData,
+    candles: fixture.candles,
+    now: analysisTime
+  })));
+  const summary = await withRole(database, "service_role", () => database.query(
+    `SELECT * FROM public."AI_Crypto_Bot_Run_Database_AI_Analysis"($1::timestamptz)`,
+    [analysisTime]
+  ));
+  const stored = await database.query(
+    `SELECT symbol, decision, confidence, reason, indicators, strategy_name, strategy_version
+     FROM public."AI_Crypto_Bot_AI_Decisions"
+     WHERE symbol = $1
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [symbol]
+  );
+  assert.equal(summary.rows.length, 1);
+  assert.equal(stored.rows.length, 1);
+  assert.deepEqual(
+    { ...stored.rows[0], confidence: Number(stored.rows[0].confidence) },
+    expected
+  );
+  return summary.rows[0];
+}
+
+function createAnalysisSnapshot(symbol, analysisTime, direction = "up", ageMs = 30000) {
+  return {
+    symbol,
+    price: direction === "up" ? 130 : 100,
+    volume: 159,
+    daily_change: direction === "up" ? 5 : direction === "down" ? -5 : 0,
+    high_24h: direction === "up" ? 135 : 105,
+    low_24h: direction === "up" ? 95 : 95,
+    captured_at: new Date(analysisTime.getTime() - ageMs).toISOString()
+  };
 }
 
 async function addDecision(database, symbol, decision, confidence = 80) {
@@ -1718,6 +1872,259 @@ test("paper trading enforces daily and maximum drawdown limits and activates the
       is_active: false,
       is_analyzing: false
     });
+  } finally {
+    await database.close();
+  }
+});
+
+test("database AI analysis exactly matches JavaScript across bounded and failure fixtures", async () => {
+  const database = await createDatabase();
+  const symbol = "BTC-EUR";
+  const analysisTime = new Date("2026-03-20T12:00:00.000Z");
+  try {
+    assert.ok(databaseAiAnalysisMigration);
+    assert.doesNotMatch(databaseAiAnalysisMigration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
+    const privileges = await database.query(`
+      SELECT
+        has_function_privilege(
+          'service_role',
+          'public."AI_Crypto_Bot_Run_Database_AI_Analysis"(timestamp with time zone)',
+          'EXECUTE'
+        ) AS service_role_can_execute,
+        has_function_privilege(
+          'anon',
+          'public."AI_Crypto_Bot_Run_Database_AI_Analysis"(timestamp with time zone)',
+          'EXECUTE'
+        ) AS anon_can_execute,
+        has_function_privilege(
+          'authenticated',
+          'public."AI_Crypto_Bot_Run_Database_AI_Analysis"(timestamp with time zone)',
+          'EXECUTE'
+        ) AS authenticated_can_execute,
+        (
+          SELECT NOT proc.prosecdef
+            AND proc.proconfig @> ARRAY['search_path=\"\"']
+          FROM pg_catalog.pg_proc AS proc
+          WHERE proc.pronamespace IN (
+            'public'::regnamespace,
+            pg_catalog.to_regnamespace('"AI_Crypto_Bot_Internal"')
+          )
+            AND proc.proname = 'AI_Crypto_Bot_Run_Database_AI_Analysis'
+        ) AS invoker_with_empty_search_path
+    `);
+    assert.deepEqual(privileges.rows[0], {
+      service_role_can_execute: true,
+      anon_can_execute: false,
+      authenticated_can_execute: false,
+      invoker_with_empty_search_path: true
+    });
+    const helperPrivileges = await database.query(`
+      SELECT
+        proc.proname,
+        has_function_privilege('service_role', proc.oid, 'EXECUTE') AS service_role_can_execute,
+        has_function_privilege('anon', proc.oid, 'EXECUTE') AS anon_can_execute,
+        has_function_privilege('authenticated', proc.oid, 'EXECUTE') AS authenticated_can_execute,
+        NOT proc.prosecdef AS security_invoker,
+        proc.proconfig @> ARRAY['search_path=\"\"'] AS empty_search_path
+      FROM pg_catalog.pg_proc AS proc
+      WHERE proc.pronamespace IN (
+        'public'::regnamespace,
+        pg_catalog.to_regnamespace('"AI_Crypto_Bot_Internal"')
+      )
+        AND proc.proname IN (
+          'AI_Crypto_Bot_AI_Analysis_Round',
+          'AI_Crypto_Bot_AI_Analysis_Clamp',
+          'AI_Crypto_Bot_AI_Analysis_Ema_Series',
+          'AI_Crypto_Bot_AI_Analysis_Timeframe',
+          'AI_Crypto_Bot_Run_Database_AI_Analysis'
+        )
+      ORDER BY proc.proname
+    `);
+    assert.equal(helperPrivileges.rows.length, 5);
+    assert.ok(helperPrivileges.rows.every((row) =>
+      row.service_role_can_execute
+        && !row.anon_can_execute
+        && !row.authenticated_can_execute
+        && row.security_invoker
+        && row.empty_search_path
+    ));
+    const roundingValues = [1.005, 2.675, -1.005, 1.235, 0.125, -0.125];
+    for (const value of roundingValues) {
+      const rounded = await database.query(
+        `SELECT "AI_Crypto_Bot_Internal"."AI_Crypto_Bot_AI_Analysis_Round"(
+          $1::double precision
+        ) AS result`,
+        [value]
+      );
+      assert.equal(Number(rounded.rows[0].result), Number(value.toFixed(2)));
+    }
+
+    const risingCandles = createAnalysisCandles(symbol, 160, "up", analysisTime);
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "up"),
+      candles: risingCandles
+    });
+    const rising = await assertDatabaseAnalysisParity(database, symbol, analysisTime);
+    assert.deepEqual(rising, {
+      analyzed_markets: 1,
+      decisions_stored: 1,
+      buy_count: 1,
+      sell_count: 0,
+      hold_count: 0,
+      wait_count: 0
+    });
+    const fullHistory = await database.query(
+      `SELECT indicators -> 'timeframes' AS timeframes
+       FROM public."AI_Crypto_Bot_AI_Decisions"
+       WHERE symbol = $1`,
+      [symbol]
+    );
+    for (const interval of analysisIntervals) {
+      assert.equal(fullHistory.rows[0].timeframes[interval].candleCount, 150);
+      assert.equal(fullHistory.rows[0].timeframes[interval].analyzedCandleCount, 150);
+    }
+
+    const fallingCandles = createAnalysisCandles(symbol, 150, "down", analysisTime);
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "down"),
+      candles: fallingCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).sell_count, 1);
+
+    const neutralCandles = createAnalysisCandles(symbol, 150, "flat", analysisTime);
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "flat"),
+      candles: neutralCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).hold_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: null,
+      candles: risingCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime),
+      candles: []
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime),
+      candles: createAnalysisCandles(symbol, 25, "up", analysisTime)
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime),
+      candles: createAnalysisCandles(
+        symbol,
+        60,
+        "up",
+        new Date(analysisTime.getTime() - 4 * 24 * 60 * 60 * 1000)
+      )
+    });
+    const staleCandles = await assertDatabaseAnalysisParity(database, symbol, analysisTime);
+    assert.equal(staleCandles.wait_count, 1);
+    const staleDecision = await database.query(
+      `SELECT decision, reason, indicators #>> '{dataQuality,staleCandleIntervals}' AS stale_intervals
+       FROM public."AI_Crypto_Bot_AI_Decisions" WHERE symbol = $1`,
+      [symbol]
+    );
+    assert.equal(staleDecision.rows[0].reason, "STALE_CANDLE_DATA");
+    assert.equal(staleDecision.rows[0].stale_intervals, '["1m", "5m", "15m", "1h", "4h", "1d"]');
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime),
+      candles: createAnalysisCandles(
+        symbol,
+        60,
+        "up",
+        new Date(analysisTime.getTime() + 2 * 60000)
+      )
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "up", 16 * 60 * 1000),
+      candles: risingCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "up", -1000),
+      candles: risingCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).wait_count, 1);
+
+    await database.exec(
+      `ALTER TABLE public."AI_Crypto_Bot_Candles"
+       DROP CONSTRAINT "AI_Crypto_Bot_Candles_ohlc_valid"`
+    );
+    const invalidCandles = createAnalysisCandles(symbol, 60, "up", analysisTime);
+    for (const interval of analysisIntervals) {
+      const invalid = { ...invalidCandles.find((candle) => candle.interval === interval) };
+      invalid.open = invalid.close + 2;
+      invalid.timestamp = new Date(analysisTime.getTime() - 2 * 60 * 60 * 1000).toISOString();
+      invalidCandles.push(invalid);
+    }
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime),
+      candles: invalidCandles
+    });
+    assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).buy_count, 1);
+    const invalidCounts = await database.query(
+      `SELECT indicators #>> '{dataQuality,invalidCandlesIgnored}' AS invalid_total
+       FROM public."AI_Crypto_Bot_AI_Decisions" WHERE symbol = $1`,
+      [symbol]
+    );
+    assert.equal(invalidCounts.rows[0].invalid_total, "6");
+
+    const duplicate = invalidCandles.find((candle) => candle.interval === "1m" && candle.open < candle.close);
+    await assert.rejects(
+      database.query(
+        `INSERT INTO public."AI_Crypto_Bot_Candles"
+          (symbol, interval, open, high, low, close, volume, "timestamp")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          duplicate.symbol,
+          duplicate.interval,
+          duplicate.open,
+          duplicate.high,
+          duplicate.low,
+          duplicate.close,
+          duplicate.volume,
+          duplicate.timestamp
+        ]
+      ),
+      { code: "23505" }
+    );
+
+    const plan = await database.query(
+      `EXPLAIN (ANALYZE, FORMAT JSON)
+       SELECT candle."timestamp", candle.open, candle.high, candle.low, candle.close, candle.volume
+       FROM public."AI_Crypto_Bot_Candles" AS candle
+       WHERE candle.symbol = $1 AND candle.interval = $2
+       ORDER BY candle."timestamp" DESC
+       LIMIT 150`,
+      [symbol, "1m"]
+    );
+    assert.equal(plan.rows.length, 1);
+    assert.ok(plan.rows[0]["QUERY PLAN"]);
+    await assert.rejects(
+      withRole(database, "anon", () => database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Run_Database_AI_Analysis"($1::timestamptz)`,
+        [analysisTime]
+      )),
+      { code: "42501" }
+    );
+    await assert.rejects(
+      withRole(database, "service_role", () => database.query(
+        `SELECT * FROM public."AI_Crypto_Bot_Run_Database_AI_Analysis"(NULL::timestamptz)`
+      )),
+      { code: "22023" }
+    );
   } finally {
     await database.close();
   }

@@ -58,6 +58,7 @@ Publieke accountpagina's: `login.html`, `register.html` en `reset-password.html`
 - De database-integratietests voeren de Supabase migrations uit in PGlite; er zijn geen Supabase-credentials nodig.
 - Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
 - Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` en `ADMIN_USER_IDS` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. `ADMIN_USER_IDS` bevat een komma-gescheiden lijst van Supabase Auth-gebruikers-UUID's. De service-role sleutel, cron secret en allowlist blijven server-side; geef `CRON_SECRET` alleen aan een externe scheduler mee als `Authorization: Bearer <CRON_SECRET>`.
+- `AI_ANALYSIS_MODE` defaults to `javascript`; set `database` only after manually applying and verifying the additive migration and completing the rollout prerequisites in the prototype report.
 - Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
 - Supabase JS en Chart.js worden via vastgepinde CDN-modules geladen. De Agent Status-circuitvisualisatie gebruikt native SVG/CSS en voegt geen externe renderbibliotheek toe. PGlite is alleen een development dependency voor database tests.
 
@@ -110,4 +111,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 13 Analytics production fix report](./docs/reports/PHASE_13_ANALYTICS_PRODUCTION_FIX_REPORT.md)
 - [Analytics pagination fix report](./docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md)
 - [Phase 07 candle query fix report](./docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
+- [AI database analysis prototype report](./docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md)
 - [Final release report](./docs/reports/FINAL_RELEASE_REPORT.md)
