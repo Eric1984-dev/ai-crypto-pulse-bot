@@ -9,8 +9,9 @@ All notable project changes should be documented here.
 ### Database AI analysis failure diagnostics
 
 - Include the failed database-analysis RPC HTTP status and a strictly validated SQLSTATE/PostgREST code in internal error logs
+- For SQLSTATE `42501`, classify the permission-object type and log a target only when it matches the project's fixed object allowlist
 - Never log the RPC error body, provider message, or request credentials; keep JavaScript as the default and database-mode failure closed
-- Add regression tests for safe recognized and unrecognized error codes
+- Add regression tests for safe recognized/unrecognized error codes and allowlisted/unknown permission targets
 
 ### Opt-in database-side AI analysis prototype
 

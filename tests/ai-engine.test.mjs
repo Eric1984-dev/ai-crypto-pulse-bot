@@ -1005,6 +1005,60 @@ test("database analysis failure never logs an unrecognized provider error code",
   assert.equal(JSON.stringify(failureLog).includes("provider detail"), false);
 });
 
+test("database permission failures log only classified, allowlisted object targets", async () => {
+  const cases = [
+    [
+      'permission denied for table "AI_Crypto_Bot_AI_Decisions"',
+      "table",
+      "public.AI_Crypto_Bot_AI_Decisions"
+    ],
+    [
+      'permission denied for function "AI_Crypto_Bot_Internal"."AI_Crypto_Bot_AI_Analysis_Timeframe"',
+      "function",
+      "AI_Crypto_Bot_Internal.AI_Crypto_Bot_AI_Analysis_Timeframe"
+    ],
+    [
+      'permission denied for schema "AI_Crypto_Bot_Internal"',
+      "schema",
+      "AI_Crypto_Bot_Internal"
+    ],
+    [
+      'permission denied for table "private_customer_data"',
+      "table",
+      null
+    ]
+  ];
+
+  for (const [message, expectedType, expectedObject] of cases) {
+    const errorLogs = [];
+    const harness = createEngineHarness({
+      failDatabaseAnalysis: true,
+      databaseAnalysisFailureStatus: 401,
+      databaseAnalysisFailureBody: { code: "42501", message },
+      logger: {
+        info() {},
+        error(logMessage, fields) {
+          errorLogs.push({ message: logMessage, fields });
+        }
+      }
+    });
+
+    await assert.rejects(
+      harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" }),
+      (error) => error.code === "DATABASE_ANALYSIS_FAILED"
+    );
+    const failureLog = errorLogs.find(({ message: logMessage }) =>
+      logMessage === "AI analysis failed."
+    );
+    assert.equal(failureLog.fields.databaseAnalysisHttpStatus, 401);
+    assert.equal(failureLog.fields.databaseAnalysisErrorCode, "42501");
+    assert.equal(failureLog.fields.databaseAnalysisPermissionObjectType, expectedType);
+    assert.equal(failureLog.fields.databaseAnalysisPermissionObject, expectedObject);
+    assert.equal(JSON.stringify(failureLog).includes("permission denied"), false);
+    assert.equal(JSON.stringify(failureLog).includes("private_customer_data"), false);
+  }
+});
+
 test("database analysis rejects inconsistent RPC summaries and marks ERROR", async () => {
   const harness = createEngineHarness({
     databaseAnalysisSummary: {
