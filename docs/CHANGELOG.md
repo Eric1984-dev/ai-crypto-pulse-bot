@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Shadow exit RPC timeout diagnostics
+
+- Increase the bounded shadow-evaluation request timeout from 750 ms to 2.5 seconds
+- Distinguish request timeouts from other Supabase transport failures in internal logs while keeping shadow failures non-blocking for paper trading
+- Ignore the workspace-specific `.vscode/mcp.json` configuration file in Git
+
 ### Database AI analysis failure diagnostics
 
 - Fix database-mode RPC authentication to use the service-role Bearer token and add a header regression assertion

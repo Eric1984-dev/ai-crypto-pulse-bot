@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createPaperTradingHandler } from "../api/paper-trading.mjs";
 import { createPaperTradingService, PaperTradingError } from "../lib/paper-trading.mjs";
-import { SHADOW_EXIT_RULES, SHADOW_EXIT_RULE_VERSION } from "../lib/shadow-exits.mjs";
+import {
+  createShadowExitService,
+  SHADOW_EXIT_RULES,
+  SHADOW_EXIT_RULE_VERSION,
+  ShadowExitEvaluationError
+} from "../lib/shadow-exits.mjs";
 
 const serviceEnv = {
   SUPABASE_URL: "https://project.supabase.co",
@@ -135,6 +140,40 @@ test("shadow evaluation failures are logged separately and do not fail a complet
   assert.deepEqual(result, runResult);
   assert.deepEqual(errors, [["Shadow exit evaluation failed.", "SHADOW_EXIT_DATABASE_FAILED"]]);
   assert.equal(shadowCalls, 2);
+});
+
+test("shadow RPC timeouts are distinguished from transport failures", async () => {
+  const timedOut = createShadowExitService({
+    fetchImpl: async () => {
+      throw Object.assign(new Error("request timed out"), { name: "TimeoutError" });
+    }
+  });
+  await assert.rejects(
+    timedOut.evaluate({
+      config: { supabaseUrl: serviceEnv.SUPABASE_URL },
+      serviceRoleKey: serviceEnv.SUPABASE_SERVICE_ROLE_KEY
+    }),
+    (error) => (
+      error instanceof ShadowExitEvaluationError
+      && error.code === "SHADOW_EXIT_DATABASE_TIMEOUT"
+    )
+  );
+
+  const unavailable = createShadowExitService({
+    fetchImpl: async () => {
+      throw new TypeError("fetch failed");
+    }
+  });
+  await assert.rejects(
+    unavailable.evaluate({
+      config: { supabaseUrl: serviceEnv.SUPABASE_URL },
+      serviceRoleKey: serviceEnv.SUPABASE_SERVICE_ROLE_KEY
+    }),
+    (error) => (
+      error instanceof ShadowExitEvaluationError
+      && error.code === "SHADOW_EXIT_DATABASE_UNAVAILABLE"
+    )
+  );
 });
 
 test("paper trading service rejects unavailable databases and malformed RPC results", async () => {

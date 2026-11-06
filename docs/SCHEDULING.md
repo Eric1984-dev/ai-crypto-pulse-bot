@@ -65,7 +65,7 @@ Schedule the paper-trading request only after the AI-analysis request completes;
 
 Inspect the JSON status and the `paperTradingDurationMs`, `portfoliosProcessed`, `decisionsProcessed`, `tradesExecuted`, `duplicates`, and `skipped` metrics. A skipped run may indicate that analysis is still in progress or another paper-trading invocation holds the database lock. The 15-minute freshness check, confidence/risk checks, and per-market cooldown are enforced in the database. No private Bitvavo endpoint, account credential, or real order is used.
 
-The existing shared service also performs best-effort shadow-exit evaluation; no additional scheduled request, Vercel Function, or scheduler job is required. Shadow errors are logged separately and must not fail the real run. Evaluation calls use their own serialization/idempotency safeguards and cannot create trades or change portfolio state.
+The existing shared service also performs best-effort shadow-exit evaluation; no additional scheduled request, Vercel Function, or scheduler job is required. Each evaluation request has a 2.5-second timeout; timeout and transport failures are logged separately and must not fail the real run. Evaluation calls use their own serialization/idempotency safeguards and cannot create trades or change portfolio state.
 
 ## Future scheduled work
 

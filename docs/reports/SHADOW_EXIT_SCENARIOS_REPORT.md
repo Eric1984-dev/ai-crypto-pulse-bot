@@ -34,7 +34,7 @@ Each rule is an independent hypothetical strategy. No candidate is selected, tun
 
 ## Execution isolation and persistence
 
-The shared paper-trading service calls the shadow evaluator independently before the actual run and, when trades execute, afterward. The post-run evaluation allows newly opened positions to initialize and actual SELLs to finalize their scenarios. Shadow failures are logged separately and do not fail a successful real paper-trading run.
+The shared paper-trading service calls the shadow evaluator independently before the actual run and, when trades execute, afterward. The post-run evaluation allows newly opened positions to initialize and actual SELLs to finalize their scenarios. Each request is bounded by a 2.5-second timeout; timeout errors are logged separately from transport and HTTP failures. Shadow failures do not fail a successful real paper-trading run.
 
 The evaluator uses its own database advisory lock and idempotent scenario/event keys to protect retries and overlapping invocations. It has no call path to AI decision generation or paper-trade execution. It writes only:
 
