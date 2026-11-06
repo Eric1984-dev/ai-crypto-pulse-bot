@@ -4,11 +4,23 @@ Date: 2026-11-06
 
 ## Status and scope
 
-**Readiness: READY FOR MANUAL MIGRATION REVIEW; NOT approved for production rollout.**
+**Status: deployed and first production run observed successful; continued monitoring is recommended.**
 
-This is a local, opt-in prototype. The JavaScript AI engine remains the default (`AI_ANALYSIS_MODE=javascript` when unset). Database mode is selected only by explicitly setting `AI_ANALYSIS_MODE=database` on the existing `/api/ai-analysis` route. The mode is not approved or enabled in production.
+The implementation was initially developed and validated as a local, opt-in prototype. Since this report was first written, the user applied the migration, deployed the application, set `AI_ANALYSIS_MODE=database`, and shared a successful production log. The existing `/api/ai-analysis` route now selects the database analysis path when that environment variable is set to `database`; JavaScript remains the default when it is unset.
 
-No Supabase migration was applied, no production data or settings were changed, no scheduler configuration was changed, and no deployment occurred. Validation used repository tests with local PGlite fixtures; no production Supabase query or write was run. Paper trading, the Risk Manager, the market universe, the six analysis intervals, and `ENABLE_LIVE_TRADING=false` were not changed. No API route or dependency was added.
+The production facts in this update are based on logs and SQL results supplied by the user in the conversation; they were not independently queried from Supabase or Vercel. No scheduler change or new API route was reported. Paper trading, the Risk Manager, the market universe, the six analysis intervals, and `ENABLE_LIVE_TRADING=false` were not changed by this implementation. No dependency was added.
+
+### First production observation (user-provided evidence)
+
+The shared Vercel log reported `analysisMode: "database"`, 102 markets analyzed, 102 decisions stored, zero WAIT decisions, and a successful completion. It reported `databaseAnalysisMs: 6385` and `runtimeMs: 7608`. The associated response-traffic estimate listed a 110-byte JSON body estimate for the analysis RPC, alongside the existing status GET/PATCH responses. This confirms that the deployed route invoked the database path and completed one observed run; it does not establish sustained reliability or exact production parity with JavaScript for changing market inputs.
+
+The earlier JavaScript-mode log after the minimal decision-insert response change reported about 7,003,179 estimated JSON response bytes across the AI-analysis invocation. Compared with the database-mode log's approximately 591 estimated response bytes across its three endpoints, that is a roughly 99.99% reduction in these logged, re-serialized response-body estimates for those two runs. These are not wire-byte measurements or billed Supabase egress, and the runs were not controlled or simultaneous. Use them as an indicative comparison only.
+
+### Database analysis timeout follow-up
+
+The user later shared an `AI analysis failed` log with `DATABASE_UNAVAILABLE`, total runtime **8,908 ms**, and only the successful status GET/PATCH in `supabaseResponseTrafficJson`. The database-analysis RPC has an **8-second** client timeout in the pre-change code. Since the response metrics only record requests after `fetch` returns a `Response`, an RPC fetch that times out is absent from that list. The runtime and missing RPC response are consistent with an RPC timeout, but do not prove it; a transient connection failure is also possible. The Supabase and Vercel status pages were operational when checked.
+
+The local follow-up change gives only `AI_Crypto_Bot_Run_Database_AI_Analysis` a **10-second** timeout. Other AI-engine Supabase requests retain their existing **8-second** timeout. This adds bounded time for a slower analysis RPC; it does not retry, change analysis or trading logic, or provide a JavaScript fallback. This follow-up has not yet been deployed or verified in production.
 
 ## Changes
 
@@ -17,6 +29,7 @@ No Supabase migration was applied, no production data or settings were changed, 
 3. The SQL caps enabled markets at 2,000 and reads no more than the latest 150 candle rows for each of the six intervals and each market. It does not send candle rows or full decisions/indicators back through PostgREST. The `AI_Crypto_Bot_Internal` helper schema and functions are not exposed to `PUBLIC`, `anon`, or `authenticated`; execution is granted to `service_role`. Functions use `SECURITY INVOKER`, an empty `search_path`, and qualified references.
 4. The existing API route selects database mode only by explicit opt-in. RPC errors are surfaced as analysis failure, status transitions to `ERROR` through the existing lifecycle, and the route does not silently fall back to JavaScript.
 5. This review replaced two qualified wildcard projections in the migration with explicit column lists. The database migration test now guards against adding `SELECT *` projections.
+6. The database-analysis RPC now has a dedicated 10-second client timeout; other Supabase requests in the AI engine retain their 8-second timeout.
 
 No API route was added. The repository has 12 API handler files, so the existing 12-function limit is unchanged.
 
@@ -74,17 +87,26 @@ The supplied baseline is for one successful analysis run and is explicitly an un
 
 The four remaining responses sum to **22,853 bytes** (17,227 + 5,149 + 21 + 456). Together with the two large responses, the components reconcile exactly to **7,386,005 bytes**. Every value above is an uncompressed JSON estimate, not measured or billed egress.
 
-The database mode is intended to avoid returning candle rows to Vercel, replacing that response with a small aggregate summary. The AI-decision insert response was separately addressed in code with `return=minimal`; whether that change is active in production is unverified. These figures are optimization baselines only: no production response-size comparison, compressed wire-byte measurement, or billing reduction was made.
+The database mode avoids returning candle rows to Vercel, replacing that response with a small aggregate summary. The AI-decision insert response was separately changed to `return=minimal`. The user-provided production logs now show a small aggregate RPC response and no large candle payload in the database-mode invocation. This is an indicative response-size comparison only: compressed wire bytes and billed egress have not been measured or attributed to this change.
 
-## Manual migration and rollout prerequisites
+## Rollout record and remaining verification
 
-Do not set `AI_ANALYSIS_MODE=database` until all of these are completed separately:
+The user reported completing the migration and deployment, then switching the server-side mode to `database`. The following checks were shared:
 
-1. Confirm the intended Supabase project identity and review the exact additive migration at `supabase/migrations/20261106120000_ai_analysis_database_mode.sql`.
-2. Apply it manually through the approved migration workflow. This task did not apply it.
-3. Verify in the target database that the migration is recorded, the RPC signature is present, and the helper/public functions have the expected `SECURITY INVOKER`, empty `search_path`, schema usage, and execution grants. Confirm `PUBLIC`, `anon`, and `authenticated` cannot invoke the analysis function or helpers and that `service_role` can.
-4. Re-run the migration validation and parity tests against the release candidate. Validate representative runtime and execution plans on the intended database with bounded, read-only analysis queries before enabling writes.
-5. Obtain explicit rollout approval, then set the server-side Vercel environment variable to `AI_ANALYSIS_MODE=database` and deploy through the normal release process. Monitor the API result, status transitions, analyzed/stored counts, decision distribution, runtime, and errors. Keep the existing scheduler unchanged.
+1. The compact candle RPC's function signature and execution privileges were checked in Supabase; the user reported `service_role=true`, `anon=false`, and `authenticated=false` for that RPC.
+2. A Vercel production log showed the compact candle RPC returning HTTP 200 before the database-analysis switch.
+3. After the database-analysis deployment and mode switch, a production log showed one successful analysis run with 102 markets analyzed and 102 decisions stored.
+4. The user reported that the subsequent paper-trading run completed without errors.
+
+The following are still not established by the evidence in this report:
+
+- Exact parity between JavaScript and database analysis on identical production inputs. Local PGlite tests establish parity only for their covered fixtures; the production runs used different market snapshots/candles.
+- Reliability across repeated scheduled runs, overlap/concurrency behavior, or long-term timeout headroom.
+- Whether the shared `DATABASE_UNAVAILABLE` production failure was specifically caused by the 8-second RPC timeout; the follow-up timeout change requires deployment and monitoring before its effect is known.
+- The exact change in Supabase billed PostgREST egress. Vercel's JSON re-serialization estimates are not wire-byte or billing measurements.
+- Independent confirmation of the production project, migration history, grants for the analysis RPC and all helpers, or current production environment settings. The successful database-mode log is evidence that the route reached a working RPC, but it does not replace a full ACL/project audit.
+
+After the timeout follow-up is deployed, compare the next several scheduled runs for the database-mode completion log, analyzed/stored totals, decision count sum, status returning to `ACTIVE`/`IDLE`, runtime, errors, and downstream paper-trading completion. In particular, watch for recurring `DATABASE_UNAVAILABLE` errors near 10 seconds. Do not compare BUY/SELL/HOLD distributions across different timestamps as a parity test; exact parity requires identical frozen inputs.
 
 The migration adds no tables, does not alter existing rows or trading safeguards, and adds no Vercel Function. It is additive, so rollback does not require deleting data or reversing schema changes.
 
@@ -121,4 +143,13 @@ Set `AI_ANALYSIS_MODE=javascript` (or remove the variable, which defaults to Jav
 | `npm.cmd run build` | Passed: static project validation and database migration validation; 18 prefixed tables, RLS coverage, and initial seed consistency |
 | `git diff --check` | Passed with no output |
 
-No production SQL query, migration, write, configuration change, scheduler change, or deployment was performed.
+### Timeout follow-up validation
+
+| Command | Result |
+|---|---|
+| `node --test --test-name-pattern="database analysis RPC has a 10-second" tests/ai-engine.test.mjs` | Passed: 1 test, 0 failures |
+| `npm.cmd test` | Passed: 302 tests, 0 failures |
+| `npm.cmd run build` | Passed: static project validation and database migration validation; 18 prefixed tables, RLS coverage, and initial seed consistency |
+| `git diff --check` | Passed with no output |
+
+The timeout follow-up is local and has not been deployed. The production migration, prior deployment, configuration switch, successful analysis log, reported timeout, and paper-trading outcome described above were supplied by the user and were not independently queried or changed by this report author.

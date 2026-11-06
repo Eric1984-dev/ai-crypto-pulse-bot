@@ -6,6 +6,11 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Database AI analysis timeout headroom
+
+- Give the database-analysis RPC a dedicated 10-second request timeout; keep all other AI-engine Supabase requests at 8 seconds
+- Add regression coverage to ensure only the database-analysis RPC receives the longer timeout
+
 ### Shadow exit RPC timeout diagnostics
 
 - Increase the bounded shadow-evaluation request timeout from 750 ms to 2.5 seconds

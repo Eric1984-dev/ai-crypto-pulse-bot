@@ -112,4 +112,5 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Analytics pagination fix report](./docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md)
 - [Phase 07 candle query fix report](./docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
 - [AI database analysis prototype report](./docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md)
+- [Supabase AI decision and candle history archive feasibility report](./docs/reports/SUPABASE_AI_CANDLE_HISTORY_ARCHIVE_FEASIBILITY_REPORT.md)
 - [Final release report](./docs/reports/FINAL_RELEASE_REPORT.md)

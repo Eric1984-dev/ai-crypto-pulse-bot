@@ -160,7 +160,8 @@ function createEngineHarness({
       method,
       url: url.toString(),
       body: options.body,
-      headers: options.headers
+      headers: options.headers,
+      signal: options.signal
     };
     requests.push(request);
 
@@ -951,6 +952,24 @@ test("database analysis is opt-in and returns only its validated summary", async
   assert.equal(harness.getStatus().status, "ACTIVE");
   assert.equal(logEntries[0].message, "AI database analysis completed.");
   assert.equal(logEntries[0].fields.buyCount, 1);
+});
+
+test("database analysis RPC has a 10-second timeout without extending other request timeouts", async (t) => {
+  const timeoutBySignal = new WeakMap();
+  t.mock.method(AbortSignal, "timeout", (milliseconds) => {
+    const signal = new AbortController().signal;
+    timeoutBySignal.set(signal, milliseconds);
+    return signal;
+  });
+  const harness = createEngineHarness();
+
+  await harness.service.runAnalysis({ config, serviceRoleKey, analysisMode: "database" });
+
+  const databaseRequest = harness.requests.find(({ table }) => table === databaseAiAnalysisRpc);
+  const otherRequests = harness.requests.filter(({ table }) => table !== databaseAiAnalysisRpc);
+  assert.equal(timeoutBySignal.get(databaseRequest.signal), 10_000);
+  assert.ok(otherRequests.length > 0);
+  assert.ok(otherRequests.every(({ signal }) => timeoutBySignal.get(signal) === 8000));
 });
 
 test("database analysis failure marks ERROR without falling back to JavaScript", async () => {
