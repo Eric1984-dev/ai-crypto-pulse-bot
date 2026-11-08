@@ -13,7 +13,7 @@ CryptoPulse AI Agent is designed to run on:
 
 Import the repository into Vercel with the repository root as the project root. The project is framework-free: `vercel.json` sets `outputDirectory` to `.` because the static HTML/CSS/JS files live in the repository root. This overrides a stale Project Settings value such as `public`; no `public/` folder or generated build directory is required. The same config enables clean URLs and orders protected-page routes before the filesystem handler, so root-level static HTML cannot bypass the authentication function.
 
-The root `.vercelignore` excludes `/archive-server/` from Vercel deployments. The directory remains in Git for Raspberry Pi installation and updates; `.vercelignore` excludes it from Vercel's deployment input but does not remove it from the Git repository. Keep `archive-server/.env` and other Pi-only credentials out of Git.
+The root `.vercelignore` excludes `/archive-server/` from Vercel deployments. The project validator skips Pi-only directory and environment-template checks when Vercel sets `VERCEL=1`; local builds still validate the archive server template. The directory remains in Git for Raspberry Pi installation and updates; `.vercelignore` excludes it from Vercel's deployment input but does not remove it from the Git repository. Keep `archive-server/.env` and other Pi-only credentials out of Git.
 
 ### iPhone home-screen icon
 

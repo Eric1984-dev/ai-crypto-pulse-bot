@@ -28,6 +28,7 @@ All notable project changes should be documented here.
 - Record the user's report that the first manual sync successfully copied data to PostgreSQL on the Pi; exact row counts were not provided or independently verified
 - Clarify that `archive-server/` runs on the Pi and is not deployed as a Vercel project or serverless function
 - Exclude `/archive-server/` from Vercel deployment inputs with the root `.vercelignore`, while retaining the source in Git for Pi installation and updates
+- Keep project validation passing in Vercel builds by skipping checks for the intentionally excluded Pi-only archive directory; retain those checks for local builds
 - Remove superseded watched-market reader V1 role and standalone RLS SQL drafts; retain V2, which is used by the archive market-seed utility
 
 ### Archive Server monitoring
