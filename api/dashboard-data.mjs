@@ -18,6 +18,7 @@ import {
 } from "../lib/analytics-exports.mjs";
 import { generateRecommendations } from "../lib/recommendations.mjs";
 import { SHADOW_EXIT_RULES } from "../lib/shadow-exits.mjs";
+import { fetchArchiveServerHealth } from "../lib/archive-server-health.mjs";
 
 const {
   clearSessionCookie,
@@ -118,6 +119,17 @@ export function createHandler({
           ? request.params.get("type")
           : null
       };
+
+      if (request.view === "archive-health") {
+        const data = await fetchArchiveServerHealth({
+          baseUrl: env.ARCHIVE_SERVER_URL,
+          token: env.ARCHIVE_HEALTH_TOKEN,
+          environment: env.NODE_ENV,
+          fetchImpl
+        });
+        sendJson(res, 200, { data });
+        return;
+      }
 
       if (request.view === "export-count") {
         const exportType = request.params.get("type");
@@ -330,6 +342,7 @@ function readDashboardRequest(req) {
     "trade-history",
     "analytics",
     "recommendations",
+    "archive-health",
     "export-count",
     "export"
   ]);

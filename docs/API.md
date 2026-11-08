@@ -84,6 +84,27 @@ Unauthenticated or expired session: `401`. Wrong method: `405`. Missing configur
 
 The authenticated dashboard requests this endpoint after session initialization, then every 30 seconds while visible and immediately when returning to the foreground. Watched-market symbols and priorities are included in this response. Its subtle activity strip displays the stored bot `last_run`, latest market-data `captured_at`, and latest paper-trade timestamp. Analytics and Market Scanner are on-demand views and do not persist run history, so they are labeled accordingly rather than given fabricated timestamps. The dashboard does not request scanner rankings; the dedicated Scanner page uses `/api/market-summary`. Browser requests and server-side PostgREST reads use `no-store`; no endpoint or response contract was added for this refresh behavior.
 
+### Archive Server health view
+
+The protected dashboard also uses `GET /api/dashboard-data?view=archive-health`. It reuses the authenticated dashboard function and does not add a Vercel Function or query Supabase tables. The server-side handler requests `GET {ARCHIVE_SERVER_URL}/api/health` with a three-second timeout, HTTPS in production, no redirects, and `Cache-Control: no-store`.
+
+The external Raspberry Pi endpoint contract is:
+
+```json
+{
+  "server": "online",
+  "postgresql": "online",
+  "database": "online",
+  "diskUsage": 12,
+  "databaseSize": "2.3 GB",
+  "lastHealthCheck": "2026-11-06T12:00:00.000Z"
+}
+```
+
+The Pi-side endpoint accepts only `GET /api/health` with a bearer token. It returns `Cache-Control: no-store`; it does not expose database connection details or error text. Statuses are `online`/`offline`, disk usage is a percentage from 0 to 100 (or `null`), database size is a short string (or `null`), and `lastHealthCheck` is an ISO timestamp. The service uses a separate TCP reachability probe for PostgreSQL and a verified-TLS SQL query to confirm the configured database and size.
+
+The Vercel handler sends `Authorization: Bearer <ARCHIVE_HEALTH_TOKEN>` in its bounded server-side request. The token must contain at least 32 bytes and is configured only in the Pi service and Vercel server environment. `ARCHIVE_DB_*` credentials stay on the Pi. On missing configuration, connection errors, non-success HTTP responses, invalid JSON, invalid timestamps, or invalid fields, the authenticated view returns HTTP 200 with all statuses `offline` and unknown values as `null`. The dashboard displays this state without raising its main data error or calling any trading endpoint. It polls immediately after authentication, then every five minutes while visible, pauses while hidden, and refreshes on return to the foreground. The browser never receives the archive URL or token.
+
 ### Trade History view
 
 The existing `GET /api/dashboard-data` function also serves the authenticated trade-history page when requested with `view=trade-history`; this does not add a Vercel Function. Optional query parameters:

@@ -4,6 +4,7 @@ const path = require("node:path");
 const test = require("node:test");
 const dashboard = require("../js/dashboard.js");
 const dashboardDataModule = import("../api/dashboard-data.mjs");
+const archiveServerHealthModule = import("../lib/archive-server-health.mjs");
 
 const authEnv = {
   SUPABASE_URL: "https://project.supabase.co",
@@ -313,6 +314,111 @@ test("authenticated dashboard API returns real table data and computed summaries
   )));
   assert.deepEqual(data.portfolioSnapshots.map((snapshot) => snapshot.portfolio_value), ["1050", "1100"]);
   assert.equal(data.generatedAt, generatedAt.toISOString());
+});
+
+test("archive health dashboard view proxies the configured endpoint without querying Supabase data", async () => {
+  const module = await dashboardDataModule;
+  const calls = [];
+  const health = {
+    server: "online",
+    postgresql: "online",
+    database: "online",
+    diskUsage: 12,
+    databaseSize: "2.3 GB",
+    lastHealthCheck: "2026-11-06T12:00:00.000Z"
+  };
+  const handler = module.createHandler({
+    env: {
+      ...authEnv,
+      ARCHIVE_SERVER_URL: "https://archive.example",
+      ARCHIVE_HEALTH_TOKEN: "a".repeat(48)
+    },
+    verify: async () => true,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, text: async () => JSON.stringify(health) };
+    }
+  });
+  const res = createResponse();
+
+  await handler({
+    method: "GET",
+    url: "/api/dashboard-data?view=archive-health",
+    headers: { cookie: sessionCookie }
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body).data, health);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://archive.example/api/health");
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.cache, "no-store");
+  assert.equal(calls[0].options.redirect, "error");
+  assert.equal(calls[0].options.headers.Accept, "application/json");
+  assert.equal(calls[0].options.headers.Authorization, `Bearer ${"a".repeat(48)}`);
+});
+
+test("archive health service fails closed for unreachable, invalid, and unsafe responses", async () => {
+  const { fetchArchiveServerHealth } = await archiveServerHealthModule;
+  const offline = {
+    server: "offline",
+    postgresql: "offline",
+    database: "offline",
+    diskUsage: null,
+    databaseSize: null,
+    lastHealthCheck: null
+  };
+
+  let fetchCalledWithoutToken = false;
+  const missingToken = await fetchArchiveServerHealth({
+    baseUrl: "https://archive.example",
+    environment: "production",
+    fetchImpl: async () => {
+      fetchCalledWithoutToken = true;
+    }
+  });
+  assert.deepEqual(missingToken, offline);
+  assert.equal(fetchCalledWithoutToken, false);
+
+  const unreachable = await fetchArchiveServerHealth({
+    baseUrl: "https://archive.example",
+    token: "a".repeat(48),
+    environment: "production",
+    fetchImpl: async () => {
+      throw new TypeError("fetch failed");
+    }
+  });
+  assert.deepEqual(unreachable, offline);
+
+  const invalidPayload = await fetchArchiveServerHealth({
+    baseUrl: "https://archive.example",
+    token: "a".repeat(48),
+    environment: "production",
+    fetchImpl: async () => ({
+      ok: true,
+      text: async () => JSON.stringify({
+        server: "online",
+        postgresql: "online",
+        database: "online",
+        diskUsage: 101,
+        databaseSize: "2.3 GB",
+        lastHealthCheck: "2026-11-06T12:00:00.000Z"
+      })
+    })
+  });
+  assert.deepEqual(invalidPayload, offline);
+
+  let fetchCalled = false;
+  const insecureUrl = await fetchArchiveServerHealth({
+    baseUrl: "http://archive.example",
+    token: "a".repeat(48),
+    environment: "production",
+    fetchImpl: async () => {
+      fetchCalled = true;
+    }
+  });
+  assert.deepEqual(insecureUrl, offline);
+  assert.equal(fetchCalled, false);
 });
 
 test("dashboard API serializes separate shadow outcomes without changing actual portfolio metrics", async () => {
@@ -657,6 +763,13 @@ function createDashboardDocument() {
     "[data-dashboard-activity=\"paper-trade\"]",
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
+    "[data-archive-health=\"server\"]",
+    "[data-archive-health=\"postgresql\"]",
+    "[data-archive-health=\"database\"]",
+    "[data-archive-health=\"disk-usage\"]",
+    "[data-archive-health=\"database-size\"]",
+    "[data-archive-health=\"last-check\"]",
+    "[data-archive-health-meter]",
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"position-ai-status\"]",
@@ -703,6 +816,37 @@ function createDashboardDocument() {
   };
   return { dashboardDocument, elements };
 }
+
+test("dashboard renders archive health safely and shows Offline for unavailable fields", () => {
+  const { dashboardDocument, elements } = createDashboardDocument();
+  dashboard.renderArchiveHealth({
+    server: "online",
+    postgresql: "online",
+    database: "online",
+    diskUsage: 12.5,
+    databaseSize: "<b>2.3 GB</b>",
+    lastHealthCheck: "2026-11-06T12:00:00.000Z"
+  }, dashboardDocument);
+
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Online");
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "online");
+  assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Online");
+  assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Online");
+  assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "12.5%");
+  assert.equal(elements.get("[data-archive-health-meter]")[0].value, 12.5);
+  assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "<b>2.3 GB</b>");
+  assert.match(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, /2026/);
+
+  dashboard.renderArchiveHealth(null, dashboardDocument);
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Offline");
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "offline");
+  assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Offline");
+  assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Offline");
+  assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-archive-health-meter]")[0].hidden, true);
+  assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, "—");
+});
 
 test("dashboard renders database summaries, recent lists, and an actual-snapshot chart", () => {
   const { dashboardDocument, elements } = createDashboardDocument();
@@ -1520,26 +1664,29 @@ test("dashboard requests same-origin API data and validates error responses", as
 test("dashboard waits for authentication and offers retry after a load error", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   let resolveAuth;
-  let fetchCalls = 0;
+  const fetchCalls = [];
   const authReady = new Promise((resolve) => { resolveAuth = resolve; });
   const windowRef = {
     CryptoPulseAuthReady: authReady,
     location: { replace() {} },
     setInterval: () => 1,
     clearInterval() {},
-    fetch: async () => {
-      fetchCalls += 1;
+    fetch: async (url) => {
+      fetchCalls.push(url);
       throw new Error("network unavailable");
     }
   };
 
   dashboard.startDashboard({ windowRef, documentRef: dashboardDocument });
   await Promise.resolve();
-  assert.equal(fetchCalls, 0);
+  assert.equal(fetchCalls.length, 0);
 
   resolveAuth();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(fetchCalls, 1);
+  assert.deepEqual(fetchCalls, [
+    "/api/dashboard-data",
+    "/api/dashboard-data?view=archive-health"
+  ]);
   assert.equal(elements.get("[data-dashboard-error]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
 });
@@ -1593,6 +1740,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   let nextIntervalId = 0;
   let holdNextDashboardRequest = false;
   let failNextDashboardRequest = false;
+  let failNextArchiveRequest = false;
   let resolveHeldDashboardRequest;
   const windowRef = {
     CryptoPulseAuthReady: Promise.resolve(),
@@ -1627,6 +1775,26 @@ test("dashboard refreshes all data periodically and when returning to the foregr
       if (url === "/api/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
       }
+      if (url === "/api/dashboard-data?view=archive-health") {
+        if (failNextArchiveRequest) {
+          failNextArchiveRequest = false;
+          return { ok: false, status: 503 };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              server: "online",
+              postgresql: "online",
+              database: "online",
+              diskUsage: 12,
+              databaseSize: "2.3 GB",
+              lastHealthCheck: "2026-11-06T12:00:00.000Z"
+            }
+          })
+        };
+      }
       throw new Error(`Unexpected dashboard request: ${url}`);
     },
     setIntervalImpl(callback, delay) {
@@ -1646,8 +1814,13 @@ test("dashboard refreshes all data periodically and when returning to the foregr
 
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 1);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
-  assert.deepEqual([...intervals.values()].map(({ delay }) => delay).sort(), [15000, 30000]);
+  assert.deepEqual(
+    [...intervals.values()].map(({ delay }) => delay).sort(),
+    [15000, 30000, 300000]
+  );
   const dashboardInterval = [...intervals.values()].find(({ delay }) => delay === 30000);
+  const archiveInterval = [...intervals.values()].find(({ delay }) => delay === 300000);
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Online");
 
   dashboardData.aiDecisions.count = 2;
   await dashboardInterval.callback();
@@ -1671,7 +1844,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   dashboardData.aiDecisions.count = 4;
   dashboardDocument.visibilityState = "visible";
   dashboardDocument.listeners.visibilitychange();
-  assert.equal(intervals.size, 2);
+  assert.equal(intervals.size, 3);
   resolveHeldDashboardRequest();
   await Promise.all([heldRefresh, duplicateRefresh]);
   await flushDashboardLoad();
@@ -1693,7 +1866,13 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 5);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
-  assert.equal(intervals.size, 2);
+  assert.equal(intervals.size, 3);
+
+  failNextArchiveRequest = true;
+  await archiveInterval.callback();
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Offline");
+  assert.equal(elements.get("[data-dashboard-error]")[0].hidden, true);
+  assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
 
   failNextDashboardRequest = true;
   await dashboardInterval.callback();
@@ -1777,13 +1956,16 @@ test("dashboard applies live database status updates and pauses polling while hi
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ACTIVE");
   assert.equal(elements.get("[data-agent-brain-fallback]")[0].hidden, true);
   assert.deepEqual(statusUpdates, ["ACTIVE"]);
-  assert.equal(intervals.size, 2);
+  assert.equal(intervals.size, 3);
   const [intervalId, interval] = [...intervals.entries()]
     .find(([, currentInterval]) => currentInterval.delay === 15000);
   const [dashboardIntervalId, dashboardInterval] = [...intervals.entries()]
     .find(([, currentInterval]) => currentInterval.delay === 30000);
+  const [archiveIntervalId, archiveInterval] = [...intervals.entries()]
+    .find(([, currentInterval]) => currentInterval.delay === 300000);
   assert.equal(interval.delay, 15000);
   assert.equal(dashboardInterval.delay, 30000);
+  assert.equal(archiveInterval.delay, 300000);
 
   await controller.refreshAgentStatus();
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
@@ -1795,10 +1977,14 @@ test("dashboard applies live database status updates and pauses polling while hi
   dashboardDocument.visibilityState = "hidden";
   dashboardDocument.listeners.visibilitychange();
   assert.equal(intervals.size, 0);
-  assert.deepEqual(new Set(clearedIntervals), new Set([intervalId, dashboardIntervalId]));
+  assert.deepEqual(
+    new Set(clearedIntervals),
+    new Set([intervalId, dashboardIntervalId, archiveIntervalId])
+  );
   const callsBeforeHiddenPoll = statusUpdates.length;
   await interval.callback();
   await dashboardInterval.callback();
+  await archiveInterval.callback();
   assert.equal(statusUpdates.length, callsBeforeHiddenPoll);
 
   dashboardDocument.visibilityState = "visible";
@@ -1807,7 +1993,7 @@ test("dashboard applies live database status updates and pauses polling while hi
   dashboardDocument.listeners.visibilitychange();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "STOPPED");
-  assert.equal(intervals.size, 2);
+  assert.equal(intervals.size, 3);
   controller.dispose();
   assert.equal(intervals.size, 0);
 });

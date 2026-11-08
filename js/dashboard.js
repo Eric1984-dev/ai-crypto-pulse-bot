@@ -20,6 +20,7 @@
   const supportedAgentStatuses = ["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"];
   const agentStatusPollIntervalMs = 15000;
   const dashboardRefreshIntervalMs = 30000;
+  const archiveHealthRefreshIntervalMs = 300000;
   const dashboardListVisibleItemCount = 2;
   const dashboardListNames = ["positions", "trades", "position-ai-status"];
 
@@ -101,6 +102,88 @@
       throw new Error("Agent status response is invalid.");
     }
     return result.data.status;
+  }
+
+  async function requestArchiveHealth(fetchImpl) {
+    const response = await fetchImpl("/api/dashboard-data?view=archive-health", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) {
+      const error = new Error("Authentication is required.");
+      error.status = 401;
+      throw error;
+    }
+    if (!response.ok) {
+      throw new Error("Archive server health is unavailable.");
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("Archive server health response is invalid.");
+    }
+    if (!result || !result.data || typeof result.data !== "object") {
+      throw new Error("Archive server health response is invalid.");
+    }
+    return result.data;
+  }
+
+  function renderArchiveHealth(health, documentRef) {
+    const statusFields = ["server", "postgresql", "database"];
+    for (const field of statusFields) {
+      const element = documentRef.querySelector(`[data-archive-health="${field}"]`);
+      if (!element) {
+        continue;
+      }
+      const value = health && typeof health[field] === "string"
+        ? health[field].trim().toLowerCase()
+        : "offline";
+      const isOnline = value === "online";
+      element.textContent = isOnline ? "Online" : "Offline";
+      element.dataset.state = isOnline ? "online" : "offline";
+    }
+
+    const diskUsageElement = documentRef.querySelector("[data-archive-health=\"disk-usage\"]");
+    const diskUsageMeter = documentRef.querySelector("[data-archive-health-meter]");
+    const diskUsage = health && typeof health.diskUsage === "number"
+      && Number.isFinite(health.diskUsage) && health.diskUsage >= 0 && health.diskUsage <= 100
+      ? health.diskUsage
+      : null;
+    if (diskUsageElement) {
+      diskUsageElement.textContent = diskUsage === null
+        ? "—"
+        : `${new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(diskUsage)}%`;
+    }
+    if (diskUsageMeter) {
+      diskUsageMeter.hidden = diskUsage === null;
+      if (diskUsage !== null) {
+        diskUsageMeter.value = diskUsage;
+      }
+    }
+
+    const databaseSizeElement = documentRef.querySelector("[data-archive-health=\"database-size\"]");
+    const databaseSize = health && typeof health.databaseSize === "string"
+      ? health.databaseSize.trim()
+      : "";
+    if (databaseSizeElement) {
+      databaseSizeElement.textContent = databaseSize && databaseSize.length <= 64
+        ? databaseSize
+        : "—";
+    }
+
+    const lastCheckElement = documentRef.querySelector("[data-archive-health=\"last-check\"]");
+    const lastCheck = health && typeof health.lastHealthCheck === "string"
+      ? new Date(health.lastHealthCheck)
+      : null;
+    if (lastCheckElement) {
+      lastCheckElement.textContent = lastCheck && Number.isFinite(lastCheck.getTime())
+        ? formatters.formatTimestamp(lastCheck)
+        : "—";
+    }
   }
 
   function renderDashboard(data, documentRef, ChartConstructor, previousChart = null) {
@@ -909,15 +992,27 @@
     let chart = null;
     let requestInProgress = false;
     let statusRequestInProgress = false;
+    let archiveRequestInProgress = false;
+    let archiveForegroundRefreshPending = false;
     let foregroundRefreshPending = false;
+    let loginRedirected = false;
     let dashboardDataLoaded = false;
     let dashboardPollingCleanup = null;
     let statusPollingTimer = null;
+    let archivePollingTimer = null;
     let brain = null;
     let currentAgentStatus = null;
     let disposed = false;
     let realtimeCleanup = null;
     const onDashboardResize = () => updateDashboardListViewports(documentRef);
+    function redirectToLogin() {
+      if (loginRedirected) {
+        return;
+      }
+      loginRedirected = true;
+      foregroundRefreshPending = false;
+      windowRef.location.replace("/login.html?next=%2Fdashboard.html");
+    }
     const loading = documentRef.querySelector("[data-dashboard-loading]");
     const errorBanner = documentRef.querySelector("[data-dashboard-error]");
     const retryButton = documentRef.querySelector("[data-dashboard-retry]");
@@ -953,8 +1048,7 @@
           return;
         }
         if (error && error.status === 401) {
-          foregroundRefreshPending = false;
-          windowRef.location.replace("/login.html?next=%2Fdashboard.html");
+          redirectToLogin();
           return;
         }
         if (!dashboardDataLoaded) {
@@ -1105,14 +1199,46 @@
           return;
         }
         if (error && error.status === 401) {
-          foregroundRefreshPending = false;
-          windowRef.location.replace("/login.html?next=%2Fdashboard.html");
+          redirectToLogin();
           return;
         }
         applyAgentStatus(null);
       } finally {
         statusRequestInProgress = false;
         runPendingForegroundRefresh();
+      }
+    }
+
+    async function refreshArchiveHealth() {
+      if (archiveRequestInProgress) {
+        archiveForegroundRefreshPending = documentRef.visibilityState !== "hidden";
+        return;
+      }
+      if (disposed || documentRef.visibilityState === "hidden") {
+        return;
+      }
+      archiveRequestInProgress = true;
+      try {
+        const health = await requestArchiveHealth(fetchImpl);
+        if (!disposed && documentRef.visibilityState !== "hidden") {
+          renderArchiveHealth(health, documentRef);
+        }
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+        if (error && error.status === 401) {
+          redirectToLogin();
+          return;
+        }
+        renderArchiveHealth(null, documentRef);
+      } finally {
+        archiveRequestInProgress = false;
+        if (archiveForegroundRefreshPending && !disposed
+          && documentRef.visibilityState !== "hidden") {
+          archiveForegroundRefreshPending = false;
+          void refreshArchiveHealth();
+        }
       }
     }
 
@@ -1176,6 +1302,25 @@
       }
     }
 
+    function startArchivePolling() {
+      if (archivePollingTimer !== null || disposed
+        || documentRef.visibilityState === "hidden"
+        || typeof setIntervalImpl !== "function") {
+        return;
+      }
+      archivePollingTimer = setIntervalImpl(
+        refreshArchiveHealth,
+        archiveHealthRefreshIntervalMs
+      );
+    }
+
+    function stopArchivePolling() {
+      if (archivePollingTimer !== null) {
+        clearIntervalImpl(archivePollingTimer);
+        archivePollingTimer = null;
+      }
+    }
+
     function startRealtime() {
       if (disposed || realtimeCleanup) {
         return;
@@ -1195,12 +1340,15 @@
       if (documentRef.visibilityState === "hidden") {
         stopDashboardPolling();
         stopStatusPolling();
+        stopArchivePolling();
         return;
       }
       if (documentRef.body.dataset.authPage === "protected"
         && !documentRef.documentElement.classList.contains("auth-pending")) {
         startDashboardPolling();
         startStatusPolling();
+        startArchivePolling();
+        void refreshArchiveHealth();
         refreshDashboardOnForeground();
       }
     }
@@ -1209,6 +1357,7 @@
       if (event && event.persisted) {
         stopDashboardPolling();
         stopStatusPolling();
+        stopArchivePolling();
         return;
       }
       dispose();
@@ -1228,6 +1377,7 @@
       foregroundRefreshPending = false;
       stopDashboardPolling();
       stopStatusPolling();
+      stopArchivePolling();
       realtimeCleanup?.();
       realtimeCleanup = null;
       if (typeof documentRef.removeEventListener === "function") {
@@ -1260,12 +1410,14 @@
           await load();
           startDashboardPolling();
           startStatusPolling();
+          startArchivePolling();
+          void refreshArchiveHealth();
           startRealtime();
         }
         return undefined;
       });
     }
-    return { dispose, load, refreshAgentStatus };
+    return { dispose, load, refreshAgentStatus, refreshArchiveHealth };
   }
 
   return {
@@ -1273,6 +1425,8 @@
     emptyDashboardData,
     initializeKpiInfo,
     requestAgentStatus,
+    requestArchiveHealth,
+    renderArchiveHealth,
     renderDashboard,
     requestDashboardData,
     startDashboard

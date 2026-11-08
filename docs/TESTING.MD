@@ -332,6 +332,10 @@ Phase 15 validation result: `npm.cmd test` passed 226 tests with 0 failures; `np
 
 ---
 
+## Raspberry Pi AI decision archive CLI
+
+`tests/archive-ai-decisions.test.mjs` covers configuration/identity guards, decision-row validation, confidence/JSON/timestamp string preservation, the explicit ID-based upsert contract, insert/update/skip classification, verified TLS options, and private identity-bound checkpoints. These are local unit tests; they do not prove source-role/RLS grants, a live schema, Pi connectivity, a completed archive copy, or backup restoration. The tests have not been executed for this implementation task.
+
 ## Regression Testing
 
 Every completed phase must be followed by regression testing.

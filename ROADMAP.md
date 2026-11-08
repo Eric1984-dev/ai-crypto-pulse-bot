@@ -242,6 +242,8 @@ Status: A subsequent `416/PGRST103` range now terminates pagination for every An
 - [x] Color BUY actions green and SELL actions red across trade, scanner, and Analytics displays
 - [x] Highlight fee labels and amounts with the existing yellow warning tone across trade views
 - [x] Show positive P&L in green and negative P&L in red across position and trade summaries
+- [x] Display authenticated archive-server health through the existing dashboard API, with an independent five-minute poll and offline-safe behavior
+- [x] Add an authenticated Pi-side PostgreSQL/database health service that requires verified TLS and supports an HTTPS tunnel, with a last-check timestamp
 - [x] Add a small visual gap between the AI Brain and live backend status
 - [ ] Complete the full Lighthouse and production release checklist
 - [ ] Verify on physical iPhone, Android, and desktop devices and validate Chrome, Edge, and Safari
@@ -507,6 +509,8 @@ Backlog
 Priority:
 Low
 
+The manual, copy-only Raspberry Pi AI-decision archive CLI and its installation/validation guides are prepared as a proof-of-concept deliverable. Source preflight permits read-only `SELECT` on multiple `public.AI_Crypto_Bot_*` relations while rejecting source writes and non-prefixed relations; the current sync still copies only AI decisions. The user reports that reader/writer readiness checks passed and that the first manual sync successfully copied data from Supabase to PostgreSQL on the Pi; exact row counts were not provided or independently verified. The CLI remains a manually invoked Pi-side tool, not a Vercel deployment. This does not implement a retention policy, scheduled synchronization, archive-aware application reads, or source deletion.
+
 Rationale:
 
 Historical data is growing continuously.
@@ -565,7 +569,7 @@ Requirements:
 
 Important:
 
-No implementation is currently planned.
+No retention, scheduled synchronization, or deletion implementation is currently planned. The decision-copy CLI is a manual proof of concept only; keep all Supabase source rows unchanged.
 
 Re-evaluate when database size exceeds 75% of allocated capacity.
 or

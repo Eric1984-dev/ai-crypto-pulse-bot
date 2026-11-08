@@ -11,3 +11,4 @@ coverage/
 dist/
 .vercel
 .vscode/mcp.json
+archive-server/.env

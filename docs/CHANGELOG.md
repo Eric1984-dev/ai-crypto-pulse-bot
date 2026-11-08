@@ -6,6 +6,39 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Manual AI decision archive POC
+
+- Add a manually invoked Raspberry Pi pull CLI that copies only `AI_Crypto_Bot_AI_Decisions` into the existing archive database
+- Allow source preflight to accept read-only `SELECT` on multiple prefixed application relations while rejecting non-prefixed relations, source writes, and ownership
+- Validate archive decision primary/foreign-key structure through catalog columns, target relation identity, validation status, and delete action instead of formatted constraint text
+- Record the user-confirmed application and verification of the Supabase decision-reader migration and login; keep the Pi-local writer separate
+- Validate the one Supabase-managed `postgres` membership edge (grantor `supabase_admin`, ADMIN enabled, INHERIT and SET disabled) and reject every other decision-reader membership
+- Document that the archive CLI does not inspect `pg_auth_members`; migration postflight and read-only operator validation check the managed edge
+- Scope migration relation/column/sequence privilege checks to schemas where the reader has effective `USAGE`, while rejecting `USAGE` outside `public` without changing `PUBLIC` grants
+- Record the accepted Supabase `PUBLIC` temporary-object and large-object capability residual for direct PostgreSQL login; do not revoke shared PUBLIC grants
+- Require verified TLS, a separate restricted archive writer, exact schema/identity/RLS checks, and pre-existing watched-market anchors
+- Add a Pi-local writer-role SQL proposal with fail-closed schema, ownership, membership, effective-privilege, and grant-option checks; it remains unapplied and creates a NOLOGIN role without credentials
+- Scope Pi writer relation and sequence checks to schemas with effective `USAGE`; keep rejecting extra privileges in `public` and add inaccessible-schema regressions
+- Compare Pi archive decision columns by ordinal position and null-safe field equality; add local executable schema-contract regressions after the provisioning preflight failure
+- Validate the archive decision primary and foreign keys through PostgreSQL catalogs and resolved relation OIDs, avoiding schema-qualification assumptions in constraint-definition text
+- Preserve original IDs, `numeric(5,2)` confidence, JSONB indicators, and UTC timestamps using explicit columns and bounded keyset batches
+- Add ID-based idempotent upserts, per-batch read-back validation, an atomic identity-bound checkpoint, overlap-based reruns, and an exclusive process lock
+- Never modify or delete Supabase rows; never delete archive rows; do not add a schedule, API route, or database object
+- Add Pi installation and validation guides for the manual copy-only CLI
+- Record the user's report that the first manual sync successfully copied data to PostgreSQL on the Pi; exact row counts were not provided or independently verified
+- Clarify that `archive-server/` runs on the Pi and is not deployed as a Vercel project or serverless function
+- Exclude `/archive-server/` from Vercel deployment inputs with the root `.vercelignore`, while retaining the source in Git for Pi installation and updates
+- Remove superseded watched-market reader V1 role and standalone RLS SQL drafts; retain V2, which is used by the archive market-seed utility
+
+### Archive Server monitoring
+
+- Add an authenticated Archive Server dashboard card for server, PostgreSQL, database, disk usage, and database size
+- Reuse the existing dashboard-data function with a bounded server-side health request and independent five-minute visible-page polling
+- Render unavailable or invalid upstream health as Offline without showing a dashboard data error or affecting trading
+- Add an isolated Raspberry Pi health service with bearer-token access and verified PostgreSQL TLS
+- Show the last health-check timestamp and keep all database credentials on the Pi
+- Document the HTTPS tunnel, environment variables, and `GET /api/health` contract
+
 ### Database AI analysis timeout headroom
 
 - Give the database-analysis RPC a dedicated 10-second request timeout; keep all other AI-engine Supabase requests at 8 seconds

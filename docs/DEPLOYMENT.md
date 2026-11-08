@@ -13,6 +13,8 @@ CryptoPulse AI Agent is designed to run on:
 
 Import the repository into Vercel with the repository root as the project root. The project is framework-free: `vercel.json` sets `outputDirectory` to `.` because the static HTML/CSS/JS files live in the repository root. This overrides a stale Project Settings value such as `public`; no `public/` folder or generated build directory is required. The same config enables clean URLs and orders protected-page routes before the filesystem handler, so root-level static HTML cannot bypass the authentication function.
 
+The root `.vercelignore` excludes `/archive-server/` from Vercel deployments. The directory remains in Git for Raspberry Pi installation and updates; `.vercelignore` excludes it from Vercel's deployment input but does not remove it from the Git repository. Keep `archive-server/.env` and other Pi-only credentials out of Git.
+
 ### iPhone home-screen icon
 
 Every page declares the shared 180×180 Apple Touch Icon and the `CryptoPulse` home-screen title. After the site is deployed over HTTPS, open it in Safari on iPhone, tap **Share**, then **Add to Home Screen**. If an older icon is already installed, remove that shortcut and add it again so iOS fetches the updated icon. This adds a home-screen shortcut; it does not provide offline support.
@@ -34,6 +36,8 @@ Set these variables in a local ignored `.env` file and in Vercel Project Setting
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
 SUPABASE_SERVICE_ROLE_KEY=server-only-service-role-key
+ARCHIVE_SERVER_URL=https://archive.example
+ARCHIVE_HEALTH_TOKEN=at-least-32-random-bytes
 CRON_SECRET=long-random-cron-secret
 AI_ANALYSIS_MODE=javascript
 ENABLE_LIVE_TRADING=false
@@ -44,6 +48,24 @@ ENABLE_LIVE_TRADING=false
 For local Vercel Functions, use `vercel dev` so the Vercel runtime loads `.env` and serves `/api/*` routes. Opening the HTML files through a static-only server does not run the protected-page functions.
 
 The anon key is designed for browser use and is returned by `/api/auth-config`; it is not a service secret. `SUPABASE_SERVICE_ROLE_KEY` allows only server-side market synchronization, AI analysis, and database writes; `CRON_SECRET` protects `/api/market-refresh`, `/api/candle-refresh`, and `/api/ai-analysis`. Keep both secrets out of browser configuration and logs. Bitvavo access uses public endpoints without an API key.
+
+`ARCHIVE_SERVER_URL` is the HTTPS base URL exposed by a trusted tunnel/reverse proxy to the Raspberry Pi health service. Vercel cannot directly route to a private LAN address. Configure the tunnel to forward to `127.0.0.1:3001`; the service binds to loopback by default. `ARCHIVE_HEALTH_TOKEN` must be a random value of at least 32 bytes and must match in Vercel and the Pi service. The existing authenticated `/api/dashboard-data?view=archive-health` handler sends the token in a server-side Authorization header; neither the URL nor token is exposed to browser code.
+
+Run the standalone service from `archive-server/` on the Pi. Copy `archive-server/.env.example` to an ignored `.env` file and set `ARCHIVE_DB_HOST`, `ARCHIVE_DB_PORT`, `ARCHIVE_DB_NAME`, `ARCHIVE_DB_USER`, `ARCHIVE_DB_PASSWORD`, and the same `ARCHIVE_HEALTH_TOKEN`. These database variables belong only on the Pi and must never be copied to Vercel or the browser. The service requires PostgreSQL TLS with certificate verification enabled. Set `ARCHIVE_DB_SSL_CA` when the PostgreSQL server uses a private certificate authority; set `ARCHIVE_DB_SSL_SERVERNAME` only when the trusted certificate DNS name differs from `ARCHIVE_DB_HOST`. TLS is not downgraded if verification fails. `ARCHIVE_DISK_PATH` selects the filesystem whose usage is reported.
+
+Install the service's isolated dependency and run it with Node.js 20.6 or newer:
+
+```powershell
+cd archive-server
+npm.cmd ci
+npm.cmd start
+```
+
+### Manual AI decision archive pull
+
+The archive CLI and health service run on the Raspberry Pi. The root `.vercelignore` excludes `archive-server/` from Vercel deployment while leaving it versioned in Git for Pi installation and updates. Do not deploy it as a separate Vercel project or serverless function, expose the sync CLI through the health tunnel, or configure an automatic timer for this proof of concept. Vercel uses the existing authenticated `/api/dashboard-data?view=archive-health` handler only to proxy health status to the Pi; no archive-sync Vercel function is needed. The user reports that the first manual `npm run sync:ai-decisions` run succeeded and copied data to the Pi archive; exact row counts were not provided or independently verified. Keep the Supabase reader and archive writer credentials on the Pi, use verified TLS, and never use the service-role key. Follow the [AI decision archive installation guide](./reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md) and [validation guide](./reports/AI_DECISION_ARCHIVE_AGENT_VALIDATION.md) for future manual runs and checks.
+
+Configure the HTTPS tunnel to forward only the health path to the loopback service and apply tunnel access controls in addition to the bearer token. The health endpoint accepts only `GET /api/health`, returns no-store responses, and does not expose database errors. Missing settings, invalid TLS, or unreachable services result in Offline status in the dashboard. The tunnel, Pi environment, and production endpoint must be verified separately; code/build tests do not establish production connectivity.
 
 ### External scheduled market refresh
 

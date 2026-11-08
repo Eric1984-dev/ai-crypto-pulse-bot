@@ -8,6 +8,8 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 - Dashboard, portfolio, scanner, trade history, instellingen en de Admin-pagina zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema en de latere uitbreidingen bevatten 18 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard toont geauthenticeerde Supabase-status-, portfolio-, positie-, trade-, watched-market- en AI-beslissingsgegevens via een read-only Vercel API. De Open Position AI Status toont per open positie de nieuwste beslissing, Market View, korte AI Commentary, actuele ongerealiseerde EUR-P&L en het rendement als percentage, plus het bijbehorende tijdstip. Ruwe confidence- en Market Strength-waarden blijven intern beschikbaar maar worden niet in deze kaarten getoond; de AI Decisions-KPI blijft het globale aantal beslissingen tonen. De volledige dashboarddata wordt na authenticatie en daarna iedere 30 seconden ververst; bij terugkeer naar de voorgrond volgt direct een refresh. Verzoeken blijven `no-store`.
+- Het dashboard toont ook de health van de Raspberry Pi Archive Server via een afzonderlijke, geauthenticeerde view van de bestaande dashboardfunctie. Een Pi-side health service controleert PostgreSQL en de archiefdatabase via geverifieerde TLS; Vercel bereikt deze service via een HTTPS-tunnel met bearer-token. Status, diskgebruik, databasegrootte en het laatste controletijdstip worden iedere vijf minuten bijgewerkt. PostgreSQL-credentials blijven op de Pi; bij onbereikbaarheid verschijnt Offline zonder invloed op trading of AI-analyse.
+- Er is een afzonderlijke, handmatig gestarte Pi pull-CLI voor een copy-only proof of concept van `AI_Crypto_Bot_AI_Decisions` naar `ai_crypto_bot_archive`. De bronvalidatie staat read-only `SELECT` toe op meerdere `public.AI_Crypto_Bot_*`-tabellen en blijft bronwrites, niet-geprefixte relaties en eigenaarschap weigeren. De gebruiker bevestigde de readerconfiguratie en writer readiness checks en meldt dat de eerste handmatige sync succesvol data naar PostgreSQL op de Pi heeft gekopieerd; aantallen zijn niet gedeeld of onafhankelijk geverifieerd. De CLI gebruikt TLS, begrensde batches, idempotente ID-upserts en een atomair checkpoint. De CLI draait op de Pi, niet op Vercel; de trading-/Vercel-paden zijn niet afhankelijk van het archief.
 - Database- en API-timestamps blijven UTC; Dashboard, AI Decision/Agent Log, Paper Trading, Portfolio, Scanner en Trade History formatteren zichtbare tijden naar `Europe/Brussels`, inclusief automatische zomer-/wintertijd.
 - Alle gebruikersgerichte interfacecopy is Engelstalig, inclusief accountflows, navigatie, lege toestanden, statusmeldingen en foutmeldingen. Getallen en bedragen gebruiken `en-GB`-notatie; zichtbare tijden blijven `Europe/Brussels`.
 - Het Dashboard behoudt de Tracked Markets-KPI. De volledige lijst met actieve watched markets en de markt-ranglijsten staan op de afzonderlijke Market Scanner-pagina.
@@ -75,6 +77,8 @@ Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase st
 
 Importeer de repository in Vercel met de projectroot als root directory en configureer de Supabase- en server-side secret-variabelen. Op Vercel Hobby kan een externe scheduler, zoals cron-job.org, `GET /api/market-refresh`, de afzonderlijke candle-batches, `POST /api/ai-analysis` en daarna `POST /api/paper-trading` aanroepen met de `CRON_SECRET`-autorisatieheader. Plan paper trading na AI analysis; zie [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) en [docs/SCHEDULING.md](./docs/SCHEDULING.md). De anon key is bedoeld voor clientgebruik en is geen service secret; plaats nooit `SUPABASE_SERVICE_ROLE_KEY` of andere private credentials in clientconfiguratie.
 
+Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit van Vercel-deployments. De broncode blijft in Git beschikbaar voor Pi-installatie en updates; `.vercelignore` voorkomt uitsluitend opname in de Vercel-deployment, niet in de Git-repository.
+
 ## Documentatie
 
 - [Roadmap](./ROADMAP.md)
@@ -113,4 +117,11 @@ Importeer de repository in Vercel met de projectroot als root directory en confi
 - [Phase 07 candle query fix report](./docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
 - [AI database analysis prototype report](./docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md)
 - [Supabase AI decision and candle history archive feasibility report](./docs/reports/SUPABASE_AI_CANDLE_HISTORY_ARCHIVE_FEASIBILITY_REPORT.md)
+- [Historical data archive destination assessment](./docs/reports/SUPABASE_HISTORICAL_DATA_ARCHIVE_DESTINATION_ASSESSMENT.md)
+- [Archive Server Monitoring report](./docs/reports/ARCHIVE_SERVER_MONITORING.md)
+- [Archive Server Connectivity report](./docs/reports/ARCHIVE_SERVER_CONNECTIVITY.md)
+- [Archive Server Remote Access plan](./docs/reports/ARCHIVE_SERVER_REMOTE_ACCESS_PLAN.md)
+- [AI decision archive agent installation guide](./docs/reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md)
+- [AI decision archive agent validation guide](./docs/reports/AI_DECISION_ARCHIVE_AGENT_VALIDATION.md)
+- [AI decision archive POC readiness](./docs/reports/AI_DECISION_ARCHIVE_POC_READINESS.md)
 - [Final release report](./docs/reports/FINAL_RELEASE_REPORT.md)

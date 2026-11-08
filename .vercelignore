@@ -1,0 +1,2 @@
+# The archive agent runs on the Raspberry Pi, not in Vercel deployments.
+/archive-server/

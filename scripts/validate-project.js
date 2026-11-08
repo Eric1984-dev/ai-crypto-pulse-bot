@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const rootDirectory = path.resolve(__dirname, "..");
-const requiredDirectories = ["api", "css", "js", "lib", "scripts", "tests"];
+const requiredDirectories = ["api", "archive-server", "css", "js", "lib", "scripts", "tests"];
 const requiredPages = [
   "index.html",
   "dashboard.html",
@@ -87,9 +87,34 @@ function validateProject() {
         errors.push(`The environment template must declare ${variable}.`);
       }
     }
-    for (const variable of ["SUPABASE_SERVICE_ROLE_KEY", "CRON_SECRET", "ADMIN_USER_IDS"]) {
+    for (const variable of [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "ARCHIVE_SERVER_URL",
+      "ARCHIVE_HEALTH_TOKEN",
+      "CRON_SECRET",
+      "ADMIN_USER_IDS"
+    ]) {
       if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
         errors.push(`The environment template must declare ${variable}.`);
+      }
+    }
+  }
+
+  const archiveEnvPath = path.join(rootDirectory, "archive-server", ".env.example");
+  if (!fs.existsSync(archiveEnvPath)) {
+    errors.push("Missing archive-server environment template.");
+  } else {
+    const archiveEnv = fs.readFileSync(archiveEnvPath, "utf8");
+    for (const variable of [
+      "ARCHIVE_DB_HOST",
+      "ARCHIVE_DB_PORT",
+      "ARCHIVE_DB_NAME",
+      "ARCHIVE_DB_USER",
+      "ARCHIVE_DB_PASSWORD",
+      "ARCHIVE_HEALTH_TOKEN"
+    ]) {
+      if (!new RegExp(`^${variable}=`, "m").test(archiveEnv)) {
+        errors.push(`The archive-server environment template must declare ${variable}.`);
       }
     }
   }

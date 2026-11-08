@@ -1,5 +1,9 @@
 # Scheduling
 
+## Manual archive copy
+
+The AI decision archive CLI is manually invoked on the Raspberry Pi with `npm run sync:ai-decisions` from `archive-server/`. It is not a Vercel Cron or external-scheduler job, and no systemd timer is part of the proof of concept. Archive availability must not affect market refresh, AI analysis, or paper trading. See the [installation guide](./reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md).
+
 ## Phase 06 market refresh
 
 Market snapshots use a lightweight endpoint:

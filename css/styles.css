@@ -919,6 +919,58 @@ a:focus-visible {
   color: #d3ddd7;
 }
 
+.status-pill[data-state="online"] {
+  border-color: var(--positive-border);
+  background: var(--positive-dark);
+  color: var(--positive);
+}
+
+.status-pill[data-state="offline"] {
+  border-color: #8d3e51;
+  background: #351e29;
+  color: #ff9aab;
+}
+
+.archive-health-panel {
+  margin-top: 14px;
+}
+
+.archive-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.archive-health-metrics > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #141a24;
+}
+
+.archive-health-metrics dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.archive-health-metrics dd {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.archive-health-metrics meter {
+  width: min(100%, 110px);
+  height: 8px;
+  accent-color: var(--accent);
+}
+
 .agent-brain {
   position: relative;
   margin-top: 16px;
