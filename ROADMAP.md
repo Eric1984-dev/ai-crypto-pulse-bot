@@ -93,6 +93,8 @@ Status: Completed
 ## Phase 07 - AI Engine
 
 - [x] Deterministic EMA, RSI, MACD, momentum, volume, and volatility analysis across supported candle intervals
+- [x] Replace directional scoring with the daily-EMA-led V2 formula; retain MACD and momentum as diagnostics and remove market context from directional scoring
+- [x] Require fresh 1h volume ratio and 1d EMA/RSI inputs; retain the existing four-interval directional-signal gate, confidence floor, and freshness limits
 - [x] Read the latest 150 candles per market and interval through a bounded service-role RPC, grouped into at most four PostgREST rows per interval
 - [x] Enforce enabled EUR-market membership in SQL and reject incomplete exact-count PostgREST responses
 - [ ] Confirm the intended production project's identity; retain `max_rows >= 600` for the legacy caller until the compact caller is deployed (`max_rows >= 4` is sufficient for the new RPC)
@@ -104,7 +106,7 @@ Status: Completed
 
 Status: Completed
 
-An additive PostgreSQL analysis path is available behind `AI_ANALYSIS_MODE=database`; the default remains the JavaScript engine. The user reported applying the initial migration, enabling database mode, and executing `20261109120000_ai_analysis_interval_batching.sql` in production. The batching migration reduces the six interval queries per market to one ordered SQL statement and passes local PGlite parity and 102-market tests. A successful hosted analysis run after the migration has not yet been confirmed, so production resolution remains pending runtime validation. See the [prototype report](docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md) and [timeout fix report](docs/reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
+An additive PostgreSQL analysis path is available behind `AI_ANALYSIS_MODE=database`; the default remains the JavaScript engine. The user reported applying the initial migration, enabling database mode, and executing `20261109120000_ai_analysis_interval_batching.sql` in production. The batching migration reduces the six interval queries per market to one ordered SQL statement and passes local PGlite parity and 102-market tests. The active engine now uses the V2 daily-EMA-led score and confidence model; MACD and momentum remain diagnostics, while market context no longer contributes to directional scoring. Fresh 1h volume ratio and 1d EMA/RSI are required, with existing freshness, data-quality, confidence, and risk controls preserved. The additive `20261110120000_ai_engine_v2_replacement.sql` migration brings the optional database path into parity; production application and hosted validation of this migration remain pending. A successful hosted analysis run after the previous batching migration also has not yet been confirmed. See the [prototype report](docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md) and [timeout fix report](docs/reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
 
 The AI Engine is analysis-only. It does not create trades or mutate portfolios; Phase 08 consumes its stored decisions through a separate risk-managed executor.
 

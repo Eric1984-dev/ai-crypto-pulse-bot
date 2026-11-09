@@ -46,7 +46,7 @@ function createSnapshot(now = fixedNow, direction = "up") {
   };
 }
 
-function buildCandles(direction = "up", now = fixedNow, intervals = ["5m", "15m", "1h", "4h"]) {
+function buildCandles(direction = "up", now = fixedNow, intervals = ["5m", "15m", "1h", "4h", "1d"]) {
   return intervals.flatMap((interval) => createCandles("BTC-EUR", interval, 60, direction, now));
 }
 
@@ -302,6 +302,113 @@ test("strong rising and falling data produce directional decisions", () => {
   assert.ok(falling.confidence >= 65 && falling.confidence <= 95);
 });
 
+test("V2 market strength and confidence use daily EMA, alignment, hourly volume, daily RSI, and volatility", () => {
+  const result = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: buildCandles(),
+    now: fixedNow
+  });
+  const hourly = result.indicators.timeframes["1h"];
+  const daily = result.indicators.timeframes["1d"];
+  const dailyEma = Math.max(-100, Math.min(100, daily.trend.percentSpread * 50));
+  const dailyRsi = Math.max(-100, Math.min(100, (daily.rsi14 - 50) * 2));
+  const alignment = hourly.trend.direction === daily.trend.direction
+    && daily.trend.direction !== "sideways" ? 1 : 0;
+  const volumeConfirmation = Math.max(0, Math.min(1, hourly.volume.ratio - 0.5));
+  const rsiConfirmation = Math.max(0, Math.min(1, Math.sign(dailyEma) * dailyRsi / 100));
+  const expectedStrength = Number(Math.max(-100, Math.min(100,
+    0.75 * dailyEma
+      + 0.10 * dailyEma * alignment
+      + 0.10 * dailyEma * volumeConfirmation
+      + 0.05 * dailyRsi
+  )).toFixed(2));
+  const volatilityPenalty = result.indicators.dataQuality.candleIntervalsAvailable
+    .map((interval) => result.indicators.timeframes[interval].volatility.level)
+    .reduce((total, level, _, levels) => total
+      + (level === "high" ? 12 : level === "medium" ? 4 : 0) / levels.length, 0);
+  const expectedConfidence = Number(Math.max(0, Math.min(95,
+    40 + 30 * Math.abs(dailyEma) / 100
+      + 10 * alignment
+      + 10 * volumeConfirmation
+      + 5 * rsiConfirmation
+      - volatilityPenalty
+  )).toFixed(2));
+
+  assert.equal(result.indicators.marketStrength, expectedStrength);
+  assert.equal(result.confidence, expectedConfidence);
+  assert.equal(result.strategy_name, "Deterministic Technical Analysis V2");
+  assert.equal(result.strategy_version, "2.0.0");
+  assert.equal(result.indicators.dataQuality.sufficientForDirectionalSignal, true);
+});
+
+test("V2 scoring ignores market context, MACD, and momentum while retaining their diagnostics", () => {
+  const candles = buildCandles();
+  const baseline = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles,
+    now: fixedNow
+  });
+  let fifteenMinuteIndex = 0;
+  const alteredDiagnostics = candles.map((candle) => {
+    if (candle.interval !== "15m") {
+      return candle;
+    }
+    const close = 160 - fifteenMinuteIndex++ * 0.1;
+    const open = close + 0.1;
+    return {
+      ...candle,
+      close,
+      open,
+      high: close + 0.7,
+      low: close - 0.7,
+      volume: 100 + fifteenMinuteIndex
+    };
+  });
+  const changed = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: { ...createSnapshot(), daily_change: -25, price: 96, high_24h: 135, low_24h: 95 },
+    candles: alteredDiagnostics,
+    now: fixedNow
+  });
+
+  assert.equal(typeof baseline.indicators.timeframes["15m"].momentum.changePct, "number");
+  assert.equal(typeof baseline.indicators.timeframes["15m"].macd.histogram, "number");
+  assert.equal(changed.indicators.timeframes["15m"].trend.direction, "bearish");
+  assert.notEqual(changed.indicators.timeframes["15m"].momentum.changePct,
+    baseline.indicators.timeframes["15m"].momentum.changePct);
+  assert.equal(changed.indicators.marketStrength, baseline.indicators.marketStrength);
+  assert.equal(changed.confidence, baseline.confidence);
+});
+
+test("V2 waits when fresh daily EMA or hourly volume ratio is unavailable", () => {
+  const missingDaily = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: buildCandles("up", fixedNow, ["5m", "15m", "1h", "4h"]),
+    now: fixedNow
+  });
+  const zeroHourlyVolume = buildCandles();
+  for (const candle of zeroHourlyVolume.filter(({ interval }) => interval === "1h")) {
+    candle.volume = 0;
+  }
+  const missingHourlyRatio = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: zeroHourlyVolume,
+    now: fixedNow
+  });
+
+  for (const result of [missingDaily, missingHourlyRatio]) {
+    assert.equal(result.decision, "WAIT");
+    assert.equal(result.indicators.marketStrength, null);
+    assert.match(result.reason, /fresh 1h volume ratio and 1d EMA\/RSI inputs are required/);
+    assert.equal(result.indicators.dataQuality.sufficientForDirectionalSignal, false);
+  }
+  assert.equal(missingHourlyRatio.indicators.timeframes["1h"].volume.ratio, null);
+});
+
 test("momentum, volume changes, and volatility are reflected in indicator output", () => {
   const candles = buildCandles();
   const hourlyCandles = candles.filter((candle) => candle.interval === "1h");
@@ -363,7 +470,7 @@ test("missing and partial candles fail safely with WAIT or reduced-confidence HO
   const partialCandles = analyzeMarket({
     symbol: "BTC-EUR",
     marketData: createSnapshot(),
-    candles: buildCandles("up", fixedNow, ["1h", "4h"]),
+    candles: buildCandles("up", fixedNow, ["1h", "1d"]),
     now: fixedNow
   });
 
@@ -372,7 +479,7 @@ test("missing and partial candles fail safely with WAIT or reduced-confidence HO
   assert.equal(noCandles.indicators.dataQuality.candleCoverage, 0);
   assert.equal(partialCandles.decision, "HOLD");
   assert.ok(partialCandles.confidence <= 64);
-  assert.deepEqual(partialCandles.indicators.dataQuality.candleIntervalsAvailable, ["1h", "4h"]);
+  assert.deepEqual(partialCandles.indicators.dataQuality.candleIntervalsAvailable, ["1h", "1d"]);
 });
 
 test("stale snapshots and invalid candle records cannot produce directional signals", () => {
@@ -485,7 +592,7 @@ test("stale timeframes are excluded while sufficient fresh timeframes retain exi
   assert.equal(withStaleTimeframe.confidence, baseline.confidence);
   assert.equal(withStaleTimeframe.indicators.marketStrength, baseline.indicators.marketStrength);
   assert.deepEqual(withStaleTimeframe.indicators.dataQuality.candleIntervalsAvailable, [
-    "5m", "15m", "1h", "4h"
+    "5m", "15m", "1h", "4h", "1d"
   ]);
   assert.deepEqual(withStaleTimeframe.indicators.dataQuality.staleCandleIntervals, ["1m"]);
   assert.equal(withStaleTimeframe.indicators.timeframes["1m"].stale, true);
@@ -884,7 +991,8 @@ test("analysis persists real decisions and updates status with PATCH", async () 
   assert.equal(result.decisionsStored, 1);
   assert.equal(decisionWrite.method, "POST");
   assert.equal(decisionWrite.body[0].decision, "BUY");
-  assert.equal(decisionWrite.body[0].strategy_name, "Deterministic Technical Analysis");
+  assert.equal(decisionWrite.body[0].strategy_name, "Deterministic Technical Analysis V2");
+  assert.equal(decisionWrite.body[0].strategy_version, "2.0.0");
   const decisionRequest = harness.requests.find(({ table, method }) =>
     table === "AI_Crypto_Bot_AI_Decisions" && method === "POST"
   );

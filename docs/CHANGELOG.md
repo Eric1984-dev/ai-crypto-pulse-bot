@@ -6,6 +6,15 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### AI Engine V2 replacement
+
+- Replace the directional score with a 1d EMA-led formula, confirmed by 1h/1d EMA alignment and fresh 1h volume, with a small 1d RSI contribution
+- Keep MACD and momentum in stored indicator diagnostics only; remove market context from directional scoring
+- Replace coverage/depth bonuses in the actionable V2 confidence formula with V2 trend, alignment, volume, and RSI terms while retaining the existing volatility penalty and bounded low-data fallback
+- Require fresh valid 1h volume-ratio and 1d EMA/RSI inputs; preserve the existing signal, freshness, low-data, and paper-trading risk gates
+- Add an append-only SQL migration to keep optional database analysis behavior aligned with JavaScript without adding tables, columns, API routes, or dependencies
+- Mark new decisions as `Deterministic Technical Analysis V2` version `2.0.0` in the existing strategy snapshot fields
+
 ### Database AI analysis timeout fix
 
 - Add an additive migration that aggregates the six bounded candle-interval reads in one ordered SQL statement per market

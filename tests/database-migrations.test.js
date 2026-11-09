@@ -40,6 +40,9 @@ const databaseAiAnalysisMigration = migrationSql.find((sql) =>
 const databaseAiAnalysisBatchingMigration = migrationSql.find((sql) =>
   sql.includes('CREATE OR REPLACE FUNCTION public."AI_Crypto_Bot_Run_Database_AI_Analysis"')
 );
+const databaseAiAnalysisV2Migration = migrationSql.find((sql) =>
+  sql.includes("daily EMA trend, hourly volume confirmation, daily RSI")
+);
 const shadowExitMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
 );
@@ -83,6 +86,7 @@ async function createDatabase() {
   await database.exec(compactAiCandleMigration);
   await database.exec(databaseAiAnalysisMigration);
   await database.exec(databaseAiAnalysisBatchingMigration);
+  await database.exec(databaseAiAnalysisV2Migration);
   return database;
 }
 
@@ -1888,14 +1892,22 @@ test("database AI analysis exactly matches JavaScript across bounded and failure
   try {
     assert.ok(databaseAiAnalysisMigration);
     assert.ok(databaseAiAnalysisBatchingMigration);
+    assert.ok(databaseAiAnalysisV2Migration);
     assert.doesNotMatch(databaseAiAnalysisMigration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
     assert.doesNotMatch(databaseAiAnalysisBatchingMigration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
+    assert.doesNotMatch(databaseAiAnalysisV2Migration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
     assert.equal(
       (databaseAiAnalysisBatchingMigration.match(/FROM public\."AI_Crypto_Bot_Candles"/g) || []).length,
       1
     );
     assert.match(databaseAiAnalysisBatchingMigration, /WITH intervals \(ordinal, interval_name, max_age_ms, weight\) AS/);
     assert.match(databaseAiAnalysisBatchingMigration, /ORDER BY intervals\.ordinal/);
+    assert.match(databaseAiAnalysisV2Migration, /0\.75 \* v_daily_ema_score/);
+    assert.match(databaseAiAnalysisV2Migration, /0\.10 \* v_daily_ema_score \* v_alignment_confirmation/);
+    assert.match(databaseAiAnalysisV2Migration, /0\.10 \* v_daily_ema_score \* v_volume_confirmation/);
+    assert.match(databaseAiAnalysisV2Migration, /0\.05 \* v_daily_rsi_score/);
+    assert.match(databaseAiAnalysisV2Migration, /AND v_v2_inputs_available/);
+    assert.match(databaseAiAnalysisV2Migration, /'Deterministic Technical Analysis V2'/);
     const privileges = await database.query(`
       SELECT
         has_function_privilege(
@@ -2009,6 +2021,35 @@ test("database AI analysis exactly matches JavaScript across bounded and failure
       candles: neutralCandles
     });
     assert.equal((await assertDatabaseAnalysisParity(database, symbol, analysisTime)).hold_count, 1);
+
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "up"),
+      candles: createAnalysisCandles(symbol, 150, "up", analysisTime, [
+        "1m", "5m", "15m", "4h", "1d"
+      ])
+    });
+    const missingHourly = await assertDatabaseAnalysisParity(database, symbol, analysisTime);
+    assert.equal(missingHourly.wait_count, 1);
+    const missingHourlyDecision = await database.query(
+      `SELECT decision, confidence, reason, indicators ->> 'marketStrength' AS market_strength
+       FROM public."AI_Crypto_Bot_AI_Decisions" WHERE symbol = $1`,
+      [symbol]
+    );
+    assert.equal(missingHourlyDecision.rows[0].decision, "WAIT");
+    assert.equal(missingHourlyDecision.rows[0].confidence <= 49, true);
+    assert.equal(missingHourlyDecision.rows[0].market_strength, null);
+    assert.match(missingHourlyDecision.rows[0].reason, /fresh 1h volume ratio and 1d EMA\/RSI inputs/);
+
+    const zeroHourlyVolume = createAnalysisCandles(symbol, 150, "up", analysisTime);
+    for (const candle of zeroHourlyVolume.filter(({ interval }) => interval === "1h")) {
+      candle.volume = 0;
+    }
+    await replaceAnalysisFixture(database, symbol, {
+      marketData: createAnalysisSnapshot(symbol, analysisTime, "up"),
+      candles: zeroHourlyVolume
+    });
+    const missingVolumeRatio = await assertDatabaseAnalysisParity(database, symbol, analysisTime);
+    assert.equal(missingVolumeRatio.wait_count, 1);
 
     await replaceAnalysisFixture(database, symbol, {
       marketData: null,

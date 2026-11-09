@@ -85,7 +85,7 @@ Use the same protected `Authorization: Bearer <CRON_SECRET>` header. Configure a
 
 ### External AI analysis
 
-The JavaScript engine remains the default. Do not opt into database analysis until its additive migration is applied manually, the function grants and signature are verified, and the production rollout is separately approved. The migration adds no tables or Vercel Functions. Local migration/tests do not apply it to Supabase.
+The JavaScript engine remains the default. Do not opt into database analysis until the existing analysis migrations, including `20261110120000_ai_engine_v2_replacement.sql`, are applied manually, the function grants and signature are verified, and the production rollout is separately approved. The V2 migration replaces the existing analysis function without adding tables or Vercel Functions. Local migration/tests do not apply it to Supabase.
 
 Phase 07 exposes `POST /api/ai-analysis` for an external scheduler. Configure the deployed URL and method, then add `Authorization: Bearer <CRON_SECRET>` using the same server-side Vercel environment variable. The function also requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Keep the credentials in protected environment/header settings and never in the request URL. No scheduler cadence is imposed by the application.
 

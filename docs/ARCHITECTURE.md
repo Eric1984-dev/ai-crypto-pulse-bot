@@ -323,13 +323,13 @@ Watched Markets
 ↓
 Stored Market Snapshots and Candles
 ↓
-Deterministic Indicators and Confidence Model
+V2 Indicators, Daily-EMA-Led Market Strength, and Confidence Model
 ↓
 AI_Crypto_Bot_AI_Decisions
 ↓
 Existing Dashboard Open Position AI Status
 
-The scheduler-protected engine's compact implementation calls the additive service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles_Compact` RPC for up to four enabled markets in each of the six supported intervals. SQL validates uppercase EUR symbols against enabled watched-market rows and applies an independent 150-row limit using the existing `(symbol, interval, timestamp)` index. It returns one row per requested symbol, with compact `[timestamp, open, high, low, close, volume]` arrays ordered newest first; empty histories remain explicit empty groups. The caller checks exact `Content-Range`, group order, symbols, and tuple shapes, failing closed on incomplete or malformed data. Indicator, confidence, freshness, and decision behavior is unchanged. The original flat-row RPC remains available for compatibility; keep `max_rows >= 600` until no legacy caller uses it. The compact RPC needs `max_rows >= 4`. The intended hosted project identity and setting remain unverified.
+The scheduler-protected engine's compact implementation calls the additive service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles_Compact` RPC for up to four enabled markets in each of the six supported intervals. SQL validates uppercase EUR symbols against enabled watched-market rows and applies an independent 150-row limit using the existing `(symbol, interval, timestamp)` index. It returns one row per requested symbol, with compact `[timestamp, open, high, low, close, volume]` arrays ordered newest first; empty histories remain explicit empty groups. The caller checks exact `Content-Range`, group order, symbols, and tuple shapes, failing closed on incomplete or malformed data. V2 Market Strength combines 75% of the normalized 1d EMA spread with 10% direction-aware 1h/1d EMA alignment, 10% direction-aware 1h volume confirmation, and 5% 1d RSI. MACD and momentum remain persisted diagnostics and do not affect the directional score; 24-hour market context is not scored. For actionable V2 inputs, confidence uses V2 trend strength, alignment, volume and RSI confirmations, and the unchanged average volatility penalty; coverage and depth bonuses are removed. The bounded low-data fallback retains its coverage/depth terms. A fresh, valid 1h volume ratio and 1d EMA/RSI are required for an actionable score. The existing two-interval analysis minimum, four-fresh-interval directional gate, 65 AI confidence floor, and interval-specific freshness checks remain. The original flat-row RPC remains available for compatibility; keep `max_rows >= 600` until no legacy caller uses it. The compact RPC needs `max_rows >= 4`. The intended hosted project identity and setting remain unverified.
 
 Every AI decision must be recorded in:
 
