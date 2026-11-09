@@ -1,7 +1,7 @@
 # AI Engine V2 Implementation Report
 
-**Status:** Implemented and committed on `main`; production migration and deployment have not been performed  
-**Mode:** Paper trading only  
+**Status:** Implemented and committed on `main`; production migration and deployment have not been performed
+**Mode:** Paper trading only
 **Baseline:** `v1-final-backup` and `v1-final` point to commit `d51bd633f51731f047cb4ea23e138d4817545a37`
 
 ## Implementation summary
