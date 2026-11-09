@@ -104,7 +104,7 @@ Status: Completed
 
 Status: Completed
 
-An additive PostgreSQL analysis prototype is available behind `AI_ANALYSIS_MODE=database`; the default remains the JavaScript engine. Local PGlite parity tests pass for the covered fixtures. The migration has not been applied to production, and no deployment or production opt-in has occurred; see [the prototype report](docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md).
+An additive PostgreSQL analysis path is available behind `AI_ANALYSIS_MODE=database`; the default remains the JavaScript engine. The user reported applying the initial migration, enabling database mode, and executing `20261109120000_ai_analysis_interval_batching.sql` in production. The batching migration reduces the six interval queries per market to one ordered SQL statement and passes local PGlite parity and 102-market tests. A successful hosted analysis run after the migration has not yet been confirmed, so production resolution remains pending runtime validation. See the [prototype report](docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md) and [timeout fix report](docs/reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
 
 The AI Engine is analysis-only. It does not create trades or mutate portfolios; Phase 08 consumes its stored decisions through a separate risk-managed executor.
 

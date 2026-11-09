@@ -6,6 +6,13 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Database AI analysis timeout fix
+
+- Add an additive migration that aggregates the six bounded candle-interval reads in one ordered SQL statement per market
+- Preserve the existing candle index, row limit, interval order, freshness checks, indicators, decisions, function privileges, and summary response
+- Add local PGlite output-parity coverage across 102 enabled markets
+- Record the user's execution of the interval-batching migration script on 2026-11-09; hosted post-migration analysis validation remains pending
+
 ### Manual AI decision archive POC
 
 - Add a manually invoked Raspberry Pi pull CLI that copies only `AI_Crypto_Bot_AI_Decisions` into the existing archive database

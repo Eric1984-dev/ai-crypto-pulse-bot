@@ -317,7 +317,7 @@ Historical market data is shared across:
 
 # Phase 07 AI Decision Flow
 
-An additive database-side analysis prototype is also available on the same `/api/ai-analysis` route. `AI_ANALYSIS_MODE` defaults to `javascript`; only the explicit value `database` calls `AI_Crypto_Bot_Run_Database_AI_Analysis`. The database function reads the same watched-market source, snapshots, and bounded histories, stores decisions in the existing table, and returns counts rather than candle/indicator payloads. PGlite parity tests compare all generated decision fields for 150-candle histories, BUY/SELL/HOLD/WAIT, stale/future/missing data, insufficient history, and invalid candles. This remains an opt-in prototype; its migration and production rollout have not been applied or verified.
+An additive database-side analysis path is also available on the same `/api/ai-analysis` route. `AI_ANALYSIS_MODE` defaults to `javascript`; only the explicit value `database` calls `AI_Crypto_Bot_Run_Database_AI_Analysis`. The database function reads the same watched-market source, snapshots, and bounded histories, stores decisions in the existing table, and returns counts rather than candle/indicator payloads. The user reported applying the initial migration, enabling database mode, and executing `20261109120000_ai_analysis_interval_batching.sql` in production. The batching migration is covered by PGlite decision-parity and 102-market tests; a successful hosted analysis run after applying it remains unverified. See the [timeout fix report](./reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
 
 Watched Markets
 ↓

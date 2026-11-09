@@ -40,6 +40,8 @@ For each non-empty batch, the candle refresh service obtains the latest stored t
 
 The optional `AI_ANALYSIS_MODE=database` prototype reuses this endpoint and leaves the scheduler unchanged. The default remains `javascript`; database mode must not be selected until its migration is manually applied and rollout separately approved. RPC failures set `AI_Crypto_Bot_Status` to `ERROR`, return an unavailable response, and do not trigger a JavaScript fallback.
 
+Production diagnostics later confirmed PostgreSQL `57014` statement-timeout errors inside the candle-read query; the observed PostgREST `authenticator` role has an 8-second `statement_timeout`. The user reports executing the additive `20261109120000_ai_analysis_interval_batching.sql` migration script in production on 2026-11-09. It reduces per-market PL/pgSQL query executions from six to one while retaining six independently bounded, index-backed interval reads. Verify a successful hosted analysis run before considering the timeout resolved. The migration does not raise the database or client timeout, alter scheduler cadence, or add a JavaScript fallback. See the [timeout fix report](./reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
+
 The analysis endpoint is available at:
 
 ```text

@@ -10,6 +10,7 @@
 - Market snapshot, candle refresh, AI analysis, and paper-trading execution require configured external scheduler jobs. Production scheduler configuration and execution are unverified.
 - Admin Actions require the server-side `ADMIN_USER_IDS` allowlist to be configured and verified.
 - Phase 15 AI Recommendations have local automated coverage but have not been verified against hosted Supabase, deployed Vercel, or live Realtime. Recommendation History exports are recomputed from current stored Analytics data; prior generated recommendation snapshots are not retained.
+- Database-mode AI analysis has produced PostgreSQL `57014` statement-timeout failures in the candle-read query. The observed PostgREST `authenticator` role has an 8-second `statement_timeout`; the candle lookup index exists, so the issue is not an absent index. The user reports executing the additive interval-batching migration script in production on 2026-11-09. Keep the fix under validation until a hosted analysis run succeeds; see the [timeout fix report](reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
 
 See [the Phase 12 system validation report](reports/PHASE_12_SYSTEM_VALIDATION_REPORT.md) for status classification, [the Analytics root-cause report](reports/ANALYTICS_ROOT_CAUSE_REPORT.md) for the latest evidence, and recommended follow-up.
 

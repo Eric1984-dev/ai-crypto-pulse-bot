@@ -37,6 +37,9 @@ const compactAiCandleMigration = migrationSql.find((sql) =>
 const databaseAiAnalysisMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Run_Database_AI_Analysis"')
 );
+const databaseAiAnalysisBatchingMigration = migrationSql.find((sql) =>
+  sql.includes('CREATE OR REPLACE FUNCTION public."AI_Crypto_Bot_Run_Database_AI_Analysis"')
+);
 const shadowExitMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
 );
@@ -79,6 +82,7 @@ async function createDatabase() {
   await database.exec(aiCandleHistoryMigration);
   await database.exec(compactAiCandleMigration);
   await database.exec(databaseAiAnalysisMigration);
+  await database.exec(databaseAiAnalysisBatchingMigration);
   return database;
 }
 
@@ -1883,7 +1887,15 @@ test("database AI analysis exactly matches JavaScript across bounded and failure
   const analysisTime = new Date("2026-03-20T12:00:00.000Z");
   try {
     assert.ok(databaseAiAnalysisMigration);
+    assert.ok(databaseAiAnalysisBatchingMigration);
     assert.doesNotMatch(databaseAiAnalysisMigration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
+    assert.doesNotMatch(databaseAiAnalysisBatchingMigration, /\bSELECT\s+(?:[a-z_][a-z_0-9]*\.)?\*/i);
+    assert.equal(
+      (databaseAiAnalysisBatchingMigration.match(/FROM public\."AI_Crypto_Bot_Candles"/g) || []).length,
+      1
+    );
+    assert.match(databaseAiAnalysisBatchingMigration, /WITH intervals \(ordinal, interval_name, max_age_ms, weight\) AS/);
+    assert.match(databaseAiAnalysisBatchingMigration, /ORDER BY intervals\.ordinal/);
     const privileges = await database.query(`
       SELECT
         has_function_privilege(
@@ -2125,6 +2137,114 @@ test("database AI analysis exactly matches JavaScript across bounded and failure
       )),
       { code: "22023" }
     );
+  } finally {
+    await database.close();
+  }
+});
+
+test("batched database AI analysis preserves decisions across 102 enabled markets", async () => {
+  const database = await createDatabase();
+  const { analyzeMarket } = await import("../lib/ai-engine.mjs");
+  const analysisTime = new Date("2026-03-20T12:00:00.000Z");
+  const symbols = [
+    "BTC-EUR",
+    ...Array.from({ length: 101 }, (_, index) => `BATCH${String(index + 1).padStart(3, "0")}-EUR`)
+  ];
+
+  try {
+    await database.query('UPDATE public."AI_Crypto_Bot_Watched_Markets" SET enabled = false');
+    const additionalSymbols = symbols.slice(1);
+    const marketValues = additionalSymbols.map((_, index) =>
+      `($${index * 2 + 1}, false, $${index * 2 + 2})`
+    );
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Watched_Markets" (symbol, enabled, priority)
+       VALUES ${marketValues.join(", ")}`,
+      additionalSymbols.flatMap((symbol, index) => [symbol, index + 10])
+    );
+    await database.query(
+      `UPDATE public."AI_Crypto_Bot_Watched_Markets"
+       SET enabled = true
+       WHERE symbol = ANY($1::text[])`,
+      [symbols]
+    );
+
+    const snapshots = symbols.map((symbol, index) =>
+      createAnalysisSnapshot(symbol, analysisTime, ["up", "down", "flat"][index % 3])
+    );
+    const snapshotValues = snapshots.map((_, index) => {
+      const offset = index * 7;
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4},
+        $${offset + 5}, $${offset + 6}, $${offset + 7})`;
+    });
+    await database.query(
+      `INSERT INTO public."AI_Crypto_Bot_Market_Data"
+        (symbol, price, volume, daily_change, high_24h, low_24h, captured_at)
+       VALUES ${snapshotValues.join(", ")}`,
+      snapshots.flatMap((snapshot) => [
+        snapshot.symbol,
+        snapshot.price,
+        snapshot.volume,
+        snapshot.daily_change,
+        snapshot.high_24h,
+        snapshot.low_24h,
+        snapshot.captured_at
+      ])
+    );
+
+    for (const [index, symbol] of symbols.entries()) {
+      const direction = ["up", "down", "flat"][index % 3];
+      const candles = createAnalysisCandles(symbol, 30, direction, analysisTime);
+      const candleValues = candles.map((_, candleIndex) => {
+        const offset = candleIndex * 8;
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4},
+          $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
+      });
+      await database.query(
+        `INSERT INTO public."AI_Crypto_Bot_Candles"
+          (symbol, interval, open, high, low, close, volume, "timestamp")
+         VALUES ${candleValues.join(", ")}`,
+        candles.flatMap((candle) => [
+          candle.symbol,
+          candle.interval,
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volume,
+          candle.timestamp
+        ])
+      );
+    }
+
+    const summary = await withRole(database, "service_role", () => database.query(
+      `SELECT * FROM public."AI_Crypto_Bot_Run_Database_AI_Analysis"($1::timestamptz)`,
+      [analysisTime]
+    ));
+    assert.equal(summary.rows[0].analyzed_markets, symbols.length);
+    assert.equal(summary.rows[0].decisions_stored, symbols.length);
+
+    const storedRows = await database.query(
+      `SELECT symbol, decision, confidence, reason, indicators, strategy_name, strategy_version
+       FROM public."AI_Crypto_Bot_AI_Decisions"`
+    );
+    assert.equal(storedRows.rows.length, symbols.length);
+    const decisionsBySymbol = new Map(storedRows.rows.map((row) => [row.symbol, row]));
+    for (const symbol of symbols) {
+      const fixture = await readAnalysisFixture(database, symbol);
+      const expected = JSON.parse(JSON.stringify(analyzeMarket({
+        symbol,
+        marketData: fixture.marketData,
+        candles: fixture.candles,
+        now: analysisTime
+      })));
+      const stored = decisionsBySymbol.get(symbol);
+      assert.ok(stored, `Expected a stored decision for ${symbol}`);
+      assert.deepEqual(
+        { ...stored, confidence: Number(stored.confidence) },
+        expected
+      );
+    }
   } finally {
     await database.close();
   }
