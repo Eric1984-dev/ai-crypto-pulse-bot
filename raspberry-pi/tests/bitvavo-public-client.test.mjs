@@ -199,13 +199,20 @@ test("manual ingestion can use an optional writer identity without changing API 
   };
   assert.throws(
     () => createIngestionDatabaseConfig(ownerModeConfig, {}),
-    /requires a separate INGESTION_DATABASE_USER/
+    /INGESTION_DATABASE_USER to differ from DATABASE_USER/
   );
   assert.throws(
     () => createIngestionDatabaseConfig(ownerModeConfig, {
       INGESTION_DATABASE_USER: "reader",
       INGESTION_DATABASE_PASSWORD: "write-secret"
     }),
-    /requires a separate INGESTION_DATABASE_USER/
+    /INGESTION_DATABASE_USER to differ from DATABASE_USER/
   );
+  const distinctOwnerConfig = createIngestionDatabaseConfig(ownerModeConfig, {
+    INGESTION_DATABASE_USER: "owner",
+    INGESTION_DATABASE_PASSWORD: "owner-secret"
+  });
+  assert.equal(distinctOwnerConfig.database.user, "owner");
+  assert.equal(distinctOwnerConfig.database.password, "owner-secret");
+  assert.equal(config.database.user, "reader");
 });

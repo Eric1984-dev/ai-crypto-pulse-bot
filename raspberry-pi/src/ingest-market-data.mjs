@@ -45,7 +45,7 @@ export function createIngestionDatabaseConfig(config, env = process.env) {
   if (config.ingestion?.allowTableOwner
     && (!user || user === config.database.user)) {
     throw new Error(
-      "INGESTION_ALLOW_TABLE_OWNER=true requires a separate INGESTION_DATABASE_USER."
+      "INGESTION_ALLOW_TABLE_OWNER=true requires INGESTION_DATABASE_USER to differ from DATABASE_USER."
     );
   }
   if (!user) {

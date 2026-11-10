@@ -74,6 +74,6 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 - `tests/` — isolated Node.js tests; no remote database or schema setup.
 - `docs/` — implementation and operational notes for this runtime foundation.
 
-The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in.
+The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in; the [Phase 5.4 report](docs/phase-5.4-ingestion-user-resolution.md) resolves the API/ingestion identity configuration.
 
 For environment variables, PostgreSQL contract checks, and validation commands, see the [deployment and validation guide](docs/phase-2-deployment-validation.md).
