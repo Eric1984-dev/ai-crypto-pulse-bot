@@ -132,6 +132,7 @@ test("runtime preflight validates contracts and uses only read-only SQL", async 
   assert.equal(result.contracts, "valid");
   assert.equal(result.enabledMarkets, 2);
   assert.equal(result.requiredTables, REQUIRED_TABLES.length);
+  assert.equal(result.requiredFunctions, 0);
   assert.ok(pool.queries.every((query) =>
     query === "BEGIN READ ONLY" || query === "COMMIT" || /^\s*SELECT\b/i.test(query)));
   assert.ok(pool.queries.includes("BEGIN READ ONLY"));

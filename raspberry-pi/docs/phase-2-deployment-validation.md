@@ -2,11 +2,11 @@
 
 ## Scope and safety
 
-This procedure installs and manually starts the Phase 2 foundation on the Raspberry Pi for validation. It is **not** a production cutover or a complete bot deployment:
+This procedure installs and manually starts the read-only Raspberry Pi foundation for validation. It is **not** a production cutover or a complete bot deployment:
 
 - The process performs read-only database preflight and serves local health endpoints only.
 - It does not create a database, apply schema, migrate/import data, write records, change markets, run a scheduler, analyze markets, or execute paper/live trades.
-- The API binds to `127.0.0.1`; do not change the bind address, create a public tunnel, or connect Vercel to it. Authentication and OIDC are not implemented.
+- The API binds to `127.0.0.1`; do not change the bind address, create a public tunnel, or connect Vercel to it. Authentication provider integration, login, and OIDC are not implemented. The provider interface is deny-all by default.
 - No `systemd` unit or timer is supplied. Run it in the foreground for validation and stop it manually.
 - Keep credentials in the Pi's untracked `raspberry-pi/.env`. Do not send them in chat, add them to Git, or put them in Vercel.
 
@@ -53,6 +53,11 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 | `DATABASE_SSL_SERVERNAME` | empty | Optional TLS server name when it differs from `DATABASE_HOST`. |
 | `API_HOST` | `127.0.0.1` | Must resolve to a loopback literal/name. `0.0.0.0` and LAN/public addresses are rejected. |
 | `API_PORT` | `3002` | Integer `1024`–`65535`; `3002` avoids the existing archive health service's default port `3001`. |
+| `API_CORS_ORIGINS` | empty | Comma-separated exact HTTPS origins; loopback HTTP origins are permitted for development. Wildcards and paths are rejected. Empty means no browser origin is allowed. |
+| `API_SESSION_TTL_MS` | `28800000` | In-memory session lifetime in milliseconds; integer `60000`–`86400000`. No endpoint creates sessions. |
+| `API_SESSION_MAX` | `1000` | Maximum in-memory sessions; integer `1`–`10000`. |
+| `API_RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window in milliseconds; integer `1000`–`3600000`. |
+| `API_RATE_LIMIT_MAX_REQUESTS` | `60` | Requests per socket peer per window; integer `1`–`1000`. Forwarded client-IP headers are not trusted. |
 | `PG_POOL_MAX` | `4` | Integer `1`–`4`; this is the maximum runtime pool size. |
 | `PG_CONNECTION_TIMEOUT_MS` | `2000` | Integer `100`–`30000`. |
 | `PG_QUERY_TIMEOUT_MS` | `5000` | Integer `100`–`30000`. |
@@ -73,14 +78,14 @@ npm run validate
 Expected results:
 
 1. `npm ci` exits with status `0` and installs the pinned dependencies from `package-lock.json`.
-2. `npm test` exits with status `0`. The current package suite reports `14` tests, `14` passed, `0` failed, and `0` skipped. These tests use a PostgreSQL protocol mock; they do **not** prove connectivity to the Pi database.
+2. `npm test` exits with status `0`. The Phase 3 package suite currently reports `24` tests; test totals may change as tests are added. These tests use local mocks; they do **not** prove connectivity to the Pi database.
 3. `npm run validate` connects to the configured existing database, performs the read-only preflight, and exits with status `0`. It prints one JSON line in this shape (the optional function value and market count depend on the database):
 
 ```json
-{"event":"runtime_validation_passed","validation":{"database":"connected","contracts":"valid","requiredTables":18,"requiredFunctions":5,"optionalFunctions":{"AI_Crypto_Bot_Run_Database_AI_Analysis":"present"},"enabledMarkets":100}}
+{"event":"runtime_validation_passed","validation":{"database":"connected","contracts":"valid","requiredTables":18,"requiredFunctions":0,"optionalFunctions":{"AI_Crypto_Bot_Run_Database_AI_Analysis":"not-installed"},"enabledMarkets":102}}
 ```
 
-`AI_Crypto_Bot_Run_Database_AI_Analysis` may instead be `"not-installed"`. It is optional. `enabledMarkets` is the actual number of enabled rows read; the validator does not require the count to equal exactly 100.
+The Pi's approximately 102 enabled markets are read from the existing table and are not changed. `enabledMarkets` reports the number actually read; it is not required to equal exactly 102. No runtime database function is required, installed, or invoked by this phase.
 
 If validation fails, the command exits nonzero and prints `runtime_validation_failed` with a safe error code and, for schema-contract failures, a `contractErrors` array. Examples include `RUNTIME_CONTRACT_INVALID`, `WATCHED_MARKETS_INVALID`, `ECONNREFUSED`, or a PostgreSQL authentication code. Do not treat a successful unit-test run as a substitute for this live check.
 
@@ -95,7 +100,7 @@ npm start
 Expected startup output is one JSON line similar to:
 
 ```json
-{"event":"runtime_started","host":"127.0.0.1","port":3002,"validation":{"database":"connected","contracts":"valid","requiredTables":18,"requiredFunctions":5,"optionalFunctions":{"AI_Crypto_Bot_Run_Database_AI_Analysis":"present"},"enabledMarkets":100}}
+{"event":"runtime_started","host":"127.0.0.1","port":3002,"validation":{"database":"connected","contracts":"valid","requiredTables":18,"requiredFunctions":0,"optionalFunctions":{"AI_Crypto_Bot_Run_Database_AI_Analysis":"not-installed"},"enabledMarkets":102}}
 ```
 
 The process stays in the foreground. In a second SSH shell on the Pi, run:
@@ -103,18 +108,19 @@ The process stays in the foreground. In a second SSH shell on the Pi, run:
 ```sh
 curl -fsS http://127.0.0.1:3002/api/v1/health/live
 curl -fsS http://127.0.0.1:3002/api/v1/health/ready
-curl -fsS http://127.0.0.1:3002/api/v1/health/diagnostics
+curl -i http://127.0.0.1:3002/api/v1/health/operational
 ```
 
 Expected outputs:
 
 ```json
 {"data":{"status":"live"}}
-{"data":{"status":"ready","database":"available","contracts":"valid","enabledMarkets":100}}
-{"data":{"node":{"version":"v20.x.x","platform":"linux","architecture":"arm"},"memory":{"residentBytes":12345678,"heapUsedBytes":1234567,"systemAvailableBytes":123456789,"systemTotalBytes":987654321},"databasePool":{"total":0,"idle":0,"waiting":0},"startup":{"contracts":"valid","enabledMarkets":100},"databaseCheck":{"status":"available","checkedAt":"2026-11-10T00:00:00.000Z"}}}
+{"data":{"status":"ready"}}
+HTTP/1.1 401 Unauthorized
+{"error":{"code":"UNAUTHENTICATED","message":"Authentication is required.","requestId":"<request-id>"}}
 ```
 
-Diagnostics values are examples and will differ. A Pi can report `arm` or `arm64` depending on its OS/Node build. The readiness response must be HTTP `200` with `"status":"ready"`. Liveness alone only proves that the HTTP process responds; it does not prove database readiness.
+Operational health is protected and intentionally unavailable without a trusted provider; there is no login flow in this phase. The readiness response must be HTTP `200` with `"status":"ready"`. Liveness alone only proves that the HTTP process responds; it does not prove database readiness.
 
 Stop the foreground process with `Ctrl+C`. Expected shutdown output:
 
@@ -176,25 +182,13 @@ It also requires these primary/unique key column sets:
 - `AI_Crypto_Bot_Candles`: unique `(symbol, interval, timestamp)`.
 - `AI_Crypto_Bot_AI_Decisions`: primary key `(id)`.
 
-### Required function signatures
+### Runtime functions
 
-The following existing functions must be present in `public` with the listed argument/result contracts and `SECURITY DEFINER` flag:
-
-| Function | Arguments | Result | `SECURITY DEFINER` |
-|---|---|---|---|
-| `AI_Crypto_Bot_Get_Latest_Candle_Checkpoints` | `text[], text` | `TABLE(symbol text, latest_timestamp timestamp with time zone)` | No |
-| `AI_Crypto_Bot_Get_Latest_AI_Candles_Compact` | `text[], text` | `TABLE(symbol text, candles jsonb)` | No |
-| `AI_Crypto_Bot_Run_Paper_Trading` | none | `jsonb` | Yes |
-| `AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios` | none | `jsonb` | Yes |
-| `AI_Crypto_Bot_Trade_History_Stats` | none | `TABLE(closed_trade_count bigint, winning_trade_count bigint, losing_trade_count bigint, average_profit numeric, average_loss numeric, best_trade numeric, worst_trade numeric)` | No |
-
-`AI_Crypto_Bot_Run_Database_AI_Analysis(timestamp with time zone)` is optional; if present, its result and security-definer contract are also checked. None of these functions is run.
-
-The optional function contract is `TABLE(analyzed_markets integer, decisions_stored integer, buy_count integer, sell_count integer, hold_count integer, wait_count integer)` with `SECURITY DEFINER` disabled.
+The Phase 2 audit had listed expected PostgreSQL functions, but subsequent Pi validation confirmed that no runtime PostgreSQL functions are installed. Phase 3 therefore no longer requires or invokes any runtime function. The preflight may inspect the optional `AI_Crypto_Bot_Run_Database_AI_Analysis` name in PostgreSQL catalogs for compatibility reporting, but its absence is accepted and no function is executed.
 
 ### Deliberate limits of this preflight
 
-The validator is a Phase 2 contract check, not an exhaustive audit of the full schema. It does not validate every column in all 18 tables, views, indexes, foreign keys, check constraints, triggers, row-level-security policy behavior, or function `EXECUTE` grants. It checks only the column/key contracts listed above, the required function signatures/flags, the listed table/sequence privileges, and enabled-market row shape. A successful result does not certify every object or historical row in PostgreSQL.
+The validator is a runtime contract check, not an exhaustive audit of the full schema. It does not validate every column in all 18 tables, views, indexes, foreign keys, check constraints, triggers, row-level-security policy behavior, or function `EXECUTE` grants. It checks only the column/key contracts listed above, the listed table/sequence privileges, and enabled-market row shape. A successful result does not certify every object or historical row in PostgreSQL.
 
 ### Existing watched-market rows
 
@@ -206,9 +200,9 @@ Phase 2 may be marked successful only after all of the following are true:
 
 - [ ] Node.js is `>=20.6`, `.env` is local and protected, `ENABLE_LIVE_TRADING=false`, and the API remains bound to loopback.
 - [ ] `npm ci` and `npm test` both exit `0`.
-- [ ] `npm run validate` exits `0` against the intended existing Pi database and reports `database:"connected"`, `contracts:"valid"`, `requiredTables:18`, `requiredFunctions:5`, and the expected nonzero enabled-market count.
+- [ ] `npm run validate` exits `0` against the intended existing Pi database and reports `database:"connected"`, `contracts:"valid"`, `requiredTables:18`, `requiredFunctions:0`, and the expected nonzero enabled-market count.
 - [ ] The actual market count is compared with the operator's known existing enabled-market count. The runtime validates rows but does not print or baseline-compare the complete symbol set.
-- [ ] `npm start` reports `runtime_started`; `/health/live` and `/health/ready` return HTTP `200`, with readiness reporting database available and valid contracts.
+- [ ] `npm start` reports `runtime_started`; `/health/live` and `/health/ready` return HTTP `200`. `/health/operational` returns `401` without an injected trusted authentication provider.
 - [ ] The process stops cleanly with `Ctrl+C`; no Vercel deployment, remote exposure, schema/data change, scheduled execution, or trading order occurred.
 
 A local mock test, successful build, liveness response alone, or a connection to a different database is not sufficient. If the live preflight fails, preserve the error code/contract error list (without secrets), stop, and investigate the existing database configuration/schema read-only. Do not “fix” a mismatch by applying migrations or changing tables/markets during Phase 2.

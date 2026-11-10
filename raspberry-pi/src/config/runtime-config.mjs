@@ -8,7 +8,11 @@ const DEFAULTS = Object.freeze({
   poolMax: 4,
   connectionTimeoutMs: 2000,
   queryTimeoutMs: 5000,
-  idleTimeoutMs: 10000
+  idleTimeoutMs: 10000,
+  sessionTtlMs: 8 * 60 * 60 * 1000,
+  sessionMax: 1000,
+  rateLimitWindowMs: 60000,
+  rateLimitMaxRequests: 60
 });
 
 function requiredString(env, name) {
@@ -47,6 +51,37 @@ function readBoolean(env, name, fallback) {
     return false;
   }
   throw new Error(`Invalid runtime setting: ${name}`);
+}
+
+function readCorsOrigins(env) {
+  const raw = env.API_CORS_ORIGINS?.trim() || "";
+  if (!raw) {
+    return Object.freeze([]);
+  }
+
+  const origins = raw.split(",").map((origin) => origin.trim());
+  if (origins.some((origin) => !origin) || new Set(origins).size !== origins.length) {
+    throw new Error("Invalid runtime setting: API_CORS_ORIGINS");
+  }
+
+  for (const origin of origins) {
+    let url;
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error("Invalid runtime setting: API_CORS_ORIGINS");
+    }
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const isLocalHttpOrigin = url.protocol === "http:" && isLoopbackHost(hostname);
+    if (origin === "*"
+      || url.origin !== origin
+      || url.username
+      || url.password
+      || (url.protocol !== "https:" && !isLocalHttpOrigin)) {
+      throw new Error("Invalid runtime setting: API_CORS_ORIGINS");
+    }
+  }
+  return Object.freeze(origins);
 }
 
 export function readRuntimeConfig(env = process.env, {
@@ -119,7 +154,32 @@ export function readRuntimeConfig(env = process.env, {
     }),
     api: Object.freeze({
       host: env.API_HOST?.trim() || DEFAULTS.apiHost,
-      port: readInteger(env, "API_PORT", DEFAULTS.apiPort, { min: 1024, max: 65535 })
+      port: readInteger(env, "API_PORT", DEFAULTS.apiPort, { min: 1024, max: 65535 }),
+      corsOrigins: readCorsOrigins(env),
+      sessionTtlMs: readInteger(
+        env,
+        "API_SESSION_TTL_MS",
+        DEFAULTS.sessionTtlMs,
+        { min: 60000, max: 86400000 }
+      ),
+      sessionMax: readInteger(
+        env,
+        "API_SESSION_MAX",
+        DEFAULTS.sessionMax,
+        { min: 1, max: 10000 }
+      ),
+      rateLimitWindowMs: readInteger(
+        env,
+        "API_RATE_LIMIT_WINDOW_MS",
+        DEFAULTS.rateLimitWindowMs,
+        { min: 1000, max: 3600000 }
+      ),
+      rateLimitMaxRequests: readInteger(
+        env,
+        "API_RATE_LIMIT_MAX_REQUESTS",
+        DEFAULTS.rateLimitMaxRequests,
+        { min: 1, max: 1000 }
+      )
     }),
     liveTradingEnabled
   });

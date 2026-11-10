@@ -16,7 +16,15 @@ function validEnvironment(overrides = {}) {
 test("runtime config defaults to loopback API and disables live trading", () => {
   const config = readRuntimeConfig(validEnvironment());
 
-  assert.deepEqual(config.api, { host: "127.0.0.1", port: 3002 });
+  assert.deepEqual(config.api, {
+    host: "127.0.0.1",
+    port: 3002,
+    corsOrigins: [],
+    sessionTtlMs: 28800000,
+    sessionMax: 1000,
+    rateLimitWindowMs: 60000,
+    rateLimitMaxRequests: 60
+  });
   assert.equal(config.liveTradingEnabled, false);
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
@@ -37,4 +45,25 @@ test("runtime config rejects remote plaintext DB, public API binding, and live t
 test("runtime config rejects out-of-range pool and port settings", () => {
   assert.throws(() => readRuntimeConfig(validEnvironment({ PG_POOL_MAX: "5" })), /PG_POOL_MAX/);
   assert.throws(() => readRuntimeConfig(validEnvironment({ DATABASE_PORT: "0" })), /DATABASE_PORT/);
+});
+
+test("runtime config validates origins and bounded API controls", () => {
+  const config = readRuntimeConfig(validEnvironment({
+    API_CORS_ORIGINS: "https://dashboard.example.com,http://localhost:5173",
+    API_RATE_LIMIT_MAX_REQUESTS: "120"
+  }));
+  assert.deepEqual(config.api.corsOrigins, [
+    "https://dashboard.example.com",
+    "http://localhost:5173"
+  ]);
+  assert.equal(config.api.rateLimitMaxRequests, 120);
+
+  for (const origin of ["*", "https://dashboard.example.com/path", "http://example.com"]) {
+    assert.throws(() => readRuntimeConfig(validEnvironment({
+      API_CORS_ORIGINS: origin
+    })), /API_CORS_ORIGINS/);
+  }
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    API_SESSION_MAX: "0"
+  })), /API_SESSION_MAX/);
 });

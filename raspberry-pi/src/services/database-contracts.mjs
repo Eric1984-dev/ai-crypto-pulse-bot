@@ -74,38 +74,7 @@ export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
   })
 });
 
-export const REQUIRED_FUNCTION_CONTRACTS = Object.freeze([
-  Object.freeze({
-    name: "AI_Crypto_Bot_Get_Latest_Candle_Checkpoints",
-    argumentTypes: "text[], text",
-    resultType: "TABLE(symbol text, latest_timestamp timestamp with time zone)",
-    securityDefiner: false
-  }),
-  Object.freeze({
-    name: "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact",
-    argumentTypes: "text[], text",
-    resultType: "TABLE(symbol text, candles jsonb)",
-    securityDefiner: false
-  }),
-  Object.freeze({
-    name: "AI_Crypto_Bot_Run_Paper_Trading",
-    argumentTypes: "",
-    resultType: "jsonb",
-    securityDefiner: true
-  }),
-  Object.freeze({
-    name: "AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios",
-    argumentTypes: "",
-    resultType: "jsonb",
-    securityDefiner: true
-  }),
-  Object.freeze({
-    name: "AI_Crypto_Bot_Trade_History_Stats",
-    argumentTypes: "",
-    resultType: "TABLE(closed_trade_count bigint, winning_trade_count bigint, losing_trade_count bigint, average_profit numeric, average_loss numeric, best_trade numeric, worst_trade numeric)",
-    securityDefiner: false
-  })
-]);
+export const REQUIRED_FUNCTION_CONTRACTS = Object.freeze([]);
 
 export const OPTIONAL_FUNCTION_CONTRACTS = Object.freeze([
   Object.freeze({

@@ -14,7 +14,7 @@ function runtimeConfig() {
   });
   return Object.freeze({
     ...config,
-    api: Object.freeze({ host: "127.0.0.1", port: 0 })
+    api: Object.freeze({ ...config.api, host: "127.0.0.1", port: 0 })
   });
 }
 
@@ -75,13 +75,12 @@ test("runtime starts only after contracts validate and closes cleanly", async ()
     );
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
-      data: {
-        status: "ready",
-        database: "available",
-        contracts: "valid",
-        enabledMarkets: 100
-      }
+      data: { status: "ready" }
     });
+    const operational = await fetch(
+      `http://127.0.0.1:${runtime.server.address().port}/api/v1/health/operational`
+    );
+    assert.equal(operational.status, 401);
   } finally {
     await runtime.close();
   }

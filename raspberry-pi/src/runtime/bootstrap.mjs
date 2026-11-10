@@ -1,6 +1,8 @@
-import { createHealthApiServer } from "../api/server.mjs";
+import { createApiServer } from "../api/server.mjs";
+import { createSessionStore } from "../auth/session-store.mjs";
 import { createPostgresPool } from "../database/pool.mjs";
-import { createDiagnosticsSnapshot } from "../monitoring/diagnostics.mjs";
+import { createOperationalHealthSnapshot } from "../monitoring/operational-health.mjs";
+import { createRequestMetrics } from "../monitoring/request-metrics.mjs";
 import { createReadinessService } from "../services/readiness-service.mjs";
 import { validateRuntimeContracts } from "../services/contract-validation.mjs";
 
@@ -40,7 +42,8 @@ export async function startRuntime(config, {
   Pool,
   logger = console,
   createServerImpl,
-  validateContracts = validateRuntimeContracts
+  validateContracts = validateRuntimeContracts,
+  authenticationProvider
 } = {}) {
   const pool = createPostgresPool(config, { Pool, logger });
   let server;
@@ -52,11 +55,24 @@ export async function startRuntime(config, {
       startupValidation: validation,
       logger
     });
-    const getDiagnostics = () => createDiagnosticsSnapshot({ pool, readiness });
-    server = createHealthApiServer({
+    const requestMetrics = createRequestMetrics();
+    const sessionStore = createSessionStore({
+      ttlMs: config.api.sessionTtlMs,
+      maxSessions: config.api.sessionMax
+    });
+    const getOperationalHealth = () => createOperationalHealthSnapshot({
+      pool,
+      requestMetrics
+    });
+    server = createApiServer({
       readiness,
-      getDiagnostics,
+      getOperationalHealth,
+      authenticationProvider,
+      allowedOrigins: config.api.corsOrigins,
+      rateLimitMaxRequests: config.api.rateLimitMaxRequests,
+      rateLimitWindowMs: config.api.rateLimitWindowMs,
       logger,
+      metrics: requestMetrics,
       ...(createServerImpl ? { createServerImpl } : {})
     });
     await waitForListening(server, config.api.host, config.api.port);
@@ -72,6 +88,8 @@ export async function startRuntime(config, {
       server,
       pool,
       validation,
+      sessionStore,
+      requestMetrics,
       async close() {
         if (closed) {
           return;

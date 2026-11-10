@@ -1,31 +1,87 @@
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import { createHealthHandler } from "../monitoring/health-handler.mjs";
+import { DisabledAuthenticationProvider } from "../auth/authentication-provider.mjs";
+import { authenticationMiddleware } from "../auth/authentication-middleware.mjs";
+import { csrfMiddleware } from "./csrf-middleware.mjs";
+import { ApiError, toErrorResponse } from "./api-error.mjs";
+import { createRequestContext } from "./request-context.mjs";
+import { composeMiddleware } from "./middleware-pipeline.mjs";
+import { FixedWindowRateLimiter, rateLimitMiddleware } from "./rate-limiter.mjs";
+import { registerHealthRoutes } from "./health-routes.mjs";
+import { ApiRouter, routerMiddleware } from "./router.mjs";
+import { corsMiddleware, securityHeadersMiddleware } from "./security-middleware.mjs";
+import { requestLoggingMiddleware } from "./request-logging-middleware.mjs";
 
-export function createHealthApiServer({
+export function createApiServer({
   readiness,
-  getDiagnostics,
+  getOperationalHealth,
+  authenticationProvider = new DisabledAuthenticationProvider(),
+  allowedOrigins = [],
+  rateLimitMaxRequests = 60,
+  rateLimitWindowMs = 60000,
   logger = console,
+  metrics,
   createServerImpl = createServer
 }) {
-  const handler = createHealthHandler({ readiness, getDiagnostics, logger });
+  const router = registerHealthRoutes(new ApiRouter(), {
+    readiness,
+    getOperationalHealth
+  });
+  const rateLimiter = new FixedWindowRateLimiter({
+    limit: rateLimitMaxRequests,
+    windowMs: rateLimitWindowMs
+  });
+  const runPipeline = composeMiddleware([
+    securityHeadersMiddleware(),
+    requestLoggingMiddleware({ logger, metrics }),
+    rateLimitMiddleware(rateLimiter),
+    corsMiddleware({ allowedOrigins }),
+    routerMiddleware(router),
+    authenticationMiddleware(authenticationProvider),
+    csrfMiddleware({ allowedOrigins })
+  ], async (context) => {
+    await context.routeHandler(context);
+  });
+
   return createServerImpl((request, response) => {
-    Promise.resolve(handler(request, response)).catch((error) => {
-      logger.error(JSON.stringify({
-        event: "health_request_failed",
-        code: safeErrorCode(error)
-      }));
-      if (!response.headersSent) {
-        response.statusCode = 500;
-        response.setHeader("Content-Type", "application/json; charset=utf-8");
-        response.setHeader("Cache-Control", "no-store");
-        response.end(JSON.stringify({
-          error: { code: "INTERNAL_ERROR", message: "The request could not be completed." }
+    let context;
+    try {
+      context = createRequestContext(request, response);
+    } catch (error) {
+      writeErrorResponse(response, error, randomUUID());
+      return;
+    }
+
+    runPipeline(context).catch((error) => {
+      if (!(error instanceof ApiError) || error.statusCode >= 500) {
+        logger.error(JSON.stringify({
+          event: "api_request_failed",
+          requestId: context.requestId,
+          code: safeErrorCode(error)
         }));
-      } else {
-        response.destroy();
       }
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      writeErrorResponse(response, error, context.requestId);
     });
   });
+}
+
+function writeErrorResponse(response, error, requestId) {
+  const result = toErrorResponse(error, requestId);
+  response.statusCode = result.statusCode;
+  for (const [name, value] of Object.entries(result.headers)) {
+    response.setHeader(name, value);
+  }
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  response.end(JSON.stringify(result.body));
 }
 
 function safeErrorCode(error) {
@@ -33,3 +89,5 @@ function safeErrorCode(error) {
     ? error.code
     : "UNKNOWN";
 }
+
+export { ApiError };
