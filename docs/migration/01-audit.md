@@ -194,8 +194,19 @@ De kolommen volgens `AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql`, `archive-server/src/arch
 De archive market seed-code valideert deze zes kolommen en de primary-key-/unique-symbol-constraints. `market_export.sql` verwachtte bij het maken van dat exportcontract 102 bronrijen; dat is geen actuele telling van de Pi. De rapportage over de seed markeert live aantallen/kopieerresultaten als niet uitgevoerd/niet verifieerbaar. De door de gebruiker gemelde bestaande Pi-marktlijst is daarom niet onafhankelijk vergeleken met dit contract.
 
 ### Behoud en scanner-toegang
+The existing Watched Markets table is the only source of truth.
 
-Behoud de aanwezige marktlijst exact zoals hij op de Pi staat. Fase 2 mag geen configuratielijst uit `config/markets.js` als vervanging gebruiken, geen seed uitvoeren en geen rijen toevoegen, bijwerken of verwijderen. De bestaande code heeft een `archive-market-seed`-utility die een Supabase-lijst naar de archieftabel kan upserten; deze audit heeft die utility niet uitgevoerd. Deze utility is geen scanner-reader en er staat geen seed-commando in `archive-server/package.json`.
+No configuration file may add markets.
+
+No synchronization process may add markets.
+
+No seed process may add markets.
+
+The active market universe is determined solely by:
+
+public."AI_Crypto_Bot_Watched_Markets"
+
+ Fase 2 mag geen configuratielijst uit `config/markets.js` als vervanging gebruiken, geen seed uitvoeren en geen rijen toevoegen, bijwerken of verwijderen. De bestaande code heeft een `archive-market-seed`-utility die een Supabase-lijst naar de archieftabel kan upserten; deze audit heeft die utility niet uitgevoerd. Deze utility is geen scanner-reader en er staat geen seed-commando in `archive-server/package.json`.
 
 De huidige scanner leest alleen de Supabase-tabel. Een Pi-implementatie kan de bestaande marktlijst read-only via de bestaande `pg`-driver ophalen met een beperkte query van deze vorm:
 
@@ -220,20 +231,139 @@ De market-data-service valideert nu `config/markets.js` tegen de Bitvavo catalog
 | PostgreSQL | Geschikt voor kleine operationele datasets mits schema, indexen, verbindingen, WAL, vacuum en diskruimte worden beheerd. De Pi-healthservice gebruikt een pool van maximaal één verbinding, maar dat is alleen voor healthchecks en zegt niets over de benodigde tradingpool. |
 | Opslag | Candles, beslissingen, trades en snapshots zorgen voor doorlopende writes. Een betrouwbare SSD is geschikter dan een microSD voor langdurige database-WAL/writebelasting. Backups, hersteltest, diskmonitoring en retentie zijn nodig. Er is geen backupstatus vastgesteld. |
 | AI | De huidige engine is deterministisch en heeft geen externe AI-provider nodig. Lokale AI-inference is niet vereist en is op een Pi 3 ongeschikt voor substantiële modellen. Eventuele toekomstige generatieve verwerking kan extern plaatsvinden, maar is geen huidige functionaliteit en vereist een aparte provider-/privacybeslissing. |
-| Geplande taken | `systemd`-services/timers passen bij een zelfstandige Pi en maken uitvoering onafhankelijk van Vercel. De bestaande applicatie heeft nu geen Pi-side scheduler voor marktrefresh, AI-analyse of trading; alleen de handmatige archiefpull is beschreven. Taken moeten idempotent, gespreid en sequentieel worden geconfigureerd. |
+| Geplande taken | Eén langlopend Pi Node.js-proces met interne scheduler. `systemd` beheert alleen boot, restart en procesbewaking; geen externe scheduler, Vercel-executor of aparte `systemd`-timer. De volledige doelvolgorde staat in [runtime-execution-spec.md](./runtime-execution-spec.md). |
 
 **Kort oordeel:** Raspberry Pi 3 kan waarschijnlijk een zorgvuldig begrensde Node.js/PostgreSQL-workload uitvoeren, maar de huidige Vercel/Supabase-configuratie is niet plug-and-play naar die hardware te verplaatsen. De candlehistorie-/writebelasting, databasegrootte, schedulerconcurrency, SSD- en herstelstrategie moeten op de daadwerkelijke Pi worden gemeten voordat de volledige bot daar als enige runtime wordt beschouwd.
+
+## 9.1 Market Load Constraints
+The production system currently monitors approximately 100 markets.
+
+The migration must assume
+100 enabled markets.
+
+Performance validation may not be based on
+10 or 20 demonstration markets.
+
+All scheduler, scanner,
+AI analysis and database workloads
+must be tested against the expected
+100-market production universe.
+
+Performance Targets
+
+The migration must be validated against approximately 100 enabled markets.
+
+Target requirements:
+
+- Full pipeline must complete before the next cycle begins.
+- No execution overlap.
+- Stable memory consumption.
+- No database growth caused by retry loops.
+- No duplicate AI decisions.
+- No duplicate paper trades.
+
+The system must remain operational on a Raspberry Pi 3 with approximately 1 GB RAM.
 
 ## 10. Voorgestelde doelarchitectuur voor fase 2
 
 1. **Pi PostgreSQL als operationele bron:** behoud `public."AI_Crypto_Bot_Watched_Markets"` en alle bestaande rijen; gebruik deze tabel read-only voor scan-/analyse-universe. Behoud de kolommen, symbolen, enabled-vlaggen en prioriteiten exact.
-2. **Node.js worker/service op de Pi:** vervang de Vercel-schedulerketen door één gecontroleerde Node-runtime die market refresh, candle refresh, AI-analyse en paper-trading uitvoert. Gebruik `systemd` voor lifecycle, herstart en afzonderlijke timers.
+2. **Node.js worker/service op de Pi:** vervang de Vercel-schedulerketen door één gecontroleerde Node-runtime die market refresh, candle refresh, AI-analyse en paper-trading uitvoert.
+Use a single long-running Node.js runtime on the Raspberry Pi.
+
+The runtime owns:
+
+- market refresh
+- candle refresh
+- AI analysis
+- paper trading
+- health monitoring
+
+Use systemd only to:
+
+- start the runtime at boot
+- restart on crash
+- monitor process health
+
+Do not use separate systemd timers.
+
+Do not use external schedulers.
+
+The runtime itself is responsible for sequencing and execution.
 3. **Databaseadapter en SQL-transacties:** vervang Supabase REST/RPC-aanroepen door expliciete PostgreSQL-repositories en lokale transacties. Port de risk checks, idempotency, locking en statusovergangen met parity-tests voordat de Pi worker writes mag doen.
 4. **Verwerkers in vaste volgorde:** verfris snapshots/candles; voer analyse uit; voer pas na succesvolle analyse paper trading uit. Behoud freshness-, cooldown-, confidence-, drawdown-, noodstop- en PAPER-only-guards.
-5. **Begrensde belasting:** start met één worker/kleine pool en lage candleconcurrency; meet CPU, geheugen, DB-latency, runtime, candleachterstand en disk/WAL. Verhoog pas na acceptatiecriteria.
+5. **Begrensde belasting:**
+Single Owner Execution
+
+At any point in time only one execution pipeline exists.
+
+Sequence:
+
+1. Refresh market snapshots
+2. Refresh candles
+3. Run AI analysis
+4. Execute paper trading
+5. Update status
+6. Sleep until next cycle
+
+No concurrent trading pipeline may exist.
+
+A new cycle may only begin after the previous cycle completes.
 6. **Beveiligde presentatie/API:** expose PostgreSQL niet rechtstreeks aan browser of Internet. Als dashboardtoegang nodig blijft, gebruik een afgeschermde lokale API of reverse proxy met TLS/auth; dashboard leest alleen via die API. Vercel kan eventueel statische UI blijven hosten, maar is dan niet de bot-runtime of datastore.
 7. **Bestaande Pi-database gebruiken:** de gebruiker bevestigt dat deze database het volledige schema en de benodigde data bevat en de primaire database wordt. Verbind de backend met de bestaande database; maak geen database aan, voer geen migrations/schema uit en kopieer geen Supabase-data opnieuw. `ai_crypto_bot_archive` is de naam in bestaande repositoryconfiguratie en moet niet zonder read-only identiteitscontrole als de definitieve operationele database worden aangenomen.
 8. **Geen live trading:** behoud paper-only gedrag en `ENABLE_LIVE_TRADING=false`; live trading valt buiten deze migratiefase.
+
+Database Compatibility Rule
+
+The migration is a runtime migration only.
+
+All existing tables must remain unchanged.
+
+All existing functions must remain unchanged.
+
+All existing views must remain unchanged.
+
+All existing AI decision data,
+trade history,
+portfolio history,
+market history
+and analytics data
+must remain accessible.
+
+The Raspberry Pi runtime must adapt to the existing database.
+
+The database must not be redesigned to adapt to the Raspberry Pi.
+
+Logic Parity Rule
+
+The migration is a runtime migration only.
+
+The following behaviour must remain identical:
+
+- AI scoring
+- confidence calculations
+- indicator calculations
+- signal generation
+- scanner ranking
+- paper trading execution
+- risk management
+- drawdown handling
+- emergency stop handling
+- cooldown handling
+
+The Raspberry Pi runtime must reproduce the existing behaviour.
+
+No strategy changes may be introduced during migration.
+
+No indicator weights may change.
+
+No confidence thresholds may change.
+
+No risk settings may change.
+
+No entry or exit logic may change.
+
+Behavioural changes are only allowed after the migration is fully completed and validated.
+
 
 ## 11. Risico's en ontbrekende informatie
 
@@ -277,3 +407,36 @@ Het volledige afhankelijkhedenoverzicht staat in [migratiearchitectuur](architec
 - [AI-engine](../../lib/ai-engine.mjs), [market scanner](../../lib/market-scanner.mjs), [market-data service](../../lib/market-data.mjs), [paper-trading service](../../lib/paper-trading.mjs)
 - [Vercel-configuratie](../../vercel.json), [API-handlers](../../api), [Pi archive-service](../../archive-server)
 - [Archiefschema](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql), [market export](../../market_export.sql), [market import](../../market_import.sql), [market-seedstatus](../reports/ARCHIVE_MARKET_SEED_IMPLEMENTATION.md), [archiefsync-architectuur](../reports/ARCHIVE_SYNC_ARCHITECTURE.md)
+
+## Historical Analysis Preservation
+Historical decision data is a strategic asset.
+
+The migration may optimize runtime performance
+but must not remove the ability to evaluate:
+
+- historical AI decisions
+- historical confidence scores
+- historical indicators
+- historical market conditions
+- historical trades
+- historical portfolio performance
+
+Future strategy improvement and
+decision-quality analysis remain requirements.
+
+Performance optimizations must preserve
+analysis capability.
+
+Future Optimization Boundary
+
+Performance optimizations may be implemented after migration.
+
+The migration phase itself must not:
+
+- remove historical decision records
+- remove historical trade records
+- remove historical portfolio records
+- remove historical market records
+- change retention policies
+
+Any future data retention or archival strategy must be implemented only after migration completion and after validation of analytical requirements.

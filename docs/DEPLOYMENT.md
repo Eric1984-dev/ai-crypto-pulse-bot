@@ -1,5 +1,7 @@
 # Deployment Guide
 
+Deze handleiding beschrijft de huidige Vercel/Supabase-deployment. Voor de doelruntime na migratiecutover geldt de [Pi runtime execution specification](./migration/runtime-execution-spec.md); Vercel beheert dan geen markt-, AI- of paper-tradinguitvoering en er worden geen externe schedulers of `systemd`-timers gebruikt.
+
 ## Current status
 
 Phases 02-08 use Supabase Auth and Vercel Functions for protected pages, dashboard data, public Bitvavo market data, AI analysis, and paper trading. Apply reviewed PostgreSQL migrations separately with the Supabase CLI before enabling the scheduled paper-trading endpoint.

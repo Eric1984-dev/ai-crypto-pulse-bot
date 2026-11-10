@@ -1,5 +1,7 @@
 # Architecture
 
+This document describes the current Vercel/Supabase implementation. The post-cutover Raspberry Pi runtime and its single-owner execution contract are specified in the [migration runtime execution specification](./migration/runtime-execution-spec.md).
+
 ## Current Implementation: Phase 11
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies. Phase 07 adds a server-side deterministic analysis engine using the existing Phase 06 market data.

@@ -1,5 +1,7 @@
 # Scheduling
 
+Dit document beschrijft de bestaande Vercel-endpoints en externe scheduler vóór de Pi-cutover. Na cutover geldt de [Pi runtime execution specification](./migration/runtime-execution-spec.md): één interne scheduler in de Pi-runtime, zonder Vercel-uitvoering, externe scheduler of afzonderlijke `systemd`-timer. De huidige secties hieronder zijn geen instructie om na cutover externe taken actief te houden.
+
 ## Manual archive copy
 
 The AI decision archive CLI is manually invoked on the Raspberry Pi with `npm run sync:ai-decisions` from `archive-server/`. It is not a Vercel Cron or external-scheduler job, and no systemd timer is part of the proof of concept. Archive availability must not affect market refresh, AI analysis, or paper trading. See the [installation guide](./reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md).

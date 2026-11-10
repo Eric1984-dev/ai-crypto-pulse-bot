@@ -58,11 +58,13 @@ Vercel-hosted browsercode mag geen directe PostgreSQL-verbinding, databasewachtw
 | PostgreSQL bewerkingen | PostgREST table routes, HTTP-methodes en RPC's met service-role- of user-JWT headers. | Parameterized SQL via bestaande DB-verbinding; behoud transactie-, sorteer-, filter-, paging-, UTC- en countsemantiek. Geen generieke willekeurige table/query-proxy. |
 | Supabase Auth / Admin | Supabase JS client plus Vercel tokenvalidatie en `ADMIN_USER_IDS`. | Auth-/sessievoorziening op de Pi API moet de huidige gebruiker/admin- en beschermde-paginafunctionaliteit vervangen. Keuze van identity/sessionmechanisme is een ontwerpbeslissing vóór implementatie. |
 | Supabase Realtime | Browserkanalen voor status/portfolio/trades/markets/candles/decisions; events invalidaten alleen; polling is fallback. | Behoud polling/API-refresh als basis. Als dezelfde live-ervaring vereist is, kan de Pi API een eigen server-pushmechanisme aanbieden; geen browserdatabaseverbinding. |
-| Scheduled jobs | Externe scheduler roept Vercel endpoints aan; Vercel zelf heeft geen Cron-entry. | Pi-side `systemd` service/timers of gelijkwaardige hostscheduler; single-owner locks, retry-safety en sequentiële analyse → paper-run. |
+| Scheduled jobs | Externe scheduler roept Vercel endpoints aan; Vercel zelf heeft geen Cron-entry. | Eén langlopend Pi Node.js-proces met interne scheduler. `systemd` start/bewaakt/herstart alleen de service; geen externe scheduler, Vercel-executor of aparte `systemd`-timer. |
 | Bitvavo | Publieke HTTP-markt-, ticker- en candle-routes. | Blijft uitsluitend als publieke data-provider in Pi backend. Geen private exchange keys/endpoints nodig voor huidige paper mode. |
 | Pi health | Loopback Node HTTP-service rapporteert PostgreSQL reachability/database size en disk. | Blijft gescheiden van botdata-endpoints; geen trading- of marktmutaties via health. |
 
 ## Databaseverzoeken en huidige RPC-grens
+
+De lifecycle, exacte cycle-volgorde, singleton-lock, 100-markt-resourcegrenzen en cutovercriteria van de doelruntime zijn normatief beschreven in [runtime-execution-spec.md](./runtime-execution-spec.md).
 
 De directe PostgREST read/write-vervanging moet per geval expliciete SQL krijgen:
 

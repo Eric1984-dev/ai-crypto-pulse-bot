@@ -12,6 +12,12 @@ All notable project changes should be documented here.
 - Record the user-confirmed existing Pi PostgreSQL/schema/data state without reconnecting, reseeding, re-running schema, or copying data
 - Add a migration architecture and dependency-ordered roadmap for moving the backend to the Pi while keeping Vercel frontend-only and paper trading safe
 
+### Raspberry Pi migration — Phase 1.7
+
+- Specify the single-owner Raspberry Pi runtime lifecycle, internal scheduler, ordered six-step execution cycle, 100-market batching, resource limits, failure recovery, logging, health, and acceptance gates
+- Define AI decision idempotency through the existing decision primary key and retain existing paper-trade locking; no schema or function changes
+- Clarify that external schedulers, Vercel execution ownership, separate systemd timers, data retention, and live trading are excluded from the target runtime
+
 ### AI Engine V2 replacement
 
 - Replace the directional score with a 1d EMA-led formula, confirmed by 1h/1d EMA alignment and fresh 1h volume, with a small 1d RSI contribution

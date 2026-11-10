@@ -5,6 +5,7 @@ Deze map bevat de fasegebonden migratieaudit en het plan voor een zelfstandige P
 ## Status
 
 - **Fase 1 — Audit en migratieplan:** documentatie bijgewerkt; geen applicatiecode, databaseschema of data gewijzigd.
+- **Fase 1.7 — Runtime Execution Specification:** doel-lifecycle, interne scheduler, single-owner pipeline en acceptatiecriteria gedocumenteerd; geen runtime geïnstalleerd of gestart.
 - **Doel:** Raspberry Pi 3 voert Node.js backend, scanner, AI-analyse, paper-trading-engine en scheduler uit op de bestaande primaire PostgreSQL-database.
 - **Frontend:** Vercel blijft statische frontend/dashboard hosting; dashboardverzoeken gaan naar een beveiligde Pi API.
 - **Supabase:** wordt pas verwijderd nadat alle bijbehorende runtimepaden en dashboardfuncties vervangen en gevalideerd zijn.
@@ -14,6 +15,7 @@ Deze map bevat de fasegebonden migratieaudit en het plan voor een zelfstandige P
 - [01-audit.md](./01-audit.md) — huidige implementatie, Supabase-calls/RPC's, scanner-marktbron, scheduler, resterende afhankelijkheden en fase-1-besluit.
 - [architecture.md](./architecture.md) — huidige en beoogde component-, data- en beveiligingsgrenzen.
 - [roadmap.md](./roadmap.md) — voorstel voor afhankelijkheden, uitvoeringsvolgorde en acceptatiegates.
+- [runtime-execution-spec.md](./runtime-execution-spec.md) — bindende Pi runtime lifecycle, pipeline, exclusief eigenaarschap, resourcegrenzen en acceptatiecriteria.
 
 ## Niet-onderhandelbare grenzen
 
