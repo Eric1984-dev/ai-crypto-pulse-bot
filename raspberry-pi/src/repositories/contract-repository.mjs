@@ -48,7 +48,7 @@ const COLUMNS_SQL = `
 const CONSTRAINTS_SQL = `
   SELECT relation.relname AS relation_name,
          constraint_row.contype AS constraint_type,
-         ARRAY_AGG(attribute.attname ORDER BY key_column.ordinality) AS columns
+         ARRAY_AGG(attribute.attname::text ORDER BY key_column.ordinality) AS columns
   FROM pg_catalog.pg_constraint AS constraint_row
   JOIN pg_catalog.pg_class AS relation
     ON relation.oid = constraint_row.conrelid

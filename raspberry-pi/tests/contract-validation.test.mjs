@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import pg from "pg";
 import {
   REQUIRED_COLUMN_CONTRACTS,
   REQUIRED_FUNCTION_CONTRACTS,
@@ -95,7 +96,14 @@ function createContractPool({
         };
       }
       if (sql.includes("constraint_row.contype AS constraint_type")) {
-        return { rows: constraints };
+        const arrayTypeOid = sql.includes("attribute.attname::text") ? 1009 : 1003;
+        const parseArray = pg.types.getTypeParser(arrayTypeOid, "text");
+        return {
+          rows: constraints.map((constraint) => ({
+            ...constraint,
+            columns: parseArray(`{${constraint.columns.join(",")}}`)
+          }))
+        };
       }
       if (sql.includes("has_table_privilege")) {
         const rows = REQUIRED_TABLES.map((relation_name) => {
@@ -311,7 +319,7 @@ test("ingestion owner opt-in does not relax the API read-only contract", async (
   );
 });
 
-test("AI writer preflight permits only decision inserts and leaves schema reads read-only", async () => {
+test("AI writer preflight recognizes catalog constraints and permits only decision inserts", async () => {
   const pool = createContractPool({
     allowAiAnalysisWrites: true,
     roleName: "ai_writer"
@@ -324,6 +332,8 @@ test("AI writer preflight permits only decision inserts and leaves schema reads 
 
   assert.equal(result.contracts, "valid");
   assert.equal(result.requiredFunctions, 0);
+  assert.ok(pool.queries.some((query) =>
+    query.includes("ARRAY_AGG(attribute.attname::text ORDER BY key_column.ordinality)")));
   assert.ok(pool.queries.every((query) =>
     query === "BEGIN READ ONLY" || query === "COMMIT" || /^\s*SELECT\b/i.test(query)));
 });
