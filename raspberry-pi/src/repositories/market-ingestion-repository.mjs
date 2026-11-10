@@ -4,6 +4,7 @@ import {
   readTimestamp,
   RepositoryDataError
 } from "./postgres-read.mjs";
+import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnostics.mjs";
 
 export const MAX_INGESTION_MARKETS_PER_BATCH = 5;
 export const MAX_CANDLES_PER_MARKET = 500;
@@ -53,6 +54,7 @@ export class MarketIngestionStorageError extends Error {
     super("A PostgreSQL market-data write failed.", { cause });
     this.name = "MarketIngestionStorageError";
     this.code = "POSTGRES_WRITE_FAILED";
+    this.component = "postgres-write-transaction";
   }
 }
 
@@ -61,6 +63,7 @@ export class MarketCheckpointError extends Error {
     super("The stored candle checkpoint does not match the ingestion request.");
     this.name = "MarketCheckpointError";
     this.code = "INVALID_CANDLE_CHECKPOINT";
+    this.component = "market-ingestion-repository";
     this.reason = reason;
   }
 }
@@ -207,7 +210,9 @@ export class MarketIngestionRepository {
     this.logger.error(JSON.stringify({
       event: "market_data_storage_failed",
       target,
-      code: safeErrorCode(error)
+      ...createIngestionFailureDiagnostic(error, {
+        component: "postgres-write-transaction"
+      })
     }));
   }
 }
@@ -377,10 +382,4 @@ function validateCandleRows(rows) {
     }
     keys.add(key);
   }
-}
-
-function safeErrorCode(error) {
-  return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
-    ? error.code
-    : "UNKNOWN";
 }

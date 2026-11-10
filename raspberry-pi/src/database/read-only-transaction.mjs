@@ -1,3 +1,5 @@
+import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnostics.mjs";
+
 export async function withReadOnlyTransaction(pool, operation, {
   logger = console
 } = {}) {
@@ -23,7 +25,9 @@ export async function withReadOnlyTransaction(pool, operation, {
         releaseError = rollbackError;
         logger.error(JSON.stringify({
           event: "postgres_read_only_rollback_failed",
-          code: safeErrorCode(rollbackError)
+          ...createIngestionFailureDiagnostic(rollbackError, {
+            component: "postgres-read-transaction"
+          })
         }));
       }
     }
@@ -31,10 +35,4 @@ export async function withReadOnlyTransaction(pool, operation, {
   } finally {
     client.release(releaseError);
   }
-}
-
-function safeErrorCode(error) {
-  return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
-    ? error.code
-    : "UNKNOWN";
 }

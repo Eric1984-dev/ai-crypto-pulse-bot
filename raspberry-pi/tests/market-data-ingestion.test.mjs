@@ -180,6 +180,33 @@ test("checkpointed intervals resume from the latest stored timestamp and skip no
   assert.equal(harness.calls.candles.length, 3);
 });
 
+test("invalid candle checkpoints log a complete diagnostic instead of UNKNOWN", async () => {
+  const markets = watchedMarkets(1);
+  const failureLogs = [];
+  const harness = createHarness({
+    markets,
+    checkpoints: new Map([[`${markets[0].symbol}:1m`, nowMs + 1]]),
+    loggerOverride: {
+      info() {},
+      error(message) {
+        failureLogs.push(JSON.parse(message));
+      }
+    }
+  });
+
+  const result = await harness.service.run({ intervals: ["1m"] });
+  const diagnostic = failureLogs.find(({ event, stage }) =>
+    event === "market_data_ingestion_failure" && stage === "candle-refresh");
+
+  assert.equal(result.status, "partial");
+  assert.equal(result.candles[0].failed, 1);
+  assert.equal(diagnostic.code, "INVALID_CANDLE_CHECKPOINT");
+  assert.equal(diagnostic.category, "data_validation");
+  assert.equal(diagnostic.component, "market-data-ingestion");
+  assert.match(diagnostic.message, /checkpoint is invalid or lies in the future/);
+  assert.equal("stack" in diagnostic, false);
+});
+
 test("a market-specific provider failure does not block other markets or persist stale replacements", async () => {
   const markets = watchedMarkets(3);
   const failingSymbol = markets[1].symbol;

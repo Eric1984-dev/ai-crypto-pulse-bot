@@ -4,6 +4,7 @@ import {
   MAX_INGESTION_MARKETS_PER_BATCH
 } from "../repositories/market-ingestion-repository.mjs";
 import { BitvavoProviderError } from "./bitvavo-public-client.mjs";
+import { createIngestionFailureDiagnostic } from "./ingestion-diagnostics.mjs";
 
 export const SUPPORTED_INGESTION_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export const MAX_INGESTION_WORKERS = 4;
@@ -42,6 +43,7 @@ export class MarketDataIngestionError extends Error {
     super(message);
     this.name = "MarketDataIngestionError";
     this.code = code;
+    this.component = "market-data-ingestion";
   }
 }
 
@@ -153,31 +155,46 @@ export function createMarketDataIngestionService({
     for (const market of markets) {
       if (tickerIndex.duplicates.has(market.symbol)) {
         result.snapshots.failed += 1;
+        const error = new BitvavoProviderError(
+          "INVALID_PROVIDER_RESPONSE",
+          "Bitvavo returned duplicate ticker rows for this watched market."
+        );
         failureEvents.push(scannerEvent(
           market.symbol,
           "MARKET_DATA_INVALID",
-          "Bitvavo returned duplicate ticker rows for this watched market."
+          error.message
         ));
+        recordFailure(error, { stage: "snapshot-validation", symbol: market.symbol });
         continue;
       }
       const ticker = tickerIndex.bySymbol.get(market.symbol);
       if (!ticker) {
         result.snapshots.missing += 1;
+        const error = new BitvavoProviderError(
+          "MARKET_DATA_MISSING",
+          "Bitvavo returned no 24-hour ticker for this watched market."
+        );
         failureEvents.push(scannerEvent(
           market.symbol,
           "MARKET_DATA_MISSING",
-          "Bitvavo returned no 24-hour ticker for this watched market."
+          error.message
         ));
+        recordFailure(error, { stage: "snapshot-validation", symbol: market.symbol });
         continue;
       }
       const parsed = parseTickerSnapshot(ticker, capturedAt);
       if (!parsed) {
         result.snapshots.failed += 1;
+        const error = new BitvavoProviderError(
+          "INVALID_PROVIDER_RESPONSE",
+          "Bitvavo returned an invalid 24-hour ticker for this watched market."
+        );
         failureEvents.push(scannerEvent(
           market.symbol,
           "MARKET_DATA_INVALID",
-          "Bitvavo returned an invalid 24-hour ticker for this watched market."
+          error.message
         ));
+        recordFailure(error, { stage: "snapshot-validation", symbol: market.symbol });
         continue;
       }
       rowsBySymbol.set(market.symbol, parsed);
@@ -290,7 +307,11 @@ export function createMarketDataIngestionService({
         const referenceTime = currentTimeMs();
         if (latestTimestamp !== undefined) {
           if (!Number.isSafeInteger(latestTimestamp) || latestTimestamp > referenceTime) {
-            return { status: "failed", errorCode: "INVALID_CANDLE_CHECKPOINT" };
+            const error = new MarketDataIngestionError(
+              "INVALID_CANDLE_CHECKPOINT",
+              "The stored candle checkpoint is invalid or lies in the future."
+            );
+            return { status: "failed", errorCode: error.code, error };
           }
           const elapsed = referenceTime - latestTimestamp;
           if (elapsed < intervalDuration) {
@@ -317,7 +338,11 @@ export function createMarketDataIngestionService({
             nowMs: referenceTime
           });
           if (candles.length === 0) {
-            return { status: "missing", errorCode: "CANDLE_DATA_MISSING" };
+            const error = new BitvavoProviderError(
+              "CANDLE_DATA_MISSING",
+              `Bitvavo returned no valid ${interval} candles for this watched market.`
+            );
+            return { status: "missing", errorCode: error.code, error };
           }
           const persisted = await ingestionRepository.upsertCandles(candles);
           return { status: "refreshed", candlesPersisted: persisted };
@@ -347,8 +372,9 @@ export function createMarketDataIngestionService({
           failureEvents.push(scannerEvent(
             market.symbol,
             "CANDLE_DATA_MISSING",
-            `Bitvavo returned no valid ${interval} candles for this watched market.`
+            outcome.error.message
           ));
+          recordFailure(outcome.error, { stage: "candle-validation", interval, symbol: market.symbol });
         } else if (outcome.status === "failed") {
           intervalResult.failed += 1;
           failureEvents.push(scannerEvent(
@@ -399,17 +425,25 @@ export function createMarketDataIngestionService({
         recordFailure(error, { stage: "scanner-event-storage" });
         logger.error(JSON.stringify({
           event: "market_data_event_storage_failed",
-          code: safeErrorCode(error)
+          ...createIngestionFailureDiagnostic(error, {
+            component: "postgres-write-transaction"
+          })
         }));
       }
     }
   }
 
   function recordFailure(error, context) {
+    const diagnosticError = error || new MarketDataIngestionError(
+      "INGESTION_FAILURE_DETAILS_MISSING",
+      `The ${context.stage} stage failed without an error object.`
+    );
     logger.error(JSON.stringify({
       event: "market_data_ingestion_failure",
       ...context,
-      code: safeErrorCode(error)
+      ...createIngestionFailureDiagnostic(diagnosticError, {
+        component: "market-data-ingestion"
+      })
     }));
   }
 
@@ -623,5 +657,5 @@ function isFatalDatabaseError(error) {
 function safeErrorCode(error) {
   return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
     ? error.code
-    : "UNKNOWN";
+    : "INGESTION_UNEXPECTED_ERROR";
 }

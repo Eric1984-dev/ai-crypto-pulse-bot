@@ -1,11 +1,6 @@
 import pg from "pg";
 import { createPoolOptions } from "../config/runtime-config.mjs";
-
-function safeErrorCode(error) {
-  return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
-    ? error.code
-    : "UNKNOWN";
-}
+import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnostics.mjs";
 
 export function createPostgresPool(config, {
   Pool = pg.Pool,
@@ -19,7 +14,7 @@ export function createPostgresPool(config, {
   pool.on("error", (error) => {
     logger.error(JSON.stringify({
       event: "postgres_pool_error",
-      code: safeErrorCode(error)
+      ...createIngestionFailureDiagnostic(error, { component: "postgres-pool" })
     }));
   });
   return pool;

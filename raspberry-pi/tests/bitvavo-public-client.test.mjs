@@ -5,9 +5,11 @@ import {
   createBitvavoPublicClient
 } from "../src/services/bitvavo-public-client.mjs";
 import {
+  runMarketDataIngestionCommand,
   createIngestionDatabaseConfig,
   parseIngestionArguments
 } from "../src/ingest-market-data.mjs";
+import { createIngestionFailureDiagnostic } from "../src/services/ingestion-diagnostics.mjs";
 
 function response(payload, {
   status = 200,
@@ -109,6 +111,30 @@ test("provider HTTP errors, timeouts, malformed JSON, and oversized payloads are
   await assert.rejects(timeoutClient.fetchTickers(), { code: "PROVIDER_TIMEOUT" });
 });
 
+test("Bitvavo transport errors retain HTTP status and network root causes for diagnostics", async () => {
+  const httpClient = createBitvavoPublicClient({
+    fetchImpl: async () => response({}, { status: 503 })
+  });
+  await assert.rejects(httpClient.fetchTickers(), (error) => {
+    assert.equal(error.httpStatus, 503);
+    assert.equal(error.component, "bitvavo-public-client");
+    assert.equal(createIngestionFailureDiagnostic(error).code, "BITVAVO_HTTP_503");
+    return true;
+  });
+
+  const dnsCause = Object.assign(new Error("DNS lookup failed"), { code: "ENOTFOUND" });
+  const dnsClient = createBitvavoPublicClient({
+    fetchImpl: async () => {
+      throw dnsCause;
+    }
+  });
+  await assert.rejects(dnsClient.fetchTickers(), (error) => {
+    assert.equal(error.cause, dnsCause);
+    assert.equal(createIngestionFailureDiagnostic(error).code, "BITVAVO_DNS_FAILED");
+    return true;
+  });
+});
+
 test("Bitvavo client rejects unbounded ticker and candle arrays", async () => {
   const tickerClient = createBitvavoPublicClient({
     fetchImpl: async () => response(Array.from({ length: 2001 }, () => ({ market: "BTC-EUR" })))
@@ -131,6 +157,20 @@ test("manual ingestion command accepts only an explicit supported interval set",
   assert.throws(() => parseIngestionArguments(["--intervals=3m"]), /supported intervals/);
   assert.throws(() => parseIngestionArguments(["--intervals=1m,1m"]), /unique supported/);
   assert.throws(() => parseIngestionArguments(["--intervals=1m", "--other"]), /Use only/);
+});
+
+test("manual ingestion configuration failures carry their originating component", async () => {
+  await assert.rejects(
+    runMarketDataIngestionCommand({ args: ["--intervals=1m"], env: {} }),
+    (error) => {
+      const diagnostic = createIngestionFailureDiagnostic(error);
+      assert.equal(diagnostic.code, "INGESTION_CONFIGURATION_INVALID");
+      assert.equal(diagnostic.category, "configuration");
+      assert.equal(diagnostic.component, "configuration");
+      assert.match(diagnostic.message, /DATABASE_HOST/);
+      return true;
+    }
+  );
 });
 
 test("manual ingestion can use an optional writer identity without changing API database settings", () => {

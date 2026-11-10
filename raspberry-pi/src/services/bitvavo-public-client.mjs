@@ -6,10 +6,14 @@ const CANDLE_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 const MAX_CANDLES_PER_REQUEST = 500;
 
 export class BitvavoProviderError extends Error {
-  constructor(code, message) {
-    super(message);
+  constructor(code, message, { cause, httpStatus } = {}) {
+    super(message, { cause });
     this.name = "BitvavoProviderError";
     this.code = code;
+    this.component = "bitvavo-public-client";
+    if (Number.isInteger(httpStatus)) {
+      this.httpStatus = httpStatus;
+    }
   }
 }
 
@@ -86,19 +90,28 @@ export function createBitvavoPublicClient({
       const code = error?.name === "TimeoutError" || error?.name === "AbortError"
         ? "PROVIDER_TIMEOUT"
         : "PROVIDER_UNAVAILABLE";
-      throw new BitvavoProviderError(code, "Bitvavo public market data could not be loaded.");
+      throw new BitvavoProviderError(
+        code,
+        "Bitvavo public market data could not be loaded.",
+        { cause: error }
+      );
     }
 
     if (response.status === 429) {
-      throw new BitvavoProviderError("RATE_LIMITED", "Bitvavo rate limit was reached.");
+      throw new BitvavoProviderError("RATE_LIMITED", "Bitvavo rate limit was reached.", {
+        httpStatus: response.status
+      });
     }
     if (response.status === 404) {
-      throw new BitvavoProviderError("MARKET_NOT_FOUND", "Bitvavo does not recognize this market.");
+      throw new BitvavoProviderError("MARKET_NOT_FOUND", "Bitvavo does not recognize this market.", {
+        httpStatus: response.status
+      });
     }
     if (!response.ok) {
       throw new BitvavoProviderError(
         response.status >= 500 ? "PROVIDER_UNAVAILABLE" : "PROVIDER_REQUEST_FAILED",
-        "Bitvavo public market data could not be loaded."
+        "Bitvavo public market data could not be loaded.",
+        { httpStatus: response.status }
       );
     }
 
@@ -119,12 +132,14 @@ export function createBitvavoPublicClient({
       if (error instanceof SyntaxError || error instanceof TypeError) {
         throw new BitvavoProviderError(
           "INVALID_PROVIDER_RESPONSE",
-          "Bitvavo returned invalid JSON."
+          "Bitvavo returned invalid JSON.",
+          { cause: error }
         );
       }
       throw new BitvavoProviderError(
         "PROVIDER_UNAVAILABLE",
-        "Bitvavo public market data could not be read."
+        "Bitvavo public market data could not be read.",
+        { cause: error }
       );
     }
   }

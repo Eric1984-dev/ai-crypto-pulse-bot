@@ -9,6 +9,11 @@ import {
   createMarketDataIngestionService,
   SUPPORTED_INGESTION_INTERVALS
 } from "./services/market-data-ingestion.mjs";
+import {
+  createIngestionFailureDiagnostic,
+  sanitizeDiagnosticText,
+  withIngestionDiagnosticComponent
+} from "./services/ingestion-diagnostics.mjs";
 
 export function parseIngestionArguments(args) {
   if (args.length === 0) {
@@ -63,32 +68,57 @@ export async function runMarketDataIngestionCommand({
   fetchImpl = globalThis.fetch,
   logger = console
 } = {}) {
-  const intervals = parseIngestionArguments(args);
-  const config = createIngestionDatabaseConfig(readRuntimeConfig(env), env);
-  const pool = createPostgresPool(config, { Pool, logger });
+  let component = "configuration";
   try {
-    const validation = await validateIngestionRuntimeContracts(pool, config, { logger });
-    logger.info(JSON.stringify({
-      event: "market_data_ingestion_preflight_passed",
-      database: validation.database,
-      enabledMarkets: validation.enabledMarkets,
-      warnings: validation.warnings
-    }));
+    const intervals = parseIngestionArguments(args);
+    const config = createIngestionDatabaseConfig(readRuntimeConfig(env), env);
+    component = "postgres-pool";
+    const pool = createPostgresPool(config, { Pool, logger });
+    try {
+      component = "ingestion-contract";
+      const validation = await validateIngestionRuntimeContracts(pool, config, { logger });
+      logger.info(JSON.stringify({
+        event: "market_data_ingestion_preflight_passed",
+        database: validation.database,
+        enabledMarkets: validation.enabledMarkets,
+        warnings: validation.warnings
+      }));
 
-    const ingestion = createMarketDataIngestionService({
-      watchedMarketsRepository: new WatchedMarketsRepository(pool, { logger }),
-      ingestionRepository: new MarketIngestionRepository(pool, { logger }),
-      bitvavoClient: createBitvavoPublicClient({ fetchImpl }),
-      logger
-    });
-    const result = await ingestion.run({ intervals });
-    logger.info(JSON.stringify({
-      event: "market_data_ingestion_finished",
-      ...result
-    }));
-    return result;
-  } finally {
-    await pool.end();
+      component = "market-data-ingestion";
+      const ingestion = createMarketDataIngestionService({
+        watchedMarketsRepository: new WatchedMarketsRepository(pool, { logger }),
+        ingestionRepository: new MarketIngestionRepository(pool, { logger }),
+        bitvavoClient: createBitvavoPublicClient({ fetchImpl }),
+        logger
+      });
+      const result = await ingestion.run({ intervals });
+      logger.info(JSON.stringify({
+        event: "market_data_ingestion_finished",
+        ...result
+      }));
+      if (result.status !== "completed") {
+        const failure = new Error(
+          `The ingestion pass finished with status "${result.status}". See preceding failure events for root causes.`
+        );
+        failure.code = result.status === "partial"
+          ? "INGESTION_RUN_PARTIAL"
+          : "INGESTION_RUN_FAILED";
+        failure.component = "market-data-ingestion";
+        logger.error(JSON.stringify({
+          event: "market_data_ingestion_command_failed",
+          ...createIngestionFailureDiagnostic(failure, { env })
+        }));
+      }
+      return result;
+    } finally {
+      try {
+        await pool.end();
+      } catch (error) {
+        throw withIngestionDiagnosticComponent(error, "postgres-pool");
+      }
+    }
+  } catch (error) {
+    throw withIngestionDiagnosticComponent(error, component);
   }
 }
 
@@ -103,18 +133,16 @@ if (isDirectExecution()) {
       process.exitCode = 1;
     }
   }).catch((error) => {
-    const safeErrors = Array.isArray(error.errors) ? error.errors : undefined;
+    const safeErrors = Array.isArray(error.errors)
+      ? error.errors.map((item) => sanitizeDiagnosticText(
+        typeof item === "string" ? item : JSON.stringify(item)
+      ))
+      : undefined;
     console.error(JSON.stringify({
       event: "market_data_ingestion_command_failed",
-      code: safeErrorCode(error),
+      ...createIngestionFailureDiagnostic(error),
       ...(safeErrors ? { errors: safeErrors } : {})
     }));
     process.exitCode = 1;
   });
-}
-
-function safeErrorCode(error) {
-  return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
-    ? error.code
-    : "UNKNOWN";
 }

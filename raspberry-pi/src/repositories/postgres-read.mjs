@@ -1,4 +1,5 @@
 import { withReadOnlyTransaction } from "../database/read-only-transaction.mjs";
+import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnostics.mjs";
 
 export class RepositoryUnavailableError extends Error {
   constructor(cause) {
@@ -28,7 +29,7 @@ export async function queryReadOnly(pool, sql, values = [], { logger = console }
     if (logger && typeof logger.error === "function") {
       logger.error(JSON.stringify({
         event: "postgres_read_api_failed",
-        code: safeErrorCode(error)
+        ...createIngestionFailureDiagnostic(error, { component: "postgres-read" })
       }));
     }
     throw new RepositoryUnavailableError(error);
@@ -68,5 +69,5 @@ export function readTimestamp(value, field) {
 export function safeErrorCode(error) {
   return typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
     ? error.code
-    : "UNKNOWN";
+    : "POSTGRES_QUERY_FAILED";
 }
