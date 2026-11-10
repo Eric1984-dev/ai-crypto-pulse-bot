@@ -1,62 +1,58 @@
-# Raspberry Pi runtime foundation
+# Raspberry Pi runtime and read-only API
 
 ## Scope and ownership
 
-Phase 3 adds API infrastructure only. This package is still a read-only Node.js foundation for the existing Raspberry Pi PostgreSQL database. The Raspberry Pi is intended to own runtime execution in the target architecture, but this phase does not start a scheduler, migrate AI/scanner/trading logic, expose dashboard data, or implement an execution pipeline.
+The package is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. Phase 4 adds read-only repositories and API endpoints only. No schema or data migration, writes, market seeding, ingestion, scanner ranking, AI, analytics, scheduler, paper trading, live trading, or Vercel dashboard cutover is included.
 
-The existing database and watched-market rows are retained as-is. The user-confirmed Pi findings are that the schema/data are already present, approximately 102 enabled markets exist, AI decision history exists, no runtime PostgreSQL functions are installed, and no candle history currently exists. Runtime functions and candle rows are not Phase 3 startup requirements. No function is invoked, no schema/data migration is performed, and every database connection is configured read-only.
+The user-confirmed Pi findings are authoritative for this phase: the existing schema/data are installed; approximately 102 enabled watched markets and AI-decision history exist; no runtime PostgreSQL functions are installed; and `AI_Crypto_Bot_Candles` currently has no history. The runtime does not assume or invoke PostgreSQL functions. An empty candle result remains empty and never triggers data collection.
 
-Paper trading remains inactive in this package; no paper or live orders can be submitted. `ENABLE_LIVE_TRADING=true` prevents startup.
+## Lifecycle and database access
 
-## Startup and failure behavior
-
-1. Parse required database settings, loopback API bind, CORS allowlist, session limits, and rate-limit limits. Reject invalid settings and live trading.
-2. Create a `pg` connection pool capped at four with TLS verification enabled by default and `default_transaction_read_only=on`.
-3. Use read-only transactions to validate database identity, role privileges, required existing prefixed tables/columns/constraints, and the watched-market schema and rows. No runtime database function signatures are required.
-4. If any configuration, connectivity, contract, privilege, or watched-market validation fails, do not listen; close the pool and return a nonzero startup result.
-5. On success, listen only on a loopback address. No worker, timer, or scheduled job starts.
+1. Parse database/API configuration, enforce loopback binding and `ENABLE_LIVE_TRADING=false`.
+2. Create the `pg` pool capped at four with TLS verification by default and `default_transaction_read_only=on`.
+3. Perform read-only startup checks for database identity, role/privileges, required existing tables/columns/keys, and the complete bounded enabled watched-market set.
+4. If a configuration, database, schema, privilege, or market-contract check fails, do not listen; close the pool and exit unsuccessfully.
+5. On success, expose the HTTP API on loopback. No background worker or scheduler starts.
 6. On `SIGINT` or `SIGTERM`, stop accepting requests and close the pool.
 
-Readiness performs a bounded read-only database check and returns only `{"data":{"status":"ready"}}` or a generic `503` error. It does not expose database identity, schema state, function list, market count, or raw database errors.
+Every repository operation uses `BEGIN READ ONLY`/`COMMIT` and explicitly selected columns. SQL values—including symbols, intervals, and limits—are passed as parameters. Repository failures are logged with a safe error code and returned as generic `503` responses. No raw SQL, database error message, credential, or error detail is returned to the caller.
 
-## API routes and security
+## Read-only repositories and result bounds
 
-| Method | Path | Access | Response purpose |
-|---|---|---|---|
-| `GET` | `/api/v1/health/live` | Unauthenticated | Process liveness only. |
-| `GET` | `/api/v1/health/ready` | Unauthenticated | Coarse dependency/readiness state. |
-| `GET` | `/api/v1/health/operational` | `admin` role | Bounded API/process/pool counters only. Denied by default. |
+| Repository | Existing table(s) | Bound |
+|---|---|---:|
+| Watched markets | `AI_Crypto_Bot_Watched_Markets` | At most 500 enabled markets; overflow fails closed. |
+| Market data and candles | `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Market_Data`, `AI_Crypto_Bot_Candles` | At most 500 snapshots and 500 candles; one market query is constrained to an enabled symbol. |
+| AI decisions | `AI_Crypto_Bot_AI_Decisions` | Most recent 5 for dashboard foundation; repository hard cap 100. |
+| Runtime status | `AI_Crypto_Bot_Status` | At most one singleton row. |
 
-Other static paths return `404`; unsupported methods return `405` with `Allow`. Query parameters are rejected unless explicitly declared by a route. Errors use `error.code`, a generic message, and `requestId`; unknown exceptions become generic `500` responses.
+Market-list ordering is database-defined as `priority ASC, symbol ASC`. The application does not consult `config/markets.js`, a hardcoded symbol list, or any fallback market configuration.
 
-Security controls:
+## API endpoints
 
-- The API continues to bind to loopback only; forwarded client-IP headers are not trusted.
-- Security headers and `Cache-Control: no-store` are set for every request.
-- CORS defaults to an empty allowlist. Allowed values must be HTTPS origins or loopback HTTP origins; wildcard origins, paths, credentials in origin URLs, and duplicate values are rejected.
-- CORS preflight accepts only safe `GET` requests and the `Content-Type`/`X-CSRF-Token` headers.
-- Unsafe methods require an exact configured Origin and a matching session-bound CSRF token. There are no unsafe/business routes in this phase.
-- The default authentication provider denies access. A provider-neutral interface and an in-memory hashed-token session store are foundations only. No HTTP session-creation, login, registration, password-reset, OIDC, or other provider integration exists.
-- Operational health requires the `admin` role and fails closed unless a trusted identity provider is injected.
-- A fixed-window rate limiter uses the socket peer address, has bounded key storage, and never derives identity from untrusted forwarding headers.
-- Request logs contain request ID, method, path, status, and duration only. They do not log cookies, authorization headers, secrets, or bodies.
+All data endpoints use the existing authentication middleware and return the common `{ "data": ... }` wrapper on success. Query parameters not declared by an endpoint, repeated parameters, invalid symbols/intervals/limits, and disabled/untracked symbols are rejected.
 
-There are no dashboard data, admin action, trading, or market-management endpoints. Vercel/dashboard communication is not enabled by Phase 3.
+| Method and path | Behavior |
+|---|---|
+| `GET /api/v1/markets` | Returns `{ "data": { "count": n, "items": [...] } }` for enabled watched-market rows. |
+| `GET /api/v1/market?symbol=BTC-EUR&interval=1m&limit=200` | Returns the existing market shape: `symbol`, `interval`, `marketData` (nullable), `candles` (newest first), and `refreshStatus: "read-only"`. Defaults are `1m` and `200`; supported intervals are `1m`, `5m`, `15m`, `1h`, `4h`, `1d`; the maximum candle limit is 500. Missing/malformed symbol is `400`; disabled and nonexistent symbols both return `404 MARKET_NOT_TRACKED`. |
+| `GET /api/v1/dashboard-data` | Returns the existing `generatedAt`, `agentStatus`, `lastMarketDataAt`, `watchedMarkets`, and `aiDecisions` shapes plus bounded `marketData`. It is intentionally partial: it does not fabricate portfolio, positions, trades, emergency, snapshots, shadow-exit, or analytics values. |
+| `GET /api/v1/agent-status` | Returns `{ "data": { "status": "ACTIVE\|ANALYZING\|IDLE\|STOPPED\|ERROR" } }`; missing or unknown status is `null`. |
+| `GET /api/v1/market-summary` | Returns stored active/data-bearing counts, market snapshot items, `refreshedAt`, and `refreshStatus: "read-only"`. No scanner rankings or refresh is performed. |
 
-## Configuration and resource bounds
+An empty result is represented by the real empty/null stored state (for example `candles: []`, `marketData: null`, or `status: null`). It is not replaced with synthetic trading/dashboard values. The `market-summary` scanner-ranking subtree is deliberately absent: ranking logic is not migrated in this phase, and no candle history is currently present. This API has not been wired into the existing frontend.
 
-The API host remains loopback-only and defaults to `127.0.0.1:3002`. CORS origins default to empty. Session storage is process-local, limited by `API_SESSION_MAX`, and expires entries using `API_SESSION_TTL_MS`; the store is not persistent and no endpoint creates sessions. Rate limiting defaults to 60 requests per 60 seconds with a bounded 10,000-key table.
+## Security
 
-PostgreSQL pool size remains at most four, with bounded connection/query/idle timeouts. Request counters are in-memory aggregate counts, and operational health exposes only aggregate counts, process memory/uptime, and pool counts after authorization. This foundation is suitable for testing the Pi runtime's wiring, not a production capacity claim.
+- The API binds only to loopback; do not expose it through a public proxy or tunnel.
+- The default authentication provider denies access. Data routes therefore return `401` until a trusted provider is injected; provider integration, OIDC, login, registration, password reset, and session creation remain outside scope.
+- CORS defaults to an empty exact-origin allowlist. HTTPS origins or loopback HTTP origins can be configured, but wildcard origins are rejected.
+- Unsafe methods require an exact allowed Origin and a session-bound CSRF token; this phase registers only GET data routes.
+- Request validation rejects unknown/repeated query keys; error responses contain only a safe code, generic message, and request ID.
+- Security headers and `Cache-Control: no-store` are applied. Rate limiting uses socket peer addresses and does not trust forwarded headers.
 
-## Database validation scope
+## Validation and limitations
 
-Catalog and watched-market queries execute inside read-only transactions. They preserve and validate the existing `public."AI_Crypto_Bot_Watched_Markets"` data; they do not insert, update, delete, normalize, seed, or print individual market symbols. The enabled set must be nonempty and valid.
+Tests use local PostgreSQL mocks and an injected trusted identity for successful data-route calls. They assert read-only transaction boundaries, explicit `SELECT` columns, parameterized limits/values, disabled-market filtering, empty-result behavior, bounded failures, and the absence of writes. Tests do not independently verify the live Pi database, network connectivity, Node.js ARM compatibility, or Pi resource headroom.
 
-The database contract checks the existing expected prefixed tables, selected columns and keys, read-only role/transaction settings, and absence of write privileges. Runtime functions are not required and never called. Candle history is not required for this API-only foundation.
-
-## Tests and verification limits
-
-`npm test` covers configuration, read-only preflight behavior, routes, middleware ordering, error responses, CORS/CSRF, session bounds/expiry, deny-by-default authentication, role checks, rate limiting, and operational-health access. The tests use local mocks and do not prove connectivity, schema state, ARM compatibility, or resource headroom on the production Raspberry Pi.
-
-The API remains loopback-only and there is no production deployment or Vercel connection in this phase. Authentication integration and external exposure require explicit future scope and a security design before implementation.
+No Supabase calls were added to the Raspberry Pi API. Existing Vercel/Supabase endpoints remain unchanged and continue to exist until a separately approved dashboard-cutover phase. Authentication, real Pi endpoint access, market ingestion, scanner ranking, full dashboard parity, and production validation remain open.

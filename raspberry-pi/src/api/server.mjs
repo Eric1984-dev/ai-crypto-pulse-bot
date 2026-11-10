@@ -8,6 +8,7 @@ import { createRequestContext } from "./request-context.mjs";
 import { composeMiddleware } from "./middleware-pipeline.mjs";
 import { FixedWindowRateLimiter, rateLimitMiddleware } from "./rate-limiter.mjs";
 import { registerHealthRoutes } from "./health-routes.mjs";
+import { registerDataRoutes } from "./data-routes.mjs";
 import { ApiRouter, routerMiddleware } from "./router.mjs";
 import { corsMiddleware, securityHeadersMiddleware } from "./security-middleware.mjs";
 import { requestLoggingMiddleware } from "./request-logging-middleware.mjs";
@@ -16,6 +17,8 @@ export function createApiServer({
   readiness,
   getOperationalHealth,
   authenticationProvider = new DisabledAuthenticationProvider(),
+  dataRepositories,
+  now,
   allowedOrigins = [],
   rateLimitMaxRequests = 60,
   rateLimitWindowMs = 60000,
@@ -27,6 +30,9 @@ export function createApiServer({
     readiness,
     getOperationalHealth
   });
+  if (dataRepositories) {
+    registerDataRoutes(router, dataRepositories, { now });
+  }
   const rateLimiter = new FixedWindowRateLimiter({
     limit: rateLimitMaxRequests,
     windowMs: rateLimitWindowMs

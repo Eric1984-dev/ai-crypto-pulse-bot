@@ -3,6 +3,10 @@ import { createSessionStore } from "../auth/session-store.mjs";
 import { createPostgresPool } from "../database/pool.mjs";
 import { createOperationalHealthSnapshot } from "../monitoring/operational-health.mjs";
 import { createRequestMetrics } from "../monitoring/request-metrics.mjs";
+import { AiDecisionsRepository } from "../repositories/ai-decisions-repository.mjs";
+import { MarketDataRepository } from "../repositories/market-data-repository.mjs";
+import { RuntimeStatusRepository } from "../repositories/runtime-status-repository.mjs";
+import { WatchedMarketsRepository } from "../repositories/watched-markets-repository.mjs";
 import { createReadinessService } from "../services/readiness-service.mjs";
 import { validateRuntimeContracts } from "../services/contract-validation.mjs";
 
@@ -64,9 +68,16 @@ export async function startRuntime(config, {
       pool,
       requestMetrics
     });
+    const dataRepositories = Object.freeze({
+      watchedMarkets: new WatchedMarketsRepository(pool, { logger }),
+      marketData: new MarketDataRepository(pool, { logger }),
+      aiDecisions: new AiDecisionsRepository(pool, { logger }),
+      runtimeStatus: new RuntimeStatusRepository(pool, { logger })
+    });
     server = createApiServer({
       readiness,
       getOperationalHealth,
+      dataRepositories,
       authenticationProvider,
       allowedOrigins: config.api.corsOrigins,
       rateLimitMaxRequests: config.api.rateLimitMaxRequests,

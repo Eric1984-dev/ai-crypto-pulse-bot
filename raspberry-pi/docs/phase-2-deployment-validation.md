@@ -4,7 +4,7 @@
 
 This procedure installs and manually starts the read-only Raspberry Pi foundation for validation. It is **not** a production cutover or a complete bot deployment:
 
-- The process performs read-only database preflight and serves local health endpoints only.
+- The process performs read-only database preflight and serves loopback health and read-only data endpoints.
 - It does not create a database, apply schema, migrate/import data, write records, change markets, run a scheduler, analyze markets, or execute paper/live trades.
 - The API binds to `127.0.0.1`; do not change the bind address, create a public tunnel, or connect Vercel to it. Authentication provider integration, login, and OIDC are not implemented. The provider interface is deny-all by default.
 - No `systemd` unit or timer is supplied. Run it in the foreground for validation and stop it manually.
@@ -78,7 +78,7 @@ npm run validate
 Expected results:
 
 1. `npm ci` exits with status `0` and installs the pinned dependencies from `package-lock.json`.
-2. `npm test` exits with status `0`. The Phase 3 package suite currently reports `24` tests; test totals may change as tests are added. These tests use local mocks; they do **not** prove connectivity to the Pi database.
+2. `npm test` exits with status `0`. The current package suite reports `35` tests; test totals may change as tests are added. These tests use local mocks; they do **not** prove connectivity to the Pi database.
 3. `npm run validate` connects to the configured existing database, performs the read-only preflight, and exits with status `0`. It prints one JSON line in this shape (the optional function value and market count depend on the database):
 
 ```json
@@ -121,6 +121,8 @@ HTTP/1.1 401 Unauthorized
 ```
 
 Operational health is protected and intentionally unavailable without a trusted provider; there is no login flow in this phase. The readiness response must be HTTP `200` with `"status":"ready"`. Liveness alone only proves that the HTTP process responds; it does not prove database readiness.
+
+Phase 4 adds `GET /api/v1/markets`, `/api/v1/market?symbol=BTC-EUR`, `/api/v1/dashboard-data`, `/api/v1/agent-status`, and `/api/v1/market-summary`. These endpoints use read-only PostgreSQL repositories, but the default authentication provider denies requests with `401` until a trusted provider is explicitly supplied. Successful data requests are covered with an injected test provider; login/OIDC and dashboard cutover are not part of this package phase. See the [Phase 4 implementation report](phase-4-implementation-report.md) for response limits and parity boundaries.
 
 Stop the foreground process with `Ctrl+C`. Expected shutdown output:
 

@@ -62,6 +62,8 @@ export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
     confidence: "numeric",
     indicators: "jsonb",
     reason: "text",
+    strategy_name: "text",
+    strategy_version: "text",
     created_at: "timestamp with time zone"
   }),
   AI_Crypto_Bot_Status: Object.freeze({
