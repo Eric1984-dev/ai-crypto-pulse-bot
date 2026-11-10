@@ -41,7 +41,9 @@ export async function validateIngestionRuntimeContracts(pool, config, {
   logger = console
 } = {}) {
   const snapshot = await inspectDatabaseContract(pool, config.database.user, { logger });
-  const contract = evaluateIngestionDatabaseContract(snapshot, config.database.name);
+  const contract = evaluateIngestionDatabaseContract(snapshot, config.database.name, {
+    allowTableOwner: config.ingestion?.allowTableOwner === true
+  });
   if (!contract.valid) {
     throw new IngestionContractError(contract.errors);
   }

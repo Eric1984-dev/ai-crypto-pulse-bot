@@ -40,7 +40,10 @@ function createContractPool({
   omitLegacyConstraints = false,
   allowIngestionWrites = false,
   extraWriterRole = false,
-  ownerTable
+  ownerTable,
+  unsafeTable,
+  extraOwnedTable,
+  canCreatePublic = false
 } = {}) {
   const queries = [];
   const columns = Object.entries(REQUIRED_COLUMN_CONTRACTS).flatMap(([table_name, values]) =>
@@ -84,7 +87,7 @@ function createContractPool({
             bypasses_rls: false,
             can_create_database: false,
             can_create_role: false,
-            can_create_objects_in_public: false
+            can_create_objects_in_public: canCreatePublic
           }]
         };
       }
@@ -92,19 +95,36 @@ function createContractPool({
         return { rows: constraints };
       }
       if (sql.includes("has_table_privilege")) {
-        return {
-          rows: REQUIRED_TABLES.map((relation_name) => ({
+        const rows = REQUIRED_TABLES.map((relation_name) => {
+          const isOwner = relation_name === ownerTable;
+          return {
             relation_name,
-            is_owner: relation_name === ownerTable,
+            is_owner: isOwner,
             can_select: REQUIRED_READ_TABLES.includes(relation_name),
             can_insert: allowIngestionWrites
               && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
-              || extraWriterRole && relation_name === "AI_Crypto_Bot_Trades",
+              || extraWriterRole && relation_name === "AI_Crypto_Bot_Trades"
+              || isOwner,
             can_update: allowIngestionWrites
-              && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name),
-            can_delete: false,
-            can_truncate: false
-          }))
+              && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
+              || isOwner,
+            can_delete: isOwner || relation_name === unsafeTable,
+            can_truncate: isOwner || relation_name === unsafeTable
+          };
+        });
+        if (extraOwnedTable) {
+          rows.push({
+            relation_name: extraOwnedTable,
+            is_owner: true,
+            can_select: false,
+            can_insert: true,
+            can_update: true,
+            can_delete: true,
+            can_truncate: true
+          });
+        }
+        return {
+          rows
         };
       }
       if (sql.includes("has_sequence_privilege")) {
@@ -194,7 +214,7 @@ test("ingestion preflight fails when snapshot or candle persistence privileges a
   );
 });
 
-test("ingestion preflight does not proceed when the runtime owns or can delete a table", async () => {
+test("ingestion preflight rejects a table owner unless the explicit owner opt-in is enabled", async () => {
   const pool = createContractPool({
     allowIngestionWrites: true,
     ownerTable: "AI_Crypto_Bot_Candles"
@@ -204,5 +224,85 @@ test("ingestion preflight does not proceed when the runtime owns or can delete a
     validateIngestionRuntimeContracts(pool, config),
     (error) => error.code === "INGESTION_CONTRACT_INVALID"
       && error.errors.includes("INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:AI_Crypto_Bot_Candles")
+  );
+});
+
+test("ingestion owner opt-in permits ownership only for known project tables and logs a warning", async () => {
+  const ownerConfig = {
+    ...config,
+    ingestion: Object.freeze({ allowTableOwner: true })
+  };
+  const pool = createContractPool({
+    allowIngestionWrites: true,
+    ownerTable: "AI_Crypto_Bot_Candles"
+  });
+
+  const result = await validateIngestionRuntimeContracts(pool, ownerConfig);
+
+  assert.equal(result.contracts, "valid");
+  assert.ok(result.warnings.includes(
+    "INGESTION_ROLE_TABLE_OWNER_ALLOWED:AI_Crypto_Bot_Candles"
+  ));
+});
+
+test("owner opt-in does not permit unsafe privileges on non-owned or unknown tables", async () => {
+  const ownerConfig = {
+    ...config,
+    ingestion: Object.freeze({ allowTableOwner: true })
+  };
+
+  await assert.rejects(
+    validateIngestionRuntimeContracts(
+      createContractPool({
+        allowIngestionWrites: true,
+        ownerTable: "AI_Crypto_Bot_Candles",
+        unsafeTable: "AI_Crypto_Bot_Trades"
+      }),
+      ownerConfig
+    ),
+    (error) => error.code === "INGESTION_CONTRACT_INVALID"
+      && error.errors.includes("INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:AI_Crypto_Bot_Trades")
+  );
+  await assert.rejects(
+    validateIngestionRuntimeContracts(
+      createContractPool({
+        allowIngestionWrites: true,
+        extraOwnedTable: "AI_Crypto_Bot_Unexpected"
+      }),
+      ownerConfig
+    ),
+    (error) => error.code === "INGESTION_CONTRACT_INVALID"
+      && error.errors.includes("INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:AI_Crypto_Bot_Unexpected")
+  );
+  await assert.rejects(
+    validateIngestionRuntimeContracts(
+      createContractPool({
+        allowIngestionWrites: true,
+        ownerTable: "AI_Crypto_Bot_Candles",
+        canCreatePublic: true
+      }),
+      ownerConfig
+    ),
+    (error) => error.code === "INGESTION_CONTRACT_INVALID"
+      && error.errors.includes("DATABASE_ROLE_TOO_PRIVILEGED")
+  );
+});
+
+test("ingestion owner opt-in does not relax the API read-only contract", async () => {
+  const ownerConfig = {
+    ...config,
+    ingestion: Object.freeze({ allowTableOwner: true })
+  };
+
+  await assert.rejects(
+    validateRuntimeContracts(
+      createContractPool({
+        allowIngestionWrites: true,
+        ownerTable: "AI_Crypto_Bot_Candles"
+      }),
+      ownerConfig
+    ),
+    (error) => error.code === "RUNTIME_CONTRACT_INVALID"
+      && error.errors.includes("DATABASE_ROLE_CAN_WRITE_TABLE:AI_Crypto_Bot_Candles")
   );
 });

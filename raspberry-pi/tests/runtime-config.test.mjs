@@ -26,8 +26,21 @@ test("runtime config defaults to loopback API and disables live trading", () => 
     rateLimitMaxRequests: 60
   });
   assert.equal(config.liveTradingEnabled, false);
+  assert.equal(config.ingestion.allowTableOwner, false);
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
+});
+
+test("runtime config requires explicit boolean opt-in for ingestion table ownership", () => {
+  assert.equal(readRuntimeConfig(validEnvironment({
+    INGESTION_ALLOW_TABLE_OWNER: "true"
+  })).ingestion.allowTableOwner, true);
+  assert.equal(readRuntimeConfig(validEnvironment({
+    INGESTION_ALLOW_TABLE_OWNER: "false"
+  })).ingestion.allowTableOwner, false);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    INGESTION_ALLOW_TABLE_OWNER: "yes"
+  })), /INGESTION_ALLOW_TABLE_OWNER/);
 });
 
 test("runtime config rejects remote plaintext DB, public API binding, and live trading", () => {

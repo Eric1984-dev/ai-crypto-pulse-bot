@@ -64,6 +64,7 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 | `PG_IDLE_TIMEOUT_MS` | `10000` | Integer `100`–`60000`. |
 | `INGESTION_DATABASE_USER` | empty | Optional separate writer identity used only by the manual Phase 5 ingestion command. |
 | `INGESTION_DATABASE_PASSWORD` | empty | Required together with `INGESTION_DATABASE_USER`; keep it only in the local ignored `.env`. |
+| `INGESTION_ALLOW_TABLE_OWNER` | `false` | Explicit opt-in for the ingestion preflight to accept ownership of known project tables; requires a distinct `INGESTION_DATABASE_USER`; API validation remains strict. Keep `false` unless the Pi's existing owner role is intentionally used for ingestion. |
 
 The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. The separate ingestion command uses an explicit `BEGIN READ WRITE` only for writes to the existing market-data, candle, and best-effort scanner-event tables. When the optional ingestion credentials are configured, the API keeps its read-only identity. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
 
@@ -149,7 +150,7 @@ All checks run in read-only transactions against schema `public`. The runtime in
 - It must not own or have `USAGE`/`UPDATE` on any discovered prefixed sequence.
 - It must have `SELECT` on the five read tables: `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Market_Data`, `AI_Crypto_Bot_Candles`, `AI_Crypto_Bot_AI_Decisions`, and `AI_Crypto_Bot_Status`.
 
-The Phase 5 ingestion preflight is separate: it accepts and reports write-capable grants, requires `INSERT`/`UPDATE` on the existing snapshot and candle tables, and rejects table ownership, `DELETE`, and `TRUNCATE`. It continues to warn on missing legacy key constraints and does not require runtime PostgreSQL functions. The API can continue using the separate read-only `DATABASE_USER`.
+The Phase 5 ingestion preflight is separate: it accepts and reports write-capable grants, requires `INSERT`/`UPDATE` on the existing snapshot and candle tables, and rejects `DELETE`/`TRUNCATE` access on tables the role does not own. Table ownership remains rejected by default; `INGESTION_ALLOW_TABLE_OWNER=true` explicitly allows ownership of known project tables for the ingestion login and emits a warning. This does not change the strict read-only API contract or allow elevated role attributes, public-schema `CREATE`, or ownership of unknown prefixed tables. It continues to warn on missing legacy key constraints and does not require runtime PostgreSQL functions.
 
 ### Required prefixed tables
 

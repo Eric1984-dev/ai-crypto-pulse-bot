@@ -1,5 +1,7 @@
 # Phase 5.1 — Live Pi Ingestion Preparation
 
+> **Superseded for the inspected Pi configuration:** Phase 5.2 confirmed RLS is disabled, no RLS policies or PostgreSQL runtime functions exist, and `ai_crypto_bot_archive_user` owns the existing project tables. The current runtime supports that table-owner case only through the explicit `INGESTION_ALLOW_TABLE_OWNER=true` ingestion opt-in. The API remains read-only. See the [Phase 5.2 alignment report](phase-5.2-ingestion-contract-alignment.md). This earlier document is retained to record the preparation-stage recommendations and remains applicable only to other installations with different role/RLS facts.
+
 ## Scope and conclusion
 
 This document explains the Phase 5 ingestion preflight and proposes a least-privilege PostgreSQL configuration for the existing `ai_crypto_bot_store` database. It is preparatory documentation only:

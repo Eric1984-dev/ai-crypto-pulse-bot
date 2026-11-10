@@ -27,7 +27,7 @@ The API runtime does not import Supabase data, run migrations, alter schema, see
 
 - Node.js 20.6 or newer
 - Network access from the Pi runtime to the already-existing PostgreSQL instance
-- PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; optionally configure the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` for the one-shot writer, with only the required existing-table privileges.
+- PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; configure the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` for the one-shot writer. `INGESTION_ALLOW_TABLE_OWNER` defaults to `false`; set it to `true` only when the ingestion login is intentionally the owner of the existing project tables.
 - PostgreSQL connection settings provisioned locally; do not copy credentials into Vercel or Git
 
 The runtime never creates a database, applies migrations, seeds markets, or changes the existing market list. It treats the installed schema and its contents as the authority.
@@ -74,6 +74,6 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 - `tests/` — isolated Node.js tests; no remote database or schema setup.
 - `docs/` — implementation and operational notes for this runtime foundation.
 
-The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation.
+The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in.
 
 For environment variables, PostgreSQL contract checks, and validation commands, see the [deployment and validation guide](docs/phase-2-deployment-validation.md).

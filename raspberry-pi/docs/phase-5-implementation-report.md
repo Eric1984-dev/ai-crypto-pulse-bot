@@ -13,7 +13,7 @@ No application code outside `raspberry-pi/` was changed. No database was contact
 - `src/repositories/market-ingestion-repository.mjs`: parameterized writes with explicit column lists to existing market-data, candle and scanner-event tables. Writes use transactions; candles are written in chunks of at most 100. Existing unique keys use `ON CONFLICT`; if a supported legacy conflict constraint is absent, a bounded table-lock/update/insert fallback prevents duplicates without DDL.
 - `src/database/write-transaction.mjs`: explicit `BEGIN READ WRITE` transaction helper. Existing API reads remain read-only.
 - `src/ingest-market-data.mjs`: one-shot CLI requiring an explicit interval selection, for example `npm run ingest:market-data -- --intervals=1m` or `--intervals=all`. It closes the pool after completion and returns a failing exit status for incomplete runs.
-- Ingestion contract validation: uses the current PostgreSQL database and existing tables/columns, permits warnings about legacy constraints and write-capable grants, and still rejects unsafe role/table properties or missing required write privileges.
+- Ingestion contract validation: uses the current PostgreSQL database and existing tables/columns, permits warnings about legacy constraints and write-capable grants, and still rejects elevated role properties, unsafe privileges on non-owned tables, ownership of unknown prefixed tables, or missing required write privileges. Known project-table ownership is rejected by default and can be explicitly accepted for ingestion with `INGESTION_ALLOW_TABLE_OWNER=true`; API validation remains strictly read-only.
 
 ## Data source, batching, and bounds
 
@@ -26,7 +26,7 @@ No application code outside `raspberry-pi/` was changed. No database was contact
 
 ## Database identity and credentials
 
-The API's `DATABASE_USER` remains intended to be read-only. The manual ingestion CLI accepts the optional pair `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD`; both must be set together. When provided, those credentials are used only by ingestion. If absent, ingestion uses the regular `DATABASE_USER`, which therefore must have the needed write privileges for that command.
+The API's `DATABASE_USER` remains intended to be read-only. The manual ingestion CLI accepts the optional pair `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD`; both must be set together. When provided, those credentials are used only by ingestion. If absent, ingestion uses the regular `DATABASE_USER`, which therefore must have the needed write privileges for that command. The Phase 5.2 owner opt-in requires a distinct ingestion username and cannot use this fallback.
 
 Ingestion writes only existing rows/tables: latest market snapshots, candles, and bounded scanner events. It does not write watched markets or call PostgreSQL runtime functions. No schema or data changes were performed during validation.
 
@@ -52,6 +52,7 @@ These results confirm local tests and syntax only. They do not prove the configu
 
 - The pre-existing Raspberry Pi database schema and market data tables are present as reported; actual live ingestion privileges and writes remain to be verified by the operator.
 - A separate writer identity is recommended so the API's read-only role is not expanded. Grant it only the necessary privileges on existing ingestion tables.
+- Some installations intentionally use a trusted owner role for ingestion. Accept that privilege boundary only through the explicit `INGESTION_ALLOW_TABLE_OWNER=true` opt-in; the owner can perform destructive DDL/DML even though the ingestion code itself issues only bounded inserts/updates.
 - Missing constraints are handled through the documented bounded fallback, but pre-existing duplicate keys in an inconsistent database are not repaired.
 - The ticker endpoint provides a single 24-hour snapshot response per pass, not historical snapshot data.
 - The initial all-interval pass can be substantial for a Raspberry Pi 3 and should not be run without observing resource usage and provider limits.
@@ -63,6 +64,7 @@ These results confirm local tests and syntax only. They do not prove the configu
 - `raspberry-pi/README.md`
 - `raspberry-pi/docs/runtime-foundation.md`
 - `raspberry-pi/docs/phase-2-deployment-validation.md`
+- `raspberry-pi/docs/phase-5.2-ingestion-contract-alignment.md`
 - This report
 
 ## Phase 6 boundary

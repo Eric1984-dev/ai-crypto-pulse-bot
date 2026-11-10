@@ -67,8 +67,8 @@ An empty result is represented by the real empty/null stored state (for example 
 ### Validation and role findings
 
 - API startup retains its strict read-only contract.
-- Ingestion performs a separate read-only preflight. It warns—but does not stop—on missing legacy constraints and write-capable table/sequence grants, and does not require PostgreSQL runtime functions. It still requires the existing tables/columns, correct database identity, safe role properties, and `INSERT`/`UPDATE` capability on the existing snapshot and candle tables.
-- The ingestion command may use the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` settings, leaving the API's `DATABASE_USER` read-only. If those optional settings are absent, it uses `DATABASE_USER`; the API's strict read-only preflight will not accept that writer identity.
+- Ingestion performs a separate read-only preflight. It warns—but does not stop—on missing legacy constraints and write-capable table/sequence grants, and does not require PostgreSQL runtime functions. It still requires the existing tables/columns, correct database identity, safe role properties, and `INSERT`/`UPDATE` capability on the existing snapshot and candle tables. Table ownership remains rejected by default; `INGESTION_ALLOW_TABLE_OWNER=true` explicitly permits ownership of known project tables for ingestion only, with a warning. The API's read-only contract is unchanged.
+- The ingestion command may use the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` settings, leaving the API's `DATABASE_USER` read-only. If those optional settings are absent, it uses `DATABASE_USER`; the API's strict read-only preflight will not accept that writer identity. Owner opt-in requires the separate ingestion identity and cannot fall back to `DATABASE_USER`.
 - Writes use only parameterized SQL against existing market-data, candle, and best-effort scanner-event tables. No `CREATE`, `ALTER`, `DELETE`, `TRUNCATE`, market-list update, or project runtime-function call is issued.
 - Ingestion is not scheduled or started by `npm start`; running the one-shot command is an explicit operator action.
 

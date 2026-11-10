@@ -181,6 +181,9 @@ export function readRuntimeConfig(env = process.env, {
         { min: 1, max: 1000 }
       )
     }),
+    ingestion: Object.freeze({
+      allowTableOwner: readBoolean(env, "INGESTION_ALLOW_TABLE_OWNER", false)
+    }),
     liveTradingEnabled
   });
 }

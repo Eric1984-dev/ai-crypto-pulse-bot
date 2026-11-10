@@ -247,18 +247,25 @@ const INGESTION_WARNING_PATTERNS = Object.freeze([
   /^FUNCTION_CONTRACT_MISMATCH:/
 ]);
 
-export function evaluateIngestionDatabaseContract(snapshot, expectedDatabaseName) {
+export function evaluateIngestionDatabaseContract(snapshot, expectedDatabaseName, {
+  allowTableOwner = false
+} = {}) {
   const base = evaluateDatabaseContract(snapshot, expectedDatabaseName);
   const warnings = base.errors.filter((error) =>
     INGESTION_WARNING_PATTERNS.some((pattern) => pattern.test(error))
   );
   const errors = base.errors.filter((error) => !warnings.includes(error));
+  const ownershipWarnings = [];
   const privileges = new Map(
     snapshot.tablePrivileges.map((table) => [table.relation_name, table])
   );
 
   for (const table of snapshot.tablePrivileges) {
-    if (table.is_owner || table.can_delete || table.can_truncate) {
+    if (table.is_owner && allowTableOwner && REQUIRED_TABLES.includes(table.relation_name)) {
+      ownershipWarnings.push(
+        `INGESTION_ROLE_TABLE_OWNER_ALLOWED:${table.relation_name}`
+      );
+    } else if (table.is_owner || table.can_delete || table.can_truncate) {
       errors.push(`INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:${table.relation_name}`);
     }
   }
@@ -274,6 +281,6 @@ export function evaluateIngestionDatabaseContract(snapshot, expectedDatabaseName
     ...base,
     valid: errors.length === 0,
     errors: Object.freeze(errors),
-    warnings: Object.freeze(warnings)
+    warnings: Object.freeze([...warnings, ...ownershipWarnings])
   });
 }
