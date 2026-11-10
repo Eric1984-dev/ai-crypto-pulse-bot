@@ -113,7 +113,7 @@ function withComponent(error, component) {
   return wrapped;
 }
 
-function createFailureDiagnostic(error, component, env) {
+export function createFailureDiagnostic(error, component, env = process.env) {
   const code = safeCode(error?.code) || "AI_ANALYSIS_FAILED";
   const causeCode = safeCode(error?.cause?.code);
   const category = component === "configuration" ? "configuration"
@@ -137,6 +137,10 @@ function createFailureDiagnostic(error, component, env) {
     diagnostic.stack = sanitizeDiagnosticText(error.stack, 12000);
   }
   return diagnostic;
+}
+
+function safeCode(value) {
+  return typeof value === "string" && SAFE_CODE_PATTERN.test(value) ? value : null;
 }
 
 function safeMessage(error, code) {

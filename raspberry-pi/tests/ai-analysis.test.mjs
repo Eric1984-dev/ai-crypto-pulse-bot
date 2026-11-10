@@ -12,7 +12,10 @@ import {
 import { createAiAnalysisService } from "../src/services/ai-analysis-service.mjs";
 import { createDeterministicDecisionId } from "../src/services/ai-decision-identity.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
-import { createAiAnalysisDatabaseConfig } from "../src/analyze-ai.mjs";
+import {
+  createAiAnalysisDatabaseConfig,
+  createFailureDiagnostic
+} from "../src/analyze-ai.mjs";
 
 const fixedNow = new Date("2026-03-20T12:00:00.000Z");
 const symbols = ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "XRP-EUR"];
@@ -250,4 +253,31 @@ test("AI database configuration requires a separate writer identity", () => {
     config,
     { ...env, INGESTION_DATABASE_USER: "ai_writer" }
   ), /distinct from the API and ingestion database users/);
+});
+
+test("AI failure diagnostics validate error codes and never crash on missing codes", () => {
+  const cause = Object.assign(new Error("database denied"), { code: "42501" });
+  const error = Object.assign(new Error("internal error details"), {
+    code: "AI_ANALYSIS_FAILED",
+    cause
+  });
+  const diagnostic = createFailureDiagnostic(error, "ai-analysis", { NODE_ENV: "production" });
+
+  assert.equal(diagnostic.code, "AI_ANALYSIS_FAILED");
+  assert.equal(diagnostic.causeCode, "42501");
+  assert.equal(diagnostic.category, "ai_analysis");
+  assert.equal(diagnostic.message, "AI analysis failed; consult the error code and component.");
+  assert.equal("stack" in diagnostic, false);
+
+  const missingCode = createFailureDiagnostic(new Error("not exposed"), "ai-analysis", {});
+  assert.equal(missingCode.code, "AI_ANALYSIS_FAILED");
+  assert.equal("stack" in missingCode, false);
+
+  const development = createFailureDiagnostic(
+    new Error("development failure"),
+    "ai-analysis",
+    { NODE_ENV: "development" }
+  );
+  assert.equal(typeof development.stack, "string");
+  assert.ok(development.stack.includes("development failure"));
 });
