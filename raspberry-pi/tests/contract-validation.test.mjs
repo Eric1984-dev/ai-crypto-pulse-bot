@@ -6,7 +6,10 @@ import {
   REQUIRED_READ_TABLES,
   REQUIRED_TABLES
 } from "../src/services/database-contracts.mjs";
-import { validateRuntimeContracts } from "../src/services/contract-validation.mjs";
+import {
+  validateIngestionRuntimeContracts,
+  validateRuntimeContracts
+} from "../src/services/contract-validation.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
 const config = readRuntimeConfig({
@@ -32,7 +35,13 @@ const marketRows = [
   }
 ];
 
-function createContractPool({ omitTable } = {}) {
+function createContractPool({
+  omitTable,
+  omitLegacyConstraints = false,
+  allowIngestionWrites = false,
+  extraWriterRole = false,
+  ownerTable
+} = {}) {
   const queries = [];
   const columns = Object.entries(REQUIRED_COLUMN_CONTRACTS).flatMap(([table_name, values]) =>
     Object.entries(values).map(([column_name, data_type]) => ({
@@ -47,7 +56,7 @@ function createContractPool({ omitTable } = {}) {
     function_kind: "f",
     security_definer: contract.securityDefiner
   }));
-  const constraints = [
+  const constraints = omitLegacyConstraints ? [] : [
     { relation_name: "AI_Crypto_Bot_Watched_Markets", constraint_type: "p", columns: ["id"] },
     { relation_name: "AI_Crypto_Bot_Watched_Markets", constraint_type: "u", columns: ["symbol"] },
     {
@@ -86,10 +95,13 @@ function createContractPool({ omitTable } = {}) {
         return {
           rows: REQUIRED_TABLES.map((relation_name) => ({
             relation_name,
-            is_owner: false,
+            is_owner: relation_name === ownerTable,
             can_select: REQUIRED_READ_TABLES.includes(relation_name),
-            can_insert: false,
-            can_update: false,
+            can_insert: allowIngestionWrites
+              && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
+              || extraWriterRole && relation_name === "AI_Crypto_Bot_Trades",
+            can_update: allowIngestionWrites
+              && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name),
             can_delete: false,
             can_truncate: false
           }))
@@ -150,4 +162,47 @@ test("runtime preflight fails closed before market access when a required table 
   );
   assert.ok(!pool.queries.some((query) =>
     query.includes('FROM public."AI_Crypto_Bot_Watched_Markets"')));
+});
+
+test("ingestion preflight warns on legacy constraints and write-capable roles without requiring runtime functions", async () => {
+  const pool = createContractPool({
+    omitLegacyConstraints: true,
+    allowIngestionWrites: true,
+    extraWriterRole: true
+  });
+
+  const result = await validateIngestionRuntimeContracts(pool, config);
+
+  assert.equal(result.contracts, "valid");
+  assert.equal(result.enabledMarkets, 2);
+  assert.ok(result.warnings.some((warning) => warning.startsWith("MISSING_CANDLE_CONSTRAINT:")));
+  assert.ok(result.warnings.some((warning) =>
+    warning === "DATABASE_ROLE_CAN_WRITE_TABLE:AI_Crypto_Bot_Trades"));
+  assert.ok(pool.queries.every((query) =>
+    query === "BEGIN READ ONLY" || query === "COMMIT" || query === "ROLLBACK"
+    || /^\s*SELECT\b/i.test(query)));
+});
+
+test("ingestion preflight fails when snapshot or candle persistence privileges are missing", async () => {
+  const pool = createContractPool();
+
+  await assert.rejects(
+    validateIngestionRuntimeContracts(pool, config),
+    (error) => error.code === "INGESTION_CONTRACT_INVALID"
+      && error.errors.includes("MISSING_INGESTION_WRITE_PRIVILEGE:AI_Crypto_Bot_Market_Data")
+      && error.errors.includes("MISSING_INGESTION_WRITE_PRIVILEGE:AI_Crypto_Bot_Candles")
+  );
+});
+
+test("ingestion preflight does not proceed when the runtime owns or can delete a table", async () => {
+  const pool = createContractPool({
+    allowIngestionWrites: true,
+    ownerTable: "AI_Crypto_Bot_Candles"
+  });
+
+  await assert.rejects(
+    validateIngestionRuntimeContracts(pool, config),
+    (error) => error.code === "INGESTION_CONTRACT_INVALID"
+      && error.errors.includes("INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:AI_Crypto_Bot_Candles")
+  );
 });

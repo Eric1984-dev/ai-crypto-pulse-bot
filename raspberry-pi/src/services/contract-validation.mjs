@@ -1,5 +1,8 @@
 import { inspectDatabaseContract } from "../repositories/contract-repository.mjs";
-import { evaluateDatabaseContract } from "./database-contracts.mjs";
+import {
+  evaluateDatabaseContract,
+  evaluateIngestionDatabaseContract
+} from "./database-contracts.mjs";
 import { readEnabledWatchedMarkets } from "../repositories/watched-markets-repository.mjs";
 import { validateEnabledWatchedMarkets } from "./watched-markets.mjs";
 
@@ -32,4 +35,34 @@ export async function validateRuntimeContracts(pool, config, {
     optionalFunctions: contract.optionalFunctions,
     enabledMarkets: watchedMarkets.length
   });
+}
+
+export async function validateIngestionRuntimeContracts(pool, config, {
+  logger = console
+} = {}) {
+  const snapshot = await inspectDatabaseContract(pool, config.database.user, { logger });
+  const contract = evaluateIngestionDatabaseContract(snapshot, config.database.name);
+  if (!contract.valid) {
+    throw new IngestionContractError(contract.errors);
+  }
+
+  const marketRows = await readEnabledWatchedMarkets(pool, { logger });
+  const watchedMarkets = validateEnabledWatchedMarkets(marketRows);
+
+  return Object.freeze({
+    database: "connected",
+    contracts: "valid",
+    requiredTables: contract.requiredTables,
+    enabledMarkets: watchedMarkets.length,
+    warnings: contract.warnings
+  });
+}
+
+export class IngestionContractError extends Error {
+  constructor(errors) {
+    super("The existing PostgreSQL database does not satisfy the market-data ingestion contract.");
+    this.name = "IngestionContractError";
+    this.code = "INGESTION_CONTRACT_INVALID";
+    this.errors = errors;
+  }
 }

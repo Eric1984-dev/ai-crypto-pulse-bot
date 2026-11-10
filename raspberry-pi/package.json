@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node --env-file=.env src/index.mjs",
     "validate": "node --env-file=.env src/validate.mjs",
+    "ingest:market-data": "node --env-file=.env src/ingest-market-data.mjs",
     "test": "node --test"
   },
   "dependencies": {

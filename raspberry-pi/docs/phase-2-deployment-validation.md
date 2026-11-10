@@ -2,9 +2,9 @@
 
 ## Scope and safety
 
-This procedure installs and manually starts the read-only Raspberry Pi foundation for validation. It is **not** a production cutover or a complete bot deployment:
+This procedure documents the original read-only Raspberry Pi foundation checks. Phase 5 has since added a separately invoked ingestion command; it is **not** part of the Phase 2 validation commands or a production cutover:
 
-- The process performs read-only database preflight and serves loopback health and read-only data endpoints.
+- The API process performs read-only database preflight and serves loopback health and read-only data endpoints.
 - It does not create a database, apply schema, migrate/import data, write records, change markets, run a scheduler, analyze markets, or execute paper/live trades.
 - The API binds to `127.0.0.1`; do not change the bind address, create a public tunnel, or connect Vercel to it. Authentication provider integration, login, and OIDC are not implemented. The provider interface is deny-all by default.
 - No `systemd` unit or timer is supplied. Run it in the foreground for validation and stop it manually.
@@ -39,7 +39,7 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 |---|---|
 | `DATABASE_HOST` | Hostname/IP of the already-existing Pi PostgreSQL server. Use a loopback address only if PostgreSQL is on the same host. |
 | `DATABASE_NAME` | Exact name of the already-existing database. The validator compares it to `current_database()`. |
-| `DATABASE_USER` | Exact PostgreSQL login used by the runtime. The validator compares it to `current_user`; use the intended restricted read-only role. |
+| `DATABASE_USER` | Exact PostgreSQL login used by the API runtime and read-only validator. The validator compares it to `current_user`; use the intended restricted read-only role. |
 | `DATABASE_PASSWORD` | Password for that login. Keep it only in the local ignored `.env`. |
 | `ENABLE_LIVE_TRADING` | Must be `false`. The code defaults to false if omitted, but set it explicitly. `true` prevents startup. |
 
@@ -62,8 +62,10 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 | `PG_CONNECTION_TIMEOUT_MS` | `2000` | Integer `100`–`30000`. |
 | `PG_QUERY_TIMEOUT_MS` | `5000` | Integer `100`–`30000`. |
 | `PG_IDLE_TIMEOUT_MS` | `10000` | Integer `100`–`60000`. |
+| `INGESTION_DATABASE_USER` | empty | Optional separate writer identity used only by the manual Phase 5 ingestion command. |
+| `INGESTION_DATABASE_PASSWORD` | empty | Required together with `INGESTION_DATABASE_USER`; keep it only in the local ignored `.env`. |
 
-The pool sets PostgreSQL's `default_transaction_read_only=on`, and every validation/read transaction also uses `BEGIN READ ONLY`. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
+The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. The separate ingestion command uses an explicit `BEGIN READ WRITE` only for writes to the existing market-data, candle, and best-effort scanner-event tables. When the optional ingestion credentials are configured, the API keeps its read-only identity. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
 
 ## 3. Install and run the local checks
 
@@ -78,7 +80,7 @@ npm run validate
 Expected results:
 
 1. `npm ci` exits with status `0` and installs the pinned dependencies from `package-lock.json`.
-2. `npm test` exits with status `0`. The current package suite reports `35` tests; test totals may change as tests are added. These tests use local mocks; they do **not** prove connectivity to the Pi database.
+2. `npm test` exits with status `0`. See the current [Phase 5 implementation report](phase-5-implementation-report.md) for the executed test count. Tests use local mocks/in-memory validation; they do **not** prove connectivity to the Pi database.
 3. `npm run validate` connects to the configured existing database, performs the read-only preflight, and exits with status `0`. It prints one JSON line in this shape (the optional function value and market count depend on the database):
 
 ```json
@@ -86,6 +88,8 @@ Expected results:
 ```
 
 The Pi's approximately 102 enabled markets are read from the existing table and are not changed. `enabledMarkets` reports the number actually read; it is not required to equal exactly 102. No runtime database function is required, installed, or invoked by this phase.
+
+The original `npm run validate` remains strict and is intended for the read-only `DATABASE_USER`. To explicitly perform a Phase 5 one-shot ingestion pass with the configured writer identity, select intervals in the command, for example `npm run ingest:market-data -- --intervals=1m`. This writes only to existing snapshot/candle/event tables and is not run by the Phase 2 validation procedure; see the [Phase 5 implementation report](phase-5-implementation-report.md) before invoking it.
 
 If validation fails, the command exits nonzero and prints `runtime_validation_failed` with a safe error code and, for schema-contract failures, a `contractErrors` array. Examples include `RUNTIME_CONTRACT_INVALID`, `WATCHED_MARKETS_INVALID`, `ECONNREFUSED`, or a PostgreSQL authentication code. Do not treat a successful unit-test run as a substitute for this live check.
 
@@ -136,7 +140,7 @@ Stop the foreground process with `Ctrl+C`. Expected shutdown output:
 
 All checks run in read-only transactions against schema `public`. The runtime inspects functions in PostgreSQL catalogs but **never invokes any database function**.
 
-### Connection and role
+### Connection and role for the Phase 2 API preflight
 
 - `current_database()` must equal `DATABASE_NAME`; `current_user` must equal `DATABASE_USER`.
 - `default_transaction_read_only` and `transaction_read_only` must both be `on`.
@@ -144,6 +148,8 @@ All checks run in read-only transactions against schema `public`. The runtime in
 - The runtime must not own or have `INSERT`, `UPDATE`, `DELETE`, or `TRUNCATE` on any discovered `public.AI_Crypto_Bot_*` ordinary or partitioned table.
 - It must not own or have `USAGE`/`UPDATE` on any discovered prefixed sequence.
 - It must have `SELECT` on the five read tables: `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Market_Data`, `AI_Crypto_Bot_Candles`, `AI_Crypto_Bot_AI_Decisions`, and `AI_Crypto_Bot_Status`.
+
+The Phase 5 ingestion preflight is separate: it accepts and reports write-capable grants, requires `INSERT`/`UPDATE` on the existing snapshot and candle tables, and rejects table ownership, `DELETE`, and `TRUNCATE`. It continues to warn on missing legacy key constraints and does not require runtime PostgreSQL functions. The API can continue using the separate read-only `DATABASE_USER`.
 
 ### Required prefixed tables
 

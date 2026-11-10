@@ -239,3 +239,41 @@ export function evaluateDatabaseContract(snapshot, expectedDatabaseName) {
     optionalFunctions: Object.freeze(optionalFunctions)
   });
 }
+
+const INGESTION_WARNING_PATTERNS = Object.freeze([
+  /^MISSING_.*_CONSTRAINT:/,
+  /^DATABASE_ROLE_CAN_WRITE_(TABLE|SEQUENCE):/,
+  /^MISSING_FUNCTION:/,
+  /^FUNCTION_CONTRACT_MISMATCH:/
+]);
+
+export function evaluateIngestionDatabaseContract(snapshot, expectedDatabaseName) {
+  const base = evaluateDatabaseContract(snapshot, expectedDatabaseName);
+  const warnings = base.errors.filter((error) =>
+    INGESTION_WARNING_PATTERNS.some((pattern) => pattern.test(error))
+  );
+  const errors = base.errors.filter((error) => !warnings.includes(error));
+  const privileges = new Map(
+    snapshot.tablePrivileges.map((table) => [table.relation_name, table])
+  );
+
+  for (const table of snapshot.tablePrivileges) {
+    if (table.is_owner || table.can_delete || table.can_truncate) {
+      errors.push(`INGESTION_ROLE_UNSAFE_TABLE_PRIVILEGE:${table.relation_name}`);
+    }
+  }
+
+  for (const tableName of ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"]) {
+    const table = privileges.get(tableName);
+    if (!table?.can_insert || !table?.can_update) {
+      errors.push(`MISSING_INGESTION_WRITE_PRIVILEGE:${tableName}`);
+    }
+  }
+
+  return Object.freeze({
+    ...base,
+    valid: errors.length === 0,
+    errors: Object.freeze(errors),
+    warnings: Object.freeze(warnings)
+  });
+}

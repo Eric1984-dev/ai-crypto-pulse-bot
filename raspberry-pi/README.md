@@ -2,21 +2,32 @@
 
 This folder is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. It is not part of the Vercel dashboard and is excluded from Vercel deployment inputs.
 
-## Phase 4 scope
+## Phase 5 scope
 
-The runtime exposes PostgreSQL-backed read-only routes for enabled watched markets, a single enabled market's stored snapshot/candles, a partial dashboard data foundation, agent status, and a stored market summary. Repositories use explicit columns, parameterized SQL, read-only transactions, and bounded result limits. The existing enabled `AI_Crypto_Bot_Watched_Markets` table is the only market-universe source.
+In addition to the Phase 4 read-only API, the package now includes an explicitly invoked, one-shot market-data ingestion command. It fetches public Bitvavo 24-hour tickers and candles, then persists snapshots and candles to the existing PostgreSQL tables. The command reads enabled markets only from `AI_Crypto_Bot_Watched_Markets`; it does not consult the configured market list or Bitvavo's market catalog.
 
-No scanner ranking calculations, portfolio aggregation, AI, market ingestion, scheduler, analytics, or trading logic is migrated. The dashboard response is deliberately partial and does not invent portfolio fields. Market summaries contain stored snapshot counts/data only; the scanner-ranking subtree is not implemented. Existing Vercel/Supabase endpoints and the dashboard have not been cut over.
+Run a deliberate ingestion pass from this directory after configuring the existing database connection:
+
+```sh
+npm run ingest:market-data -- --intervals=1m
+npm run ingest:market-data -- --intervals=all
+```
+
+An interval must be selected explicitly. The command handles every enabled market in batches of at most five, uses at most four concurrent provider requests, fetches no more than 500 candles per market/interval request, and writes candles in chunks of at most 100. It exits after one pass and does not start a scheduler. A first `--intervals=all` run can request up to 306,000 candles for 102 markets; start with selected intervals and monitor Pi resources.
+
+The existing `AI_Crypto_Bot_Market_Data` schema has a unique key on `symbol`, so it can retain only the latest snapshot per market. Ingestion upserts that row; snapshot history cannot be retained without changing the existing schema, which this phase prohibits. Candle rows remain historical and are checkpointed incrementally. No Supabase migration, schema change, market mutation, AI run, paper trade, or dashboard cutover is performed.
+
+The read-only API remains loopback-only and authenticated routes remain denied by the default provider. Its endpoints and intentionally partial dashboard response are unchanged.
 
 Data routes require an authenticated identity from the Phase 3 middleware. The default provider denies access, so these routes return `401` until a trusted provider is supplied. Provider integration, OIDC, login, registration, password reset, and session creation remain out of scope. The API is loopback-only; CORS is disabled by default.
 
-The runtime does not import Supabase data, run migrations, alter schema, write rows, seed or change markets, start a scheduler, analyze markets, or execute paper/live trades. No PostgreSQL runtime function is required or invoked, and absent candle history produces an empty candle list rather than triggering ingestion.
+The API runtime does not import Supabase data, run migrations, alter schema, seed or change markets, start a scheduler, analyze markets, or execute paper/live trades. Only the explicit ingestion CLI writes snapshots, candles, and best-effort scanner failure events. No PostgreSQL runtime function is required or invoked.
 
 ## Requirements
 
 - Node.js 20.6 or newer
 - Network access from the Pi runtime to the already-existing PostgreSQL instance
-- A dedicated PostgreSQL login configured with `SELECT` access to the required existing objects and no project-table or schema write privileges
+- PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; optionally configure the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` for the one-shot writer, with only the required existing-table privileges.
 - PostgreSQL connection settings provisioned locally; do not copy credentials into Vercel or Git
 
 The runtime never creates a database, applies migrations, seeds markets, or changes the existing market list. It treats the installed schema and its contents as the authority.
@@ -53,16 +64,16 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 ## Layout
 
 - `src/api/` — built-in Node HTTP server, health/data routes, middleware, validation, and error handling.
-- `src/runtime/` — startup validation and graceful lifecycle only; no scheduler or trading worker.
-- `src/services/` — database-contract, watched-market, and readiness services.
-- `src/repositories/` — parameterized, bounded, read-only PostgreSQL queries for contracts, watched markets, market data/candles, AI decisions, and runtime status.
+- `src/runtime/` — API startup validation and graceful lifecycle only; no scheduler or trading worker.
+- `src/services/` — database-contract, watched-market, readiness, Bitvavo public client, and one-shot ingestion orchestration.
+- `src/repositories/` — parameterized, bounded PostgreSQL access for contracts, watched markets, market reads, ingestion writes, AI decisions, and runtime status.
 - `src/auth/` — provider-neutral authentication, authorization, and in-memory session interfaces; no identity provider.
-- `src/database/` — bounded `pg` pool and read-only transaction helper.
+- `src/database/` — bounded `pg` pool plus explicit read-only and write transaction helpers.
 - `src/monitoring/` — health responses, bounded operational snapshots, and request counters.
 - `src/config/` — strict runtime environment parsing.
 - `tests/` — isolated Node.js tests; no remote database or schema setup.
 - `docs/` — implementation and operational notes for this runtime foundation.
 
-The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation.
+The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation.
 
 For environment variables, PostgreSQL contract checks, and validation commands, see the [deployment and validation guide](docs/phase-2-deployment-validation.md).
