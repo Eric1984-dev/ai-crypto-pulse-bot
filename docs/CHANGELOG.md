@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Raspberry Pi migration — Phase 1
+
+- Document the current Vercel/Supabase runtime, remaining PostgREST and RPC dependencies, Auth/Realtime usage, scanner market source, and external scheduler endpoints
+- Record the user-confirmed existing Pi PostgreSQL/schema/data state without reconnecting, reseeding, re-running schema, or copying data
+- Add a migration architecture and dependency-ordered roadmap for moving the backend to the Pi while keeping Vercel frontend-only and paper trading safe
+
 ### AI Engine V2 replacement
 
 - Replace the directional score with a 1d EMA-led formula, confirmed by 1h/1d EMA alignment and fresh 1h volume, with a small 1d RSI contribution

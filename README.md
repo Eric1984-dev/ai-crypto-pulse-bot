@@ -83,6 +83,7 @@ Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit v
 ## Documentatie
 
 - [Roadmap](./ROADMAP.md)
+- [CryptoPulseBot migration documentation](./docs/migration/README.md)
 - [Database](./docs/DATABASE.md)
 - [Architectuur](./docs/ARCHITECTURE.md)
 - [Authentication API](./docs/API.md)
