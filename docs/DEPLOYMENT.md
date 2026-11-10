@@ -6,6 +6,8 @@ Deze handleiding beschrijft de huidige Vercel/Supabase-deployment. Voor de doelr
 
 Phases 02-08 use Supabase Auth and Vercel Functions for protected pages, dashboard data, public Bitvavo market data, AI analysis, and paper trading. Apply reviewed PostgreSQL migrations separately with the Supabase CLI before enabling the scheduled paper-trading endpoint.
 
+The separate Phase 2 Raspberry Pi foundation can be installed and validated manually against the existing database; it is read-only, loopback-only, and is not a production cutover or a systemd deployment. Follow the [Phase 2 Pi deployment and validation guide](../raspberry-pi/docs/phase-2-deployment-validation.md). Authentication/OIDC, dashboard access, scheduling, and trading are not included.
+
 ## Hosting
 
 CryptoPulse AI Agent is designed to run on:
@@ -15,7 +17,7 @@ CryptoPulse AI Agent is designed to run on:
 
 Import the repository into Vercel with the repository root as the project root. The project is framework-free: `vercel.json` sets `outputDirectory` to `.` because the static HTML/CSS/JS files live in the repository root. This overrides a stale Project Settings value such as `public`; no `public/` folder or generated build directory is required. The same config enables clean URLs and orders protected-page routes before the filesystem handler, so root-level static HTML cannot bypass the authentication function.
 
-The root `.vercelignore` excludes `/archive-server/` from Vercel deployments. The project validator skips Pi-only directory and environment-template checks when Vercel sets `VERCEL=1`; local builds still validate the archive server template. The directory remains in Git for Raspberry Pi installation and updates; `.vercelignore` excludes it from Vercel's deployment input but does not remove it from the Git repository. Keep `archive-server/.env` and other Pi-only credentials out of Git.
+The root `.vercelignore` excludes `/archive-server/` and `/raspberry-pi/` from Vercel deployments. The project validator skips Pi-only directory and environment-template checks when Vercel sets `VERCEL=1`; local builds still validate the archive server template. These directories remain in Git for Raspberry Pi installation and updates; `.vercelignore` excludes them from Vercel's deployment input but does not remove them from the Git repository. Keep Pi `.env` files and other Pi-only credentials out of Git.
 
 ### iPhone home-screen icon
 

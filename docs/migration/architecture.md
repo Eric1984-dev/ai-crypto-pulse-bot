@@ -118,3 +118,11 @@ Supabase volledig uit de applicatie verwijderen betekent dus ook dat de API auth
 5. Acceptatiecriteria vastleggen voor logic parity, dashboard response parity, full scheduler cycle en Pi-resourcegebruik.
 
 De concrete fasevolgorde staat in [roadmap.md](./roadmap.md); de feitelijke huidige code-/RPC-inventaris in [01-audit.md](./01-audit.md).
+
+## Phase 2 runtime foundation
+
+The isolated implementation is in [`raspberry-pi/`](../../raspberry-pi/). It currently provides strict runtime configuration, a `pg` pool capped at four connections, explicit read-only transactions, fail-closed database/schema/function/grant checks, validation of the existing enabled `AI_Crypto_Bot_Watched_Markets` rows, and loopback-only health endpoints. It does not implement any dashboard data API, authentication/OIDC, scheduler, market-data ingestion, AI logic, or trading.
+
+The local tests use a PostgreSQL protocol mock. The Pi database identity, schema, function signatures, grants, network connectivity, and market rows have not been independently queried; production acceptance remains blocked until an operator-provisioned connection is validated read-only. The target database, schema, and market list are not modified by the foundation.
+
+Authentication implementation is out of scope and OIDC is explicitly excluded. The earlier identity flow in [api-architecture.md](./api-architecture.md) is not approved for implementation. Until a future access-control scope is explicitly authorized, keep the Phase 2 API loopback-only and do not expose it to Vercel or the Internet.

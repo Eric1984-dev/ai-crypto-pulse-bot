@@ -4,6 +4,7 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. Pha
 
 ## Huidige status
 
+- De afzonderlijke `raspberry-pi/`-package bevat de Phase 2 read-only runtime foundation: strikte configuratie, PostgreSQL-contract- en watched-market-validatie en loopback-health endpoints. Deze package is uitgesloten van Vercel-deployments; live Pi-connectiviteit is nog niet gevalideerd. Er is geen scheduler, AI-analyse, trading of authenticatie/OIDC in deze foundation. Zie de [Phase 2 deployment- en validatiehandleiding](raspberry-pi/docs/phase-2-deployment-validation.md).
 - Accountacties worden afgehandeld door Supabase Authentication; sessies blijven bestaan via de Supabase JS client.
 - Dashboard, portfolio, scanner, trade history, instellingen en de Admin-pagina zijn beschermd door server-side Vercel rewrites en een aanvullende browserguard.
 - Het Phase 03-schema en de latere uitbreidingen bevatten 18 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.

@@ -6,6 +6,8 @@
 - **Frontend host:** Vercel static files only
 - **Database:** the existing PostgreSQL database on the Pi; schema and data are unchanged
 
+> **Scope correction:** Authentication implementation is out of scope and OIDC is explicitly excluded. The identity-provider flow and authentication endpoints below are an unapproved Phase 1.8 proposal, not an implementation instruction. Phase 2 exposes only a loopback health API; do not expose it to Vercel or the public Internet. Any future authentication/network-exposure work requires a separate explicit scope decision.
+
 This specification defines the post-cutover browser/API boundary. The current Vercel/Supabase endpoints documented in [API.md](../API.md) remain descriptions of the current implementation until their individual migration phases are approved and completed. This document does not authorize implementation, database changes, runtime activation, or deployment.
 
 ## 1. Ownership and trust boundaries

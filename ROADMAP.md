@@ -5,9 +5,10 @@
 - [x] Phase 1 — audit and migration plan: [audit](docs/migration/01-audit.md), [architecture](docs/migration/architecture.md), and [migration roadmap](docs/migration/roadmap.md)
 - [x] Phase 1.7 — single-owner Pi runtime execution specification: [runtime specification](docs/migration/runtime-execution-spec.md)
 - [x] Phase 1.8 — Pi API endpoints, auth, dashboard polling, and cutover gates: [target API architecture](docs/migration/api-architecture.md)
-- [ ] Phase 2 and later — implementation has not started; each phase requires explicit user approval
+- [ ] Phase 2 — isolated Raspberry Pi read-only runtime foundation implemented; phase acceptance remains blocked pending secure live Pi database validation: [implementation report](docs/reports/PHASE_02_RASPBERRY_PI_RUNTIME_FOUNDATION.md), [deployment and validation guide](raspberry-pi/docs/phase-2-deployment-validation.md)
+- [ ] Phase 3 and later — not started; each phase requires explicit user approval
 
-These are documentation milestones only. They do not change the current Vercel/Supabase production implementation or authorize a deployment, scheduler cutover, database operation, or live trading.
+Phase 2 does not change the current Vercel/Supabase production implementation or authorize a deployment, scheduler cutover, schema/data operation, public API exposure, or live trading. Authentication implementation and OIDC are out of scope.
 
 ## Phase 01 - Project Setup
 

@@ -1,0 +1,270 @@
+export const REQUIRED_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Profiles",
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Trades",
+  "AI_Crypto_Bot_AI_Decisions",
+  "AI_Crypto_Bot_Status",
+  "AI_Crypto_Bot_Watched_Markets",
+  "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Candles",
+  "AI_Crypto_Bot_Strategies",
+  "AI_Crypto_Bot_Strategy_Changes",
+  "AI_Crypto_Bot_Strategy_Performance",
+  "AI_Crypto_Bot_Backtests",
+  "AI_Crypto_Bot_Portfolio_Snapshots",
+  "AI_Crypto_Bot_Scanner_Events",
+  "AI_Crypto_Bot_Emergency_State",
+  "AI_Crypto_Bot_Shadow_Exit_Scenarios",
+  "AI_Crypto_Bot_Shadow_Exit_Events"
+]);
+
+export const REQUIRED_READ_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Watched_Markets",
+  "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Candles",
+  "AI_Crypto_Bot_AI_Decisions",
+  "AI_Crypto_Bot_Status"
+]);
+
+export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
+  AI_Crypto_Bot_Watched_Markets: Object.freeze({
+    id: "uuid",
+    symbol: "text",
+    enabled: "boolean",
+    priority: "integer",
+    created_at: "timestamp with time zone",
+    updated_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Market_Data: Object.freeze({
+    symbol: "text",
+    price: "numeric",
+    volume: "numeric",
+    daily_change: "numeric",
+    high_24h: "numeric",
+    low_24h: "numeric",
+    captured_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Candles: Object.freeze({
+    symbol: "text",
+    interval: "text",
+    open: "numeric",
+    high: "numeric",
+    low: "numeric",
+    close: "numeric",
+    volume: "numeric",
+    timestamp: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_AI_Decisions: Object.freeze({
+    id: "uuid",
+    symbol: "text",
+    decision: "text",
+    confidence: "numeric",
+    indicators: "jsonb",
+    reason: "text",
+    created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Status: Object.freeze({
+    singleton: "boolean",
+    is_active: "boolean",
+    is_analyzing: "boolean",
+    status: "text",
+    last_run: "timestamp with time zone",
+    updated_at: "timestamp with time zone"
+  })
+});
+
+export const REQUIRED_FUNCTION_CONTRACTS = Object.freeze([
+  Object.freeze({
+    name: "AI_Crypto_Bot_Get_Latest_Candle_Checkpoints",
+    argumentTypes: "text[], text",
+    resultType: "TABLE(symbol text, latest_timestamp timestamp with time zone)",
+    securityDefiner: false
+  }),
+  Object.freeze({
+    name: "AI_Crypto_Bot_Get_Latest_AI_Candles_Compact",
+    argumentTypes: "text[], text",
+    resultType: "TABLE(symbol text, candles jsonb)",
+    securityDefiner: false
+  }),
+  Object.freeze({
+    name: "AI_Crypto_Bot_Run_Paper_Trading",
+    argumentTypes: "",
+    resultType: "jsonb",
+    securityDefiner: true
+  }),
+  Object.freeze({
+    name: "AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios",
+    argumentTypes: "",
+    resultType: "jsonb",
+    securityDefiner: true
+  }),
+  Object.freeze({
+    name: "AI_Crypto_Bot_Trade_History_Stats",
+    argumentTypes: "",
+    resultType: "TABLE(closed_trade_count bigint, winning_trade_count bigint, losing_trade_count bigint, average_profit numeric, average_loss numeric, best_trade numeric, worst_trade numeric)",
+    securityDefiner: false
+  })
+]);
+
+export const OPTIONAL_FUNCTION_CONTRACTS = Object.freeze([
+  Object.freeze({
+    name: "AI_Crypto_Bot_Run_Database_AI_Analysis",
+    argumentTypes: "timestamp with time zone",
+    resultType: "TABLE(analyzed_markets integer, decisions_stored integer, buy_count integer, sell_count integer, hold_count integer, wait_count integer)",
+    securityDefiner: false
+  })
+]);
+
+export const REQUIRED_WATCHED_MARKET_CONSTRAINTS = Object.freeze([
+  Object.freeze({ type: "p", columns: Object.freeze(["id"]) }),
+  Object.freeze({ type: "u", columns: Object.freeze(["symbol"]) })
+]);
+
+export const REQUIRED_CANDLE_CONSTRAINTS = Object.freeze([
+  Object.freeze({ type: "u", columns: Object.freeze(["symbol", "interval", "timestamp"]) })
+]);
+
+export const REQUIRED_DECISION_CONSTRAINTS = Object.freeze([
+  Object.freeze({ type: "p", columns: Object.freeze(["id"]) })
+]);
+
+const OPTIONAL_FUNCTION_NAMES = new Set(
+  OPTIONAL_FUNCTION_CONTRACTS.map((contract) => contract.name)
+);
+
+function normalizedSql(value) {
+  return typeof value === "string"
+    ? value.replace(/\s+/g, " ").trim().toLowerCase()
+    : "";
+}
+
+function sameColumns(left, right) {
+  return Array.isArray(left)
+    && left.length === right.length
+    && left.every((column, index) => column === right[index]);
+}
+
+function hasConstraint(constraints, relationName, expected) {
+  return constraints.some((constraint) => constraint.relation_name === relationName
+    && constraint.constraint_type === expected.type
+    && sameColumns(constraint.columns, expected.columns));
+}
+
+function validateFunction(contract, functions, errors, required) {
+  const candidates = functions.filter((row) => row.function_name === contract.name);
+  if (candidates.length === 0) {
+    if (required) {
+      errors.push(`MISSING_FUNCTION:${contract.name}`);
+    }
+    return;
+  }
+
+  const matches = candidates.filter((row) =>
+    row.argument_types === contract.argumentTypes
+    && normalizedSql(row.result_type) === normalizedSql(contract.resultType)
+    && row.function_kind === "f"
+    && row.security_definer === contract.securityDefiner
+  );
+  if (matches.length !== 1) {
+    errors.push(`FUNCTION_CONTRACT_MISMATCH:${contract.name}`);
+  }
+}
+
+export function evaluateDatabaseContract(snapshot, expectedDatabaseName) {
+  const errors = [];
+  const tables = new Set(snapshot.tables.map((row) => row.relation_name));
+
+  if (snapshot.connection.database_name !== expectedDatabaseName
+    || snapshot.connection.role_name !== snapshot.expectedRoleName) {
+    errors.push("DATABASE_IDENTITY_MISMATCH");
+  }
+  if (snapshot.connection.default_transaction_read_only !== "on"
+    || snapshot.connection.transaction_read_only !== "on") {
+    errors.push("READ_ONLY_MODE_REQUIRED");
+  }
+  if (snapshot.connection.is_superuser
+    || snapshot.connection.bypasses_rls
+    || snapshot.connection.can_create_database
+    || snapshot.connection.can_create_role
+    || snapshot.connection.can_create_objects_in_public) {
+    errors.push("DATABASE_ROLE_TOO_PRIVILEGED");
+  }
+
+  for (const tableName of REQUIRED_TABLES) {
+    if (!tables.has(tableName)) {
+      errors.push(`MISSING_TABLE:${tableName}`);
+    }
+  }
+
+  const columnsByTable = new Map();
+  for (const column of snapshot.columns) {
+    if (!columnsByTable.has(column.table_name)) {
+      columnsByTable.set(column.table_name, new Map());
+    }
+    columnsByTable.get(column.table_name).set(column.column_name, column.data_type);
+  }
+  for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMN_CONTRACTS)) {
+    const actualColumns = columnsByTable.get(tableName);
+    for (const [columnName, dataType] of Object.entries(expectedColumns)) {
+      if (!actualColumns?.has(columnName)) {
+        errors.push(`MISSING_COLUMN:${tableName}.${columnName}`);
+      } else if (actualColumns.get(columnName) !== dataType) {
+        errors.push(`COLUMN_TYPE_MISMATCH:${tableName}.${columnName}`);
+      }
+    }
+  }
+
+  for (const expected of REQUIRED_WATCHED_MARKET_CONSTRAINTS) {
+    if (!hasConstraint(snapshot.constraints, "AI_Crypto_Bot_Watched_Markets", expected)) {
+      errors.push(`MISSING_MARKET_CONSTRAINT:${expected.type}:${expected.columns.join(",")}`);
+    }
+  }
+  for (const expected of REQUIRED_CANDLE_CONSTRAINTS) {
+    if (!hasConstraint(snapshot.constraints, "AI_Crypto_Bot_Candles", expected)) {
+      errors.push(`MISSING_CANDLE_CONSTRAINT:${expected.columns.join(",")}`);
+    }
+  }
+  for (const expected of REQUIRED_DECISION_CONSTRAINTS) {
+    if (!hasConstraint(snapshot.constraints, "AI_Crypto_Bot_AI_Decisions", expected)) {
+      errors.push(`MISSING_DECISION_CONSTRAINT:${expected.columns.join(",")}`);
+    }
+  }
+
+  for (const table of snapshot.tablePrivileges) {
+    if (!table.can_select && REQUIRED_READ_TABLES.includes(table.relation_name)) {
+      errors.push(`MISSING_SELECT_PRIVILEGE:${table.relation_name}`);
+    }
+    if (table.is_owner || table.can_insert || table.can_update
+      || table.can_delete || table.can_truncate) {
+      errors.push(`DATABASE_ROLE_CAN_WRITE_TABLE:${table.relation_name}`);
+    }
+  }
+  for (const sequence of snapshot.sequencePrivileges) {
+    if (sequence.can_use || sequence.can_update || sequence.is_owner) {
+      errors.push(`DATABASE_ROLE_CAN_WRITE_SEQUENCE:${sequence.relation_name}`);
+    }
+  }
+
+  for (const contract of REQUIRED_FUNCTION_CONTRACTS) {
+    validateFunction(contract, snapshot.functions, errors, true);
+  }
+  for (const contract of OPTIONAL_FUNCTION_CONTRACTS) {
+    validateFunction(contract, snapshot.functions, errors, false);
+  }
+
+  const optionalFunctions = Object.fromEntries(
+    OPTIONAL_FUNCTION_CONTRACTS.map(({ name }) => [
+      name,
+      snapshot.functions.some((row) => row.function_name === name) ? "present" : "not-installed"
+    ])
+  );
+
+  return Object.freeze({
+    valid: errors.length === 0,
+    errors: Object.freeze(errors),
+    requiredTables: REQUIRED_TABLES.length,
+    requiredFunctions: REQUIRED_FUNCTION_CONTRACTS.length,
+    optionalFunctions: Object.freeze(optionalFunctions)
+  });
+}

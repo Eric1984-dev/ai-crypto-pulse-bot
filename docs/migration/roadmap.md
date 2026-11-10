@@ -9,15 +9,15 @@ Dit is een voorstel voor de uitvoeringsvolgorde, geen toestemming om volgende fa
 | 1 — Audit en migratieplan | Afhankelijkheden, bestaande werking, doelarchitectuur en gates vastleggen. | Documentatie afgerond. |
 | 1.7 — Runtime Execution Specification | Pi lifecycle, interne uitvoering, herstel, resources en acceptatie definiëren. | Documentatie afgerond; niet geïmplementeerd. |
 | 1.8 — Target API Architecture | Definitief browser-naar-Pi API-, auth-, polling- en foutcontract definiëren. | Documentatie afgerond; providerkeuze en profielmapping blijven implementatiegates. |
-| 2 — Pi runtime foundation | Read-only verbinding met bestaande PostgreSQL, runtime-config en minimale API-test. | Niet gestart; vereist gebruikersprompt. |
+| 2 — Pi runtime foundation | Read-only PostgreSQL-pool, startupcontracten, bestaande watched-market-validatie en lokale health-API. | Geïmplementeerd en lokaal getest; live Pi-DB-verbinding/schema/marktvalidatie niet uitgevoerd wegens ontbrekende lokale connection-configuratie. Faseacceptatie geblokkeerd tot read-only Pi-validatie volgens de [deployment- en validatiehandleiding](../../raspberry-pi/docs/phase-2-deployment-validation.md). |
 
 ## Voorgestelde fasering en afhankelijkheden
 
 | Fase | Werkpakket | Afhankelijk van | Acceptatie / stopcriteria |
 |---|---|---|---|
 | 1. Audit en plan | Inventarisatie van Vercel/Supabase-paden, Pi-aannames, scannerbron, scheduler en migratierisico's. | Geen | Documenten onder `docs/migration/` bijgewerkt; geen schema-/datamutaties; tests en beperkingen eerlijk gerapporteerd. |
-| 2. Pi Node/PG runtime foundation | Bestaande Node-architectuur onderzoeken; read-only `pg`-connectiviteit; bevestigen bestaande DB identity, schema contracts, function signatures en relevante query permissions. Geen DDL. | Fase 1, Pi connection configuration door gebruiker | Read-only smoke test en unit/integration harness; verbinding faalt gesloten; geen writes of schema-installatie. |
-| 3. Beveiligde Pi API en sessies | Implementeer het contract uit [api-architecture.md](./api-architecture.md): Pi HTTP API, TLS/origin/CSRF, login/session/admin en static-page guards. | Fase 2, API-contract fase 1.8, expliciete OIDC-provider- en profielmappingkeuze | Geen PostgreSQL-toegang in browser; unauthorized/expired requests correct afgewezen; bestaande login-, pagina- en adminfunctionaliteit behouden. |
+| 2. Pi Node/PG runtime foundation | Bestaande Node-architectuur onderzoeken; read-only `pg`-pool; bestaande DB identity, schema contracts, function signatures, grants en markets valideren. Geen DDL. | Fase 1, veilige lokale Pi connection configuration | Lokale contracttests slagen; echte read-only Pi-smoketest blijft vereist en blokkeert acceptatie zolang de Pi niet bereikbaar is. Geen writes of schema-installatie. |
+| 3. Pi API en dashboardcontract | Implementeer alleen een expliciet goedgekeurde API-scope en behoud de bestaande dashboardcontracten. Authenticatie-implementatie valt buiten scope; OIDC is uitgesloten. | Fase 2 geaccepteerd; afzonderlijke scopebeslissing voor netwerkblootstelling en toegangsbeveiliging | Geen PostgreSQL-toegang in browser; API blijft niet publiek bereikbaar totdat een toegestane beveiligingsaanpak afzonderlijk is goedgekeurd. |
 | 4. Read-only data API en markt-universe | Port bestaande dashboard/market/scanner reads; scanner haalt `enabled`/`priority`/`symbol` uitsluitend uit bestaande Pi `AI_Crypto_Bot_Watched_Markets`. Geen market seed. | Fase 2, API/auth contract fase 3 | Bekende symbol set blijft ongewijzigd; API response/UI parity; tests bewijzen geen Watched Markets writes. |
 | 5. Bitvavo marktdata-ingestie | Verplaats publieke ticker/candle fetch, validatie, cache, checkpoint/overlap/upsert en scanner-event logging naar Pi worker. | Fase 2 + market reader fase 4 | Alleen reeds bestaande enabled Pi-markten worden verwerkt; geen auto-market insertion; volledige gewenste interval/batch dekking en stale/failure gedrag getest. |
 | 6. AI Engine | Verplaats huidige deterministische berekening, status, decision persistence en bounded candle reads. Behoud huidige V2 score/confidence/freshness exact. | Fase 2, verse Pi data fase 5 | Golden-fixture/decision-parity tests; stale/partial input blijft fail-safe; geen verandering aan signal/strategy rules. |
@@ -39,7 +39,7 @@ Vóór scheduler-cutover moet de eigenaar van scheduled AI/paper uitvoering expl
 - Geen nieuwe database, schema, Supabase-to-Pi kopie of mutatie van de bestaande market-universe.
 - Alle databasewrites uitsluitend in een expliciet goedgekeurde uitvoeringsfase en via de bestaande schema-objecten; deze fase 1 bevat geen writes.
 - Elke wijziging heeft bestaande tests plus gerichte regressietests. Voer geen test uit die productie/remote schema of data aanraakt.
-- Documenteer API, environment-configuratie, installatie, databaseoperaties, resource-/schedulerinstellingen en changelog waar de fase die raakt.
+- Documenteer API, environment-configuratie, installatie, databaseoperaties, resource-/schedulerinstellingen en changelog waar de fase die raakt. Auth/OIDC implementeren is niet impliciet toegestaan.
 - Rapporteer pass/fail/skipped; nooit tests, production validatie of deployment verzinnen.
 - Vercel-deployments voert de gebruiker zelf uit. Geen zelfstandige volgende fase, package/service install op de Pi of scheduler activeren.
 

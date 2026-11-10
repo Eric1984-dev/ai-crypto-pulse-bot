@@ -6,6 +6,15 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Raspberry Pi migration — Phase 2
+
+- Add an isolated `raspberry-pi/` Node.js runtime package with bounded PostgreSQL pooling, verified TLS defaults, and read-only transactions
+- Fail startup closed unless the existing database identity/schema/function/grant contracts and enabled watched markets validate; never invoke database functions or modify market rows
+- Add loopback-only liveness, readiness, and bounded diagnostics endpoints; no dashboard, scheduler, trading, authentication, or OIDC implementation
+- Exclude the Pi runtime package from Vercel deployment inputs and document local setup and the live-connection acceptance blocker
+- Add focused configuration, contract, market, transaction, runtime, and HTTP API tests
+- Add a Pi-side Phase 2 deployment and validation guide with environment-variable ranges, checked PostgreSQL contracts, expected output, and acceptance criteria
+
 ### Raspberry Pi migration — Phase 1
 
 - Document the current Vercel/Supabase runtime, remaining PostgREST and RPC dependencies, Auth/Realtime usage, scanner market source, and external scheduler endpoints
