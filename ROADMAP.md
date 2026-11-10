@@ -1,5 +1,14 @@
 # CryptoPulse AI Agent Roadmap
 
+## Raspberry Pi migration documentation
+
+- [x] Phase 1 — audit and migration plan: [audit](docs/migration/01-audit.md), [architecture](docs/migration/architecture.md), and [migration roadmap](docs/migration/roadmap.md)
+- [x] Phase 1.7 — single-owner Pi runtime execution specification: [runtime specification](docs/migration/runtime-execution-spec.md)
+- [x] Phase 1.8 — Pi API endpoints, auth, dashboard polling, and cutover gates: [target API architecture](docs/migration/api-architecture.md)
+- [ ] Phase 2 and later — implementation has not started; each phase requires explicit user approval
+
+These are documentation milestones only. They do not change the current Vercel/Supabase production implementation or authorize a deployment, scheduler cutover, database operation, or live trading.
+
 ## Phase 01 - Project Setup
 
 - [x] Project structuur en vereiste pagina's

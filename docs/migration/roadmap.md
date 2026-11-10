@@ -7,6 +7,8 @@ Dit is een voorstel voor de uitvoeringsvolgorde, geen toestemming om volgende fa
 | Fase | Doel | Status |
 |---|---|---|
 | 1 — Audit en migratieplan | Afhankelijkheden, bestaande werking, doelarchitectuur en gates vastleggen. | Documentatie afgerond. |
+| 1.7 — Runtime Execution Specification | Pi lifecycle, interne uitvoering, herstel, resources en acceptatie definiëren. | Documentatie afgerond; niet geïmplementeerd. |
+| 1.8 — Target API Architecture | Definitief browser-naar-Pi API-, auth-, polling- en foutcontract definiëren. | Documentatie afgerond; providerkeuze en profielmapping blijven implementatiegates. |
 | 2 — Pi runtime foundation | Read-only verbinding met bestaande PostgreSQL, runtime-config en minimale API-test. | Niet gestart; vereist gebruikersprompt. |
 
 ## Voorgestelde fasering en afhankelijkheden
@@ -15,7 +17,7 @@ Dit is een voorstel voor de uitvoeringsvolgorde, geen toestemming om volgende fa
 |---|---|---|---|
 | 1. Audit en plan | Inventarisatie van Vercel/Supabase-paden, Pi-aannames, scannerbron, scheduler en migratierisico's. | Geen | Documenten onder `docs/migration/` bijgewerkt; geen schema-/datamutaties; tests en beperkingen eerlijk gerapporteerd. |
 | 2. Pi Node/PG runtime foundation | Bestaande Node-architectuur onderzoeken; read-only `pg`-connectiviteit; bevestigen bestaande DB identity, schema contracts, function signatures en relevante query permissions. Geen DDL. | Fase 1, Pi connection configuration door gebruiker | Read-only smoke test en unit/integration harness; verbinding faalt gesloten; geen writes of schema-installatie. |
-| 3. Beveiligde Pi API en sessies | Pi HTTP API lifecycle, API-config, TLS/origin/auth model, login/session/admin/protected-route vervanging vaststellen/implementeren. | Fase 2 | Geen PostgreSQL-toegang in browser; unauthorized/expired requests correct afgewezen; existing page guards en admin controls behouden. |
+| 3. Beveiligde Pi API en sessies | Implementeer het contract uit [api-architecture.md](./api-architecture.md): Pi HTTP API, TLS/origin/CSRF, login/session/admin en static-page guards. | Fase 2, API-contract fase 1.8, expliciete OIDC-provider- en profielmappingkeuze | Geen PostgreSQL-toegang in browser; unauthorized/expired requests correct afgewezen; bestaande login-, pagina- en adminfunctionaliteit behouden. |
 | 4. Read-only data API en markt-universe | Port bestaande dashboard/market/scanner reads; scanner haalt `enabled`/`priority`/`symbol` uitsluitend uit bestaande Pi `AI_Crypto_Bot_Watched_Markets`. Geen market seed. | Fase 2, API/auth contract fase 3 | Bekende symbol set blijft ongewijzigd; API response/UI parity; tests bewijzen geen Watched Markets writes. |
 | 5. Bitvavo marktdata-ingestie | Verplaats publieke ticker/candle fetch, validatie, cache, checkpoint/overlap/upsert en scanner-event logging naar Pi worker. | Fase 2 + market reader fase 4 | Alleen reeds bestaande enabled Pi-markten worden verwerkt; geen auto-market insertion; volledige gewenste interval/batch dekking en stale/failure gedrag getest. |
 | 6. AI Engine | Verplaats huidige deterministische berekening, status, decision persistence en bounded candle reads. Behoud huidige V2 score/confidence/freshness exact. | Fase 2, verse Pi data fase 5 | Golden-fixture/decision-parity tests; stale/partial input blijft fail-safe; geen verandering aan signal/strategy rules. |

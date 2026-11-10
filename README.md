@@ -84,6 +84,7 @@ Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit v
 
 - [Roadmap](./ROADMAP.md)
 - [CryptoPulseBot migration documentation](./docs/migration/README.md)
+- [Target Raspberry Pi API architecture](./docs/migration/api-architecture.md)
 - [Database](./docs/DATABASE.md)
 - [Architectuur](./docs/ARCHITECTURE.md)
 - [Authentication API](./docs/API.md)

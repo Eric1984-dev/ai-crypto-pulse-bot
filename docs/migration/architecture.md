@@ -90,6 +90,8 @@ De gebruiker meldt dat het volledige schema al op de Pi staat. Voordat code dire
 
 ## Dashboard- en beveiligingscontract
 
+Het doelcontract voor browser-naar-Pi verkeer, doel-endpoints, sessies, polling, CORS/CSRF, rate limits en fouten staat in [api-architecture.md](./api-architecture.md). Dat document beschrijft de doelarchitectuur; de huidige Vercel/Supabase-contracten hieronder blijven gelden totdat de afzonderlijke migratiefasen zijn uitgevoerd.
+
 De huidige browser gebruikt:
 
 - Supabase JS Auth SDK vanaf jsDelivr voor registratie, login, reset, logout en persistente sessie;

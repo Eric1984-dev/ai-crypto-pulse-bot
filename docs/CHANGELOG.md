@@ -18,6 +18,12 @@ All notable project changes should be documented here.
 - Define AI decision idempotency through the existing decision primary key and retain existing paper-trade locking; no schema or function changes
 - Clarify that external schedulers, Vercel execution ownership, separate systemd timers, data retention, and live trading are excluded from the target runtime
 
+### Raspberry Pi migration — Phase 1.8
+
+- Define the Pi API endpoint inventory and map current Vercel routes, Supabase Auth/Realtime, and scheduler endpoints to the static-dashboard/Pi-runtime target
+- Specify provider-neutral OIDC sessions, existing-profile/admin authorization gates, same-site cookie/CORS/CSRF requirements, dashboard polling, error envelopes, health endpoints, and initial rate limits
+- Preserve current dashboard response semantics while requiring operational reads/actions to go through the Pi API; no implementation, schema, runtime, or deployment changes
+
 ### AI Engine V2 replacement
 
 - Replace the directional score with a 1d EMA-led formula, confirmed by 1h/1d EMA alignment and fresh 1h volume, with a small 1d RSI contribution

@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the current Vercel/Supabase implementation. The post-cutover Raspberry Pi runtime and its single-owner execution contract are specified in the [migration runtime execution specification](./migration/runtime-execution-spec.md).
+This document describes the current Vercel/Supabase implementation. The post-cutover Raspberry Pi runtime and its single-owner execution contract are specified in the [migration runtime execution specification](./migration/runtime-execution-spec.md); its browser/API boundary is specified in the [migration target API architecture](./migration/api-architecture.md). Both migration documents describe an unimplemented target.
 
 ## Current Implementation: Phase 11
 

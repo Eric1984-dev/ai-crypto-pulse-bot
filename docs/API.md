@@ -1,5 +1,7 @@
 # API Endpoints
 
+> **Migration target:** this document describes the current Vercel/Supabase implementation. After an explicitly approved and validated cutover, the Pi-hosted endpoint, authentication, and polling contract in [the target API architecture](./migration/api-architecture.md) supersedes these transport-specific descriptions. The target is documentation only and is not active.
+
 ## Phase 02 Authentication endpoints
 
 These Vercel Functions support Supabase Authentication only. The Supabase anon key is intentionally public for browser Auth requests; no service-role key or other server secret is returned.

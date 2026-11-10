@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Deze handleiding beschrijft de huidige Vercel/Supabase-deployment. Voor de doelruntime na migratiecutover geldt de [Pi runtime execution specification](./migration/runtime-execution-spec.md); Vercel beheert dan geen markt-, AI- of paper-tradinguitvoering en er worden geen externe schedulers of `systemd`-timers gebruikt.
+Deze handleiding beschrijft de huidige Vercel/Supabase-deployment. Voor de doelruntime na migratiecutover gelden de [Pi runtime execution specification](./migration/runtime-execution-spec.md) en de [target API architecture](./migration/api-architecture.md); Vercel beheert dan geen API, markt-, AI- of paper-tradinguitvoering en er worden geen externe schedulers of `systemd`-timers gebruikt.
 
 ## Current status
 
