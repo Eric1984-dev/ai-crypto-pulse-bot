@@ -10,6 +10,7 @@
     "start": "node --env-file=.env src/index.mjs",
     "validate": "node --env-file=.env src/validate.mjs",
     "ingest:market-data": "node --env-file=.env src/ingest-market-data.mjs",
+    "ai:analyze": "node --env-file=.env src/analyze-ai.mjs",
     "test": "node --test"
   },
   "dependencies": {

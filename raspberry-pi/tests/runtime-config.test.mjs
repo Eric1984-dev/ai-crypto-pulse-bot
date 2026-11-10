@@ -27,8 +27,29 @@ test("runtime config defaults to loopback API and disables live trading", () => 
   });
   assert.equal(config.liveTradingEnabled, false);
   assert.equal(config.ingestion.allowTableOwner, false);
+  assert.deepEqual(config.aiAnalysis, {
+    databaseUser: "",
+    databasePassword: ""
+  });
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
+});
+
+test("runtime config requires AI writer credentials as a pair", () => {
+  const config = readRuntimeConfig(validEnvironment({
+    AI_DATABASE_USER: "ai_writer",
+    AI_DATABASE_PASSWORD: "writer-password"
+  }));
+  assert.deepEqual(config.aiAnalysis, {
+    databaseUser: "ai_writer",
+    databasePassword: "writer-password"
+  });
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    AI_DATABASE_USER: "ai_writer"
+  })), /AI_DATABASE_USER and AI_DATABASE_PASSWORD/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    AI_DATABASE_PASSWORD: "writer-password"
+  })), /AI_DATABASE_USER and AI_DATABASE_PASSWORD/);
 });
 
 test("runtime config requires explicit boolean opt-in for ingestion table ownership", () => {

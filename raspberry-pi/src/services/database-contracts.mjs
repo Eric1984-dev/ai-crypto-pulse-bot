@@ -240,6 +240,38 @@ export function evaluateDatabaseContract(snapshot, expectedDatabaseName) {
   });
 }
 
+export function evaluateAIAnalysisDatabaseContract(snapshot, expectedDatabaseName) {
+  const base = evaluateDatabaseContract(snapshot, expectedDatabaseName);
+  const errors = base.errors.filter((error) =>
+    !error.startsWith("DATABASE_ROLE_CAN_WRITE_TABLE:")
+  );
+  const decisionTable = "AI_Crypto_Bot_AI_Decisions";
+  const decisionPrivileges = snapshot.tablePrivileges.find(({ relation_name }) =>
+    relation_name === decisionTable
+  );
+
+  if (!decisionPrivileges?.can_insert) {
+    errors.push(`MISSING_AI_DECISION_INSERT_PRIVILEGE:${decisionTable}`);
+  }
+  for (const table of snapshot.tablePrivileges) {
+    if (table.is_owner) {
+      errors.push(`AI_DATABASE_ROLE_TABLE_OWNER_NOT_ALLOWED:${table.relation_name}`);
+    }
+    if (table.can_insert && table.relation_name !== decisionTable) {
+      errors.push(`AI_DATABASE_ROLE_UNSAFE_INSERT_PRIVILEGE:${table.relation_name}`);
+    }
+    if (table.can_update || table.can_delete || table.can_truncate) {
+      errors.push(`AI_DATABASE_ROLE_UNSAFE_TABLE_PRIVILEGE:${table.relation_name}`);
+    }
+  }
+
+  return Object.freeze({
+    ...base,
+    valid: errors.length === 0,
+    errors: Object.freeze(errors)
+  });
+}
+
 const INGESTION_WARNING_PATTERNS = Object.freeze([
   /^MISSING_.*_CONSTRAINT:/,
   /^DATABASE_ROLE_CAN_WRITE_(TABLE|SEQUENCE):/,

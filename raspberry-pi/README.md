@@ -21,7 +21,23 @@ The read-only API remains loopback-only and authenticated routes remain denied b
 
 Data routes require an authenticated identity from the Phase 3 middleware. The default provider denies access, so these routes return `401` until a trusted provider is supplied. Provider integration, OIDC, login, registration, password reset, and session creation remain out of scope. The API is loopback-only; CORS is disabled by default.
 
-The API runtime does not import Supabase data, run migrations, alter schema, seed or change markets, start a scheduler, analyze markets, or execute paper/live trades. Only the explicit ingestion CLI writes snapshots, candles, and best-effort scanner failure events. No PostgreSQL runtime function is required or invoked.
+The API runtime does not import Supabase data, run migrations, alter schema, seed or change markets, start a scheduler, or execute paper/live trades. The explicit ingestion CLI writes snapshots, candles, and best-effort scanner failure events. The explicit AI CLI writes AI decisions only. Neither command requires or invokes a PostgreSQL runtime function.
+
+## Phase 6 scope
+
+Run the deterministic V2 analysis once, explicitly, after configuring the separate AI database role:
+
+```sh
+npm run ai:analyze
+```
+
+The command reads enabled markets only from `AI_Crypto_Bot_Watched_Markets`, and reads existing snapshots and up to 150 newest candles per market for each of the six supported intervals. It processes at most four markets in memory at a time, calculates the existing EMA, RSI, MACD, momentum, volume, volatility, V2 score, confidence, freshness, and BUY/SELL/HOLD/WAIT outcome, then persists the complete decision set in one transaction. Duplicate inputs are idempotent; an existing deterministic decision ID with a different payload fails the run. There is no AI API endpoint, scheduler, status mutation, paper trade, or exchange order.
+
+The existing decision table has no interval column. Decisions remain one per market using the existing multi-timeframe V2 strategy; `indicators.interval` records the strategy's daily anchor (`1d`), while `indicators.timeframes` contains the results for each interval. `created_at` is the decision timestamp. No schema change is made.
+
+`AI_DATABASE_USER` and `AI_DATABASE_PASSWORD` are required for this command and must identify a dedicated, non-owner role distinct from both `DATABASE_USER` and `INGESTION_DATABASE_USER`. The AI role needs `CONNECT` to the existing database, `USAGE` on `public`, `SELECT` on the existing watched-markets, market-data, candles, AI-decisions, and status tables, and `INSERT` on `AI_Crypto_Bot_AI_Decisions` only. It must not own tables, have sequence or other write privileges, or have elevated role attributes. The command checks this contract before analysis. Do not reuse the table-owner ingestion login for AI.
+
+The AI command is a manual one-shot operation. It does not backfill or refresh candles, modify status, start a scheduler, alter the schema, or enable live trading. Keep `ENABLE_LIVE_TRADING=false`.
 
 ## Requirements
 
@@ -65,8 +81,8 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 
 - `src/api/` — built-in Node HTTP server, health/data routes, middleware, validation, and error handling.
 - `src/runtime/` — API startup validation and graceful lifecycle only; no scheduler or trading worker.
-- `src/services/` — database-contract, watched-market, readiness, Bitvavo public client, and one-shot ingestion orchestration.
-- `src/repositories/` — parameterized, bounded PostgreSQL access for contracts, watched markets, market reads, ingestion writes, AI decisions, and runtime status.
+- `src/services/` — database-contract, watched-market, readiness, Bitvavo public client, one-shot ingestion, and deterministic AI analysis.
+- `src/repositories/` — parameterized, bounded PostgreSQL access for contracts, watched markets, market reads, ingestion writes, AI analysis/decision persistence, and runtime status.
 - `src/auth/` — provider-neutral authentication, authorization, and in-memory session interfaces; no identity provider.
 - `src/database/` — bounded `pg` pool plus explicit read-only and write transaction helpers.
 - `src/monitoring/` — health responses, bounded operational snapshots, and request counters.
@@ -74,6 +90,6 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 - `tests/` — isolated Node.js tests; no remote database or schema setup.
 - `docs/` — implementation and operational notes for this runtime foundation.
 
-The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in; the [Phase 5.4 report](docs/phase-5.4-ingestion-user-resolution.md) resolves the API/ingestion identity configuration.
+The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in; the [Phase 5.4 report](docs/phase-5.4-ingestion-user-resolution.md) resolves the API/ingestion identity configuration; the [Phase 6 implementation report](docs/phase-6-implementation-report.md) records the AI runtime scope and validation.
 
 For environment variables, PostgreSQL contract checks, and validation commands, see the [deployment and validation guide](docs/phase-2-deployment-validation.md).

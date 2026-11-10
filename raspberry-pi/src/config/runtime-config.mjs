@@ -91,6 +91,11 @@ export function readRuntimeConfig(env = process.env, {
   const databaseName = requiredString(env, "DATABASE_NAME");
   const databaseUser = requiredString(env, "DATABASE_USER");
   const databasePassword = requiredString(env, "DATABASE_PASSWORD");
+  const aiDatabaseUser = env.AI_DATABASE_USER?.trim() || "";
+  const aiDatabasePassword = env.AI_DATABASE_PASSWORD || "";
+  if (Boolean(aiDatabaseUser) !== Boolean(aiDatabasePassword)) {
+    throw new Error("AI_DATABASE_USER and AI_DATABASE_PASSWORD must be set together.");
+  }
   const databaseSslEnabled = readBoolean(env, "DATABASE_SSL", true);
   const databaseSslCaPath = env.DATABASE_SSL_CA_PATH?.trim() || "";
   const databaseSslServername = env.DATABASE_SSL_SERVERNAME?.trim() || "";
@@ -183,6 +188,10 @@ export function readRuntimeConfig(env = process.env, {
     }),
     ingestion: Object.freeze({
       allowTableOwner: readBoolean(env, "INGESTION_ALLOW_TABLE_OWNER", false)
+    }),
+    aiAnalysis: Object.freeze({
+      databaseUser: aiDatabaseUser,
+      databasePassword: aiDatabasePassword
     }),
     liveTradingEnabled
   });

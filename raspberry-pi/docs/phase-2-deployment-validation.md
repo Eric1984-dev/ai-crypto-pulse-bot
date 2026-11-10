@@ -65,8 +65,10 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 | `INGESTION_DATABASE_USER` | empty | Optional separate writer identity used only by the manual Phase 5 ingestion command. |
 | `INGESTION_DATABASE_PASSWORD` | empty | Required together with `INGESTION_DATABASE_USER`; keep it only in the local ignored `.env`. |
 | `INGESTION_ALLOW_TABLE_OWNER` | `false` | Explicit opt-in for the ingestion preflight to accept ownership of known project tables; requires a distinct `INGESTION_DATABASE_USER`; API validation remains strict. Keep `false` unless the Pi's existing owner role is intentionally used for ingestion. |
+| `AI_DATABASE_USER` | empty | Separate, non-owner role used only by the manual Phase 6 AI analysis command. |
+| `AI_DATABASE_PASSWORD` | empty | Required together with `AI_DATABASE_USER`; keep it only in the local ignored `.env`. |
 
-The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. The separate ingestion command uses an explicit `BEGIN READ WRITE` only for writes to the existing market-data, candle, and best-effort scanner-event tables. When the optional ingestion credentials are configured, the API keeps its read-only identity. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
+The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. The separate ingestion command uses an explicit `BEGIN READ WRITE` only for writes to the existing market-data, candle, and best-effort scanner-event tables. The AI analysis command also uses an explicit write transaction, restricted by preflight to `INSERT` on the existing AI-decisions table; it requires `AI_DATABASE_USER`/`AI_DATABASE_PASSWORD` and rejects table ownership or other write privileges. The API keeps its read-only identity. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
 
 ## 3. Install and run the local checks
 
@@ -91,6 +93,8 @@ Expected results:
 The Pi's approximately 102 enabled markets are read from the existing table and are not changed. `enabledMarkets` reports the number actually read; it is not required to equal exactly 102. No runtime database function is required, installed, or invoked by this phase.
 
 The original `npm run validate` remains strict and is intended for the read-only `DATABASE_USER`. To explicitly perform a Phase 5 one-shot ingestion pass with the configured writer identity, select intervals in the command, for example `npm run ingest:market-data -- --intervals=1m`. This writes only to existing snapshot/candle/event tables and is not run by the Phase 2 validation procedure; see the [Phase 5 implementation report](phase-5-implementation-report.md) before invoking it.
+
+The Phase 6 AI command is a separate manual operation: `npm run ai:analyze`. It reads stored snapshots and candles, then inserts one deterministic multi-timeframe decision per enabled market. It does not refresh data, change status, schedule another run, or execute paper/live trading. Configure and validate the dedicated AI database role before running it; see the [Phase 6 implementation report](phase-6-implementation-report.md) for its exact privileges and limits.
 
 If validation fails, the command exits nonzero and prints `runtime_validation_failed` with a safe error code and, for schema-contract failures, a `contractErrors` array. Examples include `RUNTIME_CONTRACT_INVALID`, `WATCHED_MARKETS_INVALID`, `ECONNREFUSED`, or a PostgreSQL authentication code. Do not treat a successful unit-test run as a substitute for this live check.
 

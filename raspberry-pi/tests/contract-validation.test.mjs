@@ -10,6 +10,7 @@ import {
   validateIngestionRuntimeContracts,
   validateRuntimeContracts
 } from "../src/services/contract-validation.mjs";
+import { validateAIAnalysisRuntimeContracts } from "../src/services/ai-analysis-contract-validation.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
 const config = readRuntimeConfig({
@@ -39,11 +40,13 @@ function createContractPool({
   omitTable,
   omitLegacyConstraints = false,
   allowIngestionWrites = false,
+  allowAiAnalysisWrites = false,
   extraWriterRole = false,
   ownerTable,
   unsafeTable,
   extraOwnedTable,
-  canCreatePublic = false
+  canCreatePublic = false,
+  roleName = "runtime_reader"
 } = {}) {
   const queries = [];
   const columns = Object.entries(REQUIRED_COLUMN_CONTRACTS).flatMap(([table_name, values]) =>
@@ -80,7 +83,7 @@ function createContractPool({
         return {
           rows: [{
             database_name: "cryptopulse",
-            role_name: "runtime_reader",
+            role_name: roleName,
             default_transaction_read_only: "on",
             transaction_read_only: "on",
             is_superuser: false,
@@ -103,6 +106,7 @@ function createContractPool({
             can_select: REQUIRED_READ_TABLES.includes(relation_name),
             can_insert: allowIngestionWrites
               && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
+              || allowAiAnalysisWrites && relation_name === "AI_Crypto_Bot_AI_Decisions"
               || extraWriterRole && relation_name === "AI_Crypto_Bot_Trades"
               || isOwner,
             can_update: allowIngestionWrites
@@ -304,5 +308,61 @@ test("ingestion owner opt-in does not relax the API read-only contract", async (
     ),
     (error) => error.code === "RUNTIME_CONTRACT_INVALID"
       && error.errors.includes("DATABASE_ROLE_CAN_WRITE_TABLE:AI_Crypto_Bot_Candles")
+  );
+});
+
+test("AI writer preflight permits only decision inserts and leaves schema reads read-only", async () => {
+  const pool = createContractPool({
+    allowAiAnalysisWrites: true,
+    roleName: "ai_writer"
+  });
+  const aiConfig = {
+    ...config,
+    database: Object.freeze({ ...config.database, user: "ai_writer" })
+  };
+  const result = await validateAIAnalysisRuntimeContracts(pool, aiConfig);
+
+  assert.equal(result.contracts, "valid");
+  assert.equal(result.requiredFunctions, 0);
+  assert.ok(pool.queries.every((query) =>
+    query === "BEGIN READ ONLY" || query === "COMMIT" || /^\s*SELECT\b/i.test(query)));
+});
+
+test("AI writer preflight rejects missing decision inserts, table ownership, and unrelated writes", async () => {
+  const aiConfig = {
+    ...config,
+    database: Object.freeze({ ...config.database, user: "ai_writer" })
+  };
+  await assert.rejects(
+    validateAIAnalysisRuntimeContracts(
+      createContractPool({ roleName: "ai_writer" }),
+      aiConfig
+    ),
+    (error) => error.code === "AI_ANALYSIS_CONTRACT_INVALID"
+      && error.errors.includes("MISSING_AI_DECISION_INSERT_PRIVILEGE:AI_Crypto_Bot_AI_Decisions")
+  );
+  await assert.rejects(
+    validateAIAnalysisRuntimeContracts(
+      createContractPool({
+        allowAiAnalysisWrites: true,
+        ownerTable: "AI_Crypto_Bot_AI_Decisions",
+        roleName: "ai_writer"
+      }),
+      aiConfig
+    ),
+    (error) => error.code === "AI_ANALYSIS_CONTRACT_INVALID"
+      && error.errors.includes("AI_DATABASE_ROLE_TABLE_OWNER_NOT_ALLOWED:AI_Crypto_Bot_AI_Decisions")
+  );
+  await assert.rejects(
+    validateAIAnalysisRuntimeContracts(
+      createContractPool({
+        allowAiAnalysisWrites: true,
+        extraWriterRole: true,
+        roleName: "ai_writer"
+      }),
+      aiConfig
+    ),
+    (error) => error.code === "AI_ANALYSIS_CONTRACT_INVALID"
+      && error.errors.includes("AI_DATABASE_ROLE_UNSAFE_INSERT_PRIVILEGE:AI_Crypto_Bot_Trades")
   );
 });
