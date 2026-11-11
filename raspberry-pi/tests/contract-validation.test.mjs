@@ -12,6 +12,7 @@ import {
   validateRuntimeContracts
 } from "../src/services/contract-validation.mjs";
 import { validateAIAnalysisRuntimeContracts } from "../src/services/ai-analysis-contract-validation.mjs";
+import { inspectDatabaseContract } from "../src/repositories/contract-repository.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
 const config = readRuntimeConfig({
@@ -47,7 +48,8 @@ function createContractPool({
   unsafeTable,
   extraOwnedTable,
   canCreatePublic = false,
-  roleName = "runtime_reader"
+  roleName = "runtime_reader",
+  noSelectTables = []
 } = {}) {
   const queries = [];
   const columns = Object.entries(REQUIRED_COLUMN_CONTRACTS).flatMap(([table_name, values]) =>
@@ -111,7 +113,8 @@ function createContractPool({
           return {
             relation_name,
             is_owner: isOwner,
-            can_select: REQUIRED_READ_TABLES.includes(relation_name),
+            can_select: REQUIRED_READ_TABLES.includes(relation_name)
+              && !noSelectTables.includes(relation_name),
             can_insert: allowIngestionWrites
               && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
               || allowAiAnalysisWrites && relation_name === "AI_Crypto_Bot_AI_Decisions"
@@ -145,7 +148,7 @@ function createContractPool({
       if (sql.includes("oidvectortypes")) {
         return { rows: functions };
       }
-      if (sql.includes("information_schema.columns")) {
+      if (sql.includes("pg_catalog.pg_attribute AS attribute")) {
         return { rows: columns };
       }
       if (sql.includes("relation.relkind IN ('r', 'p')")) {
@@ -167,6 +170,29 @@ function createContractPool({
     async connect() { return client; }
   };
 }
+
+test("contract inspection reads catalog columns without requiring table SELECT", async () => {
+  const pool = createContractPool({
+    noSelectTables: ["AI_Crypto_Bot_Candles"]
+  });
+
+  const snapshot = await inspectDatabaseContract(pool, "paper_writer");
+  const candleColumns = snapshot.columns
+    .filter(({ table_name }) => table_name === "AI_Crypto_Bot_Candles")
+    .map(({ column_name }) => column_name);
+
+  assert.equal(
+    snapshot.tablePrivileges.find(({ relation_name }) =>
+      relation_name === "AI_Crypto_Bot_Candles").can_select,
+    false
+  );
+  assert.deepEqual(candleColumns, Object.keys(REQUIRED_COLUMN_CONTRACTS.AI_Crypto_Bot_Candles));
+  assert.ok(pool.queries.some((query) =>
+    query.includes("pg_catalog.format_type(attribute.atttypid, NULL)")));
+  assert.ok(pool.queries.some((query) =>
+    query.includes("attribute.attname::text AS column_name")));
+  assert.ok(pool.queries.every((query) => !query.includes("information_schema.columns")));
+});
 
 test("runtime preflight validates contracts and uses only read-only SQL", async () => {
   const pool = createContractPool();

@@ -38,11 +38,20 @@ const TABLES_SQL = `
 `;
 
 const COLUMNS_SQL = `
-  SELECT table_name, column_name, data_type
-  FROM information_schema.columns
-  WHERE table_schema = $1
-    AND table_name = ANY($2::text[])
-  ORDER BY table_name, ordinal_position
+  SELECT relation.relname::text AS table_name,
+         attribute.attname::text AS column_name,
+         pg_catalog.format_type(attribute.atttypid, NULL) AS data_type
+  FROM pg_catalog.pg_attribute AS attribute
+  JOIN pg_catalog.pg_class AS relation
+    ON relation.oid = attribute.attrelid
+  JOIN pg_catalog.pg_namespace AS namespace
+    ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname = $1
+    AND relation.relname = ANY($2::text[])
+    AND relation.relkind IN ('r', 'p')
+    AND attribute.attnum > 0
+    AND NOT attribute.attisdropped
+  ORDER BY relation.relname, attribute.attnum
 `;
 
 const CONSTRAINTS_SQL = `
