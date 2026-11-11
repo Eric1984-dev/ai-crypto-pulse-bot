@@ -121,6 +121,21 @@ test("paper trading contract rejects ownership, destructive grants, and unrelate
   ));
 });
 
+test("paper trading contract continues to reject emergency-state UPDATE privilege", () => {
+  const snapshot = createSnapshot();
+  snapshot.tablePrivileges = snapshot.tablePrivileges.map((table) =>
+    table.relation_name === "AI_Crypto_Bot_Emergency_State"
+      ? { ...table, can_update: true }
+      : table);
+
+  const result = evaluatePaperTradingDatabaseContract(snapshot, "ai_crypto_bot_store");
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes(
+    "PAPER_TRADING_DATABASE_ROLE_UNSAFE_UPDATE_PRIVILEGE:AI_Crypto_Bot_Emergency_State"
+  ));
+});
+
 test("paper trading contract preserves the database identity and elevated-role checks", () => {
   const snapshot = createSnapshot({
     connection: {

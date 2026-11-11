@@ -13,8 +13,8 @@ test("paper trading diagnostics include operation, required privilege, and SQLST
     'permission denied for table "AI_Crypto_Bot_Emergency_State"',
     {
       table: "AI_Crypto_Bot_Emergency_State",
-      operation: "SELECT FOR UPDATE",
-      requiredPrivilege: "UPDATE",
+      operation: "SELECT",
+      requiredPrivilege: "SELECT",
       repositoryOperation: "getLatestEmergencyStatus"
     }
   );
@@ -24,10 +24,10 @@ test("paper trading diagnostics include operation, required privilege, and SQLST
     code: "42501",
     component: "paper-trading-service",
     table: "AI_Crypto_Bot_Emergency_State",
-    operation: "SELECT FOR UPDATE",
+    operation: "SELECT",
     repositoryOperation: "getLatestEmergencyStatus",
     sqlState: "42501",
-    requiredPrivilege: "UPDATE",
+    requiredPrivilege: "SELECT",
     failureType: "PRIVILEGE_DENIED"
   });
 });

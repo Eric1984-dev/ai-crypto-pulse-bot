@@ -192,7 +192,6 @@ const LATEST_EMERGENCY_SQL = `
   FROM public."AI_Crypto_Bot_Emergency_State" AS emergency
   ORDER BY emergency.created_at DESC, emergency.id DESC
   LIMIT 1
-  FOR UPDATE
 `;
 
 const INSERT_EMERGENCY_SQL = `
