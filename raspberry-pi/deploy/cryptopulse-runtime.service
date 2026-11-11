@@ -6,10 +6,10 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=cryptopulse
-Group=cryptopulse
-WorkingDirectory=/opt/cryptopulse/raspberry-pi
-EnvironmentFile=/etc/cryptopulse/runtime.env
+User=eric
+Group=eric
+WorkingDirectory=/home/eric/ai-crypto-pulse-bot/raspberry-pi
+EnvironmentFile=/home/eric/ai-crypto-pulse-bot/raspberry-pi/.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node src/index.mjs
 Restart=always
@@ -19,7 +19,7 @@ KillSignal=SIGTERM
 KillMode=mixed
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
+ProtectHome=false
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true

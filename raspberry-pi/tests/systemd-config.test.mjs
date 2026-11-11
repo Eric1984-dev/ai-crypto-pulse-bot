@@ -12,4 +12,9 @@ test("systemd unit starts at boot and continuously restarts the runtime", async 
   assert.match(service, /^StartLimitIntervalSec=0$/m);
   assert.match(service, /^WantedBy=multi-user\.target$/m);
   assert.match(service, /^After=network-online\.target$/m);
+  assert.match(service, /^User=eric$/m);
+  assert.match(service, /^Group=eric$/m);
+  assert.match(service, /^WorkingDirectory=\/home\/eric\/ai-crypto-pulse-bot\/raspberry-pi$/m);
+  assert.match(service, /^EnvironmentFile=\/home\/eric\/ai-crypto-pulse-bot\/raspberry-pi\/\.env$/m);
+  assert.match(service, /^ProtectHome=false$/m);
 });

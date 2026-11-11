@@ -51,6 +51,22 @@ The scheduler is process-local, UTC-aligned, non-overlapping, and guarded by a s
 
 The runtime requires a dedicated, non-owner `PAPER_DATABASE_USER` and `PAPER_DATABASE_PASSWORD`, distinct from the API, ingestion, and AI roles. `npm start` validates all four role contracts at startup. See the [Phase 7 implementation report](docs/phase-7-implementation-report.md) for exact existing-table grants, scheduler assumptions, systemd deployment steps, and validation status. The sample systemd unit is [deploy/cryptopulse-runtime.service](deploy/cryptopulse-runtime.service).
 
+## systemd deployment profile
+
+The checked-in [systemd unit](deploy/cryptopulse-runtime.service) matches the Raspberry Pi deployment reported as passing runtime validation, restart validation, and reboot validation:
+
+```ini
+User=eric
+Group=eric
+WorkingDirectory=/home/eric/ai-crypto-pulse-bot/raspberry-pi
+EnvironmentFile=/home/eric/ai-crypto-pulse-bot/raspberry-pi/.env
+ProtectHome=false
+```
+
+These are validated host-specific settings, not portable defaults. The live service required `ProtectHome=false` because its files are under `/home/eric`.
+
+**Future recommended production deployment (not the validated deployment):** migrate to a dedicated non-root `cryptopulse` account, install the runtime under `/opt/cryptopulse/raspberry-pi`, and keep secrets in a root-owned, service-group-readable `/etc/cryptopulse/runtime.env`. With the runtime outside `/home`, `ProtectHome=true` can be used. This relocation and unit profile have not been implemented or validated; do not substitute them for the currently validated paths without a planned migration and fresh restart/reboot checks. See the [live validation addendum](docs/phase-7.7.2-live-validation-addendum.md).
+
 ## Requirements
 
 - Node.js 20.6 or newer

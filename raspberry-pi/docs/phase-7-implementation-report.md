@@ -105,9 +105,25 @@ The service returns cutoff timestamps only, with `deletionEnabled: false` and `d
 
 ## systemd deployment
 
-The sample unit is `deploy/cryptopulse-runtime.service`. Install it only after an operator provisions the Pi installation path and non-root service account. Store the existing-database connection settings and four role credential pairs in `/etc/cryptopulse/runtime.env`, owned by root and readable only by the service group. Then reload systemd, enable and start the single service, and verify its status and journald output. Do not configure a timer or cron job.
+### Validated Raspberry Pi deployment
 
-The unit uses a fixed 10-second restart delay and limits restart attempts to five within ten minutes. Graceful shutdown waits up to 120 seconds; if an active cycle exceeds that boundary, its lock connection is discarded, preventing downstream stages from starting without ownership. On process restart, PostgreSQL also releases any session lock held by a crashed process. Startup marks a leftover `ANALYZING` status as `ERROR`; it does not clear `STOPPED`. The next normal cycle refreshes current data rather than replaying missed cycles.
+The checked-in `deploy/cryptopulse-runtime.service` now reflects the reported live deployment that passed runtime validation, restart validation, and reboot validation:
+
+```ini
+User=eric
+Group=eric
+WorkingDirectory=/home/eric/ai-crypto-pulse-bot/raspberry-pi
+EnvironmentFile=/home/eric/ai-crypto-pulse-bot/raspberry-pi/.env
+ProtectHome=false
+```
+
+The environment file is local to the validated checkout; protect it from access by other users and never commit it. The paths and account are specific to this Pi. Reload systemd after installing unit changes, then verify the single service's status and journald output. Do not configure a timer or cron job.
+
+### Future recommended production deployment (not validated)
+
+For a future hardening/migration effort, use a dedicated non-root `cryptopulse` account, install the runtime under `/opt/cryptopulse/raspberry-pi`, and store credentials in `/etc/cryptopulse/runtime.env`, owned by root and readable only by the service group. A runtime located outside `/home` may use `ProtectHome=true`. This layout is a recommendation only: it is not the deployment that passed the reported checks, and it has not been installed or validated. Plan the relocation and repeat runtime, restart, and reboot validation before adopting it.
+
+The unit uses a fixed 10-second restart delay with restart-rate limiting disabled. Graceful shutdown waits up to 120 seconds; if an active cycle exceeds that boundary, its lock connection is discarded, preventing downstream stages from starting without ownership. On process restart, PostgreSQL also releases any session lock held by a crashed process. Startup marks a leftover `ANALYZING` status as `ERROR`; it does not clear `STOPPED`. The next normal cycle refreshes current data rather than replaying missed cycles.
 
 ## Validation
 
