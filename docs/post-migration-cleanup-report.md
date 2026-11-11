@@ -65,11 +65,14 @@ Files retained:
 - Syntax validation — passed `node --check` for 146 JavaScript and module files.
 - `git diff --check` — passed with no whitespace errors.
 - Dashboard, authentication, and Pi API regression coverage ran as part of the repository and Pi test suites.
-- Live Raspberry Pi, PostgreSQL, Cloudflare, and Vercel production behavior was not independently queried. No deployment was started from this workspace.
+- Commit `b7d7ccd3b550567ad7e41e7fe4a31260b0ec069e` was pushed to `main`.
+- GitHub reported the Vercel check as `success` with “Deployment has completed” for that commit.
+- Production smoke checks: the dashboard domain served its public sign-in landing page, and `/api/v1/health/live` returned `{"data":{"status":"live"}}`.
+- No manual deployment or Vercel setting changes were made; the GitHub push triggered the configured deployment.
 
 ## Remaining risks and limitations
 
-- The production Pi, Cloudflare tunnel, and PostgreSQL were not directly queried from this workspace; operational status is operator-reported.
+- The production Pi, Cloudflare tunnel configuration, and PostgreSQL internals were not directly inspected. The public API health endpoint and dashboard landing page were reachable.
 - The external Cloudflare/Vercel settings and any manually configured third-party scheduled tasks were not inspected. No Vercel cron is present in the repository; the current scheduler owner is the Pi runtime.
 - The archive CLI still uses a separate, restricted Supabase source reader for its optional manual copy workflow. It was retained because its retirement was not confirmed; it is not part of the Pi trading runtime.
 - Supabase-named migration history is retained for reproducibility and local tests. No remote Supabase database, project, branch, migration, or data was changed.
@@ -77,4 +80,4 @@ Files retained:
 
 ## Readiness assessment
 
-The cleanup leaves the Raspberry Pi runtime as the owner of backend operations while preserving the existing dashboard authentication/proxy contract. Repository, Pi, build, syntax, and whitespace checks passed. GitHub push and production-status verification remain pending; live deployment success is not claimed. No Phase 11 work is included.
+The cleanup leaves the Raspberry Pi runtime as the owner of backend operations while preserving the existing dashboard authentication/proxy contract. Repository, Pi, build, syntax, and whitespace checks passed; the commit was pushed and Vercel reported deployment success, with both production smoke checks responding as expected. Internal PostgreSQL and runtime behavior remain outside the scope of these external checks. No Phase 11 work is included.
