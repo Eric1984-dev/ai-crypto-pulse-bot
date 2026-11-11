@@ -202,7 +202,7 @@ Maximum Position Size:
 10%
 
 Maximum Open Positions:
-5
+9
 
 Minimum Confidence:
 70

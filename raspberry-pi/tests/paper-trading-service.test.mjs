@@ -371,8 +371,11 @@ test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
   }
 });
 
-test("maximum open positions prevents a sixth virtual position", async () => {
-  const symbols = ["AAA-EUR", "BBB-EUR", "CCC-EUR", "DDD-EUR", "EEE-EUR"];
+test("maximum open positions prevents a tenth virtual position", async () => {
+  const symbols = [
+    "AAA-EUR", "BBB-EUR", "CCC-EUR", "DDD-EUR", "EEE-EUR",
+    "FFF-EUR", "GGG-EUR", "HHH-EUR", "III-EUR"
+  ];
   const repository = makeRepository({
     listLatestDecisions: async () => [{
       id: DECISION_ID,

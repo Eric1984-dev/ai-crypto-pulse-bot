@@ -4,7 +4,7 @@ import { createPaperTradingFailureDiagnostic } from "./paper-trading-diagnostics
 
 export const PAPER_TRADING_RULES = Object.freeze({
   maxPositionSizeFraction: 0.10,
-  maxOpenPositions: 5,
+  maxOpenPositions: 9,
   minimumConfidence: 70,
   cooldownMs: 15 * 60 * 1000,
   marketDataFreshnessMs: 15 * 60 * 1000,

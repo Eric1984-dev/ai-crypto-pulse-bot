@@ -386,7 +386,7 @@ Position, trade, portfolio balance/value, and snapshot writes in one transaction
 
 BUY opens long positions only; SELL closes existing positions; HOLD and WAIT do not trade. The executor does not contact Bitvavo or any exchange and cannot place a real order. The service role is used only server-side. The database migration grants the scheduler RPC to `service_role` and revokes execution of its internal helpers from browser roles.
 
-Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than five open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
+Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than nine open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
 
 ## Shadow Exit Scenarios
 

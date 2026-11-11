@@ -2,7 +2,7 @@
 
 ## Phase 08 status
 
-The limits below are enforced by the server-side paper-trading database functions before any simulated entry. Browser clients cannot write trades, positions, balances, or snapshots. The executor uses stored AI decisions and stored market data only.
+The limits below are enforced by the Raspberry Pi paper-trading service before any simulated entry. Browser clients cannot write trades, positions, balances, or snapshots. The executor uses stored AI decisions and stored market data only.
 
 ## Trading Mode
 
@@ -18,7 +18,7 @@ Maximum entry notional: 10% of the current portfolio value. The fee is charged i
 
 Maximum Open Positions:
 
-5
+9
 
 ---
 
@@ -74,7 +74,7 @@ Existing positions remain visible and can still be closed by a fresh, stored SEL
 - Only the newest stored decision for an enabled market is considered.
 - Decisions and market snapshots older than 15 minutes, more than one minute in the future, missing, or invalid are rejected; no position is opened.
 - BUY and SELL execution use the database value from `AI_Crypto_Bot_Market_Data`; the executor never fetches exchange prices itself.
-- A portfolio cannot exceed five open positions or hold multiple open positions for the same market through the executor.
+- A portfolio cannot exceed nine open positions or hold multiple open positions for the same market through the executor.
 - Buys are rejected when any open position lacks a fresh market snapshot, when the available balance cannot cover notional plus fees, or when an emergency/pause is active.
 - Trades are linked to the source AI decision and use a unique deterministic idempotency key. A retried decision cannot create another trade.
 - HOLD and WAIT decisions never create trades. SELL closes existing positions only; it cannot open a short position.
