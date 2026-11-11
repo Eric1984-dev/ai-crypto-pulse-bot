@@ -1,0 +1,20 @@
+Stappen om code naar pi te krijgen
+1) open powershell
+2) ssh eric@raspberrypi.local
+--wachtwoord ingeven
+3)cd ~/ai-crypto-pulse-bot/raspberry-pi
+4) (check current) git log --oneline -5
+5) git pull
+6) (check new) git log --oneline -5 (moet een nieuwe main hebben)
+7) (Restart service) sudo systemctl restart cryptopulse-runtime.service
+8) (check na restart) sudo systemctl status cryptopulse-runtime.service
+Verwacht:
+● cryptopulse-runtime.service - CryptoPulse Raspberry Pi Runtime
+     Loaded: loaded (/etc/systemd/system/cryptopulse-runtime.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-11-11 21:19:38 CET; 24min ago
+ Invocation: ae05eb2d1bc147e4871ae2dfaa9bd8bd
+   Main PID: 8669 (node)
+      Tasks: 11 (limit: 806)
+        CPU: 1min 55.287s
+     CGroup: /system.slice/cryptopulse-runtime.service
+             └─8669 /usr/bin/node src/index.mjs

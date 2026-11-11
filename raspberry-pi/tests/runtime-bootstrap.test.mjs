@@ -171,6 +171,10 @@ test("runtime protects read-only dashboard APIs with the local session when Clou
     const anonymous = await fetch(`${baseUrl}/api/v1/markets`);
     assert.equal(anonymous.status, 401);
 
+    const unauthenticatedSession = await fetch(`${baseUrl}/api/v1/auth/session`);
+    assert.equal(unauthenticatedSession.status, 401);
+    assert.equal((await unauthenticatedSession.json()).error.code, "UNAUTHENTICATED");
+
     const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: "POST",
       headers: {
