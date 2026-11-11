@@ -46,7 +46,10 @@ const TRADE_HISTORY_QUERY_SCHEMA = Object.freeze({
   page: Object.freeze({
     validate: (value) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 1000000,
     parse: Number }),
-  side: Object.freeze({ validate: (value) => ["all", "BUY", "SELL"].includes(value) }),
+  side: Object.freeze({
+    validate: (value) => ["all", "buy", "sell"].includes(value.toLowerCase()),
+    parse: (value) => value.toLowerCase() === "all" ? "all" : value.toUpperCase()
+  }),
   period: Object.freeze({ validate: (value) => ["all", "24h", "7d", "30d"].includes(value) }),
   search: Object.freeze({ validate: (value) => value.length <= 80 }),
   sort: Object.freeze({
@@ -237,7 +240,7 @@ export function registerDataRoutes(router, repositories, {
           period: query.period || "all",
           search: query.search || "",
           sort: query.sort || "newest",
-          now: readClock(now)
+          now: new Date(readClock(now))
         }),
         "TRADE_HISTORY_UNAVAILABLE",
         "Trade history is temporarily unavailable."

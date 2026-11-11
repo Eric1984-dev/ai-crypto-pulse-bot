@@ -4,6 +4,8 @@
 
 This report records operator-provided results from validation on the real Raspberry Pi. No deployment, database connection, API request, Cloudflare configuration change or dashboard browser session was performed from this worktree. The reported endpoint responses and production fixes are not independently verified here.
 
+Phase 8.7 supersedes the temporary API-origin setup with Vercel build-time configuration and a named-tunnel hostname procedure. The Phase 8.4 Quick Tunnel use remains historical validation evidence only; no permanent hostname or Cloudflare route is claimed as independently verified.
+
 The work is documentation-only. It does not change runtime code, dashboard code, PostgreSQL schema, deployment settings or trading behavior. Phase 9 is not started.
 
 ## Deployment architecture

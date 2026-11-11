@@ -182,6 +182,7 @@ function createAiPerformance(decisions, trades) {
   const buckets = BUCKETS.map(({ label }) => createDecisionGroup(label));
   const actions = Object.fromEntries(ACTIONS.map((action) => [action, createDecisionGroup(action)]));
   const strategies = new Map();
+  const symbols = new Map();
   const decisionById = new Map();
   let below70Count = 0;
   let unmatchedDecisionTrades = 0;
@@ -196,6 +197,7 @@ function createAiPerformance(decisions, trades) {
     };
     decisionById.set(String(decision.id), normalized);
     actions[decision.decision].decisionCount += 1;
+    getGroup(symbols, normalized.symbol).decisionCount += 1;
     const bucketIndex = BUCKETS.findIndex((bucket) =>
       normalized.confidence >= bucket.min && normalized.confidence < bucket.max
     );
@@ -228,6 +230,7 @@ function createAiPerformance(decisions, trades) {
     if (decision.strategy) {
       addOutcome(getGroup(strategies, decision.strategy), trade.realized_pnl);
     }
+    addOutcome(getGroup(symbols, decision.symbol), trade.realized_pnl);
   }
 
   const finalizedBuckets = buckets.map(finalizeDecisionGroup);
@@ -249,6 +252,8 @@ function createAiPerformance(decisions, trades) {
       finalizeDecisionGroup(actions[action])
     ])),
     strategies: [...strategies.values()].map(finalizeDecisionGroup)
+      .sort((left, right) => right.netPnl - left.netPnl || right.decisionCount - left.decisionCount),
+    bySymbol: [...symbols.values()].map(finalizeDecisionGroup)
       .sort((left, right) => right.netPnl - left.netPnl || right.decisionCount - left.decisionCount)
   };
 }

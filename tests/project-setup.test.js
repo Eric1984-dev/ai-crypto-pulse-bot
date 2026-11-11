@@ -16,6 +16,12 @@ test("project structure and local references are valid", () => {
   assert.deepEqual(validateProject(), []);
 });
 
+test("Vercel runs the build step that injects the runtime API configuration", () => {
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDirectory, "vercel.json"), "utf8"));
+  assert.equal(vercelConfig.buildCommand, "npm run build");
+  assert.deepEqual(validateProject(), []);
+});
+
 test("all required project directories exist", () => {
   for (const directory of requiredDirectories) {
     assert.equal(fs.statSync(path.join(rootDirectory, directory)).isDirectory(), true);

@@ -4,7 +4,7 @@
   "private": true,
   "description": "CryptoPulse AI Agent static dashboard using the Raspberry Pi read-only runtime API",
   "scripts": {
-    "build": "node scripts/validate-project.js && node scripts/validate-database.js",
+    "build": "node scripts/build-runtime-api-config.mjs && node scripts/validate-project.js && node scripts/validate-database.js",
     "test": "node --test"
   },
   "devDependencies": {

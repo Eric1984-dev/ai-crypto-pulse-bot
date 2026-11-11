@@ -81,6 +81,9 @@ function validateProject() {
     if (vercelConfig.outputDirectory !== ".") {
       errors.push("Vercel outputDirectory must target the project root.");
     }
+    if (vercelConfig.buildCommand !== "npm run build") {
+      errors.push("Vercel buildCommand must run npm run build to configure the runtime API origin.");
+    }
   }
 
   const envExamplePath = path.join(rootDirectory, ".env.example");

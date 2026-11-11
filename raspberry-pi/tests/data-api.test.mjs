@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createApiServer } from "../src/api/server.mjs";
+import { buildDashboardAnalytics } from "../src/services/dashboard-analytics.mjs";
 import { AiDecisionsRepository } from "../src/repositories/ai-decisions-repository.mjs";
 import { MarketDataRepository } from "../src/repositories/market-data-repository.mjs";
 import { RuntimeStatusRepository } from "../src/repositories/runtime-status-repository.mjs";
@@ -494,6 +495,133 @@ test("market summary and dashboard expose bounded stored data without synthesizi
     assert.equal(body.data.openPositions.count, 0);
     assert.equal(body.data.recentTrades.count, 0);
     assert.equal(body.data.emergencyState.status, "NORMAL");
+  });
+});
+
+test("analytics endpoint returns the page's chart and metric contract", async () => {
+  const now = new Date("2026-11-10T19:00:00.000Z");
+  const analytics = buildDashboardAnalytics({
+    period: "30d",
+    now,
+    portfolio: { starting_balance: 10000, portfolio_value: 10100 },
+    positions: [{ symbol: "BTC-EUR", status: "OPEN", unrealized_pnl: 10 }],
+    trades: [{
+      id: "trade-1",
+      ai_decision_id: "decision-1",
+      symbol: "BTC-EUR",
+      side: "SELL",
+      price: 51000,
+      quantity: 0.01,
+      fees: 0.25,
+      realized_pnl: 5,
+      created_at: "2026-11-10T18:30:00.000Z"
+    }],
+    decisions: [{
+      id: "decision-1",
+      symbol: "BTC-EUR",
+      decision: "BUY",
+      confidence: 82,
+      strategy_name: null,
+      strategy_version: null,
+      created_at: "2026-11-10T18:00:00.000Z"
+    }],
+    snapshots: [{
+      id: "snapshot-1",
+      portfolio_id: "portfolio-1",
+      portfolio_value: 10100,
+      available_balance: 8000,
+      open_positions: 1,
+      captured_at: "2026-11-10T18:00:00.000Z"
+    }]
+  });
+  let requestedPeriod;
+  const repositories = createRepositories(createPool(), undefined, {
+    async getAnalytics(options) {
+      requestedPeriod = options.period;
+      return analytics;
+    }
+  });
+
+  await withServer({ dataRepositories: repositories }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analytics&period=30d`
+    );
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(requestedPeriod, "30d");
+    assert.equal(body.data.period, "30d");
+    assert.ok(body.data.tradePerformance);
+    assert.ok(body.data.aiPerformance);
+    assert.ok(Array.isArray(body.data.aiPerformance.confidenceBuckets));
+    assert.ok(body.data.aiPerformance.actions.BUY);
+    assert.equal(body.data.aiPerformance.bySymbol[0].label, "BTC-EUR");
+    assert.equal(body.data.aiPerformance.bySymbol[0].netPnl, 5);
+    assert.ok(Array.isArray(body.data.portfolio.equityCurve));
+    assert.ok(Array.isArray(body.data.portfolio.drawdownHistory));
+    assert.ok(Array.isArray(body.data.portfolio.dailyPerformance));
+    assert.ok(body.data.exportCounts);
+  });
+});
+
+test("trade history endpoint normalizes browser side filters and returns pagination data", async () => {
+  let requested;
+  const history = {
+    page: 2,
+    pageSize: 25,
+    totalCount: 26,
+    totalPages: 2,
+    items: [{
+      id: "trade-1",
+      symbol: "BTC-EUR",
+      side: "SELL",
+      price: 51000,
+      quantity: 0.01,
+      fees: 0.25,
+      realized_pnl: 9,
+      created_at: "2026-11-10T18:00:00.000Z"
+    }],
+    stats: {
+      closedTrades: 1,
+      winningTrades: 1,
+      losingTrades: 0,
+      averageProfit: 9,
+      averageLoss: null,
+      bestTrade: 9,
+      worstTrade: 9
+    }
+  };
+  const repositories = createRepositories(createPool(), undefined, {
+    async getTradeHistory(options) {
+      requested = options;
+      return history;
+    }
+  });
+
+  await withServer({ dataRepositories: repositories }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=trade-history&page=2&side=sell&period=7d&search=BTC&sort=pnl-low`
+    );
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual({
+      page: body.data.page,
+      pageSize: body.data.pageSize,
+      totalCount: body.data.totalCount,
+      totalPages: body.data.totalPages,
+      itemCount: body.data.items.length
+    }, {
+      page: 2,
+      pageSize: 25,
+      totalCount: 26,
+      totalPages: 2,
+      itemCount: 1
+    });
+    assert.equal(requested.page, 2);
+    assert.equal(requested.side, "SELL");
+    assert.equal(requested.period, "7d");
+    assert.equal(requested.search, "BTC");
+    assert.equal(requested.sort, "pnl-low");
+    assert.ok(requested.now instanceof Date);
   });
 });
 

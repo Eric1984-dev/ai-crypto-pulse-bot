@@ -22,7 +22,7 @@ Configure these values in the Raspberry Pi's local `raspberry-pi/.env`; never co
 | `API_HOST` | Keep `127.0.0.1`; the Node listener must not be exposed directly. |
 | `API_PORT` | The configured local API port (default `3002`), matching the tunnel service target. |
 
-Set the dashboard's `apiOrigin` for its deployment. In the operator-reported live setup, the API origin is configured to the validated Raspberry Pi API and `API_CORS_ORIGINS` is `https://ai-crypto-pulse-bot.vercel.app`. For Access deployments, also set `accessEnabled: true` and `accessAudience` in `js/runtime-api-config.js`; for private/local deployments, leave `accessEnabled: false`. Those are public routing values, not credentials. The frontend must never contain a database password, signing key, or service credential.
+Set the dashboard's API origin with the Vercel build-time variable `CRYPTOPULSE_RUNTIME_API_ORIGIN`; do not commit a deployment hostname in frontend source. The Vercel build generates the static `js/runtime-api-config.js`. In the operator-reported live setup, `API_CORS_ORIGINS` was `https://ai-crypto-pulse-bot.vercel.app`; the new permanent hostname must be set as the API origin and independently validated before production use. For Access deployments, set `CRYPTOPULSE_ACCESS_ENABLED=true` and `CRYPTOPULSE_ACCESS_AUDIENCE` in the same Vercel environment, and configure the corresponding issuer, audience and operator allowlist in the Pi `.env`. For private/local deployments, leave `CRYPTOPULSE_ACCESS_ENABLED=false`. These frontend values are public routing/configuration values, not credentials. The frontend must never contain a database password, signing key, or service credential. See the [Phase 8.7 permanent connectivity procedure](phase-8.7-permanent-connectivity.md).
 
 ## Cloudflare Access setup
 
@@ -30,7 +30,7 @@ Set the dashboard's `apiOrigin` for its deployment. In the operator-reported liv
 2. Record the app's audience tag and the exact team issuer. Use these same values for `CLOUDFLARE_ACCESS_AUDIENCE` and `CLOUDFLARE_ACCESS_ISSUER` on the Pi.
 3. Configure the Cloudflare Tunnel hostname to forward to `http://127.0.0.1:3002`. Keep the Node API and PostgreSQL listeners private; do not create a public port-forward to the Pi.
 4. Configure the Pi `.env` values above and set `CLOUDFLARE_ACCESS_ENABLED=true`. The runtime configuration validates the issuer format, audience and unique email allowlist.
-5. Configure the dashboard's public `apiOrigin` to the HTTPS API hostname, `accessEnabled: true`, and `accessAudience` to the Access application audience. Keep this configuration separate from Pi-only settings.
+5. In Vercel, set `CRYPTOPULSE_RUNTIME_API_ORIGIN` to the HTTPS API hostname, `CRYPTOPULSE_ACCESS_ENABLED=true`, and `CRYPTOPULSE_ACCESS_AUDIENCE` to the Access application audience. Keep the Pi-only issuer, audience and email allowlist in the Pi `.env`.
 6. Restart the runtime only after all values are correct. If Access is disabled, runtime startup and validation are still supported; the read-only dashboard data routes then permit anonymous access.
 
 Do not use example placeholders as production values. The operator email list is an operator-owned configuration value and is intentionally not recorded in this report. If Access is disabled, use only a private/trusted route: CORS does not protect the data from other clients that can reach the API.

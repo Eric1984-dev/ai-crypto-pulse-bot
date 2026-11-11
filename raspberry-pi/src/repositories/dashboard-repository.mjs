@@ -294,6 +294,12 @@ export class DashboardRepository {
         count: positions.length,
         items: positions.map((position) => ({
           symbol: position.symbol,
+          amount: position.amount,
+          entry_price: position.entry_price,
+          current_price: position.current_price,
+          unrealized_pnl: position.unrealized_pnl,
+          current_market_price: position.current_market_price,
+          current_market_captured_at: position.current_market_captured_at ?? null,
           latestAiDecision: position.latest_ai_decision
             ? {
               decision: position.latest_ai_decision,
@@ -385,8 +391,8 @@ export class DashboardRepository {
                 MAX(realized_pnl) FILTER (WHERE side = 'SELL') AS best_trade,
                 MIN(realized_pnl) FILTER (WHERE side = 'SELL') AS worst_trade
          FROM public."AI_Crypto_Bot_Trades"
-         WHERE ${where}`,
-        filters,
+         WHERE portfolio_id = $1::uuid`,
+        [portfolioId],
         { logger: this.logger }
       )
     ]);
@@ -724,7 +730,8 @@ function normalizeTrade(row) {
 
 function normalizeAnalyticsDecision(row) {
   const confidence = readFiniteNumber(row.confidence, "decision confidence");
-  if (!["BUY", "SELL", "HOLD", "WAIT"].includes(row.decision)
+  if (typeof row.symbol !== "string" || !row.symbol
+    || !["BUY", "SELL", "HOLD", "WAIT"].includes(row.decision)
     || confidence < 0 || confidence > 100
     || ((row.strategy_name === null) !== (row.strategy_version === null))) {
     throw new RepositoryDataError("invalid analytics decision");

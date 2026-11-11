@@ -141,6 +141,11 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(result.portfolio.unrealizedPnl, 10);
     assert.equal(result.portfolio.winRate, 100);
     assert.equal(result.openPositions.items[0].current_market_price, 50600);
+    assert.equal(result.openPositionAiStatus.items[0].amount, 0.02);
+    assert.equal(result.openPositionAiStatus.items[0].entry_price, 50000);
+    assert.equal(result.openPositionAiStatus.items[0].current_market_price, 50600);
+    assert.equal(result.openPositionAiStatus.items[0].unrealized_pnl, 10);
+    assert.ok(result.openPositionAiStatus.items[0].current_market_captured_at);
     assert.equal(result.openPositionAiStatus.items[0].latestAiDecision.decision, "HOLD");
     assert.equal(result.recentTrades.items[0].side, "SELL");
     assert.equal(result.portfolioSnapshots.length, 1);
@@ -149,10 +154,75 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(history.stats.winningTrades, 1);
     assert.equal(history.items[0].symbol, "BTC-EUR");
     assert.equal(analytics.tradePerformance.closedTrades, 1);
+    assert.ok(Array.isArray(analytics.tradePerformance.bestSymbols));
     assert.equal(analytics.aiPerformance.decisionCount, 1);
+    assert.ok(["BUY", "SELL", "HOLD", "WAIT"].every((action) =>
+      analytics.aiPerformance.actions[action]));
     assert.equal(analytics.portfolio.equityCurve.length, 1);
+    assert.ok(Array.isArray(analytics.portfolio.drawdownHistory));
     assert.equal(exportCount, 1);
     assert.equal(exportRows[0].symbol, "BTC-EUR");
+  } finally {
+    await database.close();
+  }
+});
+
+test("trade history filtering and pagination preserve all-time sell statistics", async () => {
+  const database = await createDatabase();
+  try {
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, portfolio_id, symbol, side, price, quantity, fees, realized_pnl, created_at)
+      VALUES
+        ('00000000-0000-4000-8000-000000000401',
+         '00000000-0000-4000-8000-000000000200', 'ETH-EUR', 'BUY', 200, 1, 0.5, 0,
+         '2026-03-20T10:00:00.000Z'),
+        ('00000000-0000-4000-8000-000000000402',
+         '00000000-0000-4000-8000-000000000200', 'SOL-EUR', 'BUY', 300, 1, 0.5, 0,
+         '2026-03-20T11:00:00.000Z')
+    `);
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+    const firstPage = await repository.getTradeHistory({
+      page: 1,
+      pageSize: 1,
+      side: "BUY",
+      sort: "price-high",
+      now: new Date("2026-03-21T00:00:00.000Z")
+    });
+    const secondPage = await repository.getTradeHistory({
+      page: 2,
+      pageSize: 1,
+      side: "BUY",
+      sort: "price-high",
+      now: new Date("2026-03-21T00:00:00.000Z")
+    });
+    const searched = await repository.getTradeHistory({
+      page: 1,
+      side: "BUY",
+      search: "ETH",
+      sort: "oldest",
+      now: new Date("2026-03-21T00:00:00.000Z")
+    });
+
+    assert.equal(firstPage.totalCount, 2);
+    assert.equal(firstPage.totalPages, 2);
+    assert.equal(firstPage.items[0].symbol, "SOL-EUR");
+    assert.equal(secondPage.items[0].symbol, "ETH-EUR");
+    assert.equal(searched.totalCount, 1);
+    assert.equal(searched.items[0].symbol, "ETH-EUR");
+    for (const result of [firstPage, secondPage, searched]) {
+      assert.equal(result.stats.closedTrades, 1);
+      assert.equal(result.stats.winningTrades, 1);
+      assert.equal(result.stats.averageProfit, 9);
+    }
   } finally {
     await database.close();
   }
