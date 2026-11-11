@@ -117,6 +117,12 @@ All JSON responses use a `{ "data": ... }` envelope; errors use `{ "error": { "c
 
 The existing Vercel dashboard now reads its runtime data from these Pi APIs and uses aligned polling instead of Supabase Realtime. See the [Phase 8 dashboard cutover report](docs/phase-8-dashboard-cutover.md) for the dependency mapping, full route contracts, security assumptions, limitations and validation results.
 
+## Raspberry Pi migration roadmap status
+
+The operator reports the Phase 8 read-only dashboard cutover is operational on the live Pi. PostgreSQL, the runtime, scheduler, AI, paper trading, Cloudflare Tunnel and Quick Tunnel were reported operational; `/api/v1/health/live`, `/api/v1/markets` and `/api/v1/dashboard-data` returned `200`. The runtime reader's six dashboard `SELECT` grants were reported missing and then resolved using the [Phase 8.3 migration](migrations/phase-8.3-dashboard-permissions.sql). See the [Phase 8.4 live validation report](docs/phase-8.4-live-validation-report.md).
+
+The reported deployment uses `CLOUDFLARE_ACCESS_ENABLED=false`. The API origin and exact Vercel CORS origin were configured; these settings do not authenticate clients. Cloudflare Access JWT validation was not live-tested, and the Quick Tunnel is not established as a durable production hostname. Keep the route private/trusted until Access or another network access control is enabled. Phase 9 has not started.
+
 ## Layout
 
 - `src/api/` — built-in Node HTTP server, health/data routes, middleware, validation, and error handling.

@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-The existing Vercel dashboard has been wired to read the shared system portfolio from the Raspberry Pi runtime API. Existing page layouts and charts remain; this phase does not create a replacement UI, add dashboard write actions, alter the PostgreSQL schema, deploy Cloudflare, or enable live trading. The API binds to loopback and exposes GET-only dashboard data routes.
+The existing Vercel dashboard reads the shared system portfolio from the Raspberry Pi runtime API. The operator reports that the live Pi runtime, PostgreSQL, scheduler, AI, paper trading, Cloudflare Tunnel and Quick Tunnel are operational, the dashboard migration is active, and all three required API endpoints return `200`. The API remains loopback-bound and exposes GET-only dashboard data routes.
 
-The dashboard deployment values and the Cloudflare/Vercel/Pi production connection have not been independently configured or verified in this worktree. The API and frontend changes are validated locally; this report distinguishes those automated results from deployment checks that still require the operator.
+The live results in this report are operator-provided evidence, not checks run from this worktree. Existing layouts and charts are preserved; this phase does not add dashboard write actions, alter the PostgreSQL schema, or enable live trading. See the [Phase 8.4 live validation report](phase-8.4-live-validation-report.md) for the deployment findings and limitations.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Browser
 
 The browser has no database connection or credential. Cloudflare Access is optional. When enabled, it injects `Cf-Access-Jwt-Assertion`; the Pi verifies the RS256 signature against Cloudflare's JWKS and validates issuer, audience, expiry and the configured operator email allowlist. When disabled, the Pi serves anonymous access to the GET-only dashboard data routes; the operational health route remains admin-only. The dashboard shares the standalone system portfolio; it does not map users to Supabase profiles or depend on `auth.users`.
 
-The frontend's `js/runtime-api-config.js` has no deployment-specific origin or audience. Configure `apiOrigin` for the chosen deployment. For Access, set `accessEnabled: true` and `accessAudience` to the Access application's audience; leave Access disabled for trusted local/private deployments. On the Pi, set `CLOUDFLARE_ACCESS_ENABLED=true` and provide issuer, audience and operator allowlist only when using Access. The API remains loopback-only; connect it through a same-host reverse proxy or tunnel. Do not expose PostgreSQL or the unauthenticated API to an untrusted network. See the [Phase 8.1/8.2 authentication configuration](phase-8.1-authentication-activation.md).
+The operator reports configuring `apiOrigin` in `js/runtime-api-config.js` to the validated Raspberry Pi API origin and setting `API_CORS_ORIGINS=https://ai-crypto-pulse-bot.vercel.app`. The live deployment used `CLOUDFLARE_ACCESS_ENABLED=false`; the API therefore allowed anonymous access to its read-only dashboard routes. Cloudflare Access remains optional. To enable it, set `accessEnabled: true` and `accessAudience` in the dashboard and configure the Pi issuer, audience and operator allowlist. The API remains loopback-only behind the tunnel. Do not expose PostgreSQL or an unauthenticated API to an untrusted network. See the [Phase 8.1/8.2 authentication configuration](phase-8.1-authentication-activation.md).
 
 ## Dashboard dependency audit and migration mapping
 
@@ -87,9 +87,10 @@ Monitoring includes the runtime's current scheduler state and last-cycle ingesti
 
 ## Limitations and risks
 
-- Vercel, Cloudflare Access, Cloudflare Tunnel, the Pi host and the production API hostname were not deployed or validated in this phase. The checked-in frontend origin and Access audience remain blank.
-- No live browser-to-Pi end-to-end session was exercised. A production rollout still needs an operator-controlled configuration, smoke test and confirmation that Access forwards the expected JWT header.
-- Disabling Access is suitable only when the API route is private/trusted. Publishing an unauthenticated API route exposes read-only portfolio and trading data even though writes and trading actions remain unavailable.
+- Live Pi, Cloudflare Tunnel/Quick Tunnel, endpoint and dashboard results are operator-reported; they were not independently queried from this worktree. The deployment-specific API origin is intentionally not copied into this repository.
+- Cloudflare Access was disabled during the reported live validation. The Access JWT path and protected production requests were not validated on the deployed Pi.
+- With Access disabled, any client able to reach the tunnel can read the dashboard data. CORS restricts cooperating browsers but is not an authentication or network access control.
+- Quick Tunnel availability and hostname stability are not established as production guarantees; validate a named tunnel and stable hostname before relying on long-term unattended access.
 - Shared system-portfolio access is intentionally not per-user isolated. Every operator allowlisted in the API environment sees the same read-only portfolio.
 - Dashboard reads depend on the Pi, its PostgreSQL connection and Cloudflare Tunnel availability. There is no Supabase fallback, offline cache or frontend same-origin fallback.
 - PostgreSQL table counts are estimates, CPU is sampled, and temperature support is host-dependent.
@@ -99,7 +100,17 @@ Monitoring includes the runtime's current scheduler state and last-cycle ingesti
 
 ## Validation results
 
-These are local automated results. No production deployment, database migration, Cloudflare configuration, Vercel deployment or live Pi test was performed.
+### Operator-reported live Raspberry Pi validation
+
+- Runtime, PostgreSQL, scheduler, AI, paper trading, Cloudflare Tunnel and Quick Tunnel: operational.
+- Dashboard migration: operational.
+- `GET /api/v1/health/live`: `200`.
+- `GET /api/v1/markets`: `200`.
+- `GET /api/v1/dashboard-data`: `200`.
+- Dashboard API CORS origin and frontend API origin were configured as described in the [Phase 8.4 report](phase-8.4-live-validation-report.md).
+- Access mode: `CLOUDFLARE_ACCESS_ENABLED=false`; live JWT authentication was not exercised.
+
+The results above were supplied by the operator. They are distinct from the original local automated results below; no deployment or live request was executed from this worktree. The following counts are historical results from the initial Phase 8 implementation, not test runs for this documentation-only Phase 8.4 update.
 
 - Raspberry Pi package tests: `npm.cmd test` passed, 161 tests.
 - Runtime API tests: included in the Pi package suite; export, monitoring, pagination, authentication, validation and read-only route tests passed.
@@ -111,4 +122,4 @@ These are local automated results. No production deployment, database migration,
 
 ## Phase 8 assessment
 
-The API and dashboard code path supports both anonymous read-only operation and optional Cloudflare Access enforcement. Production cutover remains unverified: configure a private route and exact dashboard origin, and if using Access configure its issuer, audience, allowlist and frontend login settings. Verify the selected authorization mode against the live Pi before calling Phase 8 operationally complete. Do not proceed to Phase 9 as part of this work.
+The operator reports that the dashboard-to-Pi read-only cutover and required endpoints are operational on the live Raspberry Pi. This validates the current anonymous read-only mode, not the optional Cloudflare Access JWT flow. Keep the route private/trusted while Access is disabled; use a stable named tunnel and validate Access separately before shared or public exposure. Phase 9 is not part of this work and has not been started.

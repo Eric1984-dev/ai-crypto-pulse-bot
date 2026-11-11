@@ -2,15 +2,17 @@
 
 ## Status and scope
 
-The supplied live evidence reports:
+The initial live evidence reported a permission failure. The later Phase 8.4 live validation reports that the missing privileges were identified, the migration was applied on the Pi, and the dashboard endpoint now succeeds:
 
 | Request | Result |
 |---|---|
 | `GET /api/v1/health/live` | `200 OK` |
 | `GET /api/v1/markets` | `200 OK` |
-| `GET /api/v1/dashboard-data` | `503 DASHBOARD_DATA_UNAVAILABLE`, with `POSTGRES_PERMISSION_DENIED` / SQLSTATE `42501` in the Pi logs |
+| `GET /api/v1/dashboard-data` | `200 OK` |
 
-This report traces the default dashboard request and defines the minimum additional read grants. The SQL migration is prepared but was not applied to the live Pi database in this worktree. The reported endpoint results are user-provided; there was no live Pi connection available here to verify the post-grant `200`.
+The operator reports that `ai_crypto_bot_runtime_reader` lacked `SELECT` on all six dashboard-specific tables listed below and that applying [phase-8.3-dashboard-permissions.sql](../migrations/phase-8.3-dashboard-permissions.sql) resolved the issue. This report documents that live result but does not independently connect to the Pi or database.
+
+See the [Phase 8.4 live validation report](phase-8.4-live-validation-report.md) for the broader live deployment findings.
 
 ## Execution path
 
@@ -41,7 +43,7 @@ ORDER BY portfolio.created_at ASC, portfolio.id ASC
 LIMIT 2
 ```
 
-The documented `ai_crypto_bot_runtime_reader` grant template in the Phase 5.4 report covers the core watched-market, market-data, candle, AI-decision and status tables; it does not grant dashboard account-table reads. Therefore the profile/portfolio query is the first dashboard-specific privilege gap indicated by the checked-in role contract. Either `AI_Crypto_Bot_Profiles` or `AI_Crypto_Bot_Portfolios` (or both) can raise `42501` if the corresponding live `SELECT` grant is absent.
+The documented `ai_crypto_bot_runtime_reader` grant template in the Phase 5.4 report covers the core watched-market, market-data, candle, AI-decision and status tables; it does not grant dashboard-specific reads. The operator's subsequent live validation identified missing `SELECT` on all six dashboard-specific tables: `AI_Crypto_Bot_Profiles`, `AI_Crypto_Bot_Portfolios`, `AI_Crypto_Bot_Positions`, `AI_Crypto_Bot_Trades`, `AI_Crypto_Bot_Portfolio_Snapshots`, and `AI_Crypto_Bot_Emergency_State`. The initial sanitized `42501` log alone could not distinguish the denied relation; the later live permission inspection established the full set.
 
 The rest of the default dashboard response also requires direct `SELECT` on:
 
@@ -52,7 +54,7 @@ The rest of the default dashboard response also requires direct `SELECT` on:
 
 The complete dashboard read set is also used by the paper-trading reader contract. The endpoint queries ordinary tables directly; it does not depend on a view, materialized view, application-defined function, or sequence. `/api/v1/markets` succeeding confirms the API can connect, resolve the `public` schema and read the watched-markets table, but does not prove access to the portfolio tables.
 
-The precise single relation rejected by the supplied live request cannot be determined from the sanitized log. Run the catalog query below against the Pi database before or after applying the migration to see each effective permission explicitly.
+The sanitized log still does not identify which relation was the first one rejected by PostgreSQL. The operator-reported live validation identifies all six missing grants. The catalog query below can independently confirm effective permissions on the Pi.
 
 ## Minimum fix
 
@@ -118,8 +120,8 @@ Do not use the paper-trading database login or a table owner for the API. No pro
 - Syntax validation: `node --check` succeeded for **85** Raspberry Pi source and test `.mjs`/`.js` files.
 - `git diff --check` — passed.
 - Contract validation tests confirm the runtime rejects a missing dashboard `SELECT` privilege and preserves the separate ingestion/AI role contracts.
-- Live PostgreSQL catalog verification and the post-grant dashboard `200` remain pending operator execution because the local Pi `.env` and live database connection are unavailable here.
+- The operator reports applying the migration and receiving `200` from all three required endpoints. Live catalog verification and HTTP requests were not independently executed from this worktree because the local Pi `.env` and database connection are unavailable.
 
 ## Remaining limitation
 
-The current Pi diagnostic records SQLSTATE and a safe category, not the PostgreSQL relation name. The checked-in grant template establishes the missing dashboard table access as the root cause class, while the provided runtime log cannot distinguish which individual missing relation first failed. The catalog query above supplies that exact distinction without granting additional privileges.
+The Pi diagnostic records SQLSTATE and a safe category, not the PostgreSQL relation name. The initial log therefore did not expose the failing relation; the subsequent operator validation identified all six missing dashboard grants and reports that the migration resolved them. Use the catalog query above for an independent privilege check.
