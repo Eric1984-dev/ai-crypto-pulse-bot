@@ -143,6 +143,18 @@ test("Cloudflare Access requires a valid issuer, audience, and operator allowlis
     allowedOperatorEmails: ["ops@example.com", "viewer@example.com"]
   });
 
+  test("Cloudflare Access can remain disabled without issuer, audience, or operator allowlist", () => {
+    const config = readRuntimeConfig(validEnvironment({
+      CLOUDFLARE_ACCESS_ENABLED: "false"
+    }));
+    assert.deepEqual(config.api.cloudflareAccess, {
+      enabled: false,
+      issuer: "",
+      audience: "",
+      allowedOperatorEmails: []
+    });
+  });
+
   for (const overrides of [
     { CLOUDFLARE_ACCESS_ISSUER: "" },
     { CLOUDFLARE_ACCESS_AUDIENCE: "" },

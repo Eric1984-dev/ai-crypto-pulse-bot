@@ -66,12 +66,24 @@ test("health endpoints have bounded payloads and security headers", async () => 
   });
 });
 
-test("API server refuses to start without an authentication provider", () => {
+test("API server starts without Cloudflare Access while operational health stays protected", async () => {
+  await withServer({
+    authenticationProvider: undefined
+  }, async (baseUrl) => {
+    const live = await fetch(`${baseUrl}/api/v1/health/live`);
+    assert.equal(live.status, 200);
+    const operational = await fetch(`${baseUrl}/api/v1/health/operational`);
+    assert.equal(operational.status, 401);
+  });
+});
+
+test("API server rejects an invalid authentication provider", () => {
   assert.throws(() => createApiServer({
     readiness: { async check() { return true; } },
     getOperationalHealth: () => ({ status: "foundation_only" }),
+    authenticationProvider: {},
     logger
-  }), /Cloudflare Access authentication provider is required/);
+  }), /authentication provider interface is required/);
 });
 
 test("readiness and protected operational health fail closed", async () => {

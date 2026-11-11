@@ -2,9 +2,9 @@
 
 ## Status
 
-The API now selects `CloudflareAccessAuthenticationProvider` from the runtime's Cloudflare Access configuration. There is no disabled-authentication fallback in the API server. `npm start` and `npm run validate` fail with `CLOUDFLARE_ACCESS_REQUIRED` before opening database connections unless Cloudflare Access is enabled. The Pi's actual `.env`, Access application, allowlist, and authenticated live API response were not inspected or changed by this task; production activation still requires operator configuration and verification.
+Phase 8.1 added Cloudflare Access JWT validation. Phase 8.2 supersedes its mandatory-authentication startup gate: Cloudflare Access is optional and disabled by default. With `CLOUDFLARE_ACCESS_ENABLED=false`, the runtime starts and validates without Access credentials and exposes anonymous, GET-only dashboard data routes. With it enabled, requests must pass Cloudflare JWT validation and the server-side operator email allowlist.
 
-The API stays bound to loopback and exposes only read-only dashboard routes. This phase does not change profile ownership, create user accounts, add write endpoints, enable live trading, or proceed to Phase 9.
+The API stays bound to loopback and exposes only read-only dashboard routes. `/api/v1/health/operational` remains admin-only in either mode. This phase does not change profile ownership, create user accounts, add write endpoints, enable live trading, or proceed to Phase 9.
 
 ## Required environment variables
 
@@ -12,30 +12,30 @@ Configure these values in the Raspberry Pi's local `raspberry-pi/.env`; never co
 
 | Variable | Requirement |
 |---|---|
-| `CLOUDFLARE_ACCESS_ENABLED` | Must be `true` for runtime startup and `npm run validate`. |
-| `CLOUDFLARE_ACCESS_ISSUER` | Exact HTTPS Access team issuer, for example `https://<team-name>.cloudflareaccess.com` without a trailing path, query or fragment. |
-| `CLOUDFLARE_ACCESS_AUDIENCE` | The Access application's public audience tag for the protected API hostname. |
-| `ALLOWED_OPERATOR_EMAILS` | Comma-separated operator email addresses. At least one unique valid address is required; matching is case-insensitive. |
-| `API_CORS_ORIGINS` | Exact HTTPS origin(s) of the static dashboard, comma-separated if needed. Wildcards and URL paths are rejected. |
+| `CLOUDFLARE_ACCESS_ENABLED` | Optional; defaults to `false`. Set `true` to require Cloudflare Access for dashboard data routes. |
+| `CLOUDFLARE_ACCESS_ISSUER` | Required only when Access is enabled. Exact HTTPS Access team issuer, without a trailing path, query or fragment. |
+| `CLOUDFLARE_ACCESS_AUDIENCE` | Required only when Access is enabled. The Access application's public audience tag for the protected API hostname. |
+| `ALLOWED_OPERATOR_EMAILS` | Required only when Access is enabled. Comma-separated operator email addresses; at least one unique valid address is required. Matching is case-insensitive. |
+| `API_CORS_ORIGINS` | Exact browser origin(s), comma-separated if needed. Wildcards and URL paths are rejected. This is not authentication. |
 | `API_HOST` | Keep `127.0.0.1`; the Node listener must not be exposed directly. |
 | `API_PORT` | The configured local API port (default `3002`), matching the tunnel service target. |
 
-`CLOUDFLARE_ACCESS_ISSUER`, `CLOUDFLARE_ACCESS_AUDIENCE`, and the email allowlist are also required in the dashboard deployment config as applicable; the frontend's `accessAudience` and `apiOrigin` are public routing values, not credentials. The frontend must never contain a database password, signing key, or service credential.
+Set the dashboard's `apiOrigin` for its deployment. For Access deployments, also set `accessEnabled: true` and `accessAudience` in `js/runtime-api-config.js`; for private/local deployments, leave `accessEnabled: false`. Those are public routing values, not credentials. The frontend must never contain a database password, signing key, or service credential.
 
 ## Cloudflare Access setup
 
 1. In Cloudflare Zero Trust, create a self-hosted Access application for the API hostname. Require an allow policy limited to the intended operator identities.
 2. Record the app's audience tag and the exact team issuer. Use these same values for `CLOUDFLARE_ACCESS_AUDIENCE` and `CLOUDFLARE_ACCESS_ISSUER` on the Pi.
 3. Configure the Cloudflare Tunnel hostname to forward to `http://127.0.0.1:3002`. Keep the Node API and PostgreSQL listeners private; do not create a public port-forward to the Pi.
-4. Configure the Pi `.env` values above and set `CLOUDFLARE_ACCESS_ENABLED=true`. The runtime configuration validates the issuer format, audience, unique email allowlist and CORS origins.
-5. Configure the dashboard's public `apiOrigin` to the HTTPS API hostname and `accessAudience` to the Access application audience. Keep this configuration separate from Pi-only settings.
-6. Restart the runtime only after all values are correct. A missing/disabled Access configuration causes startup/preflight to fail closed rather than leaving protected routes serving an anonymous-only runtime.
+4. Configure the Pi `.env` values above and set `CLOUDFLARE_ACCESS_ENABLED=true`. The runtime configuration validates the issuer format, audience and unique email allowlist.
+5. Configure the dashboard's public `apiOrigin` to the HTTPS API hostname, `accessEnabled: true`, and `accessAudience` to the Access application audience. Keep this configuration separate from Pi-only settings.
+6. Restart the runtime only after all values are correct. If Access is disabled, runtime startup and validation are still supported; the read-only dashboard data routes then permit anonymous access.
 
-Do not use the example placeholders as production values. The actual operator email list is an operator-owned configuration value and is intentionally not recorded in this report.
+Do not use example placeholders as production values. The operator email list is an operator-owned configuration value and is intentionally not recorded in this report. If Access is disabled, use only a private/trusted route: CORS does not protect the data from other clients that can reach the API.
 
 ## JWT validation and authenticated context
 
-For a protected API request:
+For a protected API request when Access is enabled:
 
 1. Cloudflare Access authenticates the visitor and adds the `Cf-Access-Jwt-Assertion` header when forwarding to the API.
 2. The provider rejects a missing, malformed, oversized or non-RS256 JWT.
@@ -43,7 +43,7 @@ For a protected API request:
 4. It verifies the signature and checks exact `iss`, configured `aud` (string or array), nonempty `sub`, allowlisted `email`, future `exp`, and optional `nbf`/`iat` with the configured 60-second clock skew.
 5. A valid identity becomes `{principal:{subject,email,roles:["operator"]}}`. Middleware places that identity on the request context; protected read routes then require authentication. The shared system portfolio is not user-mapped.
 
-Missing/invalid assertions return `401 UNAUTHENTICATED`. An unavailable or malformed Cloudflare signing-key set returns a safe `503` error. A valid operator receives the `operator` role; the separate `/api/v1/health/operational` endpoint still requires `admin` and is not part of dashboard access.
+With Access enabled, missing/invalid assertions return `401 UNAUTHENTICATED`; unavailable or malformed signing keys return a safe `503`. A valid operator receives the `operator` role; `/api/v1/health/operational` still requires `admin`. With Access disabled, anonymous access is allowed only by the read-only dashboard data routes; the operational health route returns `401 UNAUTHENTICATED`.
 
 ## Testing procedure
 
@@ -55,26 +55,30 @@ Set-Location raspberry-pi
 npm.cmd test
 ```
 
-The tests cover valid and invalid signatures, issuer/audience/expiry checks, email allowlisting, identity extraction, JWKS failures, API provider activation, missing-provider rejection, startup/preflight refusal when Access is disabled, protected routes, CORS and runtime behavior. The full Pi package suite includes API, repository and auth tests.
+The tests cover valid and invalid signatures, issuer/audience/expiry checks, email allowlisting, identity extraction, JWKS failures, API provider activation, protected routes, both runtime modes, anonymous read-only access, admin-only health, CORS and runtime behavior. The full Pi package suite includes API, repository and auth tests.
 
 For a controlled Pi smoke test after operator configuration:
 
-1. Run `npm run validate`; it must report valid contracts with Access enabled. It exits without starting the scheduler.
+1. With Access disabled, run `npm run validate` and confirm contract validation succeeds without issuer, audience or allowlist values.
 2. Restart `cryptopulse-runtime.service` only under the operator's deployment procedure and confirm it is active.
-3. From an allowed Access session, request `GET https://<api-host>/api/v1/markets` and confirm `200` with the `{data:{count,items}}` envelope.
-4. From the same Pi loopback listener without an Access assertion, request `GET http://127.0.0.1:3002/api/v1/markets` and confirm `401 UNAUTHENTICATED`. The public hostname should present Cloudflare's Access challenge to an unauthenticated browser.
-5. Confirm an unlisted email is denied by the Cloudflare policy and by the server-side allowlist. Do not log, paste or commit JWTs or cookies.
+3. From an authorized private/local route, request `GET http://127.0.0.1:3002/api/v1/markets` without an Access assertion and confirm `200`; confirm the operational health route remains `401`.
+4. For an Access-enabled deployment, configure issuer, audience, allowlist and frontend settings, then confirm an allowed browser request returns `200`, while a request without a valid assertion returns `401`.
+5. Confirm an unlisted email is denied by Cloudflare policy and the server-side allowlist. Do not log, paste or commit JWTs or cookies.
 
 No live Pi restart or authenticated production request was performed as part of this coding task.
 
 ## Validation results
 
-- Cloudflare authentication, runtime configuration, health/API and bootstrap tests: 28 passed.
-- Raspberry Pi full package suite (`npm.cmd test`): 165 passed, 0 failed.
-- JavaScript syntax validation (`node --check` across `src/` and `tests/`): passed.
+- Phase 8.1 Cloudflare authentication, runtime configuration, health/API and bootstrap baseline: 28 passed.
+- Phase 8.2 focused Raspberry Pi authentication/API/runtime tests: 43 passed.
+- Dashboard browser authentication tests: 8 passed.
+- Raspberry Pi full package suite (`npm.cmd test`): 168 passed, 0 failed.
+- Repository full suite (`npm.cmd test`): 507 passed, 0 failed.
+- JavaScript syntax validation across API, library, scripts, tests and Pi source/test files: passed.
+- `npm.cmd run build`: passed; static project and database migration validation succeeded.
 - `git diff --check`: passed.
 - Live Pi/Cloudflare smoke test: not run; requires operator-controlled environment values and deployment.
 
 ## Remaining activation gate
 
-The software no longer silently falls back to `DisabledAuthenticationProvider`; however, this work cannot supply the actual operator email allowlist or update the Pi's private `.env`. Until the Pi is configured and a live authenticated `200` request is verified, production authentication activation remains unconfirmed. Stop here; do not begin Phase 9.
+Cloudflare Access remains available and is recommended for shared/public API exposure, but production settings are deployment-owned and are not hardcoded here. This work does not inspect or change the Pi's private `.env` and does not verify a live deployment. When Access is disabled, keep the read-only API on a private/trusted route. Stop here; do not begin Phase 9.

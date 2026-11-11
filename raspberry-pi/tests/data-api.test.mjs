@@ -368,6 +368,31 @@ test("data endpoints fail closed when no authentication provider is configured",
   });
 });
 
+test("dashboard data routes allow anonymous read-only access when Access is disabled", async () => {
+  const pool = createPool();
+  await withServer({
+    dataRepositories: createRepositories(pool),
+    authenticationProvider: undefined,
+    cloudflareAccess: { enabled: false },
+    allowedOrigins: ["https://dashboard.example.com"]
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/markets`, {
+      headers: { Origin: "https://dashboard.example.com" }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get("access-control-allow-origin"),
+      "https://dashboard.example.com"
+    );
+    assert.deepEqual(await response.json(), {
+      data: { count: markets.length, items: markets }
+    });
+    assert.ok(pool.queries.every(({ sql }) => sql !== "BEGIN READ WRITE"));
+    const write = await fetch(`${baseUrl}/api/v1/markets`, { method: "POST" });
+    assert.equal(write.status, 405);
+  });
+});
+
 test("market endpoint accepts empty snapshot/candle sets for an enabled market", async () => {
   const pool = createPool({ snapshots: [], candles: [] });
   await withServer({ dataRepositories: createRepositories(pool) }, async (baseUrl) => {

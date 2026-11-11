@@ -8,9 +8,19 @@ const test = require("node:test");
 const auth = require("../js/auth-service.js");
 const rootDirectory = path.resolve(__dirname, "..");
 
-function createBrowser({ pageType = "protected", href, sessionValue = null } = {}) {
+function createBrowser({
+  pageType = "protected",
+  href,
+  sessionValue = null,
+  accessEnabled = true,
+  accessAudience = "public-audience"
+} = {}) {
   const redirects = [];
   const messages = [];
+  const logoutButtons = [{
+    hidden: false,
+    addEventListener() {}
+  }];
   const storage = new Map(sessionValue ? [["cryptopulse-access-authenticated", sessionValue]] : []);
   const listeners = new Map();
   const document = {
@@ -38,8 +48,8 @@ function createBrowser({ pageType = "protected", href, sessionValue = null } = {
     querySelector(selector) {
       return selector === "[data-auth-message]" ? null : null;
     },
-    querySelectorAll() {
-      return [];
+    querySelectorAll(selector) {
+      return selector === "[data-auth-logout]" ? logoutButtons : [];
     }
   };
   const location = new URL(href || "https://dashboard.example.com/dashboard.html");
@@ -48,7 +58,8 @@ function createBrowser({ pageType = "protected", href, sessionValue = null } = {
     CryptoPulseAuth: auth,
     CryptoPulseRuntimeConfig: {
       apiOrigin: "https://runtime.example.com",
-      accessAudience: "public-audience"
+      accessEnabled,
+      accessAudience
     },
     history: {
       replaceState(_state, _title, url) {
@@ -77,7 +88,7 @@ function createBrowser({ pageType = "protected", href, sessionValue = null } = {
     URLSearchParams,
     Promise
   });
-  return { document, messages, redirects, storage, window };
+  return { document, logoutButtons, messages, redirects, storage, window };
 }
 
 test("Cloudflare Access login URL uses configured API origin and a safe dashboard return path", () => {
@@ -140,6 +151,27 @@ test("unauthenticated protected pages begin Cloudflare Access login", async () =
     destination.searchParams.get("redirect_url"),
     "https://dashboard.example.com/scanner.html?view=24h&cp_access=1"
   );
+});
+
+test("protected pages allow read-only access when Cloudflare Access is disabled", async () => {
+  const browser = createBrowser({
+    accessEnabled: false,
+    href: "https://dashboard.example.com/dashboard.html"
+  });
+  await browser.window.CryptoPulseAuthReady;
+  assert.deepEqual(browser.redirects, []);
+  assert.equal(browser.document.documentElement.classList.removed, "auth-pending");
+  assert.equal(browser.logoutButtons[0].hidden, true);
+});
+
+test("legacy login routes return to the dashboard when Cloudflare Access is disabled", async () => {
+  const browser = createBrowser({
+    pageType: "login",
+    accessEnabled: false,
+    href: "https://dashboard.example.com/login.html?next=%2Fhistory.html"
+  });
+  await browser.window.CryptoPulseAuthReady;
+  assert.deepEqual(browser.redirects, ["/history.html"]);
 });
 
 test("legacy login routes hand off to Cloudflare Access without collecting Supabase credentials", async () => {

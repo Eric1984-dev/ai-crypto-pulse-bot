@@ -4,17 +4,19 @@ import { EventEmitter } from "node:events";
 import { startRuntime, validateRuntime } from "../src/runtime/bootstrap.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
-function runtimeConfig() {
+function runtimeConfig({ cloudflareAccessEnabled = true } = {}) {
   const config = readRuntimeConfig({
     DATABASE_HOST: "127.0.0.1",
     DATABASE_NAME: "cryptopulse",
     DATABASE_USER: "runtime_reader",
     DATABASE_PASSWORD: "test-password",
     DATABASE_SSL: "false",
-    CLOUDFLARE_ACCESS_ENABLED: "true",
-    CLOUDFLARE_ACCESS_ISSUER: "https://team.cloudflareaccess.com",
-    CLOUDFLARE_ACCESS_AUDIENCE: "runtime-bootstrap-test",
-    ALLOWED_OPERATOR_EMAILS: "operator@example.com",
+    ...(cloudflareAccessEnabled ? {
+      CLOUDFLARE_ACCESS_ENABLED: "true",
+      CLOUDFLARE_ACCESS_ISSUER: "https://team.cloudflareaccess.com",
+      CLOUDFLARE_ACCESS_AUDIENCE: "runtime-bootstrap-test",
+      ALLOWED_OPERATOR_EMAILS: "operator@example.com"
+    } : {}),
     INGESTION_DATABASE_USER: "ingestion_writer",
     INGESTION_DATABASE_PASSWORD: "ingestion-password",
     AI_DATABASE_USER: "ai_writer",
@@ -72,6 +74,9 @@ class MockPool extends EventEmitter {
               last_run: null
             }]
           };
+        }
+        if (sql.includes('FROM public."AI_Crypto_Bot_Watched_Markets"')) {
+          return { rows: [] };
         }
         return {
           rows: [{
@@ -145,51 +150,38 @@ test("runtime fails closed and releases database resources when validation fails
   assert.equal(pool.ended, true);
 });
 
-test("runtime refuses to start before opening the database if Cloudflare Access is disabled", async () => {
-  const config = runtimeConfig();
-  const unauthenticatedConfig = Object.freeze({
-    ...config,
-    api: Object.freeze({
-      ...config.api,
-      cloudflareAccess: Object.freeze({
-        ...config.api.cloudflareAccess,
-        enabled: false
-      })
-    })
+test("runtime starts and serves read-only dashboard APIs when Cloudflare Access is disabled", async () => {
+  const runtime = await startRuntime(runtimeConfig({ cloudflareAccessEnabled: false }), {
+    Pool: MockPool,
+    validateContracts: async () => ({ contracts: "valid" }),
+    validateIngestionContracts: async () => ({ contracts: "valid" }),
+    validateAIContracts: async () => ({ contracts: "valid" }),
+    validatePaperContracts: async () => ({ contracts: "valid" })
   });
-  let poolCreated = false;
-  await assert.rejects(startRuntime(unauthenticatedConfig, {
-    Pool: class {
-      constructor() {
-        poolCreated = true;
-      }
-    }
-  }), (error) => error.code === "CLOUDFLARE_ACCESS_REQUIRED"
-    && /Cloudflare Access authentication/.test(error.message));
-  assert.equal(poolCreated, false);
+  try {
+    const markets = await fetch(
+      `http://127.0.0.1:${runtime.server.address().port}/api/v1/markets`
+    );
+    assert.equal(markets.status, 200);
+    assert.deepEqual(await markets.json(), { data: { count: 0, items: [] } });
+  } finally {
+    await runtime.close();
+  }
 });
 
-test("runtime preflight refuses to validate production readiness without Cloudflare Access", async () => {
-  const config = runtimeConfig();
-  const unauthenticatedConfig = Object.freeze({
-    ...config,
-    api: Object.freeze({
-      ...config.api,
-      cloudflareAccess: Object.freeze({
-        ...config.api.cloudflareAccess,
-        enabled: false
-      })
-    })
-  });
-  let poolCreated = false;
-  await assert.rejects(validateRuntime(unauthenticatedConfig, {
-    Pool: class {
-      constructor() {
-        poolCreated = true;
+test("runtime preflight validates successfully when Cloudflare Access is disabled", async () => {
+  let pool;
+  const result = await validateRuntime(runtimeConfig({ cloudflareAccessEnabled: false }), {
+    Pool: class extends MockPool {
+      constructor(options) {
+        super(options);
+        pool = this;
       }
-    }
-  }), (error) => error.code === "CLOUDFLARE_ACCESS_REQUIRED");
-  assert.equal(poolCreated, false);
+    },
+    validateContracts: async () => ({ contracts: "valid" })
+  });
+  assert.deepEqual(result, { contracts: "valid" });
+  assert.equal(pool.ended, true);
 });
 
 test("runtime startup and shutdown never clear an emergency STOPPED status", async () => {

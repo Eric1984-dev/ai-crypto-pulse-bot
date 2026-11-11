@@ -4,9 +4,9 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. De 
 
 ## Huidige status
 
-- De afzonderlijke `raspberry-pi/`-package bevat de autonome runtime en de read-only dashboard-API. De API bindt aan loopback; Cloudflare Access-JWT-validatie is configureerbaar, maar Cloudflare Tunnel/API-host en de Vercel-integratie zijn niet in deze fase uitgerold of live gevalideerd. Zie het [Phase 8 dashboard-cutoverrapport](raspberry-pi/docs/phase-8-dashboard-cutover.md) en de [runtime-implementatiedocumentatie](raspberry-pi/README.md).
-- Dashboardtoegang loopt via Cloudflare Access met een server-side operator-email-allowlist. Er is geen Supabase Auth/profile-mapping in het Pi-dashboardpad; alle operators zien hetzelfde read-only systeemportfolio.
-- Vercel serveert statische dashboardpagina's. De browserguard is alleen UX; de Pi API valideert Cloudflare Access zelf. Er zijn geen server-side Vercel protected-page rewrites nodig voor het dashboard.
+- De afzonderlijke `raspberry-pi/`-package bevat de autonome runtime en read-only dashboard-API. De API bindt aan loopback; Cloudflare Access is optioneel en configureerbaar. Zonder Access geeft de API anonieme read-only toegang aan clients die de netwerkroute kunnen bereiken; met Access valideert de Pi JWT's en een operator-email-allowlist. Cloudflare Tunnel/API-host en de Vercel-integratie zijn niet live gevalideerd. Zie de [Phase 8 dashboard-cutoverrapportage](raspberry-pi/docs/phase-8-dashboard-cutover.md), [Phase 8.1/8.2-authenticatiedocumentatie](raspberry-pi/docs/phase-8.1-authentication-activation.md) en [Pi-runtimedocumentatie](raspberry-pi/README.md).
+- Er is geen Supabase Auth/profile-mapping in het Pi-dashboardpad; alle bezoekers zien hetzelfde read-only systeemportfolio. Cloudflare Access wordt aanbevolen wanneer de API via een gedeelde of publieke netwerkroute beschikbaar is; CORS is geen authenticatie.
+- Vercel serveert statische dashboardpagina's. De browserguard start een Cloudflare Access-login alleen wanneer die expliciet in de dashboardconfiguratie is ingeschakeld. Er zijn geen server-side Vercel protected-page rewrites nodig voor het dashboard.
 - Het Phase 03-schema en de latere uitbreidingen bevatten 18 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard leest status, portfolio, posities, trades, watched markets, AI-beslissingen, analytics en scannerdata uit de read-only Pi API. De bestaande Open Position AI Status en dashboardindeling blijven behouden. De data wordt periodiek ververst; er zijn geen Supabase browserqueries of Realtime-kanalen meer. Verzoeken blijven `no-store`.
 - De monitoringkaart leest de Pi-runtime-API voor runtime/schedulerstatus, proces- en hostmetrics, PostgreSQL-grootte en geschatte aantallen candles, beslissingen, trades en posities. Deze monitoringroute rapporteert geen exacte tabeltellingen; hosttemperatuur en de eerste CPU-meting kunnen ontbreken.
@@ -78,7 +78,7 @@ Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase st
 
 ## Deployen
 
-Vercel host de bestaande statische dashboardbestanden; de browser haalt operationele gegevens bij de Pi API. De live Raspberry Pi-runtime beheert zelf scheduling en paper trading. De oude Vercel serverless-paden blijven in de repository, maar zijn geen dashboarddatafallback en deze documentatie claimt geen productiecutover of deployment. Configureer dashboard-`apiOrigin` en Cloudflare Access audience alleen na operatorvalidatie; zie het [Phase 8 cutoverrapport](raspberry-pi/docs/phase-8-dashboard-cutover.md) en de [Pi runtime documentatie](raspberry-pi/README.md).
+Vercel host de bestaande statische dashboardbestanden; de browser haalt operationele gegevens bij de Pi API. De live Raspberry Pi-runtime beheert zelf scheduling en paper trading. De oude Vercel serverless-paden blijven in de repository, maar zijn geen dashboarddatafallback en deze documentatie claimt geen productiecutover of deployment. Configureer `apiOrigin` per dashboarddeployment; schakel `accessEnabled` alleen in wanneer de Pi API ook Cloudflare Access vereist en stel dan de bijbehorende `accessAudience` in. Zie het [Phase 8 cutoverrapport](raspberry-pi/docs/phase-8-dashboard-cutover.md) en de [Pi runtime documentatie](raspberry-pi/README.md).
 
 Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit van Vercel-deployments. De broncode blijft in Git beschikbaar voor Pi-installatie en updates; `.vercelignore` voorkomt uitsluitend opname in de Vercel-deployment, niet in de Git-repository.
 
@@ -88,6 +88,7 @@ Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit v
 - [CryptoPulseBot migration documentation](./docs/migration/README.md)
 - [Target Raspberry Pi API architecture](./docs/migration/api-architecture.md)
 - [Phase 8 dashboard cutover report](./raspberry-pi/docs/phase-8-dashboard-cutover.md)
+- [Phase 8.1/8.2 authentication configuration](./raspberry-pi/docs/phase-8.1-authentication-activation.md)
 - [Database](./docs/DATABASE.md)
 - [Architectuur](./docs/ARCHITECTURE.md)
 - [Authentication API](./docs/API.md)

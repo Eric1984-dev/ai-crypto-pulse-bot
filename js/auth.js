@@ -35,8 +35,16 @@
     if (!auth) {
       throw new Error("Runtime access support is unavailable.");
     }
+    const hasAudience = typeof runtimeConfig.accessAudience === "string"
+      && runtimeConfig.accessAudience.trim().length > 0;
+    const accessEnabled = runtimeConfig.accessEnabled === true
+      || (runtimeConfig.accessEnabled !== false && hasAudience);
     if (pageType === "login" || pageType === "register" || pageType === "reset") {
       const requestedPath = new URLSearchParams(windowRef.location.search).get("next");
+      if (!accessEnabled) {
+        windowRef.location.replace(auth.safeNextPath(requestedPath));
+        return;
+      }
       startLogin(auth.safeNextPath(requestedPath));
       return;
     }
@@ -46,6 +54,11 @@
     }
     if (windowRef.location.pathname === "/admin.html" || windowRef.location.pathname === "/admin") {
       windowRef.location.replace("/dashboard.html");
+      return;
+    }
+    if (!accessEnabled) {
+      hideLogout();
+      setReady();
       return;
     }
 
@@ -72,6 +85,12 @@
           loginPagePath
         ));
       });
+    });
+  }
+
+  function hideLogout() {
+    documentRef.querySelectorAll("[data-auth-logout]").forEach((button) => {
+      button.hidden = true;
     });
   }
 

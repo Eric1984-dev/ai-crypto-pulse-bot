@@ -6,10 +6,10 @@
 - [x] Phase 1.7 — single-owner Pi runtime execution specification: [runtime specification](docs/migration/runtime-execution-spec.md)
 - [x] Phase 1.8 — Pi API endpoints, auth, dashboard polling, and cutover gates: [target API architecture](docs/migration/api-architecture.md)
 - [x] Phases 2–7.7 — Raspberry Pi runtime foundation, ingestion, AI analysis, scheduler and paper trading are reported operational on the Pi; see the [Phase 7.7 live validation addendum](raspberry-pi/docs/phase-7.7.2-live-validation-addendum.md).
-- [ ] Migration Phase 8 — dashboard reads are wired to the Pi API; Vercel, Cloudflare Access/Tunnel and live browser-to-Pi cutover remain unconfigured/unverified: [cutover report](raspberry-pi/docs/phase-8-dashboard-cutover.md).
+- [ ] Migration Phase 8 — dashboard reads are wired to the Pi API, with optional Cloudflare Access authentication; Vercel, tunnel and live browser-to-Pi cutover remain unconfigured/unverified: [cutover report](raspberry-pi/docs/phase-8-dashboard-cutover.md), [authentication configuration](raspberry-pi/docs/phase-8.1-authentication-activation.md).
 - [ ] Migration Phase 9 and later — not started; requires separate explicit approval.
 
-The dashboard API remains read-only and bound to loopback behind the intended Cloudflare Tunnel. The report records automated local checks separately from unverified production integration. This roadmap entry does not authorize deployment, public API exposure, schema/data operations, or live trading.
+The dashboard API remains read-only and bound to loopback. When Cloudflare Access is disabled, any client able to reach its configured network route can read dashboard data; use a trusted network boundary or enable Access before shared/public exposure. The reports record automated local checks separately from unverified production integration. This roadmap entry does not authorize deployment, public API exposure, schema/data operations, or live trading.
 
 ## Phase 01 - Project Setup
 

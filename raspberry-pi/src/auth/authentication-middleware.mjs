@@ -30,3 +30,10 @@ export function requireAuthenticated(context) {
     throw new ApiError(401, "UNAUTHENTICATED", "Authentication is required.");
   }
 }
+
+export function requireDashboardReadAccess(context) {
+  if (context.auth?.principal || context.dashboardAccessMode === "anonymous-read-only") {
+    return;
+  }
+  throw new ApiError(401, "UNAUTHENTICATED", "Authentication is required.");
+}

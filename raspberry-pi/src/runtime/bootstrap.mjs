@@ -79,7 +79,6 @@ export async function startRuntime(config, {
   if (onFatal !== undefined && typeof onFatal !== "function") {
     throw new TypeError("The runtime fatal-failure handler must be a function.");
   }
-  assertAuthenticationConfigured(config, authenticationProvider);
   const apiConfig = withPoolMax(config, 2);
   const pool = createPostgresPool(apiConfig, { Pool, logger });
   let server;
@@ -342,24 +341,12 @@ export async function validateRuntime(config, {
   logger = console,
   validateContracts = validateRuntimeContracts
 } = {}) {
-  assertAuthenticationConfigured(config);
   const pool = createPostgresPool(config, { Pool, logger });
   try {
     return await validateContracts(pool, config, { logger });
   } finally {
     await pool.end();
   }
-}
-
-function assertAuthenticationConfigured(config, authenticationProvider) {
-  if (authenticationProvider || config?.api?.cloudflareAccess?.enabled === true) {
-    return;
-  }
-  const error = new Error(
-    "Runtime validation and startup require Cloudflare Access authentication to be enabled and configured."
-  );
-  error.code = "CLOUDFLARE_ACCESS_REQUIRED";
-  throw error;
 }
 
 function safeErrorCode(error) {

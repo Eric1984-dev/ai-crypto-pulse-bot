@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { CloudflareAccessAuthenticationProvider } from "../auth/cloudflare-access-provider.mjs";
+import { DisabledAuthenticationProvider } from "../auth/authentication-provider.mjs";
 import { authenticationMiddleware } from "../auth/authentication-middleware.mjs";
 import { csrfMiddleware } from "./csrf-middleware.mjs";
 import { ApiError, toErrorResponse } from "./api-error.mjs";
@@ -28,14 +29,16 @@ export function createApiServer({
   metrics,
   createServerImpl = createServer
 }) {
+  const cloudflareAccessEnabled = cloudflareAccess?.enabled === true;
+  const anonymousReadOnly = !authenticationProvider && !cloudflareAccessEnabled;
   const resolvedAuthenticationProvider = authenticationProvider || (
-    cloudflareAccess?.enabled
+    cloudflareAccessEnabled
       ? new CloudflareAccessAuthenticationProvider(cloudflareAccess)
-      : null
+      : new DisabledAuthenticationProvider()
   );
   if (!resolvedAuthenticationProvider
     || typeof resolvedAuthenticationProvider.authenticate !== "function") {
-    throw new TypeError("An active Cloudflare Access authentication provider is required.");
+    throw new TypeError("An authentication provider interface is required.");
   }
 
   const router = registerHealthRoutes(new ApiRouter(), {
@@ -65,6 +68,9 @@ export function createApiServer({
     let context;
     try {
       context = createRequestContext(request, response);
+      context.dashboardAccessMode = anonymousReadOnly
+        ? "anonymous-read-only"
+        : "authenticated";
     } catch (error) {
       writeErrorResponse(response, error, randomUUID());
       return;

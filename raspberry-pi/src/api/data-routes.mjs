@@ -1,5 +1,5 @@
 import { ApiError } from "./api-error.mjs";
-import { requireAuthenticated } from "../auth/authentication-middleware.mjs";
+import { requireDashboardReadAccess } from "../auth/authentication-middleware.mjs";
 import { buildMarketScannerSummary } from "../../../lib/market-scanner.mjs";
 import { generateRecommendations } from "../../../lib/recommendations.mjs";
 import {
@@ -99,7 +99,7 @@ export function registerDataRoutes(router, repositories, {
 
   router.register("GET", DATA_PATHS.markets, async (context) => {
     validateQuery(context.request);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     const markets = await readRepository(
       () => repositories.watchedMarkets.listEnabled(),
       "MARKETS_UNAVAILABLE",
@@ -121,7 +121,7 @@ export function registerDataRoutes(router, repositories, {
 
   router.register("GET", DATA_PATHS.market, async (context) => {
     const { symbol, interval, limit } = parseMarketQuery(context.request);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     const market = await readRepository(
       () => repositories.watchedMarkets.findEnabledBySymbol(symbol),
       "MARKET_DATA_UNAVAILABLE",
@@ -163,7 +163,7 @@ export function registerDataRoutes(router, repositories, {
         ? ANALYTICS_QUERY_SCHEMA
         : Object.freeze({});
     const query = validateQuery(context.request, querySchema);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     if (query.view === "export-count" || query.view === "export") {
       const exportType = query.type;
       const period = query.period || (
@@ -330,7 +330,7 @@ export function registerDataRoutes(router, repositories, {
 
   router.register("GET", DATA_PATHS.monitoring, async (context) => {
     validateQuery(context.request);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     const generatedAt = readClock(now);
     const [operational, database, system, agentStatus] = await Promise.all([
       getOperationalHealth(),
@@ -374,7 +374,7 @@ export function registerDataRoutes(router, repositories, {
 
   router.register("GET", DATA_PATHS.agentStatus, async (context) => {
     validateQuery(context.request);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     const status = await readRepository(
       () => repositories.runtimeStatus.getStatus(),
       "AGENT_STATUS_UNAVAILABLE",
@@ -388,7 +388,7 @@ export function registerDataRoutes(router, repositories, {
 
   router.register("GET", DATA_PATHS.marketSummary, async (context) => {
     validateQuery(context.request);
-    requireAuthenticated(context);
+    requireDashboardReadAccess(context);
     const markets = await readRepository(
       () => repositories.watchedMarkets.listEnabled(),
       "MARKET_DATA_UNAVAILABLE",

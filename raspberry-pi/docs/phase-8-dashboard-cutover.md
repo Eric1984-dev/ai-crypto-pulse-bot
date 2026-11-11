@@ -11,17 +11,17 @@ The dashboard deployment values and the Cloudflare/Vercel/Pi production connecti
 ```text
 Browser
   -> existing static dashboard on Vercel
-  -> HTTPS, credentialed read-only fetches
-  -> Cloudflare Access-protected API hostname
-  -> Cloudflare Tunnel
+  -> HTTPS or a trusted local route, credentialed read-only fetches
+  -> optional Cloudflare Access protection
+  -> configured tunnel or same-host reverse proxy
   -> Raspberry Pi API on 127.0.0.1:3002
   -> parameterized, read-only PostgreSQL repository queries
   -> existing ai_crypto_bot_store database
 ```
 
-The browser has no database connection or credential. Cloudflare Access injects the `Cf-Access-Jwt-Assertion` header at the protected API origin. The Pi verifies the RS256 signature against Cloudflare's JWKS and validates issuer, audience, expiry and the configured operator email allowlist. The Phase 8.1 activation change makes Cloudflare Access configuration mandatory for production runtime startup and validation; missing or invalid JWTs remain unauthenticated, while signing-key failures return `503`. The dashboard shares the standalone system portfolio; it does not map users to Supabase profiles or depend on `auth.users`.
+The browser has no database connection or credential. Cloudflare Access is optional. When enabled, it injects `Cf-Access-Jwt-Assertion`; the Pi verifies the RS256 signature against Cloudflare's JWKS and validates issuer, audience, expiry and the configured operator email allowlist. When disabled, the Pi serves anonymous access to the GET-only dashboard data routes; the operational health route remains admin-only. The dashboard shares the standalone system portfolio; it does not map users to Supabase profiles or depend on `auth.users`.
 
-The frontend's `js/runtime-api-config.js` deliberately contains blank `apiOrigin` and `accessAudience` values. Before dashboard deployment, configure those with the real HTTPS API origin and Cloudflare Access application audience. On the Pi, configure `CLOUDFLARE_ACCESS_ENABLED=true`, issuer, audience, operator allowlist and the exact HTTPS Vercel origin in `.env`. The API listens only on loopback; configure the tunnel to reach that loopback listener and do not expose PostgreSQL or the API port directly to the Internet. Phase 8.1 documents the authentication activation and configuration gate.
+The frontend's `js/runtime-api-config.js` has no deployment-specific origin or audience. Configure `apiOrigin` for the chosen deployment. For Access, set `accessEnabled: true` and `accessAudience` to the Access application's audience; leave Access disabled for trusted local/private deployments. On the Pi, set `CLOUDFLARE_ACCESS_ENABLED=true` and provide issuer, audience and operator allowlist only when using Access. The API remains loopback-only; connect it through a same-host reverse proxy or tunnel. Do not expose PostgreSQL or the unauthenticated API to an untrusted network. See the [Phase 8.1/8.2 authentication configuration](phase-8.1-authentication-activation.md).
 
 ## Dashboard dependency audit and migration mapping
 
@@ -29,7 +29,7 @@ The dashboard's browser scripts no longer create Supabase clients, issue Supabas
 
 | Existing dashboard dependency | Raspberry Pi replacement |
 |---|---|
-| Supabase Auth login/session and user/profile mapping | Cloudflare Access login redirect, JWT validation and server-side operator email allowlist |
+| Supabase Auth login/session and user/profile mapping | Optional Cloudflare Access login redirect, JWT validation and server-side operator email allowlist |
 | Portfolio, balance, P&L, position, trade and snapshot table queries | `GET /api/v1/dashboard-data` |
 | Trade history queries and filters | `GET /api/v1/dashboard-data?view=trade-history` |
 | Latest AI decisions and reasoning | Default `dashboard-data` response; detailed paginated records through `view=ai-history` |
@@ -45,7 +45,7 @@ The dashboard's browser scripts no longer create Supabase clients, issue Supabas
 
 ## API contracts
 
-All data endpoints below are `GET`, require a valid Cloudflare Access JWT when Access is enabled, and return JSON in a `{ "data": ... }` envelope except CSV downloads. Query parameters are strict; unknown or duplicate parameters are rejected. API failures use `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Common statuses are `400` invalid query, `401` missing/invalid authentication, `403` disallowed origin, `404` untracked market, and `503` unavailable database/runtime data. Responses set `Cache-Control: no-store`.
+All data endpoints below are `GET`. When Cloudflare Access is enabled, they require a valid Access JWT; when disabled, they allow anonymous read-only access. Responses use a `{ "data": ... }` envelope except CSV downloads. Query parameters are strict; unknown or duplicate parameters are rejected. API failures use `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Common statuses are `400` invalid query, `401` missing/invalid authentication when Access is enabled, `403` disallowed origin, `404` untracked market, and `503` unavailable database/runtime data. Responses set `Cache-Control: no-store`.
 
 | Endpoint | Request | Response and bounds |
 |---|---|---|
@@ -75,9 +75,10 @@ Monitoring includes the runtime's current scheduler state and last-cycle ingesti
 
 ## Read-only and Cloudflare safeguards
 
-- The API process remains bound to `127.0.0.1`; Cloudflare Tunnel is the intended public transport.
+- The API process remains bound to `127.0.0.1`; use a same-host reverse proxy or tunnel to reach it.
 - Configure exact HTTPS dashboard origins in `API_CORS_ORIGINS`; wildcard credentialed CORS is rejected.
-- Cloudflare Access must protect the API hostname. The backend verifies JWT signature, issuer, audience, timestamps and an operator email allowlist.
+- Cloudflare Access is recommended for shared or public network exposure. When enabled, the backend verifies JWT signature, issuer, audience, timestamps and an operator email allowlist.
+- When Access is disabled, any client that can reach the API can read dashboard data. Network isolation or another trusted access boundary is required; CORS is not authentication.
 - Dashboard browser requests use `credentials: "include"` so Access cookies are sent to the API origin.
 - All data routes are GET-only and repository access uses parameterized read-only queries. No direct database access is present in frontend code.
 - The runtime does not add a browser-facing API route for trading, portfolio updates, configuration changes or exchange execution.
@@ -88,6 +89,7 @@ Monitoring includes the runtime's current scheduler state and last-cycle ingesti
 
 - Vercel, Cloudflare Access, Cloudflare Tunnel, the Pi host and the production API hostname were not deployed or validated in this phase. The checked-in frontend origin and Access audience remain blank.
 - No live browser-to-Pi end-to-end session was exercised. A production rollout still needs an operator-controlled configuration, smoke test and confirmation that Access forwards the expected JWT header.
+- Disabling Access is suitable only when the API route is private/trusted. Publishing an unauthenticated API route exposes read-only portfolio and trading data even though writes and trading actions remain unavailable.
 - Shared system-portfolio access is intentionally not per-user isolated. Every operator allowlisted in the API environment sees the same read-only portfolio.
 - Dashboard reads depend on the Pi, its PostgreSQL connection and Cloudflare Tunnel availability. There is no Supabase fallback, offline cache or frontend same-origin fallback.
 - PostgreSQL table counts are estimates, CPU is sampled, and temperature support is host-dependent.
@@ -109,4 +111,4 @@ These are local automated results. No production deployment, database migration,
 
 ## Phase 8 assessment
 
-The API and dashboard code path is ready for operator-configured integration validation, not for an asserted production cutover. Configure Cloudflare Access, the tunnel, the exact dashboard origin and frontend API settings; then verify protected browser reads and authorization behavior against the live Pi before calling Phase 8 operationally complete. Do not proceed to Phase 9 as part of this work.
+The API and dashboard code path supports both anonymous read-only operation and optional Cloudflare Access enforcement. Production cutover remains unverified: configure a private route and exact dashboard origin, and if using Access configure its issuer, audience, allowlist and frontend login settings. Verify the selected authorization mode against the live Pi before calling Phase 8 operationally complete. Do not proceed to Phase 9 as part of this work.
