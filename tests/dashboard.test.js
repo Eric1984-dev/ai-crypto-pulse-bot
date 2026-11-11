@@ -1223,6 +1223,14 @@ test("dashboard omits all scanner content and uses only its watched-market summa
   assert.match(html, /data-portfolio-chart/);
 });
 
+test("infrastructure monitoring uses the Raspberry Pi label", () => {
+  const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+
+  assert.match(html, /<h2 id="archive-health-heading">Raspberry Pi<\/h2>/);
+  assert.match(html, /aria-label="Raspberry Pi disk usage"/);
+  assert.doesNotMatch(html, />Archive Server<\/h2>|aria-label="Archive server disk usage"/);
+});
+
 test("Agent Status spans the dashboard while Risk Control sits beside Position Monitoring", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   const styles = fs.readFileSync(path.join(rootDirectory, "css", "styles.css"), "utf8");

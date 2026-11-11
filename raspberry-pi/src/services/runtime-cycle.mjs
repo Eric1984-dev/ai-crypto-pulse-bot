@@ -89,7 +89,7 @@ export function createRuntimeCycle({
         const retention = retentionService.plan();
         await assertOwnership();
         await updateAgentStatus({
-          status: "IDLE",
+          status: "ACTIVE",
           lastRunAt: cycleTime,
           errorMessage: null,
           updatedAt: cycleTime

@@ -215,6 +215,13 @@ export async function startRuntime(config, {
     await waitForListening(server, config.api.host, config.api.port);
     scheduler.start();
     runtimeHealth.scheduler = "running";
+    if (existingStatus.status === "IDLE") {
+      await paperTrading.updateAgentStatus({
+        status: "ACTIVE",
+        errorMessage: null,
+        updatedAt: new Date()
+      });
+    }
     logger.info(JSON.stringify({
       event: "runtime_started",
       host: config.api.host,

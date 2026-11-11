@@ -39,6 +39,7 @@ class MockPool extends EventEmitter {
     this.waitingCount = 0;
     this.ended = false;
     this.statements = [];
+    this.statusUpdates = [];
     this.status = "IDLE";
   }
 
@@ -49,7 +50,7 @@ class MockPool extends EventEmitter {
   async connect() {
     const pool = this;
     return {
-      async query(sql) {
+      async query(sql, values) {
         pool.statements.push(sql);
         if (sql === "SELECT 1" && pool.failSelectOne) {
           throw Object.assign(new Error("runtime lock connection lost"), {
@@ -58,6 +59,10 @@ class MockPool extends EventEmitter {
         }
         if (sql === "BEGIN READ ONLY" || sql === "BEGIN READ WRITE" || sql === "COMMIT") {
           return { rows: [] };
+        }
+        if (sql.includes('UPDATE public."AI_Crypto_Bot_Status"')) {
+          pool.statusUpdates.push(values?.[0]);
+          return { rows: [{ status: values?.[0] }] };
         }
         if (sql.includes("pg_try_advisory_lock")) {
           return { rows: [{ locked: true }] };
@@ -182,6 +187,25 @@ test("runtime preflight validates successfully when Cloudflare Access is disable
   });
   assert.deepEqual(result, { contracts: "valid" });
   assert.equal(pool.ended, true);
+});
+
+test("healthy runtime startup reports ACTIVE while waiting for the first scheduled cycle", async () => {
+  const pools = [];
+  const runtime = await startRuntime(runtimeConfig(), {
+    Pool: class extends MockPool {
+      constructor(options) {
+        super(options);
+        pools.push(this);
+      }
+    },
+    validateContracts: async () => ({ contracts: "valid" }),
+    validateIngestionContracts: async () => ({ contracts: "valid" }),
+    validateAIContracts: async () => ({ contracts: "valid" }),
+    validatePaperContracts: async () => ({ contracts: "valid" })
+  });
+
+  assert.ok(pools.some((pool) => pool.statusUpdates[0] === "ACTIVE"));
+  await runtime.close();
 });
 
 test("runtime startup and shutdown never clear an emergency STOPPED status", async () => {

@@ -125,6 +125,8 @@ The reported deployment uses `CLOUDFLARE_ACCESS_ENABLED=false`. The API origin a
 
 Phase 8.5 fixes the Analytics export-count contract, Trade History query handling, and Open Positions AI Status payload locally. Raspberry Pi and repository test suites pass, but these changes have not been deployed to the live Pi; a later live probe was blocked by the Quick Tunnel returning `530`. See the [Phase 8.5 dashboard function validation report](docs/phase-8.5-dashboard-function-validation.md) for evidence and outstanding live checks. Do not treat Phase 8.5 as production-validated until those checks pass.
 
+Phase 8.6 reports `ACTIVE` after healthy runtime startup and each successful cycle, retains `ERROR` on failed cycles and `STOPPED` emergency state, and reports `IDLE` on shutdown. The dashboard's infrastructure monitor is labeled Raspberry Pi; see the [Phase 8.6 dashboard UI alignment report](docs/phase-8.6-dashboard-ui-alignment.md).
+
 ## Permanent dashboard connectivity
 
 For unattended dashboard access, use the existing named Cloudflare Tunnel `ai-crypto-pulse-bot` with a stable hostname such as `api.example.com`. Configure that public hostname to forward to `http://127.0.0.1:3002`; keep the Node API loopback-bound and do not expose PostgreSQL. The repository includes a placeholder [cloudflared configuration example](deploy/cloudflared-config.example.yml); replace the tunnel UUID, credentials path and hostname using operator-owned Cloudflare values before installing it. Quick Tunnel origins are allowed for development/validation builds only; production builds reject them.
