@@ -77,6 +77,40 @@ test("paper repository acquires its transaction lock and status updates use dist
   assert.equal(statements.at(-1).sql, "COMMIT");
 });
 
+test("paper repository attaches the emergency-state lock privilege context to SQLSTATE errors", async () => {
+  const denied = Object.assign(
+    new Error('permission denied for table "AI_Crypto_Bot_Emergency_State"'),
+    { code: "42501" }
+  );
+  const client = {
+    async query(sql) {
+      if (sql.includes("AI_Crypto_Bot_Emergency_State")) {
+        throw denied;
+      }
+      return { rows: [] };
+    },
+    release() {}
+  };
+  const repository = new PaperTradingRepository({
+    connect: async () => client
+  });
+
+  await assert.rejects(
+    repository.withTransaction((transaction) =>
+      repository.getLatestEmergencyStatus(transaction)),
+    (error) => {
+      assert.equal(error.code, "42501");
+      assert.deepEqual(error.paperTradingContext, {
+        table: "AI_Crypto_Bot_Emergency_State",
+        operation: "SELECT FOR UPDATE",
+        requiredPrivilege: "UPDATE",
+        repositoryOperation: "getLatestEmergencyStatus"
+      });
+      return true;
+    }
+  );
+});
+
 test("paper repository fails closed on malformed agent status", async () => {
   const repository = new PaperTradingRepository({
     async query() {

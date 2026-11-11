@@ -356,6 +356,18 @@ export class PaperTradingRepositoryError extends Error {
   }
 }
 
+export class PaperTradingRepositoryQueryError extends Error {
+  constructor(cause, context) {
+    super("A paper-trading database statement failed.", { cause });
+    this.name = "PaperTradingRepositoryQueryError";
+    this.code = typeof cause?.code === "string"
+      ? cause.code
+      : "PAPER_TRADING_DATABASE_FAILED";
+    this.component = "paper-trading-repository";
+    this.paperTradingContext = Object.freeze(context);
+  }
+}
+
 export class PaperTradingRepository {
   constructor(pool, { logger = console } = {}) {
     if (!pool || typeof pool.connect !== "function") {
@@ -366,7 +378,11 @@ export class PaperTradingRepository {
   }
 
   withTransaction(operation) {
-    return withWriteTransaction(this.pool, operation, { logger: this.logger });
+    return withWriteTransaction(
+      this.pool,
+      (client) => operation(createPaperTradingQueryClient(client)),
+      { logger: this.logger }
+    );
   }
 
   async tryAcquireRunLock(client) {
@@ -862,6 +878,66 @@ export class PaperTradingRepository {
       updatedAt
     });
   }
+}
+
+function createPaperTradingQueryClient(client) {
+  return new Proxy(client, {
+    get(target, property) {
+      if (property === "query") {
+        return async (sql, values) => {
+          try {
+            return await target.query(sql, values);
+          } catch (cause) {
+            throw new PaperTradingRepositoryQueryError(
+              cause,
+              describePaperTradingQuery(sql)
+            );
+          }
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+}
+
+function describePaperTradingQuery(sql) {
+  const query = typeof sql === "string" ? sql : sql?.text || "";
+  const isSelectForUpdate = /\bFOR\s+UPDATE\b/i.test(query);
+  const insertTargets = [...query.matchAll(
+    /\bINSERT\s+INTO\s+public\."([^"]+)"/gi
+  )].map((match) => match[1]);
+  const updateTarget = query.match(/\bUPDATE\s+public\."([^"]+)"/i)?.[1];
+  const selectTarget = query.match(/\bFROM\s+public\."([^"]+)"/i)?.[1];
+  const operation = isSelectForUpdate
+    ? "SELECT FOR UPDATE"
+    : insertTargets.length > 0
+      ? "INSERT"
+      : updateTarget
+        ? "UPDATE"
+        : selectTarget
+          ? "SELECT"
+          : "QUERY";
+  const table = isSelectForUpdate
+    ? selectTarget
+    : insertTargets[0] || updateTarget || selectTarget;
+  const requiredPrivilege = isSelectForUpdate || updateTarget
+    ? "UPDATE"
+    : insertTargets.length > 0
+      ? "INSERT"
+      : selectTarget
+        ? "SELECT"
+        : null;
+
+  return {
+    ...(table ? { table } : {}),
+    operation,
+    ...(requiredPrivilege ? { requiredPrivilege } : {}),
+    ...(insertTargets.length > 1 ? { tables: insertTargets } : {}),
+    ...(query === LATEST_EMERGENCY_SQL
+      ? { repositoryOperation: "getLatestEmergencyStatus" }
+      : {})
+  };
 }
 
 function validateSymbols(symbols) {

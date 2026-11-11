@@ -3,6 +3,7 @@ import {
   MAX_PAPER_TRADING_MARKETS,
   MAX_PAPER_TRADING_PORTFOLIOS
 } from "../repositories/paper-trading-repository.mjs";
+import { createPaperTradingFailureDiagnostic } from "./paper-trading-diagnostics.mjs";
 
 export const PAPER_TRADING_RULES = Object.freeze({
   initialBalance: "10000",
@@ -290,11 +291,7 @@ export function createPaperTradingService({
             "The paper trading cycle failed and was rolled back.",
             error
           );
-        logger.error(JSON.stringify({
-          event: "paper_trading_failed",
-          code: safeCode(wrapped.code),
-          component: wrapped.component
-        }));
+        logger.error(JSON.stringify(createPaperTradingFailureDiagnostic(wrapped)));
         throw wrapped;
       }
     },
@@ -422,10 +419,4 @@ function readTime(value) {
     );
   }
   return date;
-}
-
-function safeCode(value) {
-  return typeof value === "string" && /^[A-Z0-9_]{1,64}$/.test(value)
-    ? value
-    : "PAPER_TRADING_FAILED";
 }

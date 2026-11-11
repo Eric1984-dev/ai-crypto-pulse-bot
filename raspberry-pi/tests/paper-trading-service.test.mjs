@@ -295,9 +295,17 @@ test("emergency drawdown persists the stop and prevents new BUY decisions", asyn
 
 test("paper trading fails closed and reports a safe error when storage fails", async () => {
   const logs = [];
+  const denied = Object.assign(new Error("private database detail"), {
+    code: "42501",
+    paperTradingContext: {
+      table: "AI_Crypto_Bot_Trades",
+      operation: "INSERT",
+      requiredPrivilege: "INSERT"
+    }
+  });
   const repository = makeRepository({
     insertBuy: async () => {
-      throw Object.assign(new Error("private database detail"), { code: "42501" });
+      throw denied;
     }
   });
   const service = makeService(repository, logs);
@@ -308,5 +316,9 @@ test("paper trading fails closed and reports a safe error when storage fails", a
   });
   assert.equal(logs.length, 1);
   assert.equal(logs[0].code, "42501");
+  assert.equal(logs[0].table, "AI_Crypto_Bot_Trades");
+  assert.equal(logs[0].operation, "INSERT");
+  assert.equal(logs[0].sqlState, "42501");
+  assert.equal(logs[0].requiredPrivilege, "INSERT");
   assert.equal("message" in logs[0], false);
 });
