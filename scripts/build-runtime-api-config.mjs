@@ -12,8 +12,9 @@ export function createRuntimeApiConfig(environment = process.env) {
     throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN is required for Vercel builds.");
   }
 
+  const deploymentMode = resolveDeploymentMode(environment, isVercelBuild);
   const apiOrigin = rawApiOrigin
-    ? normalizeApiOrigin(rawApiOrigin, isVercelBuild)
+    ? normalizeApiOrigin(rawApiOrigin, deploymentMode, isVercelBuild)
     : "";
   const accessEnabledValue = environment.CRYPTOPULSE_ACCESS_ENABLED ?? "false";
   if (accessEnabledValue !== "true" && accessEnabledValue !== "false") {
@@ -34,35 +35,65 @@ export function renderRuntimeApiConfig(environment = process.env) {
   return `window.CryptoPulseRuntimeConfig = Object.freeze(${JSON.stringify(config, null, 2)});\n`;
 }
 
-function normalizeApiOrigin(value, isVercelBuild) {
+function resolveDeploymentMode(environment, isVercelBuild) {
+  const vercelEnvironment = environment.VERCEL_ENV?.trim() || "";
+  const vercelModes = {
+    production: "production",
+    preview: "validation",
+    development: "development"
+  };
+  const inferredMode = vercelModes[vercelEnvironment];
+  if (vercelEnvironment && !inferredMode) {
+    throw new Error("VERCEL_ENV must be production, preview, or development.");
+  }
+
+  const explicitMode = environment.CRYPTOPULSE_ENVIRONMENT?.trim() || "";
+  const deploymentMode = explicitMode || inferredMode || "development";
+  if (!["development", "validation", "production"].includes(deploymentMode)) {
+    throw new Error("CRYPTOPULSE_ENVIRONMENT must be development, validation, or production.");
+  }
+  if (isVercelBuild && !inferredMode && !explicitMode) {
+    throw new Error("Set CRYPTOPULSE_ENVIRONMENT when VERCEL_ENV is unavailable.");
+  }
+  if (inferredMode === "production" && deploymentMode !== "production") {
+    throw new Error("Vercel production builds must use CRYPTOPULSE_ENVIRONMENT=production.");
+  }
+
+  return deploymentMode;
+}
+
+function normalizeApiOrigin(value, deploymentMode, isVercelBuild) {
   let parsed;
   try {
     parsed = new URL(value);
   } catch {
-    throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN must be an absolute HTTPS origin.");
+    throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN must be an absolute URL origin.");
   }
 
   const hostname = parsed.hostname.replace(/\.$/, "");
   const isLocalhost = hostname === "localhost";
   const hasAllowedProtocol = parsed.protocol === "https:"
-    || (!isVercelBuild && isLocalhost && parsed.protocol === "http:");
+    || (!isVercelBuild && deploymentMode !== "production" && isLocalhost && parsed.protocol === "http:");
   if (!hasAllowedProtocol
     || parsed.username
     || parsed.password
     || parsed.pathname !== "/"
     || parsed.search
     || parsed.hash) {
-    throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN must be an HTTPS origin without credentials or a path.");
+    throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN must be a secure origin without credentials or a path.");
   }
 
-  if (isVercelBuild && isLocalhost) {
+  if ((isVercelBuild || deploymentMode === "production") && isLocalhost) {
     throw new Error("CRYPTOPULSE_RUNTIME_API_ORIGIN must use a stable public hostname for Vercel builds.");
   }
 
   if (hostname === "trycloudflare.com" || hostname.endsWith(".trycloudflare.com")) {
-    throw new Error("Quick Tunnel origins are not supported for dashboard deployments.");
+    if (deploymentMode === "production") {
+      throw new Error("Quick Tunnel origins are not allowed in production deployments.");
+    }
   }
 
+  parsed.hostname = hostname;
   return parsed.origin;
 }
 

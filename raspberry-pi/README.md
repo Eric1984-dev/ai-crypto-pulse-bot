@@ -127,15 +127,16 @@ Phase 8.5 fixes the Analytics export-count contract, Trade History query handlin
 
 ## Permanent dashboard connectivity
 
-For unattended dashboard access, use the existing named Cloudflare Tunnel `ai-crypto-pulse-bot` with a stable hostname such as `api.example.com`. Configure that public hostname to forward to `http://127.0.0.1:3002`; keep the Node API loopback-bound and do not expose PostgreSQL. The repository includes a placeholder [cloudflared configuration example](deploy/cloudflared-config.example.yml); replace the tunnel UUID, credentials path and hostname using operator-owned Cloudflare values before installing it. A Quick Tunnel is for temporary testing only and is rejected by the dashboard build configuration.
+For unattended dashboard access, use the existing named Cloudflare Tunnel `ai-crypto-pulse-bot` with a stable hostname such as `api.example.com`. Configure that public hostname to forward to `http://127.0.0.1:3002`; keep the Node API loopback-bound and do not expose PostgreSQL. The repository includes a placeholder [cloudflared configuration example](deploy/cloudflared-config.example.yml); replace the tunnel UUID, credentials path and hostname using operator-owned Cloudflare values before installing it. Quick Tunnel origins are allowed for development/validation builds only; production builds reject them.
 
 Configure the static dashboard through Vercel build-time environment variables:
 
-- `CRYPTOPULSE_RUNTIME_API_ORIGIN` — required for Vercel builds; the permanent HTTPS API origin, with no path.
+- `CRYPTOPULSE_RUNTIME_API_ORIGIN` — required for Vercel builds; an HTTPS API origin, with no path. Use a stable hostname in Production; Quick Tunnel hosts are for validation/development only.
+- `CRYPTOPULSE_ENVIRONMENT` — optional `development`, `validation`, or `production`; Vercel `VERCEL_ENV` automatically selects production or preview/validation.
 - `CRYPTOPULSE_ACCESS_ENABLED` — optional `true` or `false`, default `false`.
 - `CRYPTOPULSE_ACCESS_AUDIENCE` — required when dashboard Access is enabled.
 
-The Vercel build generates `js/runtime-api-config.js` from these values. The origin and Access audience are embedded in a public static file and must not contain secrets. Changing them requires a new Vercel build/deployment. The build rejects missing production origins and Quick Tunnel hostnames. On the Pi, configure `API_CORS_ORIGINS` to the exact Vercel dashboard origin and keep the API host set to `127.0.0.1`. See the [Phase 8.7 permanent connectivity report](docs/phase-8.7-permanent-connectivity.md) for setup and verification steps.
+The Vercel build generates `js/runtime-api-config.js` from these values. The origin and Access audience are embedded in a public static file and must not contain secrets. Changing them requires a new Vercel build/deployment. The build rejects missing origins, and a production build cannot be downgraded to allow Quick Tunnels. Vercel Preview defaults to validation mode; local builds default to development mode. On the Pi, configure `API_CORS_ORIGINS` to the exact Vercel dashboard origin and keep the API host set to `127.0.0.1`. See the [Phase 8.7 permanent connectivity report](docs/phase-8.7-permanent-connectivity.md) for setup and verification steps.
 
 ## Layout
 

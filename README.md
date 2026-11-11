@@ -78,7 +78,7 @@ Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase st
 
 ## Deployen
 
-Vercel host de bestaande statische dashboardbestanden; de browser haalt operationele gegevens bij de Pi API. De live Raspberry Pi-runtime beheert zelf scheduling en paper trading. De oude Vercel serverless-paden blijven in de repository, maar zijn geen dashboarddatafallback en deze documentatie claimt geen productiecutover of deployment. Configureer `apiOrigin` per dashboarddeployment; schakel `accessEnabled` alleen in wanneer de Pi API ook Cloudflare Access vereist en stel dan de bijbehorende `accessAudience` in. Zie het [Phase 8 cutoverrapport](raspberry-pi/docs/phase-8-dashboard-cutover.md) en de [Pi runtime documentatie](raspberry-pi/README.md).
+Vercel host de bestaande statische dashboardbestanden; de browser haalt operationele gegevens bij de Pi API. De live Raspberry Pi-runtime beheert zelf scheduling en paper trading. De oude Vercel serverless-paden blijven in de repository, maar zijn geen dashboarddatafallback en deze documentatie claimt geen productiecutover of deployment. Configureer `CRYPTOPULSE_RUNTIME_API_ORIGIN` als Vercel build environment variable; Vercel Preview ondersteunt Quick Tunnel-originconfiguratie voor validatie, terwijl Production-builds deze expliciet blokkeren. `CRYPTOPULSE_ENVIRONMENT` kan lokale en aangepaste buildomgevingen instellen. Configureer de Access audience via `CRYPTOPULSE_ACCESS_AUDIENCE` wanneer Access ingeschakeld is. Zie de [Phase 8 cutoverrapportage](raspberry-pi/docs/phase-8-dashboard-cutover.md), de [Phase 8.7 connectivityrapportage](raspberry-pi/docs/phase-8.7-permanent-connectivity.md) en de [Pi runtime documentatie](raspberry-pi/README.md).
 
 Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit van Vercel-deployments. De broncode blijft in Git beschikbaar voor Pi-installatie en updates; `.vercelignore` voorkomt uitsluitend opname in de Vercel-deployment, niet in de Git-repository.
 
@@ -89,6 +89,7 @@ Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit v
 - [Target Raspberry Pi API architecture](./docs/migration/api-architecture.md)
 - [Phase 8 dashboard cutover report](./raspberry-pi/docs/phase-8-dashboard-cutover.md)
 - [Phase 8.1/8.2 authentication configuration](./raspberry-pi/docs/phase-8.1-authentication-activation.md)
+- [Phase 8.7 permanent connectivity report](./raspberry-pi/docs/phase-8.7-permanent-connectivity.md)
 - [Database](./docs/DATABASE.md)
 - [Architectuur](./docs/ARCHITECTURE.md)
 - [Authentication API](./docs/API.md)

@@ -28,7 +28,7 @@ The Node API remains loopback-bound. Cloudflare Tunnel creates outbound connecti
 | No Pi-side `cloudflared` ingress file or stable API hostname was present in the repository. | The Pi deployment directory contained the runtime systemd unit but no tunnel route/configuration. |
 | The named tunnel exists operationally according to the operator, but the tunnel UUID, DNS zone, public hostname and active ingress target are not recorded here. | No Cloudflare account or live Pi checks were performed. |
 
-Quick Tunnel hostnames are temporary testing endpoints, not production origins. The dashboard build now rejects any `trycloudflare.com` hostname so a temporary tunnel cannot silently become the deployed origin.
+Quick Tunnel hostnames are temporary testing endpoints, not production origins. Phase 8.7.1 permits them only in development or validation mode; production builds continue to reject all `trycloudflare.com` hostnames.
 
 ## Permanent tunnel design
 
@@ -40,7 +40,7 @@ Supported access models:
 
 1. **Named Cloudflare Tunnel and stable hostname — recommended for the Vercel dashboard.** Requires a Cloudflare-managed DNS zone, named tunnel credentials/token on the Pi, a persistent `cloudflared` service, and an HTTPS public hostname. Protect a shared/public route with Cloudflare Access; CORS alone is not protection.
 2. **Private network or same-host reverse proxy — supported for self-hosted use.** Keep the API reachable only on a trusted network and configure the dashboard origin to that HTTPS route. The network path and certificate must remain stable.
-3. **Quick Tunnel — temporary testing only.** Not supported as a dashboard build origin; the build rejects it.
+3. **Quick Tunnel — temporary testing only.** Supported for development and validation builds. Production builds reject it.
 
 ## Dashboard API-origin configuration
 
@@ -48,11 +48,12 @@ The dashboard build reads these Vercel build-time environment variables:
 
 | Variable | Requirement |
 |---|---|
-| `CRYPTOPULSE_RUNTIME_API_ORIGIN` | Required in Vercel builds. HTTPS origin only, with no path, query or fragment; Quick Tunnel hostnames are rejected. |
+| `CRYPTOPULSE_RUNTIME_API_ORIGIN` | Required in Vercel builds. HTTPS origin only, with no path, query or fragment. Quick Tunnel hosts are permitted only outside production. |
+| `CRYPTOPULSE_ENVIRONMENT` | Optional `development`, `validation`, or `production`. Defaults from `VERCEL_ENV`: `development` and `preview` map to development and validation, respectively; production maps to production. If a Vercel build has no recognized `VERCEL_ENV`, set this explicitly. A Vercel production build cannot be downgraded. |
 | `CRYPTOPULSE_ACCESS_ENABLED` | Optional `true` or `false`, defaults to `false`. Must match `CLOUDFLARE_ACCESS_ENABLED` on the Pi. |
 | `CRYPTOPULSE_ACCESS_AUDIENCE` | Required when dashboard Access is enabled; public Access audience value, not a secret. |
 
-The root `npm run build` command generates the public static `js/runtime-api-config.js` from those values before project validation. `vercel.json` invokes that build command. Vercel production builds fail when the API origin is missing or invalid. Local builds without a deployment origin retain an empty origin, and local development may use `http://localhost:<port>`. Updating an environment value requires a new Vercel build/deployment; this phase does not trigger or claim a deployment.
+The root `npm run build` command generates the public static `js/runtime-api-config.js` from those values before project validation. `vercel.json` invokes that build command. Vercel builds fail when the API origin is missing or invalid. Production mode requires a stable HTTPS hostname and rejects Quick Tunnels, including if `CRYPTOPULSE_ENVIRONMENT` attempts to override a Vercel production build. Development and validation modes allow HTTPS Quick Tunnel origins. Vercel Preview builds default to validation mode; local builds default to development mode. Local development may also use `http://localhost:<port>`. Updating an environment value requires a new Vercel build/deployment; this phase does not trigger or claim a deployment.
 
 The generated browser file contains only the API origin and Access settings. Never put database credentials, Cloudflare tunnel tokens, Access service tokens, signing keys or operator email allowlists in Vercel's public configuration or browser JavaScript. Keep the Cloudflare issuer, audience and operator allowlist configured in the Pi runtime environment as required by Phase 8.1.
 
@@ -72,9 +73,9 @@ The generated browser file contains only the API origin and Access settings. Nev
 
 ### Vercel dashboard
 
-1. Set `CRYPTOPULSE_RUNTIME_API_ORIGIN` to the permanent HTTPS hostname, for example `https://api.example.com`.
+1. For Production, set `CRYPTOPULSE_RUNTIME_API_ORIGIN` to the permanent HTTPS hostname, for example `https://api.example.com`; leave `VERCEL_ENV=production` intact. For a development or validation deployment, the origin may be an HTTPS Quick Tunnel hostname.
 2. If using Cloudflare Access, set `CRYPTOPULSE_ACCESS_ENABLED=true` and `CRYPTOPULSE_ACCESS_AUDIENCE` to the Access application's public audience. Keep these aligned with the Pi configuration. If Access is disabled, explicitly set `CRYPTOPULSE_ACCESS_ENABLED=false` and restrict the route to a trusted network; the public read-only API is otherwise anonymous.
-3. Set the values for each Vercel environment that will serve the dashboard (Production and any intended Preview environments). Do not use a Quick Tunnel origin.
+3. Set the values for each Vercel environment that will serve the dashboard (Production and any intended Preview environments). Vercel Preview maps to validation mode automatically. For other build systems or when `VERCEL_ENV` is unavailable, set `CRYPTOPULSE_ENVIRONMENT=development`, `validation`, or `production` explicitly.
 4. Run the Vercel build/deployment through the operator's normal process. No deployment was run as part of this phase.
 
 ## Verification procedure
@@ -85,24 +86,26 @@ Perform these checks after configuration and deployment; they are not represente
 2. Confirm `cloudflared` is active and enabled at boot. Restart the named tunnel service and verify it reconnects without changing the configured public hostname.
 3. From an external network, request `https://api.<your-domain>/api/v1/health/live` and confirm `200`; verify that the hostname resolves to the named tunnel, not to a Quick Tunnel.
 4. Request `/api/v1/markets` and `/api/v1/dashboard-data`. Confirm `200` and expected read-only data. With Access enabled, also verify an authorized browser request succeeds and unauthenticated/disallowed requests fail.
-5. In the deployed dashboard browser, confirm requests use exactly the permanent API hostname, CORS permits the dashboard origin, and Dashboard, Analytics and Trade History render. Confirm no request uses `trycloudflare.com`.
+5. In the deployed dashboard browser, confirm requests use the configured API hostname, CORS permits the dashboard origin, and Dashboard, Analytics and Trade History render. In Production, confirm no request uses a `trycloudflare.com` hostname; such hostnames are expected only in development/validation deployments.
 6. Restart the Pi and verify both `cryptopulse-runtime.service` and `cloudflared` start automatically, and the same HTTPS hostname remains usable.
 7. Check the generated `js/runtime-api-config.js` in the Vercel build artifact: it must contain the selected origin and Access settings, and no credentials or temporary hostname.
 
 ## Validation results and limitations
 
 - Repository audit confirmed one hardcoded Quick Tunnel origin in the browser config and no checked-in named-tunnel UUID, ingress route or stable API hostname.
-- The new build-time configuration validates HTTPS origins, rejects Quick Tunnel hosts, requires the API origin in Vercel builds, and validates Access configuration.
+- The new build-time configuration validates HTTPS origins, permits Quick Tunnel hosts only in development/validation, requires the API origin in Vercel builds, and validates Access configuration.
 
 Local checks:
 
 | Check | Result |
 |---|---|
-| Raspberry Pi package suite (`npm.cmd test` in `raspberry-pi/`) | Passed: 172 tests, 0 failures |
-| Repository suite (`npm.cmd test` at repository root) | Passed: 518 tests, 0 failures |
-| Dashboard API-origin configuration tests | Passed: 6 tests, 0 failures |
+| Raspberry Pi package suite (`npm.cmd test` in `raspberry-pi/`) | Phase 8.7 baseline: 172 tests, 0 failures; not rerun for Phase 8.7.1, which changes only dashboard build configuration. |
+| Repository suite (`npm.cmd test` at repository root) | Passed during Phase 8.7.1: 519 tests, 0 failures |
+| Dashboard API-origin configuration tests | Passed during Phase 8.7.1: 7 tests, 0 failures |
 | `node --check` for the config builder, its tests and runtime API configuration modules | Passed |
-| Vercel-mode build with a sample stable origin and Access audience | Passed; generated config contained the expected public settings and no Quick Tunnel host |
+| Vercel Production build with stable origin | Passed |
+| Production Quick Tunnel rejection | Passed; both Vercel production mode and explicit production mode reject it |
+| Vercel Preview build with Quick Tunnel origin | Passed; generated config retains the validation origin |
 | Local build with no deployment variables | Passed; the generated origin was restored to empty |
 | `git diff --check` and whitespace checks for new files | Passed |
 
@@ -112,4 +115,10 @@ Local checks:
 
 ## Phase 8.7 assessment
 
-The dashboard no longer ships with a hardcoded Quick Tunnel origin. Its API origin is deployment-configurable through Vercel build environment, and production builds reject temporary tunnel hosts. The permanent named-tunnel hostname and live end-to-end availability still require operator configuration and verification. Phase 9 has not started.
+The dashboard no longer ships with a hardcoded Quick Tunnel origin. Its API origin is deployment-configurable through Vercel build environment; development/validation builds can use Quick Tunnels, while production builds reject them. The permanent named-tunnel hostname and live end-to-end availability still require operator configuration and verification. Phase 9 has not started.
+
+## Phase 8.7.1 — Development Quick Tunnel support
+
+The build distinguishes Vercel's `VERCEL_ENV` values: `production` remains protected, `preview` is treated as validation, and local builds default to development. `CRYPTOPULSE_ENVIRONMENT` can explicitly select `development`, `validation`, or `production` when needed. A production Vercel build cannot be reclassified as development or validation. Quick Tunnel origins remain HTTPS-only, and are accepted only in the non-production modes.
+
+Phase 8.7.1 checks: the dashboard build tests passed **7/7**, the repository suite passed **519/519**, syntax checks passed, and `git diff --check` passed. A Vercel Production build accepted a stable sample origin, rejected a Quick Tunnel origin, and a Vercel Preview build accepted one. No live Pi, Cloudflare or Vercel deployment checks were run.
