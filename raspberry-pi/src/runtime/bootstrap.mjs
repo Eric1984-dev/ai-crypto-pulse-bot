@@ -72,8 +72,12 @@ export async function startRuntime(config, {
   validatePaperContracts = validatePaperTradingRuntimeContracts,
   authenticationProvider,
   env = process.env,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  onFatal
 } = {}) {
+  if (onFatal !== undefined && typeof onFatal !== "function") {
+    throw new TypeError("The runtime fatal-failure handler must be a function.");
+  }
   const apiConfig = withPoolMax(config, 2);
   const pool = createPostgresPool(apiConfig, { Pool, logger });
   let server;
@@ -114,15 +118,17 @@ export async function startRuntime(config, {
       throw error;
     }
     if (existingStatus.status !== "STOPPED"
-      && (existingStatus.status === "ANALYZING" || existingStatus.is_analyzing)) {
+      && (existingStatus.status === "ACTIVE"
+        || existingStatus.status === "ANALYZING"
+        || existingStatus.is_analyzing)) {
       await paperTrading.updateAgentStatus({
         status: "ERROR",
-        errorMessage: "An interrupted AI analysis was detected during runtime startup.",
+        errorMessage: "Interrupted runtime activity was detected during startup.",
         updatedAt: new Date()
       });
       logger.warn(JSON.stringify({
-        event: "runtime_interrupted_analysis_recovered",
-        code: "RUNTIME_ANALYSIS_INTERRUPTED"
+        event: "runtime_interrupted_activity_recovered",
+        code: "RUNTIME_ACTIVITY_INTERRUPTED"
       }));
     }
 
@@ -162,9 +168,10 @@ export async function startRuntime(config, {
         runtimeHealth.lastCycle = result;
         return result;
       },
-      onFatal: () => {
+      onFatal: (error) => {
         runtimeHealth.scheduler = "error";
         runtimeHealth.currentStage = null;
+        onFatal?.(error);
       },
       logger
     });

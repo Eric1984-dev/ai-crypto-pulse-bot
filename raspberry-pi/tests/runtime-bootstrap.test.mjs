@@ -45,6 +45,11 @@ class MockPool extends EventEmitter {
     return {
       async query(sql) {
         pool.statements.push(sql);
+        if (sql === "SELECT 1" && pool.failSelectOne) {
+          throw Object.assign(new Error("runtime lock connection lost"), {
+            code: "ECONNRESET"
+          });
+        }
         if (sql === "BEGIN READ ONLY" || sql === "BEGIN READ WRITE" || sql === "COMMIT") {
           return { rows: [] };
         }
@@ -156,4 +161,67 @@ test("runtime startup and shutdown never clear an emergency STOPPED status", asy
 
   assert.ok(pools.every((pool) =>
     pool.statements.every((sql) => !sql.includes("UPDATE public.\"AI_Crypto_Bot_Status\""))));
+});
+
+test("runtime marks interrupted ACTIVE work as ERROR after a restart", async () => {
+  const pools = [];
+  const runtime = await startRuntime(runtimeConfig(), {
+    Pool: class extends MockPool {
+      constructor(options) {
+        super(options);
+        this.status = "ACTIVE";
+        pools.push(this);
+      }
+    },
+    validateContracts: async () => ({ contracts: "valid" }),
+    validateIngestionContracts: async () => ({ contracts: "valid" }),
+    validateAIContracts: async () => ({ contracts: "valid" }),
+    validatePaperContracts: async () => ({ contracts: "valid" })
+  });
+
+  await runtime.close();
+
+  assert.ok(pools.some((pool) =>
+    pool.statements.some((sql) => sql.includes('UPDATE public."AI_Crypto_Bot_Status"'))));
+});
+
+test("runtime reports lock loss as fatal so the process can restart", async () => {
+  const pools = [];
+  let scheduledTimer;
+  let fatalCode;
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay) => {
+    scheduledTimer = { callback, delay, unref() {} };
+    return scheduledTimer;
+  };
+  let runtime;
+  try {
+    runtime = await startRuntime(runtimeConfig(), {
+      Pool: class extends MockPool {
+        constructor(options) {
+          super(options);
+          pools.push(this);
+        }
+      },
+      validateContracts: async () => ({ contracts: "valid" }),
+      validateIngestionContracts: async () => ({ contracts: "valid" }),
+      validateAIContracts: async () => ({ contracts: "valid" }),
+      validatePaperContracts: async () => ({ contracts: "valid" }),
+      onFatal(error) {
+        fatalCode = error.code;
+      }
+    });
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+
+  try {
+    pools[0].failSelectOne = true;
+    scheduledTimer.callback();
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(fatalCode, "RUNTIME_OWNERSHIP_LOCK_LOST");
+  } finally {
+    await runtime.close();
+  }
 });

@@ -44,10 +44,22 @@ function safeCycle(cycle) {
   if (!cycle || typeof cycle !== "object") {
     return null;
   }
+  const stages = cycle.stages && typeof cycle.stages === "object"
+    ? Object.freeze({
+      ingestion: safeStatus(cycle.stages.ingestion, ["completed", "partial", "FAILED"]),
+      aiAnalysis: safeStatus(cycle.stages.aiAnalysis, ["completed", "FAILED"]),
+      paperTrading: safeStatus(cycle.stages.paperTrading, ["COMPLETED", "SKIPPED", "FAILED"])
+    })
+    : undefined;
   return Object.freeze({
     status: typeof cycle.status === "string" ? cycle.status : null,
     ...(typeof cycle.cycleAt === "string" ? { cycleAt: cycle.cycleAt } : {}),
     ...(typeof cycle.stage === "string" ? { stage: cycle.stage } : {}),
-    ...(typeof cycle.code === "string" ? { code: cycle.code } : {})
+    ...(typeof cycle.code === "string" ? { code: cycle.code } : {}),
+    ...(stages ? { stages } : {})
   });
+}
+
+function safeStatus(value, allowed) {
+  return typeof value === "string" && allowed.includes(value) ? value : null;
 }

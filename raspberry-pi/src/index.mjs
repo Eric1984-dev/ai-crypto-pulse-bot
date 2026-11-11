@@ -9,16 +9,19 @@ function safeErrorCode(error) {
 
 async function main() {
   const config = readRuntimeConfig();
-  const runtime = await startRuntime(config);
+  let runtime;
   let shuttingDown = false;
 
   const shutdown = (signal) => {
-    if (shuttingDown) {
+    if (shuttingDown || !runtime) {
       return;
     }
     shuttingDown = true;
     runtime.close().then(() => {
-      console.info(JSON.stringify({ event: "runtime_stopped", signal }));
+      console.info(JSON.stringify({
+        event: signal === "RUNTIME_FATAL" ? "runtime_fatal_shutdown_complete" : "runtime_stopped",
+        signal
+      }));
     }).catch((error) => {
       console.error(JSON.stringify({
         event: "runtime_shutdown_failed",
@@ -27,6 +30,17 @@ async function main() {
       process.exitCode = 1;
     });
   };
+
+  runtime = await startRuntime(config, {
+    onFatal(error) {
+      process.exitCode = 1;
+      console.error(JSON.stringify({
+        event: "runtime_fatal_failure",
+        code: safeErrorCode(error)
+      }));
+      shutdown("RUNTIME_FATAL");
+    }
+  });
 
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);

@@ -2,8 +2,7 @@
 Description=CryptoPulse Raspberry Pi Runtime
 Wants=network-online.target
 After=network-online.target
-StartLimitIntervalSec=600
-StartLimitBurst=5
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -13,7 +12,7 @@ WorkingDirectory=/opt/cryptopulse/raspberry-pi
 EnvironmentFile=/etc/cryptopulse/runtime.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node src/index.mjs
-Restart=on-failure
+Restart=always
 RestartSec=10s
 TimeoutStopSec=125s
 KillSignal=SIGTERM

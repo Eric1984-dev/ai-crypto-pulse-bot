@@ -40,6 +40,11 @@ test("runtime cycle allows per-market partial ingestion and preserves stage orde
   });
 
   assert.equal(result.status, "COMPLETED");
+  assert.deepEqual(result.stages, {
+    ingestion: "partial",
+    aiAnalysis: "completed",
+    paperTrading: "COMPLETED"
+  });
   assert.deepEqual(calls, ["ingestion", "analysis", "paper"]);
   assert.deepEqual(statusUpdates.map(({ status }) => status), [
     "ACTIVE",
