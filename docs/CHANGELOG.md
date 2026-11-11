@@ -6,6 +6,15 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Raspberry Pi migration — Phase 10 post-migration cleanup
+
+- Remove the nine obsolete Vercel Supabase/runtime API functions and keep only the three active authentication, protected-page, and Pi API bridge functions
+- Reduce the dashboard-data function to an allowlisted Pi API proxy with no Supabase fallback
+- Remove superseded root runtime services, routes, and tests while retaining the Pi runtime and its test coverage
+- Remove unused root Supabase/scheduler/admin/archive-proxy environment variables
+- Preserve SQL migration history, PGlite validation, and the optional Pi-side manual archive utility
+- Reconcile active deployment, API, architecture, and scheduling documentation with the Pi-owned runtime
+
 ### Raspberry Pi migration — Phase 9
 
 - Add a single-admin username/password login verified against a bcrypt hash configured only on the Raspberry Pi

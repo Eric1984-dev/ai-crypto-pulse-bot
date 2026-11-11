@@ -87,24 +87,19 @@ function validateProject() {
   }
 
   const envExamplePath = path.join(rootDirectory, ".env.example");
+  const envExample = fs.existsSync(envExamplePath)
+    ? fs.readFileSync(envExamplePath, "utf8")
+    : "";
   if (!fs.existsSync(envExamplePath)) {
     errors.push("Missing environment template: .env.example");
   } else {
-    const envExample = fs.readFileSync(envExamplePath, "utf8");
     if (!/^ENABLE_LIVE_TRADING=false$/m.test(envExample)) {
       errors.push("The environment template must keep ENABLE_LIVE_TRADING=false.");
     }
-    for (const variable of ["SUPABASE_URL", "SUPABASE_ANON_KEY"]) {
-      if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
-        errors.push(`The environment template must declare ${variable}.`);
-      }
-    }
     for (const variable of [
-      "SUPABASE_SERVICE_ROLE_KEY",
-      "ARCHIVE_SERVER_URL",
-      "ARCHIVE_HEALTH_TOKEN",
-      "CRON_SECRET",
-      "ADMIN_USER_IDS"
+      "CRYPTOPULSE_RUNTIME_API_ORIGIN",
+      "CRYPTOPULSE_ENVIRONMENT",
+      "CRYPTOPULSE_ACCESS_ENABLED"
     ]) {
       if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
         errors.push(`The environment template must declare ${variable}.`);
@@ -134,43 +129,22 @@ function validateProject() {
   }
 
   for (const endpoint of [
-    "api/auth-config.mjs",
     "api/auth-session.mjs",
     "api/protected-page.mjs",
-    "api/dashboard-data.mjs",
-    "api/agent-status.mjs",
-    "api/market.mjs",
-    "api/market-summary.mjs",
-    "api/market-refresh.mjs",
-    "api/candle-refresh.mjs",
-    "api/ai-analysis.mjs",
-    "api/paper-trading.mjs",
-    "api/admin-actions.mjs"
+    "api/dashboard-data.mjs"
   ]) {
     if (!fs.existsSync(path.join(rootDirectory, endpoint))) {
       errors.push(`Missing required API endpoint: ${endpoint}`);
     }
   }
 
+  if (!fs.existsSync(path.join(rootDirectory, "lib", "runtime-api-proxy.mjs"))) {
+    errors.push("Missing shared same-origin Pi API proxy: lib/runtime-api-proxy.mjs");
+  }
+
   if (!fs.existsSync(path.join(rootDirectory, "js/agent-brain.js"))) {
     errors.push("Missing Three.js Agent Brain module: js/agent-brain.js");
   }
-  if (!fs.existsSync(path.join(rootDirectory, "lib", "market-data.mjs"))) {
-    errors.push("Missing shared market-data service: lib/market-data.mjs");
-  }
-  if (!fs.existsSync(path.join(rootDirectory, "lib", "ai-engine.mjs"))) {
-    errors.push("Missing shared AI engine service: lib/ai-engine.mjs");
-  }
-  if (!fs.existsSync(path.join(rootDirectory, "lib", "cron-auth.js"))) {
-    errors.push("Missing shared scheduler authorization helper: lib/cron-auth.js");
-  }
-  if (!fs.existsSync(path.join(rootDirectory, "lib", "paper-trading.mjs"))) {
-    errors.push("Missing server-side paper-trading service: lib/paper-trading.mjs");
-  }
-  if (!fs.existsSync(path.join(rootDirectory, "lib", "admin-auth.js"))) {
-    errors.push("Missing server-side administrator authorization helper: lib/admin-auth.js");
-  }
-
   const protectedPageRoute = (vercelConfig?.routes || []).some((route) =>
     typeof route.src === "string"
       && route.src.includes("dashboard")
@@ -186,8 +160,22 @@ function validateProject() {
 
   const apiFunctionCount = fs.readdirSync(path.join(rootDirectory, "api"))
     .filter((name) => /\.(?:js|mjs|ts)$/.test(name)).length;
-  if (apiFunctionCount > 12) {
-    errors.push(`Vercel Hobby supports at most 12 API functions; found ${apiFunctionCount}.`);
+  if (apiFunctionCount !== 3) {
+    errors.push(`The dashboard bridge must retain exactly 3 Vercel functions; found ${apiFunctionCount}.`);
+  }
+  for (const variable of [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ARCHIVE_SERVER_URL",
+    "ARCHIVE_HEALTH_TOKEN",
+    "CRON_SECRET",
+    "ADMIN_USER_IDS",
+    "AI_ANALYSIS_MODE"
+  ]) {
+    if (new RegExp(`^${variable}=`, "m").test(envExample)) {
+      errors.push(`The root environment template must not declare retired runtime variable ${variable}.`);
+    }
   }
 
   return errors;

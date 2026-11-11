@@ -276,20 +276,24 @@ test("trade history filters start collapsed and the table supports vertical scro
   assert.match(styles, /\.history-table thead th\s*\{[^}]*position:\s*sticky/s);
 });
 
-test("market refresh endpoint remains available without a Vercel Cron configuration", () => {
+test("Vercel retains only the dashboard bridge functions and no scheduled jobs", () => {
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDirectory, "vercel.json"), "utf8"));
   assert.equal(Object.prototype.hasOwnProperty.call(vercelConfig, "crons"), false);
-  assert.equal(fs.statSync(path.join(rootDirectory, "api", "market-refresh.mjs")).isFile(), true);
-  assert.equal(fs.statSync(path.join(rootDirectory, "api", "candle-refresh.mjs")).isFile(), true);
+  assert.deepEqual(
+    fs.readdirSync(path.join(rootDirectory, "api"))
+      .filter((name) => /\.(?:mjs|js)$/.test(name))
+      .sort(),
+    ["auth-session.mjs", "dashboard-data.mjs", "protected-page.mjs"]
+  );
   assert.deepEqual(validateProject(), []);
 });
 
-test("Vercel serverless function count remains at the 12-function limit", () => {
+test("Vercel serverless function count remains below the 12-function Hobby limit", () => {
   const apiDirectory = path.join(rootDirectory, "api");
   const functionCount = fs.readdirSync(apiDirectory)
     .filter((name) => /\.(?:mjs|js)$/.test(name))
     .length;
-  assert.equal(functionCount, 12);
+  assert.equal(functionCount, 3);
 });
 
 test("protected trading pages disclose paper-only mode and initialize the auth guard", () => {

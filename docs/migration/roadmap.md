@@ -1,5 +1,7 @@
 # Migratieroadmap
 
+> **Historisch voorstel:** De onderstaande fasering en statustabel zijn vóór de Pi-cutover geschreven en geven niet de actuele implementatiestatus weer. De gebruiker rapporteert dat fasen 2–9 operationeel zijn; Phase 10 cleanup-validatie is beschreven in de [actuele rapportage](../post-migration-cleanup-report.md). Gebruik [docs/SCHEDULING.md](../SCHEDULING.md) en [docs/DEPLOYMENT.md](../DEPLOYMENT.md) voor de huidige bedieningsgrenzen.
+
 Dit is een voorstel voor de uitvoeringsvolgorde, geen toestemming om volgende fasen alvast uit te voeren. Elke fase begint pas na een expliciete gebruikersprompt en eindigt na tests, documentatie, Git-review en commit. Daarna stopt het werk tot toestemming voor de volgende fase.
 
 ## Status

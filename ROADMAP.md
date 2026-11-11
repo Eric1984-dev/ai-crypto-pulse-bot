@@ -1,16 +1,14 @@
 # CryptoPulse AI Agent Roadmap
 
-## Raspberry Pi migration documentation
+## Current migration status
 
-- [x] Phase 1 — audit and migration plan: [audit](docs/migration/01-audit.md), [architecture](docs/migration/architecture.md), and [migration roadmap](docs/migration/roadmap.md)
-- [x] Phase 1.7 — single-owner Pi runtime execution specification: [runtime specification](docs/migration/runtime-execution-spec.md)
-- [x] Phase 1.8 — Pi API endpoints, auth, dashboard polling, and cutover gates: [target API architecture](docs/migration/api-architecture.md)
-- [x] Phases 2–7.7 — Raspberry Pi runtime foundation, ingestion, AI analysis, scheduler and paper trading are reported operational on the Pi; see the [Phase 7.7 live validation addendum](raspberry-pi/docs/phase-7.7.2-live-validation-addendum.md).
-- [x] Migration Phase 8 — dashboard reads are wired to the Pi API; the operator reports the live runtime, tunnel, Vercel and dashboard integration operational: [cutover report](raspberry-pi/docs/phase-8-dashboard-cutover.md), [authentication configuration](raspberry-pi/docs/phase-8.1-authentication-activation.md).
-- [ ] Migration Phase 9 — single-admin dashboard authentication is implemented locally; Pi environment configuration, live login/logout validation and production integration remain pending: [authentication report](raspberry-pi/docs/phase-9-dashboard-authentication.md).
-- [ ] Migration Phase 10 and later — not started; requires separate explicit approval.
+- Phases 1–9: the operator reports the Raspberry Pi runtime, database, scheduler, trading services, dashboard, single-admin authentication, and tunnel operational. See the [Phase 7.7 validation](raspberry-pi/docs/phase-7.7-operational-validation.md), [Phase 8 cutover](raspberry-pi/docs/phase-8-dashboard-cutover.md), and [Phase 9 authentication](raspberry-pi/docs/phase-9-dashboard-authentication.md).
+- Phase 10: conservative post-migration cleanup is being validated. See the [cleanup report](docs/post-migration-cleanup-report.md).
+- Phase 11: not started.
 
-The dashboard API remains read-only and bound to loopback; data routes require the single-admin session, with Cloudflare Access available as an additional boundary. Phase 8 production status is operator-reported; Phase 9 authentication is not production-validated until the Pi configuration and live login checks succeed. This roadmap entry does not authorize public API exposure, schema/data operations, or live trading.
+Production status is operator-reported unless a specific live check is recorded. Do not infer deployment, database, or runtime verification from local tests.
+
+> **Historical project record:** Phase checklists below describe earlier feature development, much of which ran on the retired Supabase/Vercel backend. They are retained for history and do not describe the current runtime or deployment process.
 
 ## Phase 01 - Project Setup
 

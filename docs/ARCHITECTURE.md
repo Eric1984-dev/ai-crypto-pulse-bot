@@ -1,8 +1,27 @@
 # Architecture
 
-The active dashboard is served by Vercel and reads from the Raspberry Pi runtime API. Its Phase 9 single-admin authentication and same-origin proxy are described in the [dashboard authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md). The Vercel/Supabase sections below document legacy platform components and do not describe the active Pi dashboard request path.
+## Current production architecture
 
-## Current Implementation: Phase 11
+The operator reports the following production flow is operational:
+
+```text
+Browser
+  -> Vercel static dashboard and same-origin auth/data bridge
+  -> configured HTTPS API hostname
+  -> Cloudflare Tunnel
+  -> Raspberry Pi runtime
+  -> existing PostgreSQL database
+```
+
+The browser uses the existing Vercel bridge to preserve the single-admin session cookie. Vercel retains only three functions: auth/session proxy, protected-page delivery, and allowlisted Pi API proxy. The Pi runtime owns ingestion, AI, paper trading, scheduling, and monitoring. The API remains loopback-bound behind Cloudflare Tunnel; the dashboard is read-only.
+
+The separate `archive-server/` package is a retained optional manual archive-copy and health utility. It is not part of trading or scheduler execution, and the dashboard monitoring card reads the Pi runtime's `/api/v1/monitoring` route.
+
+The operator's live-state report is not an independent production check. See [deployment](./DEPLOYMENT.md), [API contracts](./API.md), the [Phase 9 authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md), and the [Phase 10 cleanup report](./post-migration-cleanup-report.md).
+
+> **Historical material:** Sections below retain the pre-migration Supabase/Vercel design and phase history. They are not current deployment instructions or descriptions of the active runtime.
+
+## Historical Supabase/Vercel implementation: Phase 11 (superseded)
 
 The project is a static HTML/CSS/JavaScript application hosted on Vercel. Phase 02 implements Supabase Authentication with server-side Vercel functions for configuration, session-cookie validation, and protected page delivery. Phase 03 adds the Supabase PostgreSQL schema, migrations, seed data, and RLS policies. Phase 07 adds a server-side deterministic analysis engine using the existing Phase 06 market data.
 

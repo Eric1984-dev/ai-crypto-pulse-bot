@@ -1,137 +1,42 @@
 # CryptoPulse AI Agent
 
-CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. De oorspronkelijke platformfasen omvatten Supabase Authentication, het PostgreSQL-schema, het dashboard, Agent Status-visualisatie, publieke Bitvavo-marktdata, de deterministische AI Engine, paper trading, Market Scanner, Trade History, Analytics en AI Recommendations. Daarnaast loopt een afzonderlijk Raspberry Pi-migratieprogramma; de dashboard-cutover in migratie-Phase 8 vervangt de browser-runtime afhankelijkheid van Supabase door de read-only Pi API.
+CryptoPulse is a paper-trading platform whose autonomous backend runs on a Raspberry Pi. The dashboard remains a static HTML/CSS/JavaScript site hosted by Vercel.
 
-## Huidige status
-
-- De afzonderlijke `raspberry-pi/`-package bevat de autonome runtime en read-only dashboard-API. De operator meldt de Phase 8-runtime-, tunnel-, Vercel- en dashboardintegratie operationeel. Dashboarddata vereist nu één lokale administrator-login met een bcrypt-hash en een server-side Pi-sessie; de API bindt aan loopback. Cloudflare Access kan als extra netwerkgrens worden ingeschakeld; CORS is geen authenticatie. Phase 9 is lokaal getest, maar wacht nog op Pi-configuratie en live loginvalidatie. Zie de [Phase 9-authenticatierapportage](raspberry-pi/docs/phase-9-dashboard-authentication.md) en [Pi-runtimedocumentatie](raspberry-pi/README.md).
-- Er is geen Supabase Auth/profile-mapping in het actieve Pi-dashboardpad; alle geauthenticeerde bezoekers zien hetzelfde read-only systeemportfolio. Het wachtwoord staat alleen als bcrypt-hash in de Pi-runtimeconfiguratie; Vercel bewaart uitsluitend de runtime-API-origin.
-- Vercel levert de loginpagina en beschermt dashboardpagina's via de bestaande serverless functies. De browser gebruikt een same-origin proxy naar de Pi, zodat de `HttpOnly`, `Secure`, `SameSite=Lax`-sessiecookie bij dashboardrequests meegaat. Er zijn geen nieuwe Vercel API-functies toegevoegd.
-- Het Phase 03-schema en de latere uitbreidingen bevatten 18 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
-- Het dashboard leest status, portfolio, posities, trades, watched markets, AI-beslissingen, analytics en scannerdata uit de read-only Pi API. De bestaande Open Position AI Status en dashboardindeling blijven behouden. De data wordt periodiek ververst; er zijn geen Supabase browserqueries of Realtime-kanalen meer. Verzoeken blijven `no-store`.
-- De monitoringkaart leest de Pi-runtime-API voor runtime/schedulerstatus, proces- en hostmetrics, PostgreSQL-grootte en geschatte aantallen candles, beslissingen, trades en posities. Deze monitoringroute rapporteert geen exacte tabeltellingen; hosttemperatuur en de eerste CPU-meting kunnen ontbreken.
-- Er is een afzonderlijke, handmatig gestarte Pi pull-CLI voor een copy-only proof of concept van `AI_Crypto_Bot_AI_Decisions` naar `ai_crypto_bot_archive`. De bronvalidatie staat read-only `SELECT` toe op meerdere `public.AI_Crypto_Bot_*`-tabellen en blijft bronwrites, niet-geprefixte relaties en eigenaarschap weigeren. De gebruiker bevestigde de readerconfiguratie en writer readiness checks en meldt dat de eerste handmatige sync succesvol data naar PostgreSQL op de Pi heeft gekopieerd; aantallen zijn niet gedeeld of onafhankelijk geverifieerd. De CLI gebruikt TLS, begrensde batches, idempotente ID-upserts en een atomair checkpoint. De CLI draait op de Pi, niet op Vercel; de trading-/Vercel-paden zijn niet afhankelijk van het archief.
-- Database- en API-timestamps blijven UTC; Dashboard, AI Decision/Agent Log, Paper Trading, Portfolio, Scanner en Trade History formatteren zichtbare tijden naar `Europe/Brussels`, inclusief automatische zomer-/wintertijd.
-- Alle gebruikersgerichte interfacecopy is Engelstalig, inclusief accountflows, navigatie, lege toestanden, statusmeldingen en foutmeldingen. Getallen en bedragen gebruiken `en-GB`-notatie; zichtbare tijden blijven `Europe/Brussels`.
-- Het Dashboard behoudt de Tracked Markets-KPI. De volledige lijst met actieve watched markets en de markt-ranglijsten staan op de afzonderlijke Market Scanner-pagina.
-- Elke portfolio-KPI heeft een toegankelijke uitleg die met muis, aanraking of toetsenbord te openen is.
-- De voormalige Admin-pagina toont geen uitvoeringsacties meer en stuurt door naar het dashboard. Het dashboard biedt geen AI-run, paper-trade, portfolio- of configuratiewrites.
-- Phase 06 synchroniseert geldige EUR-markten uit de centrale configuratie en haalt publieke Bitvavo-tickers en candles op. `/api/market-refresh` vernieuwt alleen marktsnapshots; `/api/candle-refresh` verwerkt candles afzonderlijk, incrementeel, per interval en in batches van maximaal vijf markten. Een service-role-only, read-only RPC haalt per symbool de nieuwste candletimestamp op via de bestaande candle-index. Beide processen schrijven uitsluitend naar bestaande tabellen en rapporteren runtimeduur en verwerkte records.
-- Phase 07 analyseert echte market snapshots en candledata. De actieve V2-score weegt 1d EMA-spread (75%), de 1h/1d EMA-uitlijning (10%), 1h-volumeconfirmatie (10%) en 1d RSI (5%); MACD en momentum blijven alleen diagnostische indicatoren en marktcontext beïnvloedt de richting-score niet. De confidenceformule voor bruikbare V2-inputs gebruikt trendsterkte, uitlijning, volume, RSI en dezelfde volatiliteitsaftrek; dekking en candlediepte zijn daarin geen bonussen. De bestaande lage-datakwaliteitsscore blijft begrensd en behoudt haar dekking/dieptecomponenten. Een fresh, geldige 1h-volume ratio en 1d EMA/RSI zijn vereist; ontbrekende inputs leveren `WAIT` op. De AI-confidencevloer (65), eis van minimaal vier fresh intervallen voor een directioneel signaal, alle bestaande versheidsgrenzen en de afzonderlijke paper-tradingcontrole blijven actief. De service-role-only `AI_Crypto_Bot_Get_Latest_AI_Candles_Compact`-RPC geeft per interval maximaal vier symbolgroepen terug, met maximaal 150 newest-first candles per markt als compacte `[timestamp, open, high, low, close, volume]`-tuples. De SQL valideert dat elk symbool een actieve EUR-markt is; de caller reconstrueert de bestaande candlevelden en wijst ontbrekende, misordende of gedeeltelijke groepen af. De compacte RPC vereist `max_rows >= 4`, maar de bestaande flat-row RPC blijft nodig voor oudere callers en kan maximaal 600 rijen teruggeven; verlaag de gehoste cap niet tijdens de overgang. Het bedoelde Supabase-project en de gehoste waarde zijn niet geverifieerd. Maximaal 24 RPC-requests lopen tegelijk. Een interval wordt uitgesloten als de nieuwste candle ouder is dan 30 minuten (`1m`), 2 uur (`5m`), 6 uur (`15m`), 12 uur (`1h`), 24 uur (`4h`) of 72 uur (`1d`). Oudere candles blijven beschikbaar zolang de nieuwste candle vers is. Als minder dan twee intervallen met minimaal 26 geldige candles vers zijn, wordt `WAIT` met reden `STALE_CANDLE_DATA` opgeslagen. Beslissingen en confidence worden server-side in de bestaande AI decision-tabel opgeslagen; runlogs onderscheiden logische market/interval-reads van daadwerkelijke RPC-requests.
-- De optionele database-side AI-analyse blijft uitsluitend actief via `AI_ANALYSIS_MODE=database`; JavaScript blijft de standaard. De append-only migratie `20261110120000_ai_engine_v2_replacement.sql` brengt de databasefunctie in lijn met dezelfde V2-score en confidenceformule en gebruikt uitsluitend bestaande databaseobjecten. De migratie is lokaal getest met PGlite; dit bewijst niet dat zij op Supabase is toegepast of daar is gevalideerd. Voor de eerdere timeoutoplossing: zie het [database-analyse-timeoutfixrapport](./docs/reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md).
-- Phase 08 voert uitsluitend de nieuwste, opgeslagen AI-beslissingen uit tegen verse, opgeslagen marktprijzen. Een server-only Supabase RPC serialiseert runs en voert risicocontroles, paper buys/sells, kosten, positiewaardering, portfolio-snapshots en trade-idempotency transactioneel uit. Een nieuw profiel krijgt een gesimuleerd startportfolio van €10.000; er worden geen trades verzonnen of echte orders geplaatst.
-- De sectie Shadow Exit Scenarios toont per positie zeven versie-gemarkeerde, experimentele take-profit- en trailing-stopscenario's. Deze prospectieve simulaties gebruiken uitsluitend verse marktmarks, wijzigen geen handels- of portfoliodata en voeren nooit een SELL uit; er is geen historische backtest of bewijs dat een kandidaatregel beter presteert.
-- Phase 09 rangschikt actieve watched markets als Top Gainers, Top Losers, Highest Volume, Strongest Momentum en AI Opportunities over 24 uur, 7 dagen en 30 dagen. De scanner leest verse snapshots, opgeslagen candles en bestaande AI-beslissingen via de bestaande authenticated `/api/market-summary`-route; er is geen extra Vercel Function of databasewijziging. Een `416/PGRST103` op een gegenereerde vervolgrange beëindigt de paginatie als lege eindpagina. Storage-fouten loggen alleen interne querymetadata (query, tabel, operatie, pagina/range, HTTP-status, foutcode en categorie); de publieke productie-response blijft ongewijzigd.
-- Dashboard en portfolio lezen echte, door RLS afgeschermde databasegegevens. De portfolio toont beschikbaar saldo, totale/gerealiseerde/ongerealiseerde/dagelijkse P&L, win rate, posities en recente trades; waarden blijven onbeschikbaar als een begrensde query geen volledige berekening ondersteunt.
-- Phase 10 vervangt de history-placeholder door een geauthenticeerd, filterbaar en server-side gepagineerd overzicht van opgeslagen paper-trades. Zoeken, actie/periodefilters en sortering werken op de server; statistieken worden met een SECURITY INVOKER-RPC over alle zichtbare opgeslagen SELL-uitvoeringen berekend. Trade History en Portfolio tonen BUY-kosten en SELL-opbrengsten uit bestaande uitvoeringsvelden. Open BUY-posities tonen ook de nieuwste marktsnapshot en ongerealiseerde EUR-opbrengst; SELL-uitvoeringen tonen entry/exit en gerealiseerde opbrengstpercentages, uitsluitend als presentatieberekeningen.
-- De oorspronkelijke Phase 11 Supabase Realtime-integratie is niet langer de bron voor dashboardupdates. Migratie-Phase 8 gebruikt aligned polling op de Pi API; de oude `js/realtime.js`-bestandsnaam bevat alleen de pollinghelper en geen Supabase-subscriptions.
-- De beschermde Exports-pagina groepeert ruwe data, Analytics-rapporten en Recommendation-rapporten apart; Trade- en Position-exports staan bij elkaar. De CSV-bestanden gebruiken de bestaande geauthenticeerde `/api/dashboard-data`-function; de API-functiontelling blijft 12 en er zijn geen databasewijzigingen.
-- Alle pagina's gebruiken hetzelfde 180×180 Apple Touch Icon met de Bitcoin-munt in blauwe handen tegen een diepblauwe achtergrond en de app-naam AI Crypto Bot voor Toevoegen aan beginscherm op iPhone; de miniatuur staat ook in de navigatie en linkt naar Dashboard. De gedeelde interface gebruikt een neutrale antracietachtergrond, donker leigrijze kaartoppervlakken, blauwe accenten en gedempte tekst; positieve P&L-waarden en BUY-acties zijn groen, negatieve P&L-waarden en SELL-acties rood, en getoonde fee-bedragen gebruiken de bestaande gele waarschuwingskleur. Grafieken, browserchrome en marktsymbolen volgen dezelfde blauwe accentkleur; de statusgestuurde circuitvisualisatie behoudt haar functionele statuskleuren. Legenda-iconen in de Dashboard-grafiek en Dashboard KPI-info-iconen zijn grijs, terwijl grafieklijnen hun eigen kleuren behouden. De KPI-info-iconen behouden een blauwe toetsenbordfocusindicator. De backend-statusmonitor heeft een kleine tussenruimte onder het AI-brein. Subtiele blauwe gloedaccenten zijn toegepast op kaarten, de app-miniatuur en de chip zonder de statusgestuurde signalen te veranderen. Dit schakelt geen offline-functionaliteit in.
-- Het Dashboard toont een groene activiteitstrip met de laatste bot-run, marktdata-snapshot en paper trade als volledige lokale datum en tijd (`Europe/Brussels`). Analytics en Market Scan tonen `On demand`, omdat er geen uitvoeringsgeschiedenis voor die views wordt bewaard.
-- Phase 13 biedt een aparte, beschermde Analytics-pagina voor trade-, AI-, strategie- en portfolioprestaties. Historische trades, beslissingen en snapshots zijn filterbaar op 30, 90 of 365 dagen (standaard 30); huidige posities en accounttotalen blijven actueel. De bestaande dashboard-datafunctie leest in begrensde batches van maximaal vier 500-rijpagina's tegelijk; een `416/PGRST103` op een vervolgrange beëindigt elke Analytics-dataset veilig, behoudt eerdere pagina's en negeert later geprefetchte ranges. Fouten op de eerste pagina en andere foutcodes blijven fouten. De vier CSV-rapporten hebben ieder een eigen periodekeuze; er zijn geen endpoints, tabellen of handelslogica toegevoegd.
-- Phase 15 biedt een beschermde AI Recommendations-pagina met advies op basis van bestaande Analytics-uitkomsten voor 30, 90 en 365 dagen. Aanbevelingen tonen onderbouwing, gemeten impact, steekproefomvang en confidence; ze wijzigen geen strategieën, markten, portefeuilles, risico-instellingen of trades. Aligned polling ververst de analyse via de Pi API. Recommendation- en history-CSV's worden on-demand opnieuw berekend; er wordt geen aanbevelingsgeschiedenis opgeslagen.
-- Dashboard-summary toont de eerste zes portfolio-KPI's standaard en klapt de overige metrics in. De panels Portfolio, Activity en Agent log starten ook ingeklapt; hun aantallen staan tussen haakjes direct naast de titel en de Overview heeft minder ruimte onder de header. Risk Control staat naast Position Monitoring en stapelt op smalle schermen eronder. Open Positions, Activity en Position Monitoring krijgen een scrollbar wanneer ze meer dan vijf items bevatten. De actieve watched-marketlijst staat op Market Scanner. Trade History start met ingeklapte zoekfilters en een eigen scrollbare tabel.
-- De Agent Status-visualisatie gebruikt blauwe AI-circuitillustratie geïnspireerd op de aangeleverde referentie, in een vierkant paneel dat de beschikbare mobiele breedte vult en op desktop maximaal 440 px breed is. De 32 neuronroutes zijn uitgelijnd op de zichtbare circuitsporen; tests controleren de routepixels en de fade-eindpunten aan de buitenrand van het artwork. Tijdens `ANALYZING` bewegen 32 unieke signalen over die routes, pulseren 24 pads op de sporen en wordt de blauwe chiprand helderder. Route- en luminantiemaskers houden neuronen op hun toegewezen baan; signalen faden vlak voor de rand uit en laten terminalpads oplichten bij aankomst. `ACTIVE`, `ANALYZING` en `IDLE` zijn blauw; `ERROR` blijft rood en `STOPPED`/`UNKNOWN` blijven grijs en statisch. Activiteit volgt uitsluitend de actuele `AI_Crypto_Bot_Status.status` via de geauthenticeerde status-API; `prefers-reduced-motion` schakelt bewegende signalen en glow-overgangen uit. De bestaande statusbron en agentlogica blijven ongewijzigd. Emergency State/Risk Control staat onderaan het dashboard.
-- Interne mobiele navigatie blijft in hetzelfde venster en brengt de doelpagina na laden terug naar boven; browser-terugnavigatie behoudt de bestaande positie. Open de geïnstalleerde beginscherm-app om iOS-browserbalken te vermijden; Safari en in-app browsers bepalen hun eigen browserknoppen.
-- Phase 14 final-polish-audit: all 12 pages passed Chromium viewport checks at 320px, 768px, and 1280px after removing a fixed body width that caused narrow-screen overflow. Analytics tables now have accessible captions and scoped column headers. Local test/build validation passes; physical-device, Lighthouse, browser-matrix, and hosted-production checks remain pending. See [the final release report](./docs/reports/FINAL_RELEASE_REPORT.md).
-- De scanner gebruikt bestaande opgeslagen marktdata en AI-beslissingen, maar voert geen AI-analyse of trades uit. De herhaalde PAPER ACTIVE-meldingen op de pagina's en in authenticatievoetteksten zijn verwijderd; de gedeelde header toont overal PAPER MODE. Settings blijft een placeholder; strategieoptimalisatie, backtesting en live trading zijn niet geïmplementeerd. De AI Engine blijft analysis-only; paper-trades worden uitsluitend door de afzonderlijke Phase 08 risk-managed executor aangemaakt.
-- Alle pagina's tonen de gele badge **PAPER MODE** naast het app-icoon. Het menu houdt Dashboard bovenaan, scheidt het van de overige alfabetische links, geeft links een blauwe hover-glow, blijft boven sticky Analytics-tabellen en sluit bij een klik buiten het menu. Er worden geen echte orders uitgevoerd.
-- `ENABLE_LIVE_TRADING=false` blijft de verplichte standaard. De paper-tradingcode gebruikt geen private Bitvavo-endpoints, exchange-accountgegevens of echte orders.
-- Phase 11 code en lokale validatie zijn afgerond; verificatie van de hosted Supabase-publicatiemigratie en live reconnects blijft open. De Phase 12-systeemvalidatie noteerde een productie-readinessscore van 50% (WARNING). De Phase 13 productie-fix is lokaal geïmplementeerd; de oorspronkelijke falende query en hosted runtime blijven onbevestigd totdat de wijziging is uitgerold en de nieuwe veilige logs zijn gecontroleerd. De huidige Phase 14-polishwijzigingen zijn lokaal geïmplementeerd; de volledige release-checklist en fysieke mobiele validatie zijn nog open.
-
-## Pagina's en projectstructuur
+## Current architecture
 
 ```text
-api/        Bestaande Vercel-functies voor Pi-login, sessievalidatie, beschermde pagina's en de runtimeproxy, naast legacy API's
-config/     Centrale standaardmarktconfiguratie voor database-seeding
-css/        Gedeelde stijlen
-docs/       Projectdocumentatie en faserapporten
-js/         Browserauthenticatie, same-origin Pi API-client, dashboard-, analytics-, scanner-, export- en history-rendering
-lib/        Server-side runtimeproxy, analytics-, sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
-prompts/    Faseprompts
-scripts/    Statische projectvalidatie
-supabase/   Supabase-configuratie en versioned SQL migrations
-tests/      Node.js unit- en routetests
+Browser
+  -> Vercel static dashboard and same-origin auth/data bridge
+  -> configured HTTPS API hostname
+  -> Cloudflare Tunnel
+  -> Raspberry Pi runtime
+  -> existing PostgreSQL database
 ```
 
-`login.html` biedt de single-admin aanmelding; registratie en wachtwoordherstel zijn niet beschikbaar. Beschermde dashboardpagina's vereisen een geldige Pi-sessie. De browser gebruikt de same-origin Vercel proxy; databasecredentials, bcrypt-hashes en sessietokens staan niet in browserconfiguratie. Legacy Supabase schema- en serverfuncties zijn niet door deze dashboard-cutover verwijderd.
+The bridge preserves the single-admin session cookie and forwards only allowlisted `/api/v1/` requests. Three Vercel functions remain active: login/session proxy, protected-page delivery, and Pi API proxy. No market ingestion, AI, trading, or scheduling runs on Vercel.
 
-## Configuratie en checks
+The operator reports that the Pi runtime, PostgreSQL, ingestion, AI analysis, scheduler, paper trading, Cloudflare Tunnel, dashboard, and authentication are operational. This repository does not independently verify the live Pi, Cloudflare, database, or Vercel configuration. Paper trading is simulated only; `ENABLE_LIVE_TRADING=false` remains required.
 
-- Node.js 18 of hoger voor root-tests en validatie; de Raspberry Pi-runtime vereist Node.js 20.6 of hoger.
-- De database-integratietests voeren de Supabase migrations uit in PGlite; er zijn geen Supabase-credentials nodig.
-- Voor lokaal Supabase draaien zijn de Supabase CLI en Docker vereist. De SQL is niet automatisch toegepast op een externe database.
-- De volgende bestaande Supabase/Vercel-configuratiebeschrijving betreft legacy serverless- en databasepaden; ze wordt niet gebruikt voor dashboardlogin of dashboarddata na de Pi API-cutover.
-- Configureer `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` en `ADMIN_USER_IDS` in een lokaal genegeerd `.env`-bestand en als Vercel Environment Variables. `ADMIN_USER_IDS` bevat een komma-gescheiden lijst van Supabase Auth-gebruikers-UUID's. De service-role sleutel, cron secret en allowlist blijven server-side; geef `CRON_SECRET` alleen aan een externe scheduler mee als `Authorization: Bearer <CRON_SECRET>`.
-- `AI_ANALYSIS_MODE` defaults to `javascript`. The user reports that the interval-batching migration script was executed on 2026-11-09; verify a successful hosted analysis run before considering the timeout resolved.
-- Voeg in Supabase Auth de productie-URL voor e-mailbevestiging en wachtwoordherstel toe aan de toegestane redirect-URL's.
-- Chart.js blijft voor grafieken; dashboarddata wordt via `js/runtime-api.js` bij de Pi API opgehaald. De Agent Status-circuitvisualisatie gebruikt native SVG/CSS. PGlite is alleen een development dependency voor database tests.
+## Runtime and dashboard
+
+- The [Raspberry Pi package](raspberry-pi/) owns the API, PostgreSQL repositories, market ingestion, deterministic AI, risk-managed paper trading, scheduler, and operational monitoring.
+- The dashboard uses a single administrator account configured on the Pi. Passwords are checked against a bcrypt hash, and the browser receives only the secure session cookie.
+- Monitoring reads the Pi runtime API, including scheduler, process, host, and database metrics. It does not depend on the separate archive service.
+- The optional [archive service](archive-server/) contains a manual, copy-only historical-decision utility and a standalone health service. It is not a trading or scheduler dependency; its retirement has not been confirmed.
+- `supabase/migrations/` and `config/markets.js` remain as historical schema/seed provenance and inputs to local PGlite validation. They do not configure a live Supabase runtime.
+
+See [deployment](docs/DEPLOYMENT.md), [API contracts](docs/API.md), [architecture](docs/ARCHITECTURE.md), [scheduling](docs/SCHEDULING.md), and the [Phase 10 cleanup report](docs/post-migration-cleanup-report.md).
+
+## Local validation
 
 ```powershell
 npm.cmd test
 npm.cmd run build
+npm.cmd test --prefix raspberry-pi
 ```
 
-`npm.cmd run build` valideert statische pagina's en verwijzingen, de bestaande Vercel functionlimiet, database-table/RLS-contract en initiële marktseeds; dashboardpagina's gebruiken geen beschermde Vercel rewrites. `npm.cmd test` bevat ook indicator-, confidence-, besluitlogica-, AI API-, dashboard-, trade-history-, marktdata-, scanner-, database- en authenticatietests, plus PGlite-RLS-, risico- en paper-tradingintegratietests.
+The tests are local checks only. They do not constitute a Pi deployment, production database validation, or Vercel deployment.
 
-Database migrations staan in `supabase/migrations/`. Gebruik lokaal `supabase start` en `supabase db reset`. Link een project en inspecteer bestaande prefixed objecten vóór `supabase db push`; migrations mogen niet zonder review op productie worden toegepast.
+## Historical phase documentation
 
-## Deployen
-
-Vercel host de bestaande statische dashboardbestanden; de browser haalt operationele gegevens bij de Pi API. De live Raspberry Pi-runtime beheert zelf scheduling en paper trading. De oude Vercel serverless-paden blijven in de repository, maar zijn geen dashboarddatafallback en deze documentatie claimt geen productiecutover of deployment. Configureer `CRYPTOPULSE_RUNTIME_API_ORIGIN` als Vercel build environment variable; Vercel Preview ondersteunt Quick Tunnel-originconfiguratie voor validatie, terwijl Production-builds deze expliciet blokkeren. `CRYPTOPULSE_ENVIRONMENT` kan lokale en aangepaste buildomgevingen instellen. Configureer de Access audience via `CRYPTOPULSE_ACCESS_AUDIENCE` wanneer Access ingeschakeld is. Zie de [Phase 8 cutoverrapportage](raspberry-pi/docs/phase-8-dashboard-cutover.md), de [Phase 8.7 connectivityrapportage](raspberry-pi/docs/phase-8.7-permanent-connectivity.md) en de [Pi runtime documentatie](raspberry-pi/README.md).
-
-Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit van Vercel-deployments. De broncode blijft in Git beschikbaar voor Pi-installatie en updates; `.vercelignore` voorkomt uitsluitend opname in de Vercel-deployment, niet in de Git-repository.
-
-## Documentatie
-
-- [Roadmap](./ROADMAP.md)
-- [CryptoPulseBot migration documentation](./docs/migration/README.md)
-- [Target Raspberry Pi API architecture](./docs/migration/api-architecture.md)
-- [Phase 8 dashboard cutover report](./raspberry-pi/docs/phase-8-dashboard-cutover.md)
-- [Phase 8.1/8.2 authentication configuration](./raspberry-pi/docs/phase-8.1-authentication-activation.md)
-- [Phase 8.7 permanent connectivity report](./raspberry-pi/docs/phase-8.7-permanent-connectivity.md)
-- [Phase 9 dashboard authentication report](./raspberry-pi/docs/phase-9-dashboard-authentication.md)
-- [Database](./docs/DATABASE.md)
-- [Architectuur](./docs/ARCHITECTURE.md)
-- [Authentication API](./docs/API.md)
-- [Teststrategie](./docs/TESTING.MD)
-- [Phase 02 completion report](./docs/reports/PHASE_02_COMPLETION_REPORT.md)
-- [Phase 03 completion report](./docs/reports/PHASE_03_COMPLETION_REPORT.md)
-- [Phase 04 completion report](./docs/reports/PHASE_04_COMPLETION_REPORT.md)
-- [Dashboard auto-refresh report](./docs/reports/DASHBOARD_AUTO_REFRESH_REPORT.md)
-- [Phase 05 completion report](./docs/reports/PHASE_05_COMPLETION_REPORT.md)
-- [Phase 05 Brain Improvement Report](./docs/reports/PHASE_05_BRAIN_IMPROVEMENT_REPORT.md)
-- [Phase 05 Final Fix Report](./docs/reports/PHASE_05_FINAL_FIX_REPORT.md)
-- [Phase 05 Visual Redesign Report](./docs/reports/PHASE_05_VISUAL_REDESIGN_REPORT.md)
-- [Phase 05 Final Visual Redesign Report](./docs/reports/PHASE_05_FINAL_VISUAL_REDESIGN_REPORT.md)
-- [Phase 05 Final Visual Refinement Report](./docs/reports/PHASE_05_FINAL_VISUAL_REFINEMENT_REPORT.md)
-- [Phase 05 Final Redesign Report](./docs/reports/PHASE_05_FINAL_REDESIGN_REPORT.md)
-- [Phase 05 Neural Activity Refinement Report](./docs/reports/PHASE_05_NEURAL_ACTIVITY_REFINEMENT_REPORT.md)
-- [Phase 06 completion report](./docs/reports/PHASE_06_COMPLETION_REPORT.md)
-- [Phase 06 candle refresh optimization report](./docs/reports/PHASE_06_CANDLE_OPTIMIZATION_REPORT.md)
-- [Phase 06 candle batching report](./docs/reports/PHASE_06_CANDLE_BATCHING_REPORT.md)
-- [Phase 06 deployment fix report](./docs/reports/PHASE_06_DEPLOYMENT_FIX_REPORT.md)
-- [Phase 07 completion report](./docs/reports/PHASE_07_COMPLETION_REPORT.md)
-- [Dashboard Admin Actions report](./docs/reports/DASHBOARD_ADMIN_ACTIONS_REPORT.md)
-- [UI language standardization report](./docs/reports/UI_LANGUAGE_STANDARDIZATION_REPORT.md)
-- [Phase 08 completion report](./docs/reports/PHASE_08_COMPLETION_REPORT.md)
-- [Phase 09 completion report](./docs/reports/PHASE_09_COMPLETION_REPORT.md)
-- [Phase 10 completion report](./docs/reports/PHASE_10_COMPLETION_REPORT.md)
-- [Phase 11 completion report](./docs/reports/PHASE_11_COMPLETION_REPORT.md)
-- [Exports module report](./docs/reports/EXPORTS_MODULE_REPORT.md)
-- [Phase 13 Analytics report](./docs/reports/PHASE_13_ANALYTICS_REPORT.md)
-- [Phase 15 AI Recommendations report](./docs/reports/PHASE_15_AI_RECOMMENDATIONS_REPORT.md)
-- [Phase 13 Analytics production fix report](./docs/reports/PHASE_13_ANALYTICS_PRODUCTION_FIX_REPORT.md)
-- [Analytics pagination fix report](./docs/reports/ANALYTICS_PAGINATION_FIX_REPORT.md)
-- [Phase 07 candle query fix report](./docs/reports/PHASE_07_CANDLE_QUERY_FIX_REPORT.md)
-- [AI database analysis prototype report](./docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md)
-- [AI database-analysis timeout fix report](./docs/reports/AI_ANALYSIS_DATABASE_TIMEOUT_FIX_REPORT.md)
-- [Supabase AI decision and candle history archive feasibility report](./docs/reports/SUPABASE_AI_CANDLE_HISTORY_ARCHIVE_FEASIBILITY_REPORT.md)
-- [Historical data archive destination assessment](./docs/reports/SUPABASE_HISTORICAL_DATA_ARCHIVE_DESTINATION_ASSESSMENT.md)
-- [Archive Server Monitoring report](./docs/reports/ARCHIVE_SERVER_MONITORING.md)
-- [Archive Server Connectivity report](./docs/reports/ARCHIVE_SERVER_CONNECTIVITY.md)
-- [Archive Server Remote Access plan](./docs/reports/ARCHIVE_SERVER_REMOTE_ACCESS_PLAN.md)
-- [AI decision archive agent installation guide](./docs/reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md)
-- [AI decision archive agent validation guide](./docs/reports/AI_DECISION_ARCHIVE_AGENT_VALIDATION.md)
-- [AI decision archive POC readiness](./docs/reports/AI_DECISION_ARCHIVE_POC_READINESS.md)
-- [Final release report](./docs/reports/FINAL_RELEASE_REPORT.md)
+Earlier platform-phase descriptions and reports preserve the pre-migration Supabase/Vercel implementation history. They are not instructions for the current production runtime. The current migration state and retained historical materials are summarized in the [roadmap](ROADMAP.md) and [cleanup report](docs/post-migration-cleanup-report.md).

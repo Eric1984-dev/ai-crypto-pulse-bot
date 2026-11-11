@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeMarket as legacyAnalyzeMarket } from "../../lib/ai-engine.mjs";
 import {
   AI_ANALYSIS_INTERVALS,
   AI_DECISION_INTERVAL,
@@ -56,12 +55,6 @@ function createSnapshot(symbol = "BTC-EUR", now = fixedNow, direction = "up") {
 function buildCandles(symbol = "BTC-EUR", direction = "up", now = fixedNow,
   intervals = ["5m", "15m", "1h", "4h", "1d"]) {
   return intervals.flatMap((interval) => createCandles(symbol, interval, 60, direction, now));
-}
-
-function legacyComparable(result) {
-  const { interval, timestamp, ...decision } = result;
-  const { interval: indicatorInterval, ...indicators } = decision.indicators;
-  return { ...decision, indicators };
 }
 
 function makeMarket(symbol, priority) {
@@ -134,7 +127,7 @@ function createServiceFixture({
   };
 }
 
-test("Pi V2 analysis matches the existing engine across directional and safe outcomes", () => {
+test("Pi V2 analysis returns the expected directional and safe outcomes", () => {
   const scenarios = [
     { direction: "up", market: createSnapshot("BTC-EUR", fixedNow, "up"), candles: buildCandles() },
     { direction: "down", market: createSnapshot("BTC-EUR", fixedNow, "down"), candles: buildCandles("BTC-EUR", "down") },
@@ -149,20 +142,15 @@ test("Pi V2 analysis matches the existing engine across directional and safe out
     }
   ];
 
-  for (const { market, candles } of scenarios) {
-    const expected = legacyAnalyzeMarket({
-      symbol: "BTC-EUR",
-      marketData: market,
-      candles,
-      now: fixedNow
-    });
+  const expectedDecisions = ["BUY", "SELL", "HOLD", "HOLD", "WAIT", "WAIT"];
+  for (const [index, { market, candles }] of scenarios.entries()) {
     const actual = analyzeMarket({
       symbol: "BTC-EUR",
       marketData: market,
       candles,
       now: fixedNow
     });
-    assert.deepEqual(legacyComparable(actual), expected);
+    assert.equal(actual.decision, expectedDecisions[index]);
     assert.equal(actual.interval, AI_DECISION_INTERVAL);
     assert.equal(actual.timestamp, fixedNow.toISOString());
     assert.equal(actual.indicators.interval, AI_DECISION_INTERVAL);

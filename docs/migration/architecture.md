@@ -1,5 +1,7 @@
 # Migratiearchitectuur
 
+> **Historisch doelontwerp:** Dit document beschrijft de architectuur vóór de Pi-cutover. De huidige productieflow wordt operator-gerapporteerd als dashboard → Vercel auth/data bridge → Cloudflare Tunnel → Pi-runtime → PostgreSQL. Zie de [Phase 10-cleanuprapportage](../post-migration-cleanup-report.md) en actuele [architectuurdocumentatie](../ARCHITECTURE.md).
+
 ## Uitgangssituatie
 
 De projectinstructie bevestigt dat de PostgreSQL-database op de Raspberry Pi operationeel is, het volledige schema bevat en de benodigde Supabase-data al heeft ontvangen. Deze status is voor dit document gebruikersinformatie; er is geen live Pi-connectie of query uitgevoerd. De migratie herhaalt geen schema- of datawerk.

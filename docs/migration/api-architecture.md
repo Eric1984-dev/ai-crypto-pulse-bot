@@ -1,5 +1,7 @@
 # Target API Architecture
 
+> **Superseded design proposal:** The diagrams and route/auth proposals below predate the implemented Phase 8/9 dashboard. The active browser uses the existing same-origin Vercel session/data bridge to the Pi API; see current [API documentation](../API.md) and the [Phase 10 cleanup report](../post-migration-cleanup-report.md).
+
 - **Phase:** 1.8 — documentation-only
 - **Status:** Phase 1.8 design baseline; the selected Phase 8 dashboard implementation is in progress and has not been deployed
 - **Runtime owner:** Raspberry Pi Node.js service

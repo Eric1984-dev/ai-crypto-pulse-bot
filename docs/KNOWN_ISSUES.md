@@ -1,5 +1,12 @@
 # Known Issues
 
+## Current post-migration verification boundaries
+
+- The operator reports the Pi runtime, PostgreSQL, scheduler, AI, paper trading, dashboard, authentication, Cloudflare Tunnel, and custom domain are operational; this workspace has not independently checked those live services.
+- External scheduler-provider configuration and Vercel project settings were not inspected. The repository has no Vercel Cron configuration, and the Pi runtime is the documented scheduler owner.
+- The optional archive-copy CLI still has a restricted Supabase source connection. It is not a trading/runtime dependency and was retained because its retirement was not confirmed.
+- Historical sections below describe issues from the former Supabase/Vercel runtime and are not statements about the current Pi deployment.
+
 ## Open Production Validation
 
 - Phase 14 local Chromium checks cover all 12 pages at 320px, 768px, and 1280px and pass without horizontal overflow. Physical iPhone/Android/desktop rendering, Chrome/Edge/Safari coverage, Lighthouse, and hosted production smoke checks remain unverified.

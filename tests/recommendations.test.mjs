@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createAnalyticsExportsService,
   getAnalyticsExportRows
 } from "../lib/analytics-exports.mjs";
+import { streamCsvRows } from "../lib/dashboard-exports.mjs";
 import { generateRecommendations } from "../lib/recommendations.mjs";
 
 function createAnalytics({
@@ -182,9 +182,6 @@ test("recommendation CSV streams generated metrics and labels recomputed history
       netPnl: -20
     }]
   });
-  const service = createAnalyticsExportsService({
-    analyticsService: { load: async () => analytics }
-  });
   for (const [exportType, expected] of [
     ["recommendations", "Category,Recommendation,Reason"],
     ["recommendation-history", "History Type,Category,Recommendation"]
@@ -204,13 +201,14 @@ test("recommendation CSV streams generated metrics and labels recomputed history
         this.ended = true;
       }
     };
-    const result = await service.streamCsv({
-      config: {},
-      accessToken: "test-token",
+    const content = getAnalyticsExportRows(exportType, analytics);
+    const result = await streamCsvRows(
+      response,
       exportType,
-      period: "30d",
-      response
-    });
+      "30d",
+      content.headers,
+      content.rows
+    );
 
     assert.equal(result.count, 1);
     assert.equal(response.statusCode, 200);

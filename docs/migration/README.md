@@ -1,5 +1,7 @@
 # CryptoPulseBot-migratie
 
+> **Historical migration planning:** The status and architecture notes in this folder predate the completed Pi cutover and are retained as design/audit history. The operator reports the runtime, dashboard, tunnel, and single-admin authentication operational. Current cleanup status is in the [Phase 10 report](../post-migration-cleanup-report.md); current operating guidance is in the root [deployment](../DEPLOYMENT.md), [API](../API.md), and [scheduling](../SCHEDULING.md) documents.
+
 Deze map bevat de fasegebonden migratieaudit en het plan voor een zelfstandige Pi-runtime. Zij vult de bestaande projectdocumentatie aan; tradingregels, schema-informatie en API-contracten blijven beschreven in de bestaande documenten waar mogelijk.
 
 ## Status

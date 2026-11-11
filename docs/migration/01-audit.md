@@ -1,5 +1,7 @@
 # Fase 1 — CryptoPulseBot-migratieaudit
 
+> **Historische audit:** Dit document beschrijft de pre-cutover Supabase/Vercel-runtime en was een uitgangsmeting, geen actuele productie-inventaris. De huidige runtime- en deploymentgrenzen staan in [de Phase 10-cleanuprapportage](../post-migration-cleanup-report.md) en de actuele root-documentatie.
+
 **Auditdatum:** 10 november 2026
 **Doel:** huidige applicatie beoordelen voor een latere migratie naar een Raspberry Pi 3 met Node.js en PostgreSQL.
 

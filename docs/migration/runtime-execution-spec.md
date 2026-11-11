@@ -1,5 +1,7 @@
 # Runtime Execution Specification
 
+> **Historical target specification:** This document records intended design constraints from before runtime implementation. The operator reports the Pi scheduler and runtime operational; consult [Phase 7.7 operational validation](../../raspberry-pi/docs/phase-7.7-operational-validation.md) and the [Phase 10 cleanup report](../post-migration-cleanup-report.md) for the current evidence boundary.
+
 - **Fase:** 1.7 — documentatie-only
 - **Status:** Normatieve doelconfiguratie voor de Raspberry Pi-runtime
 - **Scope:** runtime lifecycle, scheduling, marktdata, AI-analyse en paper trading

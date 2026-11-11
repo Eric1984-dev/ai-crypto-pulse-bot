@@ -1,6 +1,8 @@
 # Database Design
 
-## Phase 03 schema and Phase 08 runtime usage
+> **Current runtime:** PostgreSQL on the Raspberry Pi is the primary operational database. The operator reports the existing schema and data are present. No database or migration is changed by Phase 10. The Supabase-era schema details below are retained as historical migration provenance and local PGlite test fixtures; they are not instructions to connect to, recreate, or migrate a live Supabase project.
+
+## Historical Phase 03 schema and Phase 08 runtime usage
 
 Phase 03 adds the application schema to Supabase PostgreSQL through versioned migrations. Phase 06 consumes the existing market tables for public data ingestion; Phase 07 reads those tables and writes analysis decisions/status. Phase 08 uses the existing portfolio, position, trade, snapshot, decision, market-data, and status tables; it adds an auditable decision reference to trades and server-only functions/triggers, but no new table. A separate prospective Shadow Exit Scenarios feature adds two prefixed tables for simulation state and meaningful events. Browser writes remain prohibited.
 

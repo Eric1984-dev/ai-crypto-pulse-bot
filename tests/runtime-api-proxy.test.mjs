@@ -120,6 +120,29 @@ test("dashboard data function proxies same-origin runtime reads without Supabase
   assert.deepEqual(JSON.parse(response.body), { data: { status: "live" } });
 });
 
+test("dashboard data function rejects missing, duplicate, and unsupported legacy view paths", async () => {
+  let upstreamCalls = 0;
+  const handler = createDashboardDataHandler({
+    env,
+    fetchImpl: async () => {
+      upstreamCalls += 1;
+      return Response.json({ data: {} });
+    }
+  });
+
+  for (const url of [
+    "/api/dashboard-data",
+    "/api/dashboard-data?path=%2Fapi%2Fv1%2Fmarkets&path=%2Fapi%2Fv1%2Fmonitoring",
+    "/api/dashboard-data?view=analytics"
+  ]) {
+    const response = createResponse();
+    await handler({ method: "GET", url, headers: { cookie } }, response);
+    assert.equal(response.statusCode, 400);
+    assert.equal(JSON.parse(response.body).error.code, "INVALID_RUNTIME_API_PATH");
+  }
+  assert.equal(upstreamCalls, 0);
+});
+
 test("protected dashboard pages redirect without a session and serve only after Pi verification", async () => {
   let reads = 0;
   const handler = createProtectedPageHandler({

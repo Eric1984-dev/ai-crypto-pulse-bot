@@ -10,7 +10,7 @@ import {
 import {
   EXPORT_DEFINITIONS,
   streamCsvRows
-} from "../../../lib/exports.mjs";
+} from "../../../lib/dashboard-exports.mjs";
 import {
   MAX_CANDLE_ROWS,
   SUPPORTED_CANDLE_INTERVALS

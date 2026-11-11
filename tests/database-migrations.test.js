@@ -265,14 +265,14 @@ async function readAnalysisFixture(database, symbol) {
 }
 
 async function assertDatabaseAnalysisParity(database, symbol, analysisTime) {
-  const { analyzeMarket } = await import("../lib/ai-engine.mjs");
+  const { analyzeMarket } = await import("../raspberry-pi/src/services/ai-engine.mjs");
   const fixture = await readAnalysisFixture(database, symbol);
-  const expected = JSON.parse(JSON.stringify(analyzeMarket({
+  const expected = JSON.parse(JSON.stringify(databaseComparable(analyzeMarket({
     symbol,
     marketData: fixture.marketData,
     candles: fixture.candles,
     now: analysisTime
-  })));
+  }))));
   const summary = await withRole(database, "service_role", () => database.query(
     `SELECT * FROM public."AI_Crypto_Bot_Run_Database_AI_Analysis"($1::timestamptz)`,
     [analysisTime]
@@ -292,6 +292,12 @@ async function assertDatabaseAnalysisParity(database, symbol, analysisTime) {
     expected
   );
   return summary.rows[0];
+}
+
+function databaseComparable(decision) {
+  const { interval, timestamp, ...storedDecision } = decision;
+  const { interval: indicatorInterval, ...indicators } = storedDecision.indicators;
+  return { ...storedDecision, indicators };
 }
 
 function createAnalysisSnapshot(symbol, analysisTime, direction = "up", ageMs = 30000) {
@@ -2177,7 +2183,7 @@ test("database AI analysis exactly matches JavaScript across bounded and failure
 
 test("batched database AI analysis preserves decisions across 102 enabled markets", async () => {
   const database = await createDatabase();
-  const { analyzeMarket } = await import("../lib/ai-engine.mjs");
+  const { analyzeMarket } = await import("../raspberry-pi/src/services/ai-engine.mjs");
   const analysisTime = new Date("2026-03-20T12:00:00.000Z");
   const symbols = [
     "BTC-EUR",
@@ -2265,12 +2271,12 @@ test("batched database AI analysis preserves decisions across 102 enabled market
     const decisionsBySymbol = new Map(storedRows.rows.map((row) => [row.symbol, row]));
     for (const symbol of symbols) {
       const fixture = await readAnalysisFixture(database, symbol);
-      const expected = JSON.parse(JSON.stringify(analyzeMarket({
+      const expected = JSON.parse(JSON.stringify(databaseComparable(analyzeMarket({
         symbol,
         marketData: fixture.marketData,
         candles: fixture.candles,
         now: analysisTime
-      })));
+      }))));
       const stored = decisionsBySymbol.get(symbol);
       assert.ok(stored, `Expected a stored decision for ${symbol}`);
       assert.deepEqual(
