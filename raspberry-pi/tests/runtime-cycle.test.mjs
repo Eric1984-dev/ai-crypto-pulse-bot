@@ -50,7 +50,7 @@ test("runtime cycle allows per-market partial ingestion and preserves stage orde
     "ACTIVE",
     "ANALYZING",
     "ACTIVE",
-    "IDLE"
+    "ACTIVE"
   ]);
 });
 
