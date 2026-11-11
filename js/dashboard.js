@@ -23,6 +23,12 @@
   const archiveHealthRefreshIntervalMs = 300000;
   const dashboardListVisibleItemCount = 2;
   const dashboardListNames = ["positions", "trades", "position-ai-status"];
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
 
   function emptyDashboardData() {
     return {
@@ -49,10 +55,10 @@
   }
 
   async function requestDashboardData(fetchImpl) {
-    const response = await fetchImpl("/api/dashboard-data", {
+    const response = await fetchImpl(runtimeApiUrl("/api/v1/dashboard-data"), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {
@@ -77,10 +83,10 @@
   }
 
   async function requestAgentStatus(fetchImpl) {
-    const response = await fetchImpl("/api/agent-status", {
+    const response = await fetchImpl(runtimeApiUrl("/api/v1/agent-status"), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {
@@ -105,10 +111,10 @@
   }
 
   async function requestArchiveHealth(fetchImpl) {
-    const response = await fetchImpl("/api/dashboard-data?view=archive-health", {
+    const response = await fetchImpl(runtimeApiUrl("/api/v1/monitoring"), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

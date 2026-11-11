@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const analytics = require("../js/analytics.js");
 
 function createNode() {
@@ -135,8 +136,8 @@ test("analytics API request uses the existing authenticated dashboard-data view"
     return { ok: true, status: 200, async json() { return { data }; } };
   });
 
-  assert.equal(request.url, "/api/dashboard-data?view=analytics&period=30d");
-  assert.equal(request.options.credentials, "same-origin");
+  assert.equal(request.url, "/api/v1/dashboard-data?view=analytics&period=30d");
+  assert.equal(request.options.credentials, "include");
   assert.equal(request.options.cache, "no-store");
   assert.equal(result, data);
 });
@@ -204,8 +205,8 @@ test("analytics range changes request only the selected supported period", async
   cleanup();
 
   assert.deepEqual(requests, [
-    "/api/dashboard-data?view=analytics&period=30d",
-    "/api/dashboard-data?view=analytics&period=90d"
+    "/api/v1/dashboard-data?view=analytics&period=30d",
+    "/api/v1/dashboard-data?view=analytics&period=90d"
   ]);
 });
 

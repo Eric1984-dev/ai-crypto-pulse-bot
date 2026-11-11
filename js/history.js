@@ -13,6 +13,12 @@
   const pageSize = 25;
   const refreshIntervalMs = 30000;
   const numberFormat = new Intl.NumberFormat("en-GB");
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
   function buildTradeHistoryUrl({
     page = 1,
     search = "",
@@ -30,14 +36,14 @@
     if (search.trim()) {
       params.set("search", search.trim());
     }
-    return `/api/dashboard-data?${params}`;
+    return runtimeApiUrl(`/api/v1/dashboard-data?${params}`);
   }
 
   async function requestTradeHistory(fetchImpl, filters) {
     const response = await fetchImpl(buildTradeHistoryUrl(filters), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

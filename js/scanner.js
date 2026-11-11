@@ -19,12 +19,18 @@
     maximumFractionDigits: 2
   });
   const refreshIntervalMs = 30000;
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
 
   async function requestMarketScannerSummary(fetchImpl) {
-    const response = await fetchImpl("/api/market-summary", {
+    const response = await fetchImpl(runtimeApiUrl("/api/v1/market-summary"), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

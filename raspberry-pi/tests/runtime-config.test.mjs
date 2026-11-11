@@ -20,6 +20,12 @@ test("runtime config defaults to loopback API and disables live trading", () => 
     host: "127.0.0.1",
     port: 3002,
     corsOrigins: [],
+    cloudflareAccess: {
+      enabled: false,
+      issuer: "",
+      audience: "",
+      allowedOperatorEmails: []
+    },
     sessionTtlMs: 28800000,
     sessionMax: 1000,
     rateLimitWindowMs: 60000,
@@ -121,4 +127,35 @@ test("runtime config validates origins and bounded API controls", () => {
   assert.throws(() => readRuntimeConfig(validEnvironment({
     API_SESSION_MAX: "0"
   })), /API_SESSION_MAX/);
+});
+
+test("Cloudflare Access requires a valid issuer, audience, and operator allowlist", () => {
+  const config = readRuntimeConfig(validEnvironment({
+    CLOUDFLARE_ACCESS_ENABLED: "true",
+    CLOUDFLARE_ACCESS_ISSUER: "https://team.cloudflareaccess.com",
+    CLOUDFLARE_ACCESS_AUDIENCE: "application-audience",
+    ALLOWED_OPERATOR_EMAILS: "Ops@example.com,viewer@example.com"
+  }));
+  assert.deepEqual(config.api.cloudflareAccess, {
+    enabled: true,
+    issuer: "https://team.cloudflareaccess.com",
+    audience: "application-audience",
+    allowedOperatorEmails: ["ops@example.com", "viewer@example.com"]
+  });
+
+  for (const overrides of [
+    { CLOUDFLARE_ACCESS_ISSUER: "" },
+    { CLOUDFLARE_ACCESS_AUDIENCE: "" },
+    { ALLOWED_OPERATOR_EMAILS: "" },
+    { ALLOWED_OPERATOR_EMAILS: "operator@example.com,operator@example.com" },
+    { CLOUDFLARE_ACCESS_ISSUER: "http://team.cloudflareaccess.com" }
+  ]) {
+    assert.throws(() => readRuntimeConfig(validEnvironment({
+      CLOUDFLARE_ACCESS_ENABLED: "true",
+      CLOUDFLARE_ACCESS_ISSUER: "https://team.cloudflareaccess.com",
+      CLOUDFLARE_ACCESS_AUDIENCE: "application-audience",
+      ALLOWED_OPERATOR_EMAILS: "operator@example.com",
+      ...overrides
+    })), /Cloudflare Access|CLOUDFLARE_ACCESS/);
+  }
 });

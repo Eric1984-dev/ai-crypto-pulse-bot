@@ -56,6 +56,32 @@ const CANDLES_FOR_SYMBOL_SQL = `
   ORDER BY candle."timestamp" DESC
   LIMIT $3
 `;
+const CANDLES_FOR_MARKETS_SQL = `
+  WITH ranked_candles AS (
+    SELECT candle.symbol,
+           candle.interval,
+           candle.open,
+           candle.high,
+           candle.low,
+           candle.close,
+           candle.volume,
+           candle."timestamp",
+           ROW_NUMBER() OVER (
+             PARTITION BY candle.symbol
+             ORDER BY candle."timestamp" DESC
+           ) AS row_number
+    FROM public."AI_Crypto_Bot_Candles" AS candle
+    JOIN public."AI_Crypto_Bot_Watched_Markets" AS watched_market
+      ON watched_market.symbol = candle.symbol
+    WHERE watched_market.enabled IS TRUE
+      AND candle.interval = $1
+      AND candle.symbol = ANY($2::text[])
+  )
+  SELECT symbol, interval, open, high, low, close, volume, "timestamp"
+  FROM ranked_candles
+  WHERE row_number <= $3
+  ORDER BY symbol ASC, "timestamp" ASC
+`;
 
 export class MarketDataRepository {
   constructor(pool, { logger = console } = {}) {
@@ -105,6 +131,30 @@ export class MarketDataRepository {
       this.pool,
       CANDLES_FOR_SYMBOL_SQL,
       [symbol, interval, boundedLimit],
+      { logger: this.logger }
+    );
+    return result.rows.map(normalizeCandleRow);
+  }
+
+  async listRecentCandlesForEnabledMarkets(markets, interval, { perMarket = 40 } = {}) {
+    if (!SUPPORTED_CANDLE_INTERVALS.includes(interval)) {
+      throw new TypeError("A supported candle interval is required.");
+    }
+    if (!Array.isArray(markets) || markets.length > MAX_MARKET_DATA_ROWS) {
+      throw new RangeError("A bounded enabled-market list is required.");
+    }
+    const boundedPerMarket = readPositiveLimit(perMarket, 50, 40);
+    const symbols = markets.map(({ symbol }) => symbol);
+    if (symbols.some((symbol) => typeof symbol !== "string" || !MARKET_SYMBOL_PATTERN.test(symbol))) {
+      throw new TypeError("Enabled markets contain an invalid symbol.");
+    }
+    if (symbols.length === 0) {
+      return [];
+    }
+    const result = await queryReadOnly(
+      this.pool,
+      CANDLES_FOR_MARKETS_SQL,
+      [interval, symbols, boundedPerMarket],
       { logger: this.logger }
     );
     return result.rows.map(normalizeCandleRow);

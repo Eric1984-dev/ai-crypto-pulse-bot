@@ -26,16 +26,22 @@
     timeZone: "Europe/Brussels"
   });
   const refreshIntervalMs = 30_000;
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
 
   async function requestRecommendations(fetchImpl, period = "30d") {
     if (!supportedPeriods.has(period)) {
       throw new TypeError("A valid recommendations date range is required.");
     }
     const params = new URLSearchParams({ view: "recommendations", period });
-    const response = await fetchImpl(`/api/dashboard-data?${params}`, {
+    const response = await fetchImpl(runtimeApiUrl(`/api/v1/dashboard-data?${params}`), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

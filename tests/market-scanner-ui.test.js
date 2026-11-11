@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const scanner = require("../js/scanner.js");
 
 const rankingNames = [
@@ -111,9 +112,9 @@ test("scanner requests the existing summary endpoint without caching", async () 
     return { ok: true, status: 200, json: async () => ({ data: { scanner: expected } }) };
   });
 
-  assert.equal(request.url, "/api/market-summary");
+  assert.equal(request.url, "/api/v1/market-summary");
   assert.equal(request.options.cache, "no-store");
-  assert.equal(request.options.credentials, "same-origin");
+  assert.equal(request.options.credentials, "include");
   assert.equal(result, expected);
 });
 

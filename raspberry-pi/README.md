@@ -97,13 +97,23 @@ npm start
 - `GET /api/v1/health/operational` — bounded runtime/resource counters and last-cycle ingestion, AI, and paper-trading stage outcomes, protected by the `admin` role and denied by default.
 - `GET /api/v1/markets` — enabled watched-market rows, ordered by priority then symbol.
 - `GET /api/v1/market?symbol=BTC-EUR&interval=1m&limit=200` — one enabled market's stored snapshot and bounded newest-first candle history.
-- `GET /api/v1/dashboard-data` — bounded status, watched-market, snapshot, and recent-decision data; not a full dashboard parity response.
+- `GET /api/v1/dashboard-data` — system portfolio, positions, recent trades, snapshots, watched markets, latest decisions and runtime state.
+- `GET /api/v1/dashboard-data?view=trade-history&page=1` — filtered, sorted and paginated trade history.
+- `GET /api/v1/dashboard-data?view=ai-history&page=1` — paginated AI decisions with reasoning and indicator payloads.
+- `GET /api/v1/dashboard-data?view=analytics&period=30d` — paper-trade, AI decision and portfolio analytics for `30d`, `90d` or `365d`.
+- `GET /api/v1/dashboard-data?view=recommendations&period=30d` — on-demand recommendations computed from current analytics; not persisted.
+- `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
-- `GET /api/v1/market-summary` — stored enabled-market/snapshot counts and rows; no scanner rankings or refresh.
+- `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
+- `GET /api/v1/monitoring` — runtime status, last-cycle stages, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
 
-Data routes are authenticated through the existing provider interface and fail closed by default. All errors use a bounded JSON envelope with a request ID. Security headers and `Cache-Control: no-store` are applied. CORS origins default to empty; configuration accepts HTTPS origins or loopback HTTP origins only. Unsafe methods require an exact allowed Origin and a session-bound CSRF token. Rate limiting uses the socket peer address and does not trust forwarded headers.
+`npm start` and `npm run validate` require `CLOUDFLARE_ACCESS_ENABLED=true` and a valid issuer, audience and operator email allowlist. Runtime startup refuses to create the database pool or API when Access is disabled or missing; the API server also refuses to start without an authentication provider. With Access enabled, each protected request validates the Cloudflare JWT signature, issuer, audience, expiry and allowlisted operator email. Signing-key retrieval failures return `503`; missing or invalid assertions are unauthenticated. CORS accepts only configured HTTPS dashboard origins (or loopback HTTP for local development), and credentialed reads are allowed only for those exact origins. The API binds to loopback and must be reached through the Access-protected Cloudflare Tunnel. Keep the database private; never put PostgreSQL credentials in Vercel or browser code.
 
-Authentication integration, OIDC, login/registration, password reset, session-creation endpoints, and admin actions are not implemented. The API remains loopback-only; do not expose it through an Internet-facing proxy.
+Set the Pi-only `CLOUDFLARE_ACCESS_ENABLED`, `CLOUDFLARE_ACCESS_ISSUER`, `CLOUDFLARE_ACCESS_AUDIENCE`, `ALLOWED_OPERATOR_EMAILS`, and exact `API_CORS_ORIGINS` values in `.env`. Set `apiOrigin` and `accessAudience` in the dashboard's `js/runtime-api-config.js` to the real HTTPS API origin and application audience before dashboard deployment. The repository intentionally leaves frontend deployment values blank. No Supabase Auth or profile mapping is used; access is shared and read-only for allowlisted operators. Every dashboard data route is GET-only; trading, portfolio mutations and configuration writes are not exposed. See the [Phase 8.1 authentication activation report](docs/phase-8.1-authentication-activation.md).
+
+All JSON responses use a `{ "data": ... }` envelope; errors use `{ "error": { "code", "message", "requestId" } }`. Invalid query input is rejected, market candle results are limited to 500 rows, trade/AI history pages are limited to 100 rows, analytics and CSV reads are capped at 10,000 rows, and monitoring table counts are PostgreSQL estimates. CPU, disk, temperature or other host details may be unavailable on unsupported systems. The admin-only operational health route is not used by the dashboard.
+
+The existing Vercel dashboard now reads its runtime data from these Pi APIs and uses aligned polling instead of Supabase Realtime. See the [Phase 8 dashboard cutover report](docs/phase-8-dashboard-cutover.md) for the dependency mapping, full route contracts, security assumptions, limitations and validation results.
 
 ## Layout
 

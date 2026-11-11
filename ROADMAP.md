@@ -5,10 +5,11 @@
 - [x] Phase 1 — audit and migration plan: [audit](docs/migration/01-audit.md), [architecture](docs/migration/architecture.md), and [migration roadmap](docs/migration/roadmap.md)
 - [x] Phase 1.7 — single-owner Pi runtime execution specification: [runtime specification](docs/migration/runtime-execution-spec.md)
 - [x] Phase 1.8 — Pi API endpoints, auth, dashboard polling, and cutover gates: [target API architecture](docs/migration/api-architecture.md)
-- [ ] Phase 2 — isolated Raspberry Pi read-only runtime foundation implemented; phase acceptance remains blocked pending secure live Pi database validation: [implementation report](docs/reports/PHASE_02_RASPBERRY_PI_RUNTIME_FOUNDATION.md), [deployment and validation guide](raspberry-pi/docs/phase-2-deployment-validation.md)
-- [ ] Phase 3 and later — not started; each phase requires explicit user approval
+- [x] Phases 2–7.7 — Raspberry Pi runtime foundation, ingestion, AI analysis, scheduler and paper trading are reported operational on the Pi; see the [Phase 7.7 live validation addendum](raspberry-pi/docs/phase-7.7.2-live-validation-addendum.md).
+- [ ] Migration Phase 8 — dashboard reads are wired to the Pi API; Vercel, Cloudflare Access/Tunnel and live browser-to-Pi cutover remain unconfigured/unverified: [cutover report](raspberry-pi/docs/phase-8-dashboard-cutover.md).
+- [ ] Migration Phase 9 and later — not started; requires separate explicit approval.
 
-Phase 2 does not change the current Vercel/Supabase production implementation or authorize a deployment, scheduler cutover, schema/data operation, public API exposure, or live trading. Authentication implementation and OIDC are out of scope.
+The dashboard API remains read-only and bound to loopback behind the intended Cloudflare Tunnel. The report records automated local checks separately from unverified production integration. This roadmap entry does not authorize deployment, public API exposure, schema/data operations, or live trading.
 
 ## Phase 01 - Project Setup
 

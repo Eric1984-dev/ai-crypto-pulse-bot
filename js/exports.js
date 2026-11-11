@@ -19,6 +19,12 @@
     "recommendation-history"
   ]);
   const countFormat = new Intl.NumberFormat("en-GB");
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
 
   function buildExportUrl(type, period, view = "export-count") {
     const validPeriod = analyticsExportTypes.has(type)
@@ -29,14 +35,14 @@
       throw new TypeError("A valid export type, period, and view are required.");
     }
     const params = new URLSearchParams({ view, type, period });
-    return `/api/dashboard-data?${params}`;
+    return runtimeApiUrl(`/api/v1/dashboard-data?${params}`);
   }
 
   async function requestExportCount(fetchImpl, type, period) {
     const response = await fetchImpl(buildExportUrl(type, period), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {
@@ -67,10 +73,10 @@
       throw new TypeError("A valid analytics date range is required.");
     }
     const params = new URLSearchParams({ view: "analytics", period });
-    const response = await fetchImpl(`/api/dashboard-data?${params}`, {
+    const response = await fetchImpl(runtimeApiUrl(`/api/v1/dashboard-data?${params}`), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

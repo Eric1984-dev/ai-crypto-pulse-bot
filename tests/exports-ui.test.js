@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const exportsPage = require("../js/exports.js");
 
 const rootDirectory = path.resolve(__dirname, "..");
@@ -93,9 +94,9 @@ function createExportsDocument(cards) {
   };
 }
 
-test("export UI builds same-origin count and stream URLs", () => {
+test("export UI builds Raspberry Pi API count and stream URLs", () => {
   const countUrl = new URL(exportsPage.buildExportUrl("trades", "7d"), "https://cryptopulse.local");
-  assert.equal(countUrl.pathname, "/api/dashboard-data");
+  assert.equal(countUrl.pathname, "/api/v1/dashboard-data");
   assert.equal(countUrl.searchParams.get("view"), "export-count");
   assert.equal(countUrl.searchParams.get("type"), "trades");
   assert.equal(countUrl.searchParams.get("period"), "7d");
@@ -135,7 +136,7 @@ test("export page displays counts, empty states, download status, and failures",
 
   await card.nodes["[data-export-download]"].trigger("click");
   assert.equal(documentRef.appended[0].clicked, true);
-  assert.equal(documentRef.appended[0].href, "/api/dashboard-data?view=export&type=trades&period=24h");
+  assert.equal(documentRef.appended[0].href, "/api/v1/dashboard-data?view=export&type=trades&period=24h");
   assert.match(card.nodes["[data-export-status]"].textContent, /download requested/i);
   assert.equal(card.nodes["[data-export-status]"].dataset.state, "success");
 
@@ -183,7 +184,7 @@ test("analytics export cards use independent ranges for their counts and downloa
 
   const cleanup = exportsPage.startExports({ windowRef, documentRef });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics&period=30d").length, 1);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data?view=analytics&period=30d").length, 1);
   for (const card of cards) {
     assert.equal(card.nodes["[data-export-count]"].textContent, "3 report rows available");
     assert.equal(card.nodes["[data-export-download]"].disabled, false);
@@ -191,23 +192,23 @@ test("analytics export cards use independent ranges for their counts and downloa
   await cards[0].nodes["[data-export-download]"].trigger("click");
   assert.equal(
     documentRef.appended[0].href,
-    "/api/dashboard-data?view=export&type=analytics-summary&period=30d"
+    "/api/v1/dashboard-data?view=export&type=analytics-summary&period=30d"
   );
 
   cards[0].nodes["[data-export-period]"].value = "90d";
   await cards[0].nodes["[data-export-period]"].trigger("change");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data?view=analytics&period=90d").length, 1);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data?view=analytics&period=90d").length, 1);
   await cards[0].nodes["[data-export-download]"].trigger("click");
   assert.equal(
     documentRef.appended[1].href,
-    "/api/dashboard-data?view=export&type=analytics-summary&period=90d"
+    "/api/v1/dashboard-data?view=export&type=analytics-summary&period=90d"
   );
   assert.equal(cards[1].nodes["[data-export-period]"].value, "30d");
   await cards[1].nodes["[data-export-download]"].trigger("click");
   assert.equal(
     documentRef.appended[2].href,
-    "/api/dashboard-data?view=export&type=trade-analytics&period=30d"
+    "/api/v1/dashboard-data?view=export&type=trade-analytics&period=30d"
   );
   cleanup();
 });
@@ -251,6 +252,6 @@ test("Exports page is English, protected, and links to the existing data API", (
   for (const period of ["24h", "7d", "30d", "all"]) {
     assert.match(html, new RegExp(`value="${period}"`));
   }
-  assert.match(script, /\/api\/dashboard-data/);
+  assert.match(script, /\/api\/v1\/dashboard-data/);
   assert.doesNotMatch(script, /\/api\/exports/);
 });

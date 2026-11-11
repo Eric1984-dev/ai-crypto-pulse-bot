@@ -4,6 +4,7 @@ import { createPostgresPool } from "../database/pool.mjs";
 import { createOperationalHealthSnapshot } from "../monitoring/operational-health.mjs";
 import { createRequestMetrics } from "../monitoring/request-metrics.mjs";
 import { AiDecisionsRepository } from "../repositories/ai-decisions-repository.mjs";
+import { DashboardRepository } from "../repositories/dashboard-repository.mjs";
 import { MarketDataRepository } from "../repositories/market-data-repository.mjs";
 import { PaperTradingRepository } from "../repositories/paper-trading-repository.mjs";
 import { RuntimeStatusRepository } from "../repositories/runtime-status-repository.mjs";
@@ -78,6 +79,7 @@ export async function startRuntime(config, {
   if (onFatal !== undefined && typeof onFatal !== "function") {
     throw new TypeError("The runtime fatal-failure handler must be a function.");
   }
+  assertAuthenticationConfigured(config, authenticationProvider);
   const apiConfig = withPoolMax(config, 2);
   const pool = createPostgresPool(apiConfig, { Pool, logger });
   let server;
@@ -195,6 +197,7 @@ export async function startRuntime(config, {
       watchedMarkets: new WatchedMarketsRepository(pool, { logger }),
       marketData: new MarketDataRepository(pool, { logger }),
       aiDecisions: new AiDecisionsRepository(pool, { logger }),
+      dashboard: new DashboardRepository(pool, { logger }),
       runtimeStatus: new RuntimeStatusRepository(pool, { logger })
     });
     server = createApiServer({
@@ -202,6 +205,7 @@ export async function startRuntime(config, {
       getOperationalHealth,
       dataRepositories,
       authenticationProvider,
+      cloudflareAccess: config.api.cloudflareAccess,
       allowedOrigins: config.api.corsOrigins,
       rateLimitMaxRequests: config.api.rateLimitMaxRequests,
       rateLimitWindowMs: config.api.rateLimitWindowMs,
@@ -338,12 +342,24 @@ export async function validateRuntime(config, {
   logger = console,
   validateContracts = validateRuntimeContracts
 } = {}) {
+  assertAuthenticationConfigured(config);
   const pool = createPostgresPool(config, { Pool, logger });
   try {
     return await validateContracts(pool, config, { logger });
   } finally {
     await pool.end();
   }
+}
+
+function assertAuthenticationConfigured(config, authenticationProvider) {
+  if (authenticationProvider || config?.api?.cloudflareAccess?.enabled === true) {
+    return;
+  }
+  const error = new Error(
+    "Runtime validation and startup require Cloudflare Access authentication to be enabled and configured."
+  );
+  error.code = "CLOUDFLARE_ACCESS_REQUIRED";
+  throw error;
 }
 
 function safeErrorCode(error) {

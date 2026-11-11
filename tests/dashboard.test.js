@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const dashboard = require("../js/dashboard.js");
 const dashboardDataModule = import("../api/dashboard-data.mjs");
 const archiveServerHealthModule = import("../lib/archive-server-health.mjs");
@@ -1627,15 +1628,15 @@ test("chart rendering failures do not hide already-rendered dashboard values", (
   assert.match(elements.get("[data-dashboard-chart-empty]")[0].textContent, /chart is currently unavailable/);
 });
 
-test("dashboard requests same-origin API data and validates error responses", async () => {
+test("dashboard requests Raspberry Pi API data and validates error responses", async () => {
   let request;
   const expected = { data: { portfolioValue: 12 } };
   assert.deepEqual(await dashboard.requestDashboardData(async (url, options) => {
     request = { url, options };
     return { ok: true, status: 200, json: async () => expected };
   }), expected.data);
-  assert.equal(request.url, "/api/dashboard-data");
-  assert.equal(request.options.credentials, "same-origin");
+  assert.equal(request.url, "/api/v1/dashboard-data");
+  assert.equal(request.options.credentials, "include");
   assert.equal(request.options.cache, "no-store");
 
   let statusRequest;
@@ -1643,8 +1644,8 @@ test("dashboard requests same-origin API data and validates error responses", as
     statusRequest = { url, options };
     return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
   }), "ACTIVE");
-  assert.equal(statusRequest.url, "/api/agent-status");
-  assert.equal(statusRequest.options.credentials, "same-origin");
+  assert.equal(statusRequest.url, "/api/v1/agent-status");
+  assert.equal(statusRequest.options.credentials, "include");
   assert.equal(statusRequest.options.cache, "no-store");
 
   await assert.rejects(
@@ -1684,8 +1685,8 @@ test("dashboard waits for authentication and offers retry after a load error", a
   resolveAuth();
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(fetchCalls, [
-    "/api/dashboard-data",
-    "/api/dashboard-data?view=archive-health"
+    "/api/v1/dashboard-data",
+    "/api/v1/monitoring"
   ]);
   assert.equal(elements.get("[data-dashboard-error]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-retry]")[0].hidden, false);
@@ -1707,10 +1708,10 @@ test("dashboard keeps the tracked-markets KPI without displaying the market list
     setInterval: () => 1,
     clearInterval() {},
     fetch: async (url) => {
-      if (url === "/api/dashboard-data") {
+      if (url === "/api/v1/dashboard-data") {
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
-      if (url === "/api/agent-status") {
+      if (url === "/api/v1/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: null } }) };
       }
       throw new Error(`Unexpected dashboard request: ${url}`);
@@ -1755,7 +1756,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
     ChartConstructor: null,
     fetchImpl: async (url) => {
       requests.push(url);
-      if (url === "/api/dashboard-data") {
+      if (url === "/api/v1/dashboard-data") {
         if (failNextDashboardRequest) {
           failNextDashboardRequest = false;
           return { ok: false, status: 503 };
@@ -1772,10 +1773,10 @@ test("dashboard refreshes all data periodically and when returning to the foregr
         }
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
-      if (url === "/api/agent-status") {
+      if (url === "/api/v1/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: "ACTIVE" } }) };
       }
-      if (url === "/api/dashboard-data?view=archive-health") {
+      if (url === "/api/v1/monitoring") {
         if (failNextArchiveRequest) {
           failNextArchiveRequest = false;
           return { ok: false, status: 503 };
@@ -1812,7 +1813,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   };
   await flushDashboardLoad();
 
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 1);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data").length, 1);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.deepEqual(
     [...intervals.values()].map(({ delay }) => delay).sort(),
@@ -1824,7 +1825,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
 
   dashboardData.aiDecisions.count = 2;
   await dashboardInterval.callback();
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 2);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data").length, 2);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "2");
 
@@ -1832,7 +1833,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   const heldRefresh = dashboardInterval.callback();
   await Promise.resolve();
   const duplicateRefresh = controller.load();
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 3);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data").length, 3);
 
   dashboardDocument.visibilityState = "hidden";
   dashboardDocument.listeners.visibilitychange();
@@ -1848,7 +1849,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   resolveHeldDashboardRequest();
   await Promise.all([heldRefresh, duplicateRefresh]);
   await flushDashboardLoad();
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 4);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data").length, 4);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "4");
 
@@ -1863,7 +1864,7 @@ test("dashboard refreshes all data periodically and when returning to the foregr
   dashboardDocument.visibilityState = "visible";
   dashboardDocument.listeners.visibilitychange();
   await flushDashboardLoad();
-  assert.equal(requests.filter((url) => url === "/api/dashboard-data").length, 5);
+  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data").length, 5);
   assert.equal(requests.some((url) => url.includes("market-summary")), false);
   assert.equal(elements.get("[data-dashboard-value=\"aiDecisions\"]")[0].textContent, "5");
   assert.equal(intervals.size, 3);
@@ -1927,10 +1928,10 @@ test("dashboard applies live database status updates and pauses polling while hi
     CryptoPulseAgentBrain: agentBrainApi,
     location: { replace() {} },
     fetch: async (url) => {
-      if (url === "/api/dashboard-data") {
+      if (url === "/api/v1/dashboard-data") {
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
-      if (url === "/api/agent-status") {
+      if (url === "/api/v1/agent-status") {
         return { ok: true, status: 200, json: async () => ({ data: { status: pollStatus } }) };
       }
       throw new Error(`Unexpected dashboard request: ${url}`);
@@ -2057,7 +2058,7 @@ test("dashboard retries circuit initialization after a transient failure", async
     setInterval: () => 1,
     clearInterval() {},
     fetch: async (url) => {
-      if (url === "/api/dashboard-data") {
+      if (url === "/api/v1/dashboard-data") {
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
       return { ok: true, status: 200, json: async () => ({ data: { status: null } }) };
@@ -2109,7 +2110,7 @@ test("dashboard keeps fallback hidden when the circuit survives a status update 
     setInterval: () => 1,
     clearInterval() {},
     fetch: async (url) => {
-      if (url === "/api/dashboard-data") {
+      if (url === "/api/v1/dashboard-data") {
         return { ok: true, status: 200, json: async () => ({ data: dashboardData }) };
       }
       return { ok: true, status: 200, json: async () => ({ data: { status: "ANALYZING" } }) };

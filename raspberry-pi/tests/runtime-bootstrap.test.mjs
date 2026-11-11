@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { startRuntime } from "../src/runtime/bootstrap.mjs";
+import { startRuntime, validateRuntime } from "../src/runtime/bootstrap.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
 function runtimeConfig() {
@@ -11,6 +11,10 @@ function runtimeConfig() {
     DATABASE_USER: "runtime_reader",
     DATABASE_PASSWORD: "test-password",
     DATABASE_SSL: "false",
+    CLOUDFLARE_ACCESS_ENABLED: "true",
+    CLOUDFLARE_ACCESS_ISSUER: "https://team.cloudflareaccess.com",
+    CLOUDFLARE_ACCESS_AUDIENCE: "runtime-bootstrap-test",
+    ALLOWED_OPERATOR_EMAILS: "operator@example.com",
     INGESTION_DATABASE_USER: "ingestion_writer",
     INGESTION_DATABASE_PASSWORD: "ingestion-password",
     AI_DATABASE_USER: "ai_writer",
@@ -139,6 +143,53 @@ test("runtime fails closed and releases database resources when validation fails
   }), { code: "RUNTIME_CONTRACT_INVALID" });
 
   assert.equal(pool.ended, true);
+});
+
+test("runtime refuses to start before opening the database if Cloudflare Access is disabled", async () => {
+  const config = runtimeConfig();
+  const unauthenticatedConfig = Object.freeze({
+    ...config,
+    api: Object.freeze({
+      ...config.api,
+      cloudflareAccess: Object.freeze({
+        ...config.api.cloudflareAccess,
+        enabled: false
+      })
+    })
+  });
+  let poolCreated = false;
+  await assert.rejects(startRuntime(unauthenticatedConfig, {
+    Pool: class {
+      constructor() {
+        poolCreated = true;
+      }
+    }
+  }), (error) => error.code === "CLOUDFLARE_ACCESS_REQUIRED"
+    && /Cloudflare Access authentication/.test(error.message));
+  assert.equal(poolCreated, false);
+});
+
+test("runtime preflight refuses to validate production readiness without Cloudflare Access", async () => {
+  const config = runtimeConfig();
+  const unauthenticatedConfig = Object.freeze({
+    ...config,
+    api: Object.freeze({
+      ...config.api,
+      cloudflareAccess: Object.freeze({
+        ...config.api.cloudflareAccess,
+        enabled: false
+      })
+    })
+  });
+  let poolCreated = false;
+  await assert.rejects(validateRuntime(unauthenticatedConfig, {
+    Pool: class {
+      constructor() {
+        poolCreated = true;
+      }
+    }
+  }), (error) => error.code === "CLOUDFLARE_ACCESS_REQUIRED");
+  assert.equal(poolCreated, false);
 });
 
 test("runtime startup and shutdown never clear an emergency STOPPED status", async () => {

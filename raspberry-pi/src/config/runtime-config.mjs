@@ -84,6 +84,51 @@ function readCorsOrigins(env) {
   return Object.freeze(origins);
 }
 
+function readCloudflareAccessConfig(env) {
+  const enabled = readBoolean(env, "CLOUDFLARE_ACCESS_ENABLED", false);
+  const issuer = env.CLOUDFLARE_ACCESS_ISSUER?.trim() || "";
+  const audience = env.CLOUDFLARE_ACCESS_AUDIENCE?.trim() || "";
+  const allowedOperatorEmails = (env.ALLOWED_OPERATOR_EMAILS?.trim() || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!enabled) {
+    return Object.freeze({
+      enabled,
+      issuer: "",
+      audience: "",
+      allowedOperatorEmails: Object.freeze([])
+    });
+  }
+  if (!issuer || !audience || allowedOperatorEmails.length === 0
+    || new Set(allowedOperatorEmails).size !== allowedOperatorEmails.length
+    || allowedOperatorEmails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+    throw new Error(
+      "CLOUDFLARE_ACCESS_ENABLED requires a valid issuer, audience, and operator email allowlist."
+    );
+  }
+
+  let issuerUrl;
+  try {
+    issuerUrl = new URL(issuer);
+  } catch {
+    throw new Error("Invalid runtime setting: CLOUDFLARE_ACCESS_ISSUER");
+  }
+  if (issuerUrl.protocol !== "https:" || issuerUrl.origin !== issuer
+    || issuerUrl.username || issuerUrl.password || issuerUrl.pathname !== "/"
+    || issuerUrl.search || issuerUrl.hash) {
+    throw new Error("Invalid runtime setting: CLOUDFLARE_ACCESS_ISSUER");
+  }
+
+  return Object.freeze({
+    enabled,
+    issuer,
+    audience,
+    allowedOperatorEmails: Object.freeze(allowedOperatorEmails)
+  });
+}
+
 export function readRuntimeConfig(env = process.env, {
   readFile = readFileSync
 } = {}) {
@@ -166,6 +211,7 @@ export function readRuntimeConfig(env = process.env, {
       host: env.API_HOST?.trim() || DEFAULTS.apiHost,
       port: readInteger(env, "API_PORT", DEFAULTS.apiPort, { min: 1024, max: 65535 }),
       corsOrigins: readCorsOrigins(env),
+      cloudflareAccess: readCloudflareAccessConfig(env),
       sessionTtlMs: readInteger(
         env,
         "API_SESSION_TTL_MS",

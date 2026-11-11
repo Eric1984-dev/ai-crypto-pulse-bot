@@ -1,14 +1,14 @@
 # Target API Architecture
 
 - **Phase:** 1.8 — documentation-only
-- **Status:** target contract; not implemented or deployed
+- **Status:** Phase 1.8 design baseline; the selected Phase 8 dashboard implementation is in progress and has not been deployed
 - **Runtime owner:** Raspberry Pi Node.js service
 - **Frontend host:** Vercel static files only
 - **Database:** the existing PostgreSQL database on the Pi; schema and data are unchanged
 
-> **Scope correction:** Authentication implementation is out of scope and OIDC is explicitly excluded. The identity-provider flow and authentication endpoints below are an unapproved Phase 1.8 proposal, not an implementation instruction. Phase 2 exposes only a loopback health API; do not expose it to Vercel or the public Internet. Any future authentication/network-exposure work requires a separate explicit scope decision.
+> **Phase 8 implementation update:** The approved dashboard integration uses Cloudflare Access JWT validation and a server-side operator email allowlist, with a shared read-only system portfolio. It does not use OIDC application callbacks, Supabase Auth, profile mapping, dashboard write actions, or an admin execution API. The Pi listener remains loopback-only and is intended to be reached through Cloudflare Tunnel. Cloudflare, Vercel and production API connectivity remain unconfigured/unverified; see the [Phase 8 cutover report](../../raspberry-pi/docs/phase-8-dashboard-cutover.md).
 
-This specification defines the post-cutover browser/API boundary. The current Vercel/Supabase endpoints documented in [API.md](../API.md) remain descriptions of the current implementation until their individual migration phases are approved and completed. This document does not authorize implementation, database changes, runtime activation, or deployment.
+The authentication, profile-mapping, admin-action and route proposals in this document are historical design content and are superseded for the current dashboard cutover by the Phase 8 implementation update above. The Phase 8 report is authoritative for implemented API paths and response contracts. This update does not authorize a production deployment, database changes, runtime activation or live trading.
 
 ## 1. Ownership and trust boundaries
 
@@ -233,14 +233,14 @@ The existing runtime limits in [runtime-execution-spec.md](./runtime-execution-s
 
 | Current surface | Target after cutover |
 |---|---|
-| `/api/auth-config`, `/api/auth-session`, Supabase JS Auth, `/api/protected-page` | Pi `/auth/*` OIDC/session endpoints; Vercel serves static pages; client guard remains UX only. |
-| `/api/dashboard-data`, `/api/agent-status`, `/api/market-summary`, `/api/market` | Same read capabilities on the Pi under `/api/v1`; preserve current response contracts and page behavior. |
-| `/api/dashboard-data?view=archive-health` | Authenticated Pi `/health/summary`; remove the Vercel-to-archive proxy after the dashboard is switched. |
-| `/api/admin-actions` | Pi `/admin-actions`, authorized by existing profile identity and serialized with runtime work. |
+| Supabase JS Auth, `/api/protected-page` | Cloudflare Access login redirect; Pi validates the Access JWT and allowlisted operator email. Static page guards are UX only. |
+| `/api/dashboard-data`, `/api/agent-status`, `/api/market-summary`, `/api/market` | Read-only Pi endpoints under `/api/v1`; the browser uses the configured runtime API origin. |
+| `/api/dashboard-data?view=archive-health` | Pi `GET /api/v1/monitoring`; supplies runtime, host and database monitoring fields. |
+| `/api/admin-actions` | No dashboard replacement; admin execution controls are removed and the API remains read-only. |
 | `/api/market-refresh`, `/api/candle-refresh` | Internal Pi scheduler stages; no public replacement routes. |
 | `/api/ai-analysis`, `/api/paper-trading` scheduler endpoints | Internal runtime coordinator only. Admin API actions remain authenticated, manual, and separately serialized. |
 | Supabase Realtime table subscriptions | Bounded visible-tab polling against the Pi read APIs; no direct browser database connection. |
-| Supabase Auth/PostgREST/RPC application calls | Pi-owned OIDC/session adapter and explicit database repositories using the already-installed PostgreSQL schema. |
+| Supabase Auth/PostgREST/RPC dashboard calls | Cloudflare Access JWT validation and explicit read-only Pi PostgreSQL repositories using the installed schema. |
 
 ## 10. Acceptance criteria and implementation gates
 

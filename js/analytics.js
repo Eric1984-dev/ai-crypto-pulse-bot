@@ -25,6 +25,12 @@
   });
 
   const supportedPeriods = new Set(["30d", "90d", "365d"]);
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
   const periodLabels = new Map([
     ["30d", "Last 30 days"],
     ["90d", "Last 90 days"],
@@ -36,10 +42,10 @@
       throw new TypeError("A valid analytics date range is required.");
     }
     const params = new URLSearchParams({ view: "analytics", period });
-    const response = await fetchImpl(`/api/dashboard-data?${params}`, {
+    const response = await fetchImpl(runtimeApiUrl(`/api/v1/dashboard-data?${params}`), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

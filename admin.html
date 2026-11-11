@@ -14,9 +14,10 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
+    <script src="/js/runtime-api-config.js" defer></script>
+    <script src="/js/runtime-api.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
-    <script src="/js/admin.js" defer></script>
   </head>
   <body data-auth-page="protected">
     <header class="site-header">
@@ -45,24 +46,14 @@
     </header>
     <main class="page-shell">
       <p data-auth-message role="status" aria-live="polite"></p>
-      <p data-admin-access-message role="status" aria-live="polite">Checking administrator access…</p>
-      <section class="dashboard-panel dashboard-admin-actions" data-admin-page aria-labelledby="admin-actions-heading" hidden>
+      <section class="dashboard-panel" aria-labelledby="admin-actions-heading">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Administrator</p>
-            <h1 id="admin-actions-heading">Admin Actions</h1>
+            <p class="eyebrow">Read-only dashboard</p>
+            <h1 id="admin-actions-heading">Administrator actions are unavailable</h1>
           </div>
         </div>
-        <p class="card-description">Run AI analysis or paper trading with the existing engine and risk controls.</p>
-        <div class="admin-action-buttons">
-          <button class="admin-action-button" data-admin-action="ai-analysis" type="button">Execute AI Analysis</button>
-          <button class="admin-action-button" data-admin-action="paper-trading" type="button">Execute Paper Trading</button>
-        </div>
-        <div class="admin-action-output" data-admin-action-output role="region" aria-live="polite" hidden>
-          <p class="admin-action-status" data-admin-action-status role="status"></p>
-          <p class="dashboard-muted">Execution duration: <span data-admin-action-duration>—</span></p>
-          <pre class="admin-action-summary" data-admin-action-summary></pre>
-        </div>
+        <p class="card-description">Dashboard access is read-only. AI and paper-trading execution are managed by the Raspberry Pi runtime.</p>
       </section>
     </main>
     <footer class="site-footer">

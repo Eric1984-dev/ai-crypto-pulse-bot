@@ -11,6 +11,7 @@ async function withServer(options, run) {
   const server = createApiServer({
     readiness: { async check() { return true; } },
     getOperationalHealth: () => ({ status: "foundation_only" }),
+    authenticationProvider: { async authenticate() { return null; } },
     logger,
     ...options
   });
@@ -63,6 +64,14 @@ test("health endpoints have bounded payloads and security headers", async () => 
     assert.equal(post.headers.get("allow"), "GET, OPTIONS");
     assert.equal(checks, 1);
   });
+});
+
+test("API server refuses to start without an authentication provider", () => {
+  assert.throws(() => createApiServer({
+    readiness: { async check() { return true; } },
+    getOperationalHealth: () => ({ status: "foundation_only" }),
+    logger
+  }), /Cloudflare Access authentication provider is required/);
 });
 
 test("readiness and protected operational health fail closed", async () => {

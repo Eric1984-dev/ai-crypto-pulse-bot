@@ -286,12 +286,13 @@ test("Admin actions show progress, prevent duplicates, and report results", asyn
   cleanup();
 });
 
-test("protected navigation includes Admin only as a hidden, authorized menu entry", () => {
+test("dashboard does not load administrator actions or expose write controls", () => {
   const pages = ["dashboard", "portfolio", "scanner", "history", "settings", "admin"];
   for (const pageName of pages) {
     const html = fs.readFileSync(path.join(rootDirectory, `${pageName}.html`), "utf8");
     assert.match(html, /data-admin-nav href="\/admin\.html" hidden>Admin<\/a>/);
-    assert.match(html, /\/js\/admin\.js/);
+    assert.doesNotMatch(html, /\/js\/admin\.js/);
+    assert.doesNotMatch(html, /data-admin-action=/);
   }
   const dashboardHtml = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
   assert.doesNotMatch(dashboardHtml, /data-admin-actions|Execute AI Analysis|Execute Paper Trading/);

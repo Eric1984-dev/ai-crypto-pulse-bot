@@ -46,10 +46,6 @@ const databaseAiAnalysisV2Migration = migrationSql.find((sql) =>
 const shadowExitMigration = migrationSql.find((sql) =>
   sql.includes('CREATE FUNCTION public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"')
 );
-const realtimePublicationMigration = migrationSql.find((sql) =>
-  sql.includes("ALTER PUBLICATION supabase_realtime")
-);
-const realtimeSurfaceSubscriptions = require("../js/realtime.js").surfaceSubscriptions;
 
 async function createDatabase() {
   const { PGlite } = await import("@electric-sql/pglite");
@@ -117,23 +113,19 @@ async function getInitialPortfolioForUser(database, userId) {
   return portfolio.rows[0].id;
 }
 
-test("Realtime publication includes the tables required by authenticated UI surfaces", () => {
-  assert.ok(realtimePublicationMigration);
-  assert.match(realtimePublicationMigration, /pg_catalog\.pg_publication/);
-  assert.match(realtimePublicationMigration, /pg_catalog\.pg_publication_tables/);
-  assert.match(realtimePublicationMigration, /RAISE EXCEPTION/);
-
-  const requiredRealtimeTables = [...new Set(
-    Object.values(realtimeSurfaceSubscriptions)
-      .flat()
-      .map((subscription) => subscription.table)
-  )].sort();
-  const configuredRealtimeTables = [...new Set(
-    [...realtimePublicationMigration.matchAll(/'(AI_Crypto_Bot_[A-Za-z0-9_]+)'/g)]
-      .map((match) => match[1])
-  )].sort();
-  assert.deepEqual(configuredRealtimeTables, requiredRealtimeTables);
-  assert.equal(new Set(requiredRealtimeTables).size, requiredRealtimeTables.length);
+test("dashboard pages use the Pi API and do not load Supabase Realtime", () => {
+  for (const page of [
+    "dashboard.html", "portfolio.html", "scanner.html", "analytics.html",
+    "recommendations.html", "history.html", "exports.html"
+  ]) {
+    const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
+    assert.match(html, /\/js\/runtime-api\.js/);
+    assert.doesNotMatch(html, /supabase-js/);
+  }
+  const dashboard = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  assert.match(dashboard, /\/js\/realtime\.js/);
+  const realtime = fs.readFileSync(path.join(rootDirectory, "js", "realtime.js"), "utf8");
+  assert.doesNotMatch(realtime, /supabase|\.channel\(/i);
 });
 
 async function setMarketPrice(database, symbol, price) {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import { DisabledAuthenticationProvider } from "../auth/authentication-provider.mjs";
+import { CloudflareAccessAuthenticationProvider } from "../auth/cloudflare-access-provider.mjs";
 import { authenticationMiddleware } from "../auth/authentication-middleware.mjs";
 import { csrfMiddleware } from "./csrf-middleware.mjs";
 import { ApiError, toErrorResponse } from "./api-error.mjs";
@@ -16,9 +16,11 @@ import { requestLoggingMiddleware } from "./request-logging-middleware.mjs";
 export function createApiServer({
   readiness,
   getOperationalHealth,
-  authenticationProvider = new DisabledAuthenticationProvider(),
+  authenticationProvider,
+  cloudflareAccess,
   dataRepositories,
   now,
+  getSystemMetrics,
   allowedOrigins = [],
   rateLimitMaxRequests = 60,
   rateLimitWindowMs = 60000,
@@ -26,12 +28,22 @@ export function createApiServer({
   metrics,
   createServerImpl = createServer
 }) {
+  const resolvedAuthenticationProvider = authenticationProvider || (
+    cloudflareAccess?.enabled
+      ? new CloudflareAccessAuthenticationProvider(cloudflareAccess)
+      : null
+  );
+  if (!resolvedAuthenticationProvider
+    || typeof resolvedAuthenticationProvider.authenticate !== "function") {
+    throw new TypeError("An active Cloudflare Access authentication provider is required.");
+  }
+
   const router = registerHealthRoutes(new ApiRouter(), {
     readiness,
     getOperationalHealth
   });
   if (dataRepositories) {
-    registerDataRoutes(router, dataRepositories, { now });
+    registerDataRoutes(router, dataRepositories, { now, getOperationalHealth, getSystemMetrics });
   }
   const rateLimiter = new FixedWindowRateLimiter({
     limit: rateLimitMaxRequests,
@@ -43,7 +55,7 @@ export function createApiServer({
     rateLimitMiddleware(rateLimiter),
     corsMiddleware({ allowedOrigins }),
     routerMiddleware(router),
-    authenticationMiddleware(authenticationProvider),
+    authenticationMiddleware(resolvedAuthenticationProvider),
     csrfMiddleware({ allowedOrigins })
   ], async (context) => {
     await context.routeHandler(context);

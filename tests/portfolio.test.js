@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const portfolio = require("../js/portfolio.js");
 
 function createElement() {
@@ -169,9 +170,9 @@ test("portfolio data request uses the authenticated no-store dashboard API and v
     request = { url, options };
     return { ok: true, status: 200, json: async () => ({ data }) };
   });
-  assert.equal(request.url, "/api/dashboard-data");
+  assert.equal(request.url, "/api/v1/dashboard-data");
   assert.equal(request.options.cache, "no-store");
-  assert.equal(request.options.credentials, "same-origin");
+  assert.equal(request.options.credentials, "include");
   assert.equal(result, data);
 
   await assert.rejects(

@@ -1,73 +1,90 @@
-(function attachAuthService(root, createApi) {
+(function attachRuntimeAccess(root, createApi) {
   const api = createApi();
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   root.CryptoPulseAuth = api;
-})(globalThis, function createAuthApi() {
-  function createSupabaseClient(createClient, config) {
-    if (typeof createClient !== "function" || !config || !config.supabaseUrl || !config.supabaseAnonKey) {
-      throw new Error("Supabase Authentication configuration is incomplete.");
+})(globalThis, function createRuntimeAccessApi() {
+  const protectedPaths = Object.freeze([
+    "/dashboard.html",
+    "/portfolio.html",
+    "/scanner.html",
+    "/analytics.html",
+    "/recommendations.html",
+    "/history.html",
+    "/exports.html",
+    "/settings.html"
+  ]);
+
+  function safeNextPath(candidate) {
+    if (typeof candidate !== "string") {
+      return "/dashboard.html";
     }
-
-    return createClient(config.supabaseUrl, config.supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
-      }
-    });
-  }
-
-  function createAuthService(client) {
-    if (!client || !client.auth) {
-      throw new Error("A Supabase Authentication client is required.");
+    let path;
+    try {
+      const url = new URL(candidate, "https://dashboard.invalid");
+      path = protectedPaths.includes(url.pathname) ? `${url.pathname}${url.search}` : null;
+    } catch {
+      path = null;
     }
-
-    return {
-      register(email, password, emailRedirectTo) {
-        return resolve(client.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo }
-        }));
-      },
-      login(email, password) {
-        return resolve(client.auth.signInWithPassword({ email, password }));
-      },
-      logout() {
-        return resolve(client.auth.signOut());
-      },
-      requestPasswordReset(email, origin) {
-        const redirectTo = new URL("/reset-password.html", origin).toString();
-        return resolve(client.auth.resetPasswordForEmail(email, { redirectTo }));
-      },
-      updatePassword(password) {
-        return resolve(client.auth.updateUser({ password }));
-      },
-      getSession() {
-        return resolve(client.auth.getSession()).then((data) => data.session);
-      },
-      onAuthStateChange(callback) {
-        return client.auth.onAuthStateChange(callback);
-      }
-    };
+    return path || "/dashboard.html";
   }
 
-  function safeNextPath(candidate, allowedPaths) {
-    const normalized = typeof candidate === "string" && candidate.endsWith(".html")
-      ? candidate
-      : `${candidate || ""}.html`;
-    return allowedPaths.includes(normalized) ? normalized : "/dashboard.html";
-  }
-
-  async function resolve(operation) {
-    const result = await operation;
-    if (!result || result.error) {
-      throw result && result.error ? result.error : new Error("Supabase Authentication returned no result.");
+  function createAccessLoginUrl(
+    apiOrigin,
+    audience,
+    returnTo,
+    dashboardOrigin = globalThis.location?.origin || "https://dashboard.invalid"
+  ) {
+    const origin = validateApiOrigin(apiOrigin);
+    if (typeof audience !== "string" || !audience.trim()) {
+      throw new Error("Cloudflare Access application audience is not configured.");
     }
-    return result.data;
+    const destination = new URL(safeNextPath(returnTo), "https://dashboard.invalid");
+    const redirectUrl = new URL(
+      destination.pathname + destination.search,
+      dashboardOrigin
+    );
+    redirectUrl.searchParams.set("cp_access", "1");
+    const login = new URL(
+      `/cdn-cgi/access/login/${encodeURIComponent(audience.trim())}`,
+      origin
+    );
+    login.searchParams.set("redirect_url", redirectUrl.toString());
+    return login.toString();
   }
 
-  return { createAuthService, createSupabaseClient, safeNextPath };
+  function createAccessLogoutUrl(apiOrigin, returnTo) {
+    const origin = validateApiOrigin(apiOrigin);
+    const logout = new URL("/cdn-cgi/access/logout", origin);
+    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
+      logout.searchParams.set("returnTo", new URL(
+        returnTo,
+        globalThis.location?.origin || "https://dashboard.invalid"
+      ).toString());
+    }
+    return logout.toString();
+  }
+
+  function validateApiOrigin(value) {
+    let url;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error("Raspberry Pi runtime API origin is not configured.");
+    }
+    if ((url.protocol !== "https:" && url.hostname !== "localhost")
+      || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("Raspberry Pi runtime API origin is invalid.");
+    }
+    return url.origin;
+  }
+
+  return {
+    protectedPaths,
+    createAccessLoginUrl,
+    createAccessLogoutUrl,
+    safeNextPath,
+    validateApiOrigin
+  };
 });

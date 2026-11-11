@@ -14,6 +14,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
+    <script src="/js/runtime-api-config.js" defer></script>
+    <script src="/js/runtime-api.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
   </head>
@@ -25,7 +27,6 @@
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
-              <a data-nav-link href="/register.html">Create Account</a>
               <a data-nav-link href="/login.html">Sign In</a>
             </div>
           </details>
@@ -35,21 +36,11 @@
     <main class="page-shell">
       <p class="eyebrow">Account</p>
       <h1>Welcome back.</h1>
-      <p class="page-description">Sign in to continue to your secure CryptoPulse account.</p>
+      <p class="page-description">Operator access is provided by Cloudflare Access.</p>
       <section class="auth-card" aria-labelledby="login-heading">
         <h2 id="login-heading">Sign In</h2>
-        <form id="login-form" method="post">
-          <label for="login-email">Email address</label>
-          <input id="login-email" name="email" type="email" autocomplete="email" required>
-          <label for="login-password">Password</label>
-          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
-          <button class="button-link" type="submit">Sign In</button>
-        </form>
         <p data-auth-message role="status" aria-live="polite"></p>
-        <div class="auth-links">
-          <a href="/reset-password.html">Forgot your password?</a>
-          <a href="/register.html">New to CryptoPulse? Create an account</a>
-        </div>
+        <p>Only operator email addresses configured by the service owner can access this read-only dashboard.</p>
       </section>
     </main>
     <footer class="site-footer">

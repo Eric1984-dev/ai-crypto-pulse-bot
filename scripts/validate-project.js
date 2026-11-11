@@ -168,31 +168,13 @@ function validateProject() {
     errors.push("Missing server-side administrator authorization helper: lib/admin-auth.js");
   }
 
-  const protectedPages = ["dashboard", "portfolio", "scanner", "analytics", "recommendations", "history", "exports", "settings", "admin"];
-  for (const page of protectedPages) {
-    for (const source of [`^/${page}$`, `^/${page}\\.html$`]) {
-      const hasRoute = (vercelConfig?.routes || []).some((route) =>
-        route.src === source && route.dest === `/api/protected-page?page=${page}`
-      );
-      if (!hasRoute) {
-        errors.push(`Missing ordered Vercel authentication route for ${source}.`);
-      }
-    }
+  if ((vercelConfig?.routes || []).some((route) =>
+    typeof route.dest === "string" && route.dest.startsWith("/api/protected-page")
+  )) {
+    errors.push("Vercel must serve dashboard pages as static files; API authentication is enforced by the Raspberry Pi runtime.");
   }
-
-  const filesystemRouteIndex = (vercelConfig?.routes || []).findIndex((route) => route.handle === "filesystem");
-  const lastProtectedRouteIndex = Math.max(...(vercelConfig?.routes || []).reduce((indices, route, index) => {
-    if (typeof route.dest === "string" && route.dest.startsWith("/api/protected-page?page=")) {
-      indices.push(index);
-    }
-    return indices;
-  }, [-1]));
-  if (filesystemRouteIndex === -1 || filesystemRouteIndex < lastProtectedRouteIndex) {
-    errors.push("Vercel filesystem handling must follow all protected-page authentication routes.");
-  }
-
-  if (vercelConfig?.functions?.["api/protected-page.mjs"]?.includeFiles !== "*.html") {
-    errors.push("The protected-page function must bundle the protected HTML files.");
+  if (vercelConfig?.functions?.["api/protected-page.mjs"]) {
+    errors.push("Vercel must not bundle the legacy protected-page function for dashboard access.");
   }
 
   return errors;

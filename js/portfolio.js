@@ -12,12 +12,18 @@
 })(globalThis, function createPortfolioApi(formatters) {
   const refreshIntervalMs = 30000;
   const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 8 });
+  const runtimeApiUrl = (path) => {
+    if (!globalThis.CryptoPulseRuntimeApi) {
+      throw new Error("Raspberry Pi runtime API is not configured.");
+    }
+    return globalThis.CryptoPulseRuntimeApi.url(path);
+  };
 
   async function requestPortfolioData(fetchImpl) {
-    const response = await fetchImpl("/api/dashboard-data", {
+    const response = await fetchImpl(runtimeApiUrl("/api/v1/dashboard-data"), {
       method: "GET",
       cache: "no-store",
-      credentials: "same-origin",
+      credentials: "include",
       headers: { Accept: "application/json" }
     });
     if (response.status === 401) {

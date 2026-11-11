@@ -45,9 +45,8 @@ test("all pages use a dropdown for their top navigation", () => {
     const menuItems = [...menu[1].matchAll(/<a\b[^>]*>([^<]*)<\/a>/g)]
       .map(([, label]) => label.trim());
     if (accountPages.includes(page)) {
-      assert.deepEqual(menuItems, ["Create Account", "Sign In"]);
+      assert.deepEqual(menuItems, ["Sign In"]);
       assert.match(menu[1], /href="\/login\.html"/);
-      assert.match(menu[1], /href="\/register\.html"/);
     } else {
       const expectedLinks = [
         "/dashboard.html",

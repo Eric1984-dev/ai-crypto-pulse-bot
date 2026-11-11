@@ -14,6 +14,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/css/styles.css">
     <script src="/js/main.js" defer></script>
+    <script src="/js/runtime-api-config.js" defer></script>
+    <script src="/js/runtime-api.js" defer></script>
     <script src="/js/auth-service.js" defer></script>
     <script src="/js/auth.js" defer></script>
   </head>
@@ -25,7 +27,6 @@
           <details class="nav-dropdown">
             <summary class="nav-trigger">Menu</summary>
             <div class="nav-menu">
-              <a data-nav-link href="/register.html">Create Account</a>
               <a data-nav-link href="/login.html">Sign In</a>
             </div>
           </details>
@@ -34,21 +35,13 @@
     </header>
     <main class="page-shell">
       <p class="eyebrow">Account</p>
-      <h1>Create your account.</h1>
-      <p class="page-description">Supabase Authentication manages your account and email confirmation.</p>
+      <h1>Operator access only.</h1>
+      <p class="page-description">Dashboard accounts are managed by the Cloudflare Access application.</p>
       <section class="auth-card" aria-labelledby="register-heading">
-        <h2 id="register-heading">Create Account</h2>
-        <form id="register-form" method="post">
-          <label for="register-email">Email address</label>
-          <input id="register-email" name="email" type="email" autocomplete="email" required>
-          <label for="register-password">Password</label>
-          <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
-          <label for="register-confirm-password">Confirm password</label>
-          <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required>
-          <button class="button-link" type="submit">Create Account</button>
-        </form>
+        <h2 id="register-heading">Registration is disabled</h2>
         <p data-auth-message role="status" aria-live="polite"></p>
-        <div class="auth-links"><a href="/login.html">Already have an account? Sign in</a></div>
+        <p>Contact the service owner to request allowlist access.</p>
+        <div class="auth-links"><a href="/login.html">Continue to sign in</a></div>
       </section>
     </main>
     <footer class="site-footer">

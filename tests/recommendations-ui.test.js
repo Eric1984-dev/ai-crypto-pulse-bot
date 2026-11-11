@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const recommendations = require("../js/recommendations.js");
 
 const rootDirectory = path.resolve(__dirname, "..");
@@ -93,8 +94,8 @@ test("recommendation request uses the authenticated existing dashboard-data view
     };
   }, "90d");
 
-  assert.equal(request.url, "/api/dashboard-data?view=recommendations&period=90d");
-  assert.equal(request.options.credentials, "same-origin");
+  assert.equal(request.url, "/api/v1/dashboard-data?view=recommendations&period=90d");
+  assert.equal(request.options.credentials, "include");
   assert.equal(request.options.cache, "no-store");
   assert.equal(result.analysisPeriod, "90d");
 });

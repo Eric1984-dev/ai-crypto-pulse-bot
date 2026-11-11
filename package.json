@@ -2,7 +2,7 @@
   "name": "crypto-pulse-ai-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "CryptoPulse AI Agent static application with Supabase Auth and dashboard",
+  "description": "CryptoPulse AI Agent static dashboard using the Raspberry Pi read-only runtime API",
   "scripts": {
     "build": "node scripts/validate-project.js && node scripts/validate-database.js",
     "test": "node --test"

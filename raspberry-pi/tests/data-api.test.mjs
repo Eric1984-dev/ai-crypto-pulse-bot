@@ -44,6 +44,7 @@ const decisionRows = [
     decision: "HOLD",
     confidence: "72.5",
     reason: "Trend is consolidating.",
+    indicators: {},
     strategy_name: null,
     strategy_version: null,
     created_at: capturedAt
@@ -86,6 +87,14 @@ function createPool({
             throw error;
           }
           if (sql.includes('FROM public."AI_Crypto_Bot_AI_Decisions"')) {
+            if (sql.includes("COUNT(*)")) {
+              return { rows: [{ total_count: decisions.length }] };
+            }
+            if (sql.includes("OFFSET $2")) {
+              return {
+                rows: decisions.slice(values[1], values[1] + values[0])
+              };
+            }
             return { rows: decisions.slice(0, values[0]) };
           }
           if (sql.includes('FROM public."AI_Crypto_Bot_Status"')) {
@@ -141,11 +150,90 @@ function createPool({
   return pool;
 }
 
-function createRepositories(pool, logger = { error() {} }) {
+function createRepositories(pool, logger = { error() {} }, dashboardOverrides = {}) {
   return {
     watchedMarkets: new WatchedMarketsRepository(pool, { logger }),
     marketData: new MarketDataRepository(pool, { logger }),
     aiDecisions: new AiDecisionsRepository(pool, { logger }),
+    dashboard: {
+      async getSystemDashboardData() {
+        return {
+          portfolio: {
+            count: 0,
+            portfolioValue: null,
+            totalPnl: null,
+            realizedPnl: null,
+            unrealizedPnl: null,
+            dailyPnl: 0,
+            dailyPnlTradeCount: 0,
+            availableBalance: null,
+            winRate: null,
+            winRateTradeCount: 0
+          },
+          openPositions: { count: 0, items: [] },
+          openPositionAiStatus: { count: 0, items: [] },
+          recentTrades: { count: 0, items: [] },
+          portfolioSnapshots: [],
+          emergencyState: { status: "NORMAL" },
+          lastMarketDataAt: null
+        };
+      },
+      async getTradeHistory({ page, pageSize }) {
+        return {
+          page,
+          pageSize: pageSize || 25,
+          totalCount: 0,
+          totalPages: 0,
+          items: [],
+          stats: {
+            closedTrades: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+            averageProfit: null,
+            averageLoss: null,
+            bestTrade: null,
+            worstTrade: null
+          }
+        };
+      },
+      async getAnalytics() {
+        return {
+          generatedAt: capturedAt,
+          period: "30d",
+          periodStart: capturedAt,
+          tradePerformance: { closedTrades: 0 },
+          aiPerformance: { decisionCount: 0, confidenceBuckets: [] },
+          portfolio: { equityCurve: [] },
+          dataQuality: {}
+        };
+      },
+      async getExportRecordCount() {
+        return 1;
+      },
+      async getExportRecords() {
+        return [{
+          created_at: capturedAt,
+          symbol: "BTC-EUR",
+          side: "BUY",
+          price: "90000.25",
+          quantity: "0.5",
+          fees: "10.00",
+          realized_pnl: "0"
+        }];
+      },
+      async getMonitoringMetrics() {
+        return {
+          databaseSizeBytes: 1024,
+          estimatedRows: {
+            candles: 200000,
+            decisions: 5000,
+            trades: 12,
+            positions: 3
+          }
+        };
+      },
+      ...dashboardOverrides
+    },
     runtimeStatus: new RuntimeStatusRepository(pool, { logger })
   };
 }
@@ -310,6 +398,50 @@ test("agent status preserves its existing status envelope and returns null for m
   }
 });
 
+test("AI decision history is paginated and includes reasoning and indicators", async () => {
+  const history = [
+    { ...decisionRows[0], reason: "Recent decision", indicators: { rsi: 54 } },
+    {
+      ...decisionRows[0],
+      id: "00000000-0000-0000-0000-000000000011",
+      symbol: "ETH-EUR",
+      reason: "Earlier decision",
+      indicators: { rsi: 48 }
+    }
+  ];
+  const pool = createPool({ decisions: history });
+  await withServer({ dataRepositories: createRepositories(pool) }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=ai-history&page=2&pageSize=1`
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).data, {
+      page: 2,
+      pageSize: 1,
+      totalCount: 2,
+      totalPages: 2,
+      items: [{
+        ...history[1],
+        confidence: 72.5
+      }]
+    });
+    const select = pool.queries.find(({ sql }) =>
+      sql.includes('FROM public."AI_Crypto_Bot_AI_Decisions"')
+      && sql.includes("OFFSET $2"));
+    assert.deepEqual(select.values, [1, 1]);
+  });
+
+  await withServer({ dataRepositories: createRepositories(createPool()) }, async (baseUrl) => {
+    for (const query of ["page=0", "pageSize=0", "pageSize=101"]) {
+      const response = await fetch(
+        `${baseUrl}/api/v1/dashboard-data?view=ai-history&${query}`
+      );
+      assert.equal(response.status, 400, query);
+      assert.equal((await response.json()).error.code, "INVALID_QUERY", query);
+    }
+  });
+});
+
 test("market summary and dashboard expose bounded stored data without synthesizing absent dashboard metrics", async () => {
   const pool = createPool();
   await withServer({
@@ -318,22 +450,12 @@ test("market summary and dashboard expose bounded stored data without synthesizi
   }, async (baseUrl) => {
     const summary = await fetch(`${baseUrl}/api/v1/market-summary`);
     assert.equal(summary.status, 200);
-    assert.deepEqual(await summary.json(), {
-      data: {
-        activeMarkets: 2,
-        marketsWithData: 1,
-        items: [{
-          ...marketDataRows[0],
-          price: 90000.25,
-          volume: 10.5,
-          daily_change: 2.25,
-          high_24h: 92000,
-          low_24h: 88000
-        }],
-        refreshedAt: capturedAt,
-        refreshStatus: "read-only"
-      }
-    });
+    const scanner = (await summary.json()).data.scanner;
+    assert.equal(scanner.activeMarkets, 2);
+    assert.equal(scanner.generatedAt, "2026-11-10T19:00:00.000Z");
+    assert.equal(scanner.marketsWithFreshData, 0);
+    assert.equal(scanner.marketsWithDecisions, 1);
+    assert.equal(scanner.timeframes["24h"].aiOpportunities[0].symbol, "BTC-EUR");
 
     const dashboard = await fetch(`${baseUrl}/api/v1/dashboard-data`);
     assert.equal(dashboard.status, 200);
@@ -343,7 +465,79 @@ test("market summary and dashboard expose bounded stored data without synthesizi
     assert.equal(body.data.watchedMarkets.count, 2);
     assert.equal(body.data.aiDecisions.count, 1);
     assert.equal(body.data.marketData.count, 1);
-    assert.equal(Object.hasOwn(body.data, "portfolio"), false);
+    assert.equal(body.data.portfolio.count, 0);
+    assert.equal(body.data.openPositions.count, 0);
+    assert.equal(body.data.recentTrades.count, 0);
+    assert.equal(body.data.emergencyState.status, "NORMAL");
+  });
+});
+
+test("export routes provide bounded counts and read-only CSV output", async () => {
+  const pool = createPool();
+  await withServer({
+    dataRepositories: createRepositories(pool),
+    now: () => new Date("2026-11-10T19:00:00.000Z")
+  }, async (baseUrl) => {
+    const countResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=export-count&type=trades&period=7d`
+    );
+    assert.equal(countResponse.status, 200);
+    assert.deepEqual(await countResponse.json(), {
+      data: { exportType: "trades", period: "7d", recordCount: 1 }
+    });
+
+    const csvResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=export&type=trades&period=7d`
+    );
+    assert.equal(csvResponse.status, 200);
+    assert.match(csvResponse.headers.get("content-type"), /text\/csv/);
+    assert.equal(csvResponse.headers.get("x-export-record-count"), "1");
+    const csv = await csvResponse.text();
+    assert.match(csv, /Date,Symbol,Action,Entry Price/);
+    assert.match(csv, /BTC-EUR,BUY,90000\.25,0\.5/);
+    assert.equal(pool.queries.some(({ sql }) => /\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
+  });
+});
+
+test("monitoring route returns runtime, system, and estimated database metrics", async () => {
+  const pool = createPool();
+  await withServer({
+    dataRepositories: createRepositories(pool),
+    getOperationalHealth: () => ({ status: "healthy" }),
+    getSystemMetrics: async () => ({
+      cpuUsagePercent: 12.5,
+      loadAverage: [0.1, 0.2, 0.3],
+      memory: { totalBytes: 1000, availableBytes: 400, usedPercent: 60 },
+      temperatureC: 42.5,
+      disk: { totalBytes: 2000, availableBytes: 500, usedPercent: 75 }
+    }),
+    now: () => new Date("2026-11-10T19:00:00.000Z")
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/monitoring`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.data, {
+      server: "online",
+      postgresql: "online",
+      database: "online",
+      diskUsage: 75,
+      databaseSize: "1.0 KB",
+      lastHealthCheck: "2026-11-10T19:00:00.000Z",
+      runtime: { status: "healthy" },
+      system: {
+        cpuUsagePercent: 12.5,
+        loadAverage: [0.1, 0.2, 0.3],
+        memory: { totalBytes: 1000, availableBytes: 400, usedPercent: 60 },
+        temperatureC: 42.5,
+        disk: { totalBytes: 2000, availableBytes: 500, usedPercent: 75 }
+      },
+      databaseSizeBytes: 1024,
+      tableRowsAreEstimated: true,
+      tableCounts: { candles: 200000, decisions: 5000, trades: 12, positions: 3 },
+      stages: null,
+      agentStatus: "ANALYZING"
+    });
+    assert.equal(pool.queries.some(({ sql }) => /\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
   });
 });
 

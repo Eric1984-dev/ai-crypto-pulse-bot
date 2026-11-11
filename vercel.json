@@ -2,29 +2,6 @@
   "cleanUrls": true,
   "outputDirectory": ".",
   "routes": [
-    { "src": "^/dashboard$", "dest": "/api/protected-page?page=dashboard" },
-    { "src": "^/dashboard\\.html$", "dest": "/api/protected-page?page=dashboard" },
-    { "src": "^/portfolio$", "dest": "/api/protected-page?page=portfolio" },
-    { "src": "^/portfolio\\.html$", "dest": "/api/protected-page?page=portfolio" },
-    { "src": "^/scanner$", "dest": "/api/protected-page?page=scanner" },
-    { "src": "^/scanner\\.html$", "dest": "/api/protected-page?page=scanner" },
-    { "src": "^/analytics$", "dest": "/api/protected-page?page=analytics" },
-    { "src": "^/analytics\\.html$", "dest": "/api/protected-page?page=analytics" },
-    { "src": "^/recommendations$", "dest": "/api/protected-page?page=recommendations" },
-    { "src": "^/recommendations\\.html$", "dest": "/api/protected-page?page=recommendations" },
-    { "src": "^/history$", "dest": "/api/protected-page?page=history" },
-    { "src": "^/history\\.html$", "dest": "/api/protected-page?page=history" },
-    { "src": "^/exports$", "dest": "/api/protected-page?page=exports" },
-    { "src": "^/exports\\.html$", "dest": "/api/protected-page?page=exports" },
-    { "src": "^/settings$", "dest": "/api/protected-page?page=settings" },
-    { "src": "^/settings\\.html$", "dest": "/api/protected-page?page=settings" },
-    { "src": "^/admin$", "dest": "/api/protected-page?page=admin" },
-    { "src": "^/admin\\.html$", "dest": "/api/protected-page?page=admin" },
     { "handle": "filesystem" }
-  ],
-  "functions": {
-    "api/protected-page.mjs": {
-      "includeFiles": "*.html"
-    }
-  }
+  ]
 }

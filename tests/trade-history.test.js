@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+require("./helpers/runtime-api.js");
 const history = require("../js/history.js");
 const dashboardDataModule = import("../api/dashboard-data.mjs");
 
@@ -300,7 +301,7 @@ test("trade history query construction preserves search, filter, sort, and page 
     sort: "pnl-low"
   }), "https://cryptopulse.local");
 
-  assert.equal(url.pathname, "/api/dashboard-data");
+  assert.equal(url.pathname, "/api/v1/dashboard-data");
   assert.deepEqual(Object.fromEntries(url.searchParams), {
     view: "trade-history",
     page: "3",
