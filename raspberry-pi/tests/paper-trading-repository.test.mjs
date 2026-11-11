@@ -2,8 +2,111 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   PaperTradingRepository,
-  PAPER_TRADING_RUN_LOCK_ID
+  PAPER_TRADING_RUN_LOCK_ID,
+  SYSTEM_PROFILE_ID
 } from "../src/repositories/paper-trading-repository.mjs";
+
+test("paper repository only reads the explicitly provisioned system portfolio", async () => {
+  const statements = [];
+  const repository = new PaperTradingRepository({
+    connect: async () => ({
+      query: async () => ({ rows: [] }),
+      release() {}
+    })
+  });
+  const client = {
+    async query(sql, values) {
+      statements.push({ sql, values });
+      if (sql.includes("AI_Crypto_Bot_Profiles")) {
+        return { rows: [{ id: SYSTEM_PROFILE_ID }] };
+      }
+      return {
+        rows: [{
+          id: "00000000-0000-4000-8000-000000000001",
+          user_id: SYSTEM_PROFILE_ID,
+          starting_balance: "10000",
+          available_balance: "9900",
+          portfolio_value: "10000"
+        }]
+      };
+    }
+  };
+
+  const account = await repository.getSystemPortfolio(client);
+
+  assert.equal(account.status, "READY");
+  assert.equal(account.portfolio.available_balance, "9900");
+  assert.equal(statements.length, 2);
+  assert.deepEqual(statements.map(({ values }) => values), [
+    [SYSTEM_PROFILE_ID],
+    [SYSTEM_PROFILE_ID]
+  ]);
+  assert.ok(statements.every(({ sql }) => /^\s*SELECT/i.test(sql)));
+  assert.ok(statements[1].sql.includes("FOR UPDATE"));
+});
+
+test("paper repository reports missing profile and portfolio without writes", async () => {
+  const repository = new PaperTradingRepository({
+    connect: async () => ({
+      query: async () => ({ rows: [] }),
+      release() {}
+    })
+  });
+  let queryCount = 0;
+  const missingProfile = await repository.getSystemPortfolio({
+    async query() {
+      queryCount += 1;
+      return { rows: [] };
+    }
+  });
+  assert.deepEqual(missingProfile, { status: "PROFILE_MISSING" });
+  assert.equal(queryCount, 1);
+
+  const missingPortfolio = await repository.getSystemPortfolio({
+    async query(sql) {
+      queryCount += 1;
+      return sql.includes("AI_Crypto_Bot_Profiles")
+        ? { rows: [{ id: SYSTEM_PROFILE_ID }] }
+        : { rows: [] };
+    }
+  });
+  assert.deepEqual(missingPortfolio, { status: "PORTFOLIO_MISSING" });
+  assert.equal(queryCount, 3);
+});
+
+test("paper repository rejects multiple system portfolios", async () => {
+  const repository = new PaperTradingRepository({
+    connect: async () => ({
+      query: async () => ({ rows: [] }),
+      release() {}
+    })
+  });
+
+  await assert.rejects(repository.getSystemPortfolio({
+    async query(sql) {
+      return sql.includes("AI_Crypto_Bot_Profiles")
+        ? { rows: [{ id: SYSTEM_PROFILE_ID }] }
+        : {
+          rows: [
+            {
+              id: "00000000-0000-4000-8000-000000000001",
+              user_id: SYSTEM_PROFILE_ID,
+              starting_balance: "10000",
+              available_balance: "10000",
+              portfolio_value: "10000"
+            },
+            {
+              id: "00000000-0000-4000-8000-000000000002",
+              user_id: SYSTEM_PROFILE_ID,
+              starting_balance: "10000",
+              available_balance: "10000",
+              portfolio_value: "10000"
+            }
+          ]
+        };
+    }
+  }), { code: "PAPER_TRADING_SYSTEM_PORTFOLIO_INVALID" });
+});
 
 test("paper repository uses direct parameterized SQL for position aggregation", async () => {
   let captured;

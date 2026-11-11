@@ -2,50 +2,33 @@ import { withWriteTransaction } from "../database/write-transaction.mjs";
 import { queryReadOnly } from "./postgres-read.mjs";
 
 export const MAX_PAPER_TRADING_MARKETS = 500;
-export const MAX_PAPER_TRADING_PORTFOLIOS = 500;
 export const MAX_PAPER_TRADING_POSITIONS = 500;
 export const PAPER_TRADING_RUN_LOCK_ID = 882018081;
+export const SYSTEM_PROFILE_ID = "00000000-0000-4000-8000-000000000100";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]+-EUR$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUS_VALUES = new Set(["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"]);
 const EMERGENCY_VALUES = new Set(["NORMAL", "PAUSED", "EMERGENCY_STOP"]);
 
-const ENSURE_PORTFOLIOS_SQL = `
-  WITH candidates AS (
-    SELECT profile.id
-    FROM public."AI_Crypto_Bot_Profiles" AS profile
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM public."AI_Crypto_Bot_Portfolios" AS portfolio
-      WHERE portfolio.user_id = profile.id
-    )
-    ORDER BY profile.created_at ASC, profile.id ASC
-    LIMIT $2
-  ),
-  new_portfolios AS (
-    INSERT INTO public."AI_Crypto_Bot_Portfolios"
-      (user_id, starting_balance, available_balance, portfolio_value)
-    SELECT candidate.id, $1::numeric, $1::numeric, $1::numeric
-    FROM candidates AS candidate
-    RETURNING id, starting_balance, available_balance
-  )
-  INSERT INTO public."AI_Crypto_Bot_Portfolio_Snapshots"
-    (portfolio_id, portfolio_value, available_balance, open_positions)
-  SELECT portfolio.id, portfolio.starting_balance, portfolio.available_balance, 0
-  FROM new_portfolios AS portfolio
-  RETURNING portfolio_id
+const SYSTEM_PROFILE_SQL = `
+  SELECT id
+  FROM public."AI_Crypto_Bot_Profiles"
+  WHERE id = $1::uuid
+  LIMIT 1
 `;
 
-const PORTFOLIOS_SQL = `
+const SYSTEM_PORTFOLIO_SQL = `
   SELECT portfolio.id,
+         portfolio.user_id,
          portfolio.starting_balance,
          portfolio.available_balance,
          portfolio.portfolio_value,
          portfolio.created_at
   FROM public."AI_Crypto_Bot_Portfolios" AS portfolio
+  WHERE portfolio.user_id = $1::uuid
   ORDER BY portfolio.created_at ASC, portfolio.id ASC
-  LIMIT $1
+  LIMIT 2
   FOR UPDATE
 `;
 
@@ -392,23 +375,43 @@ export class PaperTradingRepository {
     return result.rows[0]?.locked === true;
   }
 
-  async ensureDefaultPortfolios(client, startingBalance) {
-    const result = await client.query(ENSURE_PORTFOLIOS_SQL, [
-      startingBalance,
-      MAX_PAPER_TRADING_PORTFOLIOS + 1
-    ]);
-    if (result.rows.length > MAX_PAPER_TRADING_PORTFOLIOS) {
-      throw new PaperTradingRepositoryError(
-        "The profile count exceeds the bounded paper portfolio limit.",
-        "PAPER_TRADING_PORTFOLIO_LIMIT_EXCEEDED"
-      );
-    }
-    return result.rows.length;
-  }
-
   async getAgentStatus(client, { forUpdate = false } = {}) {
     const result = await client.query(forUpdate ? STATUS_FOR_UPDATE_SQL : STATUS_SQL);
     return result.rows[0] ? validateStatusRow(result.rows[0]) : null;
+  }
+
+  async getSystemPortfolio(client) {
+    const profileResult = await client.query(SYSTEM_PROFILE_SQL, [SYSTEM_PROFILE_ID]);
+    if (profileResult.rows.length === 0) {
+      return Object.freeze({ status: "PROFILE_MISSING" });
+    }
+
+    const portfolioResult = await client.query(SYSTEM_PORTFOLIO_SQL, [SYSTEM_PROFILE_ID]);
+    if (portfolioResult.rows.length === 0) {
+      return Object.freeze({ status: "PORTFOLIO_MISSING" });
+    }
+    if (portfolioResult.rows.length !== 1) {
+      throw new PaperTradingRepositoryError(
+        "The system profile must have exactly one paper portfolio.",
+        "PAPER_TRADING_SYSTEM_PORTFOLIO_INVALID"
+      );
+    }
+
+    const portfolio = portfolioResult.rows[0];
+    if (portfolio.user_id !== SYSTEM_PROFILE_ID) {
+      throw new PaperTradingRepositoryError(
+        "The paper portfolio does not belong to the system profile.",
+        "PAPER_TRADING_SYSTEM_PORTFOLIO_INVALID"
+      );
+    }
+    requireUuid(portfolio.id, "portfolio id");
+    requireNumeric(portfolio.starting_balance, "starting balance");
+    requireNumeric(portfolio.available_balance, "available balance");
+    requireNumeric(portfolio.portfolio_value, "portfolio value");
+    return Object.freeze({
+      status: "READY",
+      portfolio: Object.freeze(portfolio)
+    });
   }
 
   async writeAgentStatus(client, {
@@ -438,25 +441,6 @@ export class PaperTradingRepository {
       errorMessage
     ]);
     return result.rows[0]?.status || null;
-  }
-
-  async listPortfolios(client) {
-    const result = await client.query(PORTFOLIOS_SQL, [
-      MAX_PAPER_TRADING_PORTFOLIOS + 1
-    ]);
-    if (result.rows.length > MAX_PAPER_TRADING_PORTFOLIOS) {
-      throw new PaperTradingRepositoryError(
-        "The portfolio count exceeds the bounded paper trading limit.",
-        "PAPER_TRADING_PORTFOLIO_LIMIT_EXCEEDED"
-      );
-    }
-    for (const portfolio of result.rows) {
-      requireUuid(portfolio.id, "portfolio id");
-      requireNumeric(portfolio.starting_balance, "starting balance");
-      requireNumeric(portfolio.available_balance, "available balance");
-      requireNumeric(portfolio.portfolio_value, "portfolio value");
-    }
-    return result.rows;
   }
 
   async listLatestDecisions(client) {

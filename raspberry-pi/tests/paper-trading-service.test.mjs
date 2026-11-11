@@ -27,13 +27,15 @@ function makeRepository(overrides = {}) {
     withTransaction: (operation) => operation({}),
     tryAcquireRunLock: async () => true,
     getAgentStatus: async () => ({ status: "ACTIVE" }),
-    ensureDefaultPortfolios: async () => 1,
-    listPortfolios: async () => [{
-      id: PORTFOLIO_ID,
-      starting_balance: "10000",
-      available_balance: state.availableBalance,
-      portfolio_value: state.portfolioValue
-    }],
+    getSystemPortfolio: async () => ({
+      status: "READY",
+      portfolio: {
+        id: PORTFOLIO_ID,
+        starting_balance: "10000",
+        available_balance: state.availableBalance,
+        portfolio_value: state.portfolioValue
+      }
+    }),
     listLatestDecisions: async () => [{
       id: DECISION_ID,
       symbol: SYMBOL,
@@ -104,7 +106,10 @@ function makeService(repository, logs = []) {
   return createPaperTradingService({
     repository,
     now: () => NOW,
-    logger: { error: (message) => logs.push(JSON.parse(message)) }
+    logger: {
+      error: (message) => logs.push(JSON.parse(message)),
+      warn: (message) => logs.push(JSON.parse(message))
+    }
   });
 }
 
@@ -138,6 +143,48 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
   assert.equal(result.status, "COMPLETED");
   assert.equal(result.tradesExecuted, 1);
   assert.deepEqual(repository.calls, ["buy"]);
+});
+
+test("paper trading skips safely when the system profile has not been provisioned", async () => {
+  const logs = [];
+  const repository = makeRepository({
+    getSystemPortfolio: async () => ({ status: "PROFILE_MISSING" }),
+    listLatestDecisions: async () => {
+      throw new Error("Unprovisioned paper trading must not process decisions.");
+    }
+  });
+
+  const result = await makeService(repository, logs).run();
+
+  assert.deepEqual(result, {
+    status: "SKIPPED",
+    reason: "SYSTEM_PROFILE_NOT_PROVISIONED"
+  });
+  assert.deepEqual(logs, [{
+    event: "paper_trading_not_provisioned",
+    code: "SYSTEM_PROFILE_NOT_PROVISIONED",
+    component: "paper-trading-service"
+  }]);
+  assert.deepEqual(repository.calls, []);
+});
+
+test("paper trading skips safely when the system portfolio is missing", async () => {
+  const logs = [];
+  const repository = makeRepository({
+    getSystemPortfolio: async () => ({ status: "PORTFOLIO_MISSING" }),
+    listLatestDecisions: async () => {
+      throw new Error("A missing paper portfolio must not process decisions.");
+    }
+  });
+
+  const result = await makeService(repository, logs).run();
+
+  assert.deepEqual(result, {
+    status: "SKIPPED",
+    reason: "SYSTEM_PORTFOLIO_NOT_PROVISIONED"
+  });
+  assert.equal(logs[0].code, "SYSTEM_PORTFOLIO_NOT_PROVISIONED");
+  assert.deepEqual(repository.calls, []);
 });
 
 test("SELL decisions close an existing virtual position without opening a short", async () => {

@@ -1,12 +1,8 @@
 import { createHash } from "node:crypto";
-import {
-  MAX_PAPER_TRADING_MARKETS,
-  MAX_PAPER_TRADING_PORTFOLIOS
-} from "../repositories/paper-trading-repository.mjs";
+import { MAX_PAPER_TRADING_MARKETS } from "../repositories/paper-trading-repository.mjs";
 import { createPaperTradingFailureDiagnostic } from "./paper-trading-diagnostics.mjs";
 
 export const PAPER_TRADING_RULES = Object.freeze({
-  initialBalance: "10000",
   maxPositionSizeFraction: 0.10,
   maxOpenPositions: 5,
   minimumConfidence: 70,
@@ -75,6 +71,7 @@ export function createPaperTradingService({
   if (!repository
     || typeof repository.withTransaction !== "function"
     || typeof repository.tryAcquireRunLock !== "function"
+    || typeof repository.getSystemPortfolio !== "function"
     || typeof repository.listLatestDecisions !== "function"
     || typeof now !== "function") {
     throw new TypeError("A paper-trading repository and clock are required.");
@@ -99,17 +96,28 @@ export function createPaperTradingService({
             return skipped("AI_ANALYSIS_IN_PROGRESS");
           }
 
-          await repository.ensureDefaultPortfolios(
-            client,
-            PAPER_TRADING_RULES.initialBalance
-          );
-          const portfolios = await repository.listPortfolios(client);
-          if (portfolios.length > MAX_PAPER_TRADING_PORTFOLIOS) {
+          const systemAccount = await repository.getSystemPortfolio(client);
+          if (!systemAccount
+            || !["READY", "PROFILE_MISSING", "PORTFOLIO_MISSING"].includes(systemAccount.status)) {
             throw new PaperTradingServiceError(
-              "PAPER_TRADING_PORTFOLIO_LIMIT_EXCEEDED",
-              "The portfolio count exceeds the bounded paper trading limit."
+              "PAPER_TRADING_SYSTEM_PROFILE_INVALID",
+              "The system profile repository returned an invalid state."
             );
           }
+          if (systemAccount.status !== "READY") {
+            const code = systemAccount.status === "PROFILE_MISSING"
+              ? "SYSTEM_PROFILE_NOT_PROVISIONED"
+              : "SYSTEM_PORTFOLIO_NOT_PROVISIONED";
+            const message = JSON.stringify({
+              event: "paper_trading_not_provisioned",
+              code,
+              component: "paper-trading-service"
+            });
+            const log = typeof logger.warn === "function" ? logger.warn : logger.error;
+            log.call(logger, message);
+            return skipped(code);
+          }
+          const portfolios = [systemAccount.portfolio];
           const decisions = await repository.listLatestDecisions(client);
           const openPositionsByPortfolio = new Map();
           const symbols = new Set(decisions.map(({ symbol }) => symbol));
