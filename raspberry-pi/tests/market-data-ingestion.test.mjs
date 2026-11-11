@@ -129,6 +129,17 @@ test("full 102-market ingestion completes every snapshot and interval batch with
     }
   });
 
+  test("snapshot-only ingestion refreshes snapshots without requesting candles", async () => {
+    const harness = createHarness();
+
+    const result = await harness.service.run({ intervals: [] });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.snapshots.persisted, 2);
+    assert.deepEqual(result.candles, []);
+    assert.equal(harness.calls.candleRequests.length, 0);
+  });
+
   const result = await harness.service.run();
 
   assert.equal(result.status, "completed");

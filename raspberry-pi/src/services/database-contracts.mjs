@@ -100,6 +100,87 @@ export const REQUIRED_DECISION_CONSTRAINTS = Object.freeze([
   Object.freeze({ type: "p", columns: Object.freeze(["id"]) })
 ]);
 
+export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
+  AI_Crypto_Bot_Profiles: Object.freeze({
+    id: "uuid",
+    created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Portfolios: Object.freeze({
+    id: "uuid",
+    user_id: "uuid",
+    starting_balance: "numeric",
+    available_balance: "numeric",
+    portfolio_value: "numeric",
+    created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Positions: Object.freeze({
+    id: "uuid",
+    portfolio_id: "uuid",
+    symbol: "text",
+    amount: "numeric",
+    entry_price: "numeric",
+    current_price: "numeric",
+    unrealized_pnl: "numeric",
+    status: "text",
+    created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Trades: Object.freeze({
+    id: "uuid",
+    portfolio_id: "uuid",
+    ai_decision_id: "uuid",
+    idempotency_key: "uuid",
+    symbol: "text",
+    side: "text",
+    price: "numeric",
+    quantity: "numeric",
+    fees: "numeric",
+    slippage: "numeric",
+    realized_pnl: "numeric",
+    created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Portfolio_Snapshots: Object.freeze({
+    id: "uuid",
+    portfolio_id: "uuid",
+    portfolio_value: "numeric",
+    available_balance: "numeric",
+    open_positions: "integer",
+    captured_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Emergency_State: Object.freeze({
+    id: "uuid",
+    status: "text",
+    reason: "text",
+    created_at: "timestamp with time zone"
+  })
+});
+
+export const PAPER_TRADING_READ_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Profiles",
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Trades",
+  "AI_Crypto_Bot_AI_Decisions",
+  "AI_Crypto_Bot_Status",
+  "AI_Crypto_Bot_Watched_Markets",
+  "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Portfolio_Snapshots",
+  "AI_Crypto_Bot_Emergency_State"
+]);
+
+export const PAPER_TRADING_INSERT_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Trades",
+  "AI_Crypto_Bot_Portfolio_Snapshots",
+  "AI_Crypto_Bot_Emergency_State"
+]);
+
+export const PAPER_TRADING_UPDATE_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Status"
+]);
+
 const OPTIONAL_FUNCTION_NAMES = new Set(
   OPTIONAL_FUNCTION_CONTRACTS.map((contract) => contract.name)
 );
@@ -262,6 +343,70 @@ export function evaluateAIAnalysisDatabaseContract(snapshot, expectedDatabaseNam
     }
     if (table.can_update || table.can_delete || table.can_truncate) {
       errors.push(`AI_DATABASE_ROLE_UNSAFE_TABLE_PRIVILEGE:${table.relation_name}`);
+    }
+  }
+
+  return Object.freeze({
+    ...base,
+    valid: errors.length === 0,
+    errors: Object.freeze(errors)
+  });
+}
+
+export function evaluatePaperTradingDatabaseContract(snapshot, expectedDatabaseName) {
+  const base = evaluateDatabaseContract(snapshot, expectedDatabaseName);
+  const errors = base.errors.filter((error) =>
+    !error.startsWith("DATABASE_ROLE_CAN_WRITE_TABLE:")
+      && !error.startsWith("MISSING_SELECT_PRIVILEGE:")
+  );
+  const columnsByTable = new Map();
+  for (const column of snapshot.columns) {
+    if (!columnsByTable.has(column.table_name)) {
+      columnsByTable.set(column.table_name, new Map());
+    }
+    columnsByTable.get(column.table_name).set(column.column_name, column.data_type);
+  }
+  for (const [tableName, expectedColumns] of Object.entries(REQUIRED_PAPER_TRADING_COLUMNS)) {
+    const actualColumns = columnsByTable.get(tableName);
+    for (const [columnName, dataType] of Object.entries(expectedColumns)) {
+      if (!actualColumns?.has(columnName)) {
+        errors.push(`MISSING_PAPER_TRADING_COLUMN:${tableName}.${columnName}`);
+      } else if (actualColumns.get(columnName) !== dataType) {
+        errors.push(`PAPER_TRADING_COLUMN_TYPE_MISMATCH:${tableName}.${columnName}`);
+      }
+    }
+  }
+
+  const privilegesByTable = new Map(
+    snapshot.tablePrivileges.map((table) => [table.relation_name, table])
+  );
+  for (const tableName of PAPER_TRADING_READ_TABLES) {
+    if (!privilegesByTable.get(tableName)?.can_select) {
+      errors.push(`MISSING_PAPER_TRADING_SELECT_PRIVILEGE:${tableName}`);
+    }
+  }
+  for (const tableName of PAPER_TRADING_INSERT_TABLES) {
+    if (!privilegesByTable.get(tableName)?.can_insert) {
+      errors.push(`MISSING_PAPER_TRADING_INSERT_PRIVILEGE:${tableName}`);
+    }
+  }
+  for (const tableName of PAPER_TRADING_UPDATE_TABLES) {
+    if (!privilegesByTable.get(tableName)?.can_update) {
+      errors.push(`MISSING_PAPER_TRADING_UPDATE_PRIVILEGE:${tableName}`);
+    }
+  }
+  for (const table of snapshot.tablePrivileges) {
+    if (table.is_owner) {
+      errors.push(`PAPER_TRADING_DATABASE_ROLE_TABLE_OWNER_NOT_ALLOWED:${table.relation_name}`);
+    }
+    if (table.can_insert && !PAPER_TRADING_INSERT_TABLES.includes(table.relation_name)) {
+      errors.push(`PAPER_TRADING_DATABASE_ROLE_UNSAFE_INSERT_PRIVILEGE:${table.relation_name}`);
+    }
+    if (table.can_update && !PAPER_TRADING_UPDATE_TABLES.includes(table.relation_name)) {
+      errors.push(`PAPER_TRADING_DATABASE_ROLE_UNSAFE_UPDATE_PRIVILEGE:${table.relation_name}`);
+    }
+    if (table.can_delete || table.can_truncate) {
+      errors.push(`PAPER_TRADING_DATABASE_ROLE_UNSAFE_TABLE_PRIVILEGE:${table.relation_name}`);
     }
   }
 

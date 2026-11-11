@@ -154,6 +154,7 @@ test("manual ingestion command accepts only an explicit supported interval set",
   assert.throws(parseIngestionArguments.bind(null, []), /Select candle intervals explicitly/);
   assert.deepEqual(parseIngestionArguments(["--intervals=1m,1h"]), ["1m", "1h"]);
   assert.deepEqual(parseIngestionArguments(["--intervals=all"]), ["1m", "5m", "15m", "1h", "4h", "1d"]);
+  assert.deepEqual(parseIngestionArguments(["--intervals=none"]), []);
   assert.throws(() => parseIngestionArguments(["--intervals=3m"]), /supported intervals/);
   assert.throws(() => parseIngestionArguments(["--intervals=1m,1m"]), /unique supported/);
   assert.throws(() => parseIngestionArguments(["--intervals=1m", "--other"]), /Use only/);

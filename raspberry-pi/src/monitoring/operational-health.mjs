@@ -11,18 +11,19 @@ function safeBytes(value) {
 export function createOperationalHealthSnapshot({
   pool,
   requestMetrics,
+  runtimeStatus = null,
   processRef = process,
   osRef = os
 }) {
   const memory = processRef.memoryUsage();
   return Object.freeze({
-    status: "foundation_only",
+    status: runtimeStatus ? "running" : "foundation_only",
     runtime: Object.freeze({
       api: "running",
-      scheduler: "not_implemented"
+      scheduler: runtimeStatus?.scheduler || "not_implemented"
     }),
-    lastCycle: null,
-    currentStage: null,
+    lastCycle: safeCycle(runtimeStatus?.lastCycle),
+    currentStage: runtimeStatus?.currentStage || null,
     resources: Object.freeze({
       uptimeSeconds: safeBytes(processRef.uptime()),
       residentBytes: safeBytes(memory.rss),
@@ -36,5 +37,17 @@ export function createOperationalHealthSnapshot({
       })
     }),
     failureCounts: requestMetrics.getSnapshot()
+  });
+}
+
+function safeCycle(cycle) {
+  if (!cycle || typeof cycle !== "object") {
+    return null;
+  }
+  return Object.freeze({
+    status: typeof cycle.status === "string" ? cycle.status : null,
+    ...(typeof cycle.cycleAt === "string" ? { cycleAt: cycle.cycleAt } : {}),
+    ...(typeof cycle.stage === "string" ? { stage: cycle.stage } : {}),
+    ...(typeof cycle.code === "string" ? { code: cycle.code } : {})
   });
 }

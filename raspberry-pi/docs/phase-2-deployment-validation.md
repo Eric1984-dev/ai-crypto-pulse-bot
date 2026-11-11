@@ -2,12 +2,12 @@
 
 ## Scope and safety
 
-This procedure documents the original read-only Raspberry Pi foundation checks. Phase 5 has since added a separately invoked ingestion command; it is **not** part of the Phase 2 validation commands or a production cutover:
+This guide documents the original Phase 2 read-only API foundation checks. Phase 7 has since added a separately validated scheduled runtime with paper-only processing; use the [Phase 7 implementation report](phase-7-implementation-report.md) for its deployment and operational requirements.
 
 - The API process performs read-only database preflight and serves loopback health and read-only data endpoints.
-- It does not create a database, apply schema, migrate/import data, write records, change markets, run a scheduler, analyze markets, or execute paper/live trades.
+- The integrated `npm start` runtime additionally schedules market ingestion, AI analysis, and paper trading. It does not create a database, apply schema, migrate/import data, change markets, or execute live trades.
 - The API binds to `127.0.0.1`; do not change the bind address, create a public tunnel, or connect Vercel to it. Authentication provider integration, login, and OIDC are not implemented. The provider interface is deny-all by default.
-- No `systemd` unit or timer is supplied. Run it in the foreground for validation and stop it manually.
+- `deploy/cryptopulse-runtime.service` is the single-process systemd sample. Do not install a timer or cron job. Foreground operation is for controlled validation only.
 - Keep credentials in the Pi's untracked `raspberry-pi/.env`. Do not send them in chat, add them to Git, or put them in Vercel.
 
 The package requires Node.js `>=20.6` and uses the existing PostgreSQL database/schema. Do not run any migration or database setup command.
@@ -58,17 +58,19 @@ Edit `.env` locally with the Pi's secure editor/process, for example `nano .env`
 | `API_SESSION_MAX` | `1000` | Maximum in-memory sessions; integer `1`–`10000`. |
 | `API_RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window in milliseconds; integer `1000`–`3600000`. |
 | `API_RATE_LIMIT_MAX_REQUESTS` | `60` | Requests per socket peer per window; integer `1`–`1000`. Forwarded client-IP headers are not trusted. |
-| `PG_POOL_MAX` | `4` | Integer `1`–`4`; this is the maximum runtime pool size. |
+| `PG_POOL_MAX` | `4` | Integer `1`–`4`; the integrated runtime caps total concurrent connections at four (API pool including owner lock: two; paper pool: one; sequential worker pool: one). |
 | `PG_CONNECTION_TIMEOUT_MS` | `2000` | Integer `100`–`30000`. |
 | `PG_QUERY_TIMEOUT_MS` | `5000` | Integer `100`–`30000`. |
 | `PG_IDLE_TIMEOUT_MS` | `10000` | Integer `100`–`60000`. |
-| `INGESTION_DATABASE_USER` | empty | Optional separate writer identity used only by the manual Phase 5 ingestion command. |
+| `INGESTION_DATABASE_USER` | empty | Writer identity used only by the manual or scheduled market-data ingestion stage. |
 | `INGESTION_DATABASE_PASSWORD` | empty | Required together with `INGESTION_DATABASE_USER`; keep it only in the local ignored `.env`. |
 | `INGESTION_ALLOW_TABLE_OWNER` | `false` | Explicit opt-in for the ingestion preflight to accept ownership of known project tables; requires a distinct `INGESTION_DATABASE_USER`; API validation remains strict. Keep `false` unless the Pi's existing owner role is intentionally used for ingestion. |
-| `AI_DATABASE_USER` | empty | Separate, non-owner role used only by the manual Phase 6 AI analysis command. |
+| `AI_DATABASE_USER` | empty | Separate, non-owner role used only by the manual or scheduled AI analysis stage. |
 | `AI_DATABASE_PASSWORD` | empty | Required together with `AI_DATABASE_USER`; keep it only in the local ignored `.env`. |
+| `PAPER_DATABASE_USER` | empty | Separate non-owner role used only for paper trading and existing runtime-status updates. |
+| `PAPER_DATABASE_PASSWORD` | empty | Required together with `PAPER_DATABASE_USER`; keep it only in the local ignored `.env`. |
 
-The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. The separate ingestion command uses an explicit `BEGIN READ WRITE` only for writes to the existing market-data, candle, and best-effort scanner-event tables. The AI analysis command also uses an explicit write transaction, restricted by preflight to `INSERT` on the existing AI-decisions table; it requires `AI_DATABASE_USER`/`AI_DATABASE_PASSWORD` and rejects table ownership or other write privileges. The API keeps its read-only identity. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
+The API pool sets PostgreSQL's `default_transaction_read_only=on`, and every API/validation read transaction also uses `BEGIN READ ONLY`. Ingestion, AI, and paper operations use separate logins and explicit write transactions, each restricted by its preflight to its existing tables. The paper role additionally must be distinct from the API, ingestion, and AI roles and cannot own tables or have destructive/unrelated write privileges. `npm run validate` checks only the API identity; `npm start` validates all four identities before starting. An invalid/missing required setting, invalid range, unsafe TLS configuration, non-loopback API host, or live-trading enablement makes startup fail closed.
 
 ## 3. Install and run the local checks
 
@@ -112,7 +114,7 @@ Expected startup output is one JSON line similar to:
 {"event":"runtime_started","host":"127.0.0.1","port":3002,"validation":{"database":"connected","contracts":"valid","requiredTables":18,"requiredFunctions":0,"optionalFunctions":{"AI_Crypto_Bot_Run_Database_AI_Analysis":"not-installed"},"enabledMarkets":102}}
 ```
 
-The process stays in the foreground. In a second SSH shell on the Pi, run:
+The process stays in the foreground and starts the internal scheduler after all role contracts pass. It runs a five-minute UTC pipeline and paper trading only. In a second SSH shell on the Pi, run:
 
 ```sh
 curl -fsS http://127.0.0.1:3002/api/v1/health/live
@@ -139,7 +141,7 @@ Stop the foreground process with `Ctrl+C`. Expected shutdown output:
 {"event":"runtime_stopped","signal":"SIGINT"}
 ```
 
-`SIGTERM` is also handled. Do not leave a second copy running; this Phase 2 package has no singleton scheduler or production service manager.
+`SIGTERM` is also handled. Do not leave a second copy running; the PostgreSQL session advisory lock rejects a second runtime. For service installation, use the Phase 7 report and unit file; this document's Phase 2 acceptance checklist below is historical and does not establish Phase 7 production acceptance.
 
 ## 5. PostgreSQL objects and properties checked
 

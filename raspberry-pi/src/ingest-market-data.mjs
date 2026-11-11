@@ -27,6 +27,9 @@ export function parseIngestionArguments(args) {
   if (value === "all") {
     return Object.freeze([...SUPPORTED_INGESTION_INTERVALS]);
   }
+  if (value === "none") {
+    return Object.freeze([]);
+  }
   const intervals = value.split(",");
   if (intervals.length === 0 || intervals.some((interval) =>
     !SUPPORTED_INGESTION_INTERVALS.includes(interval))

@@ -1,21 +1,32 @@
-# Raspberry Pi runtime, read-only API, and market ingestion
+# Raspberry Pi runtime, API, ingestion, AI, and paper trading
 
 ## Scope and ownership
 
-The package is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. Phase 5 adds a manually invoked, one-shot Bitvavo market-data ingestion command. It does not start from the API process, install a scheduler, or expose an ingestion endpoint. The Phase 4 API remains read-only.
+The package is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. The Phase 4 API remains read-only. Phase 5's one-shot Bitvavo ingestion and Phase 6's one-shot AI command remain available for explicit operation; Phase 7 also wires them into the long-running Node.js runtime with paper-only trade processing.
 
-The current user-confirmed Pi state is approximately 102 enabled watched markets, no candle history, no AI-decision history, and no PostgreSQL runtime functions. The API does not assume or invoke runtime functions. Ingestion builds candle history from bounded Bitvavo requests; it does not generate AI decisions.
+The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and existing PostgreSQL tables. It does not assume or invoke project PostgreSQL runtime functions. The API, ingestion, AI, and paper-trading roles are separately validated; the latter three use bounded worker connections. No schema creation, migration, seed, live trade, or private exchange API is used.
 
 ## Lifecycle and database access
 
-1. Parse database/API configuration, enforce loopback binding and `ENABLE_LIVE_TRADING=false`.
-2. Create the `pg` pool capped at four with TLS verification by default and `default_transaction_read_only=on`.
-3. API startup performs read-only checks for database identity, role/privileges, required existing tables/columns/keys, and the complete bounded enabled watched-market set.
-4. If a configuration, database, schema, privilege, or market-contract check fails, do not listen; close the pool and exit unsuccessfully.
-5. On success, expose the HTTP API on loopback. No background worker or scheduler starts.
-6. On `SIGINT` or `SIGTERM`, stop accepting requests and close the pool.
+1. Parse configuration, enforce loopback binding and `ENABLE_LIVE_TRADING=false`.
+2. Create the API pool (two connections maximum), acquire the exclusive PostgreSQL session advisory lock, and validate the API contract.
+3. Validate ingestion and AI identities/contracts with one short-lived connection each. Open a one-connection paper writer pool and validate its exact existing-table grants.
+4. Require the singleton status row. A leftover `ANALYZING` state is changed to `ERROR`; `STOPPED` is never cleared automatically.
+5. Start the API and an in-process scheduler. UTC cycles run every five minutes and do not replay missed slots. The API pool is capped at two connections including its reserved owner-lock connection, the paper pool at one, and the sequential worker pool at one; total concurrent PostgreSQL connections remain at most four.
+6. Each cycle runs market ingestion, AI analysis, paper trading, then a non-destructive retention plan. A failed ingestion or AI stage skips dependent downstream stages; safely partial per-market ingestion can continue to AI.
+7. On `SIGINT` or `SIGTERM`, stop scheduling, wait up to 120 seconds for the active cycle, preserve `STOPPED`, set status to `IDLE` only when safe, release the lock, and close pools.
 
 The `npm run ingest:market-data -- --intervals=...` command separately validates the existing ingestion contract, reads enabled watched markets, and runs one snapshot/candle pass. It uses no Vercel function, HTTP trigger, external scheduler, or `systemd` timer. Each write uses an explicit `BEGIN READ WRITE` transaction; API repositories continue to use `BEGIN READ ONLY`. No write targets the watched-market table. Database/provider failures are logged with safe codes; credentials and raw error details are never logged.
+
+## Phase 7 scheduler and paper trading
+
+The internal scheduler aligns to five-minute UTC slots. It runs snapshot refresh each cycle and requests candles on the current defaults: `1m` every five minutes, `5m` every fifteen minutes, `15m` every thirty minutes, `1h` hourly, `4h` every four hours, and `1d` daily. The `1h`, `4h`, and `1d` active production cadences were not independently verified; confirm them against the external scheduler before cutover. Missed slots are skipped; bounded ingestion checkpoints advance only during later normal cycles.
+
+A process-level session advisory lock (`882018082`) prevents a second runtime instance and is checked at pipeline-stage boundaries. Losing the lock stops further scheduling. Paper runs also take a separate transaction-level lock (`882018081`) and persist a deterministic idempotency key for each portfolio/decision pair. BUY sizing and SELL accounting keep numeric arithmetic in PostgreSQL. The runtime honors confidence, position count/size, cooldown, market freshness, daily/portfolio drawdown, emergency stop, fees, and slippage rules. It never uses an authenticated Bitvavo API.
+
+The retention service creates a plan for candle and AI-decision age cutoffs but issues no `DELETE` or other data-removal statement. Its deletion flag remains false until a separately authorized implementation changes that policy.
+
+The systemd sample is `deploy/cryptopulse-runtime.service`. systemd starts and restarts the single Node service; it is not a timer and does not trigger pipeline cycles.
 
 ## Read-only repositories and result bounds
 

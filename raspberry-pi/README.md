@@ -21,7 +21,7 @@ The read-only API remains loopback-only and authenticated routes remain denied b
 
 Data routes require an authenticated identity from the Phase 3 middleware. The default provider denies access, so these routes return `401` until a trusted provider is supplied. Provider integration, OIDC, login, registration, password reset, and session creation remain out of scope. The API is loopback-only; CORS is disabled by default.
 
-The API runtime does not import Supabase data, run migrations, alter schema, seed or change markets, start a scheduler, or execute paper/live trades. The explicit ingestion CLI writes snapshots, candles, and best-effort scanner failure events. The explicit AI CLI writes AI decisions only. Neither command requires or invokes a PostgreSQL runtime function.
+The API and worker stages do not import Supabase data, run migrations, alter schema, seed or change markets, or invoke PostgreSQL runtime functions. The explicit ingestion CLI writes snapshots, candles, and best-effort scanner failure events. The explicit AI CLI writes AI decisions only. `npm start` runs the integrated Phase 7 pipeline; it is the only command that starts the scheduler and paper trading.
 
 ## Phase 6 scope
 
@@ -39,11 +39,21 @@ The existing decision table has no interval column. Decisions remain one per mar
 
 The AI command is a manual one-shot operation. It does not backfill or refresh candles, modify status, start a scheduler, alter the schema, or enable live trading. Keep `ENABLE_LIVE_TRADING=false`.
 
+## Phase 7 scope
+
+`npm start` validates the existing API, ingestion, AI, and paper-writer database contracts, obtains the PostgreSQL runtime-owner lock, starts the loopback API, and schedules one pipeline every five minutes. Each cycle refreshes snapshots and due candles, runs one complete AI analysis, then evaluates paper trades using direct parameterized SQL. Live trading remains disabled and no private Bitvavo endpoint or order path is used.
+
+The paper engine preserves the existing rules: 10% maximum position size, five open positions, minimum BUY confidence 70, 15-minute cooldown, 0.25% fee, 0.10% slippage, 5% daily drawdown, 15% portfolio drawdown, and a 20% emergency stop. It uses existing tables only; it does not create schema objects or market rows. A failed ingestion or AI stage prevents downstream execution. Partial per-market ingestion can continue to AI so existing freshness safeguards can reject stale inputs.
+
+The scheduler is process-local, UTC-aligned, non-overlapping, and guarded by a session advisory lock. `systemd` starts/restarts the one runtime service but does not schedule cycles. The retention service only emits a policy plan; it never deletes data. Starter candle cadences are 1m every five minutes, 5m every fifteen minutes, 15m every thirty minutes, 1h hourly, 4h every four hours, and 1d daily. The external production cadences for 1h/4h/1d were not independently verified; confirm them before cutover.
+
+The runtime requires a dedicated, non-owner `PAPER_DATABASE_USER` and `PAPER_DATABASE_PASSWORD`, distinct from the API, ingestion, and AI roles. `npm start` validates all four role contracts at startup. See the [Phase 7 implementation report](docs/phase-7-implementation-report.md) for exact existing-table grants, scheduler assumptions, systemd deployment steps, and validation status. The sample systemd unit is [deploy/cryptopulse-runtime.service](deploy/cryptopulse-runtime.service).
+
 ## Requirements
 
 - Node.js 20.6 or newer
 - Network access from the Pi runtime to the already-existing PostgreSQL instance
-- PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; configure the paired `INGESTION_DATABASE_USER` and `INGESTION_DATABASE_PASSWORD` for the one-shot writer. `INGESTION_ALLOW_TABLE_OWNER` defaults to `false`; set it to `true` only when the ingestion login is intentionally the owner of the existing project tables.
+- PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; configure separate paired credentials for ingestion, AI analysis, and paper trading. `INGESTION_ALLOW_TABLE_OWNER` defaults to `false`; set it to `true` only when the ingestion login is intentionally the owner of the existing project tables.
 - PostgreSQL connection settings provisioned locally; do not copy credentials into Vercel or Git
 
 The runtime never creates a database, applies migrations, seeds markets, or changes the existing market list. It treats the installed schema and its contents as the authority.
@@ -60,7 +70,7 @@ npm run validate
 npm start
 ```
 
-`npm run validate` performs the read-only startup preflight and exits without listening. `npm start` validates first, then starts the local API on `127.0.0.1:3002`. No credentials or connection strings are printed. TLS certificate verification is enabled by default; `DATABASE_SSL=false` is accepted only for loopback database hosts.
+`npm run validate` performs the API read-only preflight and exits without listening. `npm start` validates all runtime role contracts, then starts the local API on `127.0.0.1:3002` and the internal scheduler. No credentials or connection strings are printed. TLS certificate verification is enabled by default; `DATABASE_SSL=false` is accepted only for loopback database hosts.
 
 ## API endpoints
 
@@ -80,9 +90,9 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 ## Layout
 
 - `src/api/` — built-in Node HTTP server, health/data routes, middleware, validation, and error handling.
-- `src/runtime/` — API startup validation and graceful lifecycle only; no scheduler or trading worker.
-- `src/services/` — database-contract, watched-market, readiness, Bitvavo public client, one-shot ingestion, and deterministic AI analysis.
-- `src/repositories/` — parameterized, bounded PostgreSQL access for contracts, watched markets, market reads, ingestion writes, AI analysis/decision persistence, and runtime status.
+- `src/runtime/` — API startup, worker-stage orchestration, bounded pools, lock ownership, and graceful lifecycle.
+- `src/services/` — database contracts, public Bitvavo ingestion, deterministic AI analysis, paper trading, UTC scheduling, and non-destructive retention planning.
+- `src/repositories/` — parameterized, bounded PostgreSQL access for API reads, ingestion, AI decisions, and paper portfolios/positions/trades.
 - `src/auth/` — provider-neutral authentication, authorization, and in-memory session interfaces; no identity provider.
 - `src/database/` — bounded `pg` pool plus explicit read-only and write transaction helpers.
 - `src/monitoring/` — health responses, bounded operational snapshots, and request counters.
@@ -90,6 +100,6 @@ Authentication integration, OIDC, login/registration, password reset, session-cr
 - `tests/` — isolated Node.js tests; no remote database or schema setup.
 - `docs/` — implementation and operational notes for this runtime foundation.
 
-The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the current API scope and validation; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion scope and validation; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the explicit table-owner opt-in; the [Phase 5.4 report](docs/phase-5.4-ingestion-user-resolution.md) resolves the API/ingestion identity configuration; the [Phase 6 implementation report](docs/phase-6-implementation-report.md) records the AI runtime scope and validation.
+The runtime-specific specification is in [docs/runtime-foundation.md](docs/runtime-foundation.md). The [Phase 4 implementation report](docs/phase-4-implementation-report.md) records the API scope; the [Phase 5 implementation report](docs/phase-5-implementation-report.md) records ingestion; the [Phase 5.2 report](docs/phase-5.2-ingestion-contract-alignment.md) documents the ingestion owner opt-in; the [Phase 5.4 report](docs/phase-5.4-ingestion-user-resolution.md) resolves API/ingestion identities; the [Phase 6 implementation report](docs/phase-6-implementation-report.md) records AI analysis; and the [Phase 7 report](docs/phase-7-implementation-report.md) records scheduler, paper trading, and retention.
 
 For environment variables, PostgreSQL contract checks, and validation commands, see the [deployment and validation guide](docs/phase-2-deployment-validation.md).

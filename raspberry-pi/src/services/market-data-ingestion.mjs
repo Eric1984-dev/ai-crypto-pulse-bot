@@ -550,10 +550,10 @@ export function parseCandleRows(rows, { symbol, interval, limit, nowMs }) {
 }
 
 function validateIntervals(intervals) {
-  if (!Array.isArray(intervals) || intervals.length === 0
+  if (!Array.isArray(intervals)
     || intervals.some((interval) => !SUPPORTED_INGESTION_INTERVALS.includes(interval))
     || new Set(intervals).size !== intervals.length) {
-    throw new TypeError("A unique, non-empty list of supported intervals is required.");
+    throw new TypeError("A unique list of supported intervals is required.");
   }
 }
 
