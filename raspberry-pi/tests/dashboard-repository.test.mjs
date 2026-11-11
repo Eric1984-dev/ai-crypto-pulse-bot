@@ -82,9 +82,10 @@ async function createDatabase() {
     VALUES ('00000000-0000-4000-8000-000000000300',
       '00000000-0000-4000-8000-000000000200', 'BTC-EUR', 0.02, 50000, 50500, 10, 'OPEN', NOW());
     INSERT INTO public."AI_Crypto_Bot_Trades"
-      (id, portfolio_id, symbol, side, price, quantity, fees, realized_pnl, created_at)
+      (id, portfolio_id, ai_decision_id, symbol, side, price, quantity, fees, realized_pnl, created_at)
     VALUES ('00000000-0000-4000-8000-000000000400',
-      '00000000-0000-4000-8000-000000000200', 'BTC-EUR', 'SELL', 51000, 0.01, 1, 9, NOW());
+      '00000000-0000-4000-8000-000000000200',
+      '00000000-0000-4000-8000-000000000700', 'BTC-EUR', 'SELL', 51000, 0.01, 1, 9, NOW());
     INSERT INTO public."AI_Crypto_Bot_Portfolio_Snapshots"
       (id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at)
     VALUES ('00000000-0000-4000-8000-000000000500',
@@ -158,6 +159,13 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(analytics.aiPerformance.decisionCount, 1);
     assert.ok(["BUY", "SELL", "HOLD", "WAIT"].every((action) =>
       analytics.aiPerformance.actions[action]));
+    assert.equal(
+      analytics.aiPerformance.confidenceBuckets.reduce((count, bucket) =>
+        count + bucket.tradeCount, 0),
+      1
+    );
+    assert.equal(analytics.portfolio.maxDrawdown, 0);
+    assert.equal(analytics.portfolio.snapshotCount, 1);
     assert.equal(analytics.portfolio.equityCurve.length, 1);
     assert.ok(Array.isArray(analytics.portfolio.drawdownHistory));
     assert.equal(exportCount, 1);

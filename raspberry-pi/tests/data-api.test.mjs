@@ -563,6 +563,78 @@ test("analytics endpoint returns the page's chart and metric contract", async ()
   });
 });
 
+test("analytics and recommendations endpoints handle recommendation generator inputs", async () => {
+  const now = new Date("2026-11-10T19:00:00.000Z");
+  const decisions = Array.from({ length: 12 }, (_, index) => ({
+    id: `decision-${index}`,
+    symbol: "BTC-EUR",
+    decision: "SELL",
+    confidence: index < 10 ? 72 : 82,
+    strategy_name: index < 10 ? "Weak" : "Better",
+    strategy_version: "1.0",
+    created_at: new Date(now.getTime() - (12 - index) * 60000).toISOString()
+  }));
+  const trades = decisions.map((decision, index) => ({
+    id: `trade-${index}`,
+    ai_decision_id: decision.id,
+    symbol: decision.symbol,
+    side: "SELL",
+    price: 100,
+    quantity: 1,
+    fees: 0,
+    realized_pnl: index < 10 ? -10 : 10,
+    created_at: decision.created_at
+  }));
+  const snapshots = Array.from({ length: 10 }, (_, index) => ({
+    id: `snapshot-${index}`,
+    portfolio_id: "portfolio-1",
+    portfolio_value: index < 9 ? 1000 : 900,
+    available_balance: index < 9 ? 1000 : 900,
+    open_positions: 0,
+    captured_at: new Date(now.getTime() - (10 - index) * 86400000).toISOString()
+  }));
+  const analytics = buildDashboardAnalytics({
+    period: "30d",
+    now,
+    portfolio: { starting_balance: 1000, portfolio_value: 900 },
+    positions: [],
+    trades,
+    decisions,
+    snapshots
+  });
+  const repositories = createRepositories(createPool(), undefined, {
+    async getAnalytics() {
+      return analytics;
+    }
+  });
+
+  await withServer({ dataRepositories: repositories }, async (baseUrl) => {
+    const analyticsResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analytics&period=30d`
+    );
+    assert.equal(analyticsResponse.status, 200);
+    const analyticsBody = await analyticsResponse.json();
+    assert.equal(analyticsBody.data.exportCounts.recommendations, 3);
+    assert.equal(analytics.aiPerformance.confidenceBuckets[0].tradeCount, 10);
+    assert.equal(
+      analytics.aiPerformance.strategies.find(({ label }) => label.startsWith("Weak")).tradeCount,
+      10
+    );
+    assert.equal(analytics.portfolio.snapshotCount, 10);
+    assert.equal(analytics.portfolio.maxDrawdown, 10);
+
+    const recommendationsResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=recommendations&period=30d`
+    );
+    assert.equal(recommendationsResponse.status, 200);
+    const recommendationsBody = await recommendationsResponse.json();
+    assert.equal(recommendationsBody.data.analysisPeriod, "30d");
+    assert.equal(recommendationsBody.data.insufficientData, false);
+    assert.equal(recommendationsBody.data.recommendations.length, 3);
+    assert.equal(recommendationsBody.data.categories.length, 5);
+  });
+});
+
 test("trade history endpoint normalizes browser side filters and returns pagination data", async () => {
   let requested;
   const history = {

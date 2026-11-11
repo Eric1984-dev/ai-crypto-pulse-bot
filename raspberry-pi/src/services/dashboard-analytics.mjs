@@ -223,14 +223,14 @@ function createAiPerformance(decisions, trades) {
     const bucketIndex = BUCKETS.findIndex((bucket) =>
       decision.confidence >= bucket.min && decision.confidence < bucket.max
     );
-    addOutcome(actions[decision.decision], trade.realized_pnl);
+    addOutcome(actions[decision.decision], trade.realized_pnl, trade.id);
     if (bucketIndex >= 0) {
-      addOutcome(buckets[bucketIndex], trade.realized_pnl);
+      addOutcome(buckets[bucketIndex], trade.realized_pnl, trade.id);
     }
     if (decision.strategy) {
-      addOutcome(getGroup(strategies, decision.strategy), trade.realized_pnl);
+      addOutcome(getGroup(strategies, decision.strategy), trade.realized_pnl, trade.id);
     }
-    addOutcome(getGroup(symbols, decision.symbol), trade.realized_pnl);
+    addOutcome(getGroup(symbols, decision.symbol), trade.realized_pnl, trade.id);
   }
 
   const finalizedBuckets = buckets.map(finalizeDecisionGroup);
@@ -263,6 +263,7 @@ function createDecisionGroup(label) {
     label,
     decisionCount: 0,
     scoredCount: 0,
+    closedTradeIds: new Set(),
     wins: 0,
     losses: 0,
     breakeven: 0,
@@ -277,9 +278,12 @@ function getGroup(groups, label) {
   return groups.get(label);
 }
 
-function addOutcome(group, pnl) {
+function addOutcome(group, pnl, tradeId) {
   group.scoredCount += 1;
   group.netPnl += pnl;
+  if (tradeId !== undefined && tradeId !== null) {
+    group.closedTradeIds.add(String(tradeId));
+  }
   if (pnl > 0) {
     group.wins += 1;
   } else if (pnl < 0) {
@@ -290,8 +294,10 @@ function addOutcome(group, pnl) {
 }
 
 function finalizeDecisionGroup(group) {
+  const { closedTradeIds, ...metrics } = group;
   return {
-    ...group,
+    ...metrics,
+    tradeCount: closedTradeIds.size,
     unscoredCount: Math.max(0, group.decisionCount - group.scoredCount),
     winRate: group.scoredCount ? group.wins / group.scoredCount * 100 : null,
     averagePnl: group.scoredCount ? group.netPnl / group.scoredCount : null
@@ -320,6 +326,9 @@ function createPortfolioAnalytics(portfolio, snapshots) {
   const dailyPerformance = summarizeSnapshotPeriods(ordered, "daily", portfolio);
   const weeklyPerformance = summarizeSnapshotPeriods(ordered, "weekly", portfolio);
   const monthlyPerformance = summarizeSnapshotPeriods(ordered, "monthly", portfolio);
+  const maxDrawdown = drawdownHistory.length
+    ? Math.max(...drawdownHistory.map(({ drawdownPercent }) => drawdownPercent))
+    : null;
   const finalValue = ordered.at(-1)?.portfolio_value ?? portfolio?.portfolio_value ?? null;
   const startingValue = portfolio?.starting_balance ?? null;
   const growthPercent = startingValue
@@ -328,6 +337,8 @@ function createPortfolioAnalytics(portfolio, snapshots) {
 
   return {
     growthPercent,
+    maxDrawdown,
+    snapshotCount: ordered.length,
     equityCurve,
     drawdownHistory,
     dailyPerformance,
