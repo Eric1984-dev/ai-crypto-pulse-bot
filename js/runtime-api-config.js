@@ -1,5 +1,5 @@
 window.CryptoPulseRuntimeConfig = Object.freeze({
-  apiOrigin: "",
+  apiOrigin: "https://breeding-commitments-disciplines-determining.trycloudflare.com",
   accessEnabled: false,
   accessAudience: ""
 });
