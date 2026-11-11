@@ -71,7 +71,7 @@ The `default_transaction_read_only` role setting is defense in depth, not the au
 - Removed superseded draft: `ARCHIVE_MARKET_READER_ROLE.sql`
 - [`ARCHIVE_MARKET_READER_SETUP.md`](./ARCHIVE_MARKET_READER_SETUP.md)
 - [`archive-market-seed.mjs`](../../archive-server/src/archive-market-seed.mjs)
-- [`20261031190000_create_agent_tables.sql`](../../supabase/migrations/20261031190000_create_agent_tables.sql)
+- [`20261031190000_create_agent_tables.sql`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
 - [`DATABASE.md`](../DATABASE.md)
 - [`ARCHIVE_CREDENTIAL_IMPLEMENTATION.md`](./ARCHIVE_CREDENTIAL_IMPLEMENTATION.md)
 - [`MARKET_SEED_EXECUTION_GUIDE.md`](./MARKET_SEED_EXECUTION_GUIDE.md)

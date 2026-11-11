@@ -21,9 +21,9 @@
 **Added**
 
 - `config/markets.js`
-- `supabase/config.toml`
-- `supabase/migrations/20261031190000_create_agent_tables.sql`
-- `supabase/migrations/20261031190100_seed_initial_data.sql`
+- `PostgreSQL/config.toml`
+- `PostgreSQL/migrations/20261031190000_create_agent_tables.sql`
+- `PostgreSQL/migrations/20261031190100_seed_initial_data.sql`
 - `scripts/validate-database.js`
 - `tests/database-migrations.test.js`
 - `package-lock.json`

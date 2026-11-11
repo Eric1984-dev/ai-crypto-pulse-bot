@@ -146,6 +146,6 @@ Low trade volume in the audited post-fix period is explained primarily by the **
 - [AI signal-generation logic](../../lib/ai-engine.mjs)
 - [Paper-trading API aggregate logging](../../api/paper-trading.mjs)
 - [Execution-audit backlog](../../ROADMAP.md)
-- [Confidence-threshold experiment migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql)
+- [Confidence-threshold experiment migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql)
 
 **Tests:** Not run; this is a read-only production audit and report.

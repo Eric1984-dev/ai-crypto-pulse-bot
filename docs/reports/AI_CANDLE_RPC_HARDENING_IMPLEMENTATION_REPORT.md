@@ -23,7 +23,7 @@ The AI indicator, freshness, and decision formulas were not changed. For a compl
 
 ## PostgREST rollout prerequisite
 
-`supabase/config.toml` does not define `max_rows`; its local project identifier and seed settings do not establish the hosted value. The intended production project identity and its hosted `max_rows` were not verified in this task. Before a controlled migration/deployment, confirm both the project identity and that its PostgREST `max_rows` is at least 600. No hosted setting was changed.
+`PostgreSQL/config.toml` does not define `max_rows`; its local project identifier and seed settings do not establish the hosted value. The intended production project identity and its hosted `max_rows` were not verified in this task. Before a controlled migration/deployment, confirm both the project identity and that its PostgREST `max_rows` is at least 600. No hosted setting was changed.
 
 ## Validation performed
 
@@ -42,7 +42,7 @@ No Supabase migration was applied and no deployment was performed.
 - `README.md`
 - `ROADMAP.md`
 - `lib/ai-engine.mjs`
-- `supabase/migrations/20261105120000_ai_candle_history_rpc.sql`
+- `PostgreSQL/migrations/20261105120000_ai_candle_history_rpc.sql`
 - `tests/ai-engine.test.mjs`
 - `tests/database-migrations.test.js`
 - `docs/API.md`

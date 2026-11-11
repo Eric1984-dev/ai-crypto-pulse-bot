@@ -15,7 +15,7 @@ The repository's Supabase schema uses an auth-owned profile model:
 3. The Phase 08 migration defines an `AFTER INSERT` trigger on `AI_Crypto_Bot_Profiles`. It provisions a virtual portfolio with a 10,000 starting, available, and total balance, then creates the initial portfolio snapshot. That migration also backfills portfolios and snapshots for profiles that already exist.
 4. Independently of those database triggers, the Raspberry Pi paper runtime calls `ensureDefaultPortfolios()` on each paper run. Its direct SQL selects existing profiles that have no portfolio, inserts a portfolio for each candidate, and inserts the initial snapshot. It does not insert profiles or access `auth.users`.
 
-The trigger path is defined in `supabase/migrations/20261031190000_create_agent_tables.sql` and `supabase/migrations/20261101154600_phase08_paper_trading.sql`. The Pi runtime's direct initialization is in `raspberry-pi/src/repositories/paper-trading-repository.mjs`; it is designed not to require PostgreSQL business functions.
+The trigger path is defined in `PostgreSQL/migrations/20261031190000_create_agent_tables.sql` and `PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql`. The Pi runtime's direct initialization is in `raspberry-pi/src/repositories/paper-trading-repository.mjs`; it is designed not to require PostgreSQL business functions.
 
 ## Required records
 

@@ -15,7 +15,7 @@ Approximately 80% of BUY decisions were below the previous entry threshold. The 
 
 ## Implementation
 
-The new migration [`20261102140000_paper_trading_confidence_experiment.sql`](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql) updates the existing `AI_Crypto_Bot_Apply_Paper_Decision` function for databases where the Phase 08 migration has already been applied. It changes the BUY-entry rejection condition from confidence below 70 to confidence below 67. The migration fails explicitly unless the expected original condition occurs exactly once.
+The new migration [`20261102140000_paper_trading_confidence_experiment.sql`](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql) updates the existing `AI_Crypto_Bot_Apply_Paper_Decision` function for databases where the Phase 08 migration has already been applied. It changes the BUY-entry rejection condition from confidence below 70 to confidence below 67. The migration fails explicitly unless the expected original condition occurs exactly once.
 
 Confidence 67 is accepted by the confidence gate; values below 67 are rejected. The decision must still pass every other existing requirement, including freshness, enabled-market checks, emergency/pause state, position limits, cooldown, funds, and drawdown protections.
 
@@ -42,7 +42,7 @@ No experiment outcome is asserted before the evaluation data is available.
 
 ## Files changed
 
-- `supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql`
+- `PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql`
 - `tests/database-migrations.test.js`
 - `docs/RISK_MANAGEMENT.md`
 - `docs/OPERATIONS_LOG.md`

@@ -182,8 +182,8 @@ The two existing positions also received HOLD, not SELL, throughout the window, 
 ## Sources
 
 - [AI Engine](../../lib/ai-engine.mjs)
-- [Paper-trading migration](../../supabase/migrations/20261101154600_phase08_paper_trading.sql)
-- [Active confidence-threshold migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql)
+- [Paper-trading migration](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql)
+- [Active confidence-threshold migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql)
 - [Risk Management](../RISK_MANAGEMENT.md)
 - [Scheduling](../SCHEDULING.md)
 

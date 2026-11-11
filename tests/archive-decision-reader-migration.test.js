@@ -8,7 +8,7 @@ const test = require("node:test");
 const migrationPath = path.join(
   __dirname,
   "..",
-  "supabase",
+  "PostgreSQL",
   "migrations",
   "20261107120000_ai_decision_archive_reader.sql"
 );

@@ -94,7 +94,7 @@ The position source timestamp is one nullable value per position row, not a new 
 
 ## Implementation guardrails for a future change
 
-1. Add the two nullable columns through a new append-only migration under `supabase/migrations/`; do not edit an applied migration. Keep the existing table's RLS and grants unchanged.
+1. Add the two nullable columns through a new append-only migration under `PostgreSQL/migrations/`; do not edit an applied migration. Keep the existing table's RLS and grants unchanged.
 2. Update the existing position-mark path and snapshot insertion only. Preserve all existing eligibility predicates and portfolio arithmetic exactly; do not modify a scheduler, route, cadence, decision, or trade rule.
 3. Keep telemetry nullable and versioned. A legacy position's unknown source time must remain null until a known eligible source row is applied; never fabricate historical provenance.
 4. Ensure trace generation cannot cause a different price to be selected or block the established valuation path. If trace-only construction fails, preserve the normal valuation/snapshot path, leave the trace null, and surface a diagnostic warning. Avoid indexes and external logging calls in the valuation transaction.
@@ -108,7 +108,7 @@ Adopt **one nullable `valuation_trace` JSONB field on each new portfolio snapsho
 ## References
 
 - [Root-cause analysis](./VALUATION_MARK_LAG_ROOT_CAUSE.md)
-- [Portfolio mark update and snapshot calculation](../../supabase/migrations/20261101154600_phase08_paper_trading.sql#L81)
-- [Position and market-data schema](../../supabase/migrations/20261031190000_create_agent_tables.sql#L36)
+- [Portfolio mark update and snapshot calculation](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql#L81)
+- [Position and market-data schema](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql#L36)
 - [Database design and migration rules](../DATABASE.md)
 - [Market and paper-trading cadence](../SCHEDULING.md)

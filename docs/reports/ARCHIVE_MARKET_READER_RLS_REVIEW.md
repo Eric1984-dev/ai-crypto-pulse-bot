@@ -51,5 +51,5 @@ The SQL file contains a separately commented rollback block. Execute only the `D
 - Removed superseded drafts: `ARCHIVE_MARKET_READER_RLS_MIGRATION.sql` and `ARCHIVE_MARKET_READER_ROLE.sql`
 - [`ARCHIVE_MARKET_READER_SETUP.md`](./ARCHIVE_MARKET_READER_SETUP.md)
 - [`ARCHIVE_MARKET_READER_FINAL_REVIEW.md`](./ARCHIVE_MARKET_READER_FINAL_REVIEW.md)
-- [`20261031190000_create_agent_tables.sql`](../../supabase/migrations/20261031190000_create_agent_tables.sql)
+- [`20261031190000_create_agent_tables.sql`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
 - [`DATABASE.md`](../DATABASE.md)

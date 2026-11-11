@@ -84,6 +84,6 @@ Relative to the WIN entry, the post-fix average has **3.64 fewer points** from M
 - [Post-Fix Threshold Impact Analysis](./POST_FIX_THRESHOLD_IMPACT_ANALYSIS.md) — confidence distribution and threshold counts for the same window.
 - [AI confidence calculation](../../lib/ai-engine.mjs) — formula, valid-interval coverage/depth, volatility penalty, and confidence cap.
 - [Risk management rules](../RISK_MANAGEMENT.md) — current Phase 08 execution controls.
-- [Confidence-threshold experiment migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql).
+- [Confidence-threshold experiment migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql).
 
 **Tests:** Not run; this is a read-only production data analysis.

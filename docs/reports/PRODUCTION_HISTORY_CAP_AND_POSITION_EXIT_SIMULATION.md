@@ -59,8 +59,8 @@ Read-only production inspection of `pg_get_functiondef` for `public."AI_Crypto_B
 
 The local migration history distinguishes the baseline and experiment:
 
-- [`20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) defines the Phase 08 baseline BUY gate of 70.
-- [`20261102140000_paper_trading_confidence_experiment.sql`](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql) verifies and replaces the single old condition with the 67 gate.
+- [`20261101154600_phase08_paper_trading.sql`](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) defines the Phase 08 baseline BUY gate of 70.
+- [`20261102140000_paper_trading_confidence_experiment.sql`](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql) verifies and replaces the single old condition with the 67 gate.
 - [`RISK_MANAGEMENT.md`](../RISK_MANAGEMENT.md) already documents the current paper-entry threshold as 67.
 - The AI Engine's separate signal-generation floor is 65.
 

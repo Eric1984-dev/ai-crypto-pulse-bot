@@ -153,7 +153,7 @@ The previously reported source count of 102 watched markets and archive count of
 - [Archive sync architecture](./ARCHIVE_SYNC_ARCHITECTURE.md)
 - [Database documentation](../DATABASE.md)
 - [Deployment guide](../DEPLOYMENT.md)
-- [Source schema and RLS migration](../../supabase/migrations/20261031190000_create_agent_tables.sql)
+- [Source schema and RLS migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
 - Supabase: [Connect to your database](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - Supabase: [Postgres roles](https://supabase.com/docs/guides/database/postgres/roles)
 - Supabase: [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)

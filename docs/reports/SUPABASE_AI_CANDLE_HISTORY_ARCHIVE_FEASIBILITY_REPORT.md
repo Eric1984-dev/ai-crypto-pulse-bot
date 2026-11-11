@@ -157,6 +157,6 @@ Before any future deletion, preserve immutable archive objects and a separately 
 
 ## Evidence and repository references
 
-The assessment reviewed the existing [retention assessment](./SUPABASE_DATA_RETENTION_AND_CLEANUP_ASSESSMENT.md), [egress and database-size report](./SUPABASE_EGRESS_AND_DATABASE_SIZE_OPTIMIZATION_REPORT.md), [project roadmap](../../ROADMAP.md), [AI candle retrieval](../../lib/ai-engine.mjs), [compact candle RPC](../../supabase/migrations/20261105150000_ai_candle_rpc_compact_payload.sql), [Analytics](../../lib/analytics.mjs), [exports](../../lib/exports.mjs), [dashboard data](../../api/dashboard-data.mjs), and [market data](../../lib/market-data.mjs).
+The assessment reviewed the existing [retention assessment](./SUPABASE_DATA_RETENTION_AND_CLEANUP_ASSESSMENT.md), [egress and database-size report](./SUPABASE_EGRESS_AND_DATABASE_SIZE_OPTIMIZATION_REPORT.md), [project roadmap](../../ROADMAP.md), [AI candle retrieval](../../lib/ai-engine.mjs), [compact candle RPC](../../PostgreSQL/migrations/20261105150000_ai_candle_rpc_compact_payload.sql), [Analytics](../../lib/analytics.mjs), [exports](../../lib/exports.mjs), [dashboard data](../../api/dashboard-data.mjs), and [market data](../../lib/market-data.mjs).
 
 The compact timeframe-payload investigation was not repeated or evaluated in this report.

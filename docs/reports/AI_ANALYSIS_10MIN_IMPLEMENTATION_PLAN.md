@@ -52,7 +52,7 @@ The current job IDs, expressions, and scheduler behavior must be verified before
 - [lib/ai-engine.mjs](../../lib/ai-engine.mjs) — no run-frequency constant. Freshness limits are per-candle-interval (`CANDLE_MAX_AGE_MS`: 30 min for `1m` up to 72h for `1d`) and are independent of how often analysis runs. `MARKET_DATA_MAX_AGE_MS` = 15 min (input snapshot freshness), unchanged.
 - [api/ai-analysis.mjs](../../api/ai-analysis.mjs) and [api/paper-trading.mjs](../../api/paper-trading.mjs) — no cadence constant; both are triggered purely by the external scheduler.
 - [lib/market-data.mjs](../../lib/market-data.mjs) — candle/market refresh logic has no 5-minute assumption.
-- Database functions in [20261101154600_phase08_paper_trading.sql](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) — all time gates are 15 minutes (see §5); none reference 5 minutes.
+- Database functions in [20261101154600_phase08_paper_trading.sql](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) — all time gates are 15 minutes (see §5); none reference 5 minutes.
 - Tests — no test asserts a 5-minute scheduler cadence; `30000`-ms values in front-end tests are the 30-second UI polling interval, unrelated.
 
 **Conclusion:** no code change, no migration, and no test update is required for this cadence change.
@@ -112,5 +112,5 @@ The 15-minute freshness gate alone does not justify a cadence change. Preserve c
 - [AI_ANALYSIS_CADENCE_AUDIT.md](./AI_ANALYSIS_CADENCE_AUDIT.md) — decision simulation, executed-trade analysis, resource estimates.
 - [docs/SCHEDULING.md](../SCHEDULING.md), [docs/DEPLOYMENT.md](../DEPLOYMENT.md) — current scheduler guidance.
 - [lib/ai-engine.mjs](../../lib/ai-engine.mjs), [api/ai-analysis.mjs](../../api/ai-analysis.mjs), [api/paper-trading.mjs](../../api/paper-trading.mjs), [lib/market-data.mjs](../../lib/market-data.mjs) — code search confirming no 5-minute cadence assumption.
-- [supabase/migrations/20261101154600_phase08_paper_trading.sql](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) — 15-minute freshness/cooldown gates.
+- [PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) — 15-minute freshness/cooldown gates.
 - No tests were run; this is a plan-only document with no code changes.

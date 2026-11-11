@@ -99,7 +99,7 @@ The executor stores executed trades and aggregate run metrics, not durable per-d
 
 The current [AI Engine](../../lib/ai-engine.mjs) is deterministic technical analysis (`Deterministic Technical Analysis`, version `1.0.0`). It evaluates EMA trend, momentum, RSI, MACD, volume, volatility, and stored 24-hour market data across the six candle intervals. Its signal floor is confidence 65; it emits HOLD when market-strength magnitude is below 20 or confidence is below 65. It does not consult the position's unrealized profit to create an exit.
 
-The database paper executor in [the Phase 08 migration](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) closes a position only for an eligible stored SELL decision. The production function has no take-profit, trailing-stop, stop-loss, or profit-protection code. The portfolio-level 5% daily and 15% maximum drawdown controls block **new BUYs**; the 20% emergency drawdown rule is portfolio-wide and stops new entries. These are not individual-position exits. No emergency stop was active at the observation time.
+The database paper executor in [the Phase 08 migration](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) closes a position only for an eligible stored SELL decision. The production function has no take-profit, trailing-stop, stop-loss, or profit-protection code. The portfolio-level 5% daily and 15% maximum drawdown controls block **new BUYs**; the 20% emergency drawdown rule is portfolio-wide and stops new entries. These are not individual-position exits. No emergency stop was active at the observation time.
 
 At the ARX decision-time low on Nov 5, strength was -19.85 and confidence 60.21. Both the magnitude and confidence rules kept it at HOLD. That result is expected under the implementation, although the absence of a protective exit is a material strategy limitation for positions that first become profitable and then reverse.
 
@@ -213,7 +213,7 @@ WHERE previous_at IS NOT NULL
 ORDER BY gap DESC;
 ```
 
-The production paper-trading function was checked read-only through `pg_get_functiondef`; its BUY gate, SELL cost model, and absence of take-profit/trailing/stop-loss logic were compared with [the Phase 08 migration](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) and [the confidence experiment migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql). Candle constraints were read from `pg_constraint`. No tests were run because this was a read-only production audit.
+The production paper-trading function was checked read-only through `pg_get_functiondef`; its BUY gate, SELL cost model, and absence of take-profit/trailing/stop-loss logic were compared with [the Phase 08 migration](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) and [the confidence experiment migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql). Candle constraints were read from `pg_constraint`. No tests were run because this was a read-only production audit.
 
 ## Limitations
 

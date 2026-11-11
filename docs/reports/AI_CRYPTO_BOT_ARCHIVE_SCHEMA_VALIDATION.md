@@ -32,7 +32,7 @@ This conclusion is about the SQL's static compatibility with PostgreSQL 17. Runt
 
 ### Tables
 
-The source migrations create 16 prefixed tables in [`20261031190000_create_agent_tables.sql`](../../supabase/migrations/20261031190000_create_agent_tables.sql#L3) and two more in [`20261105104400_shadow_exit_scenarios.sql`](../../supabase/migrations/20261105104400_shadow_exit_scenarios.sql#L3). All 18 are present in [`AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql`](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql#L10). The later `Trades.ai_decision_id` addition is included at the end of the trade columns, with its restrictive foreign key and index, as added by [`20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql#L3).
+The source migrations create 16 prefixed tables in [`20261031190000_create_agent_tables.sql`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql#L3) and two more in [`20261105104400_shadow_exit_scenarios.sql`](../../PostgreSQL/migrations/20261105104400_shadow_exit_scenarios.sql#L3). All 18 are present in [`AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql`](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql#L10). The later `Trades.ai_decision_id` addition is included at the end of the trade columns, with its restrictive foreign key and index, as added by [`20261101154600_phase08_paper_trading.sql`](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql#L3).
 
 No project table, column, primary key, foreign key, unique constraint, or explicit index required by those table migrations was found missing in the generated archive DDL.
 
@@ -108,11 +108,11 @@ Until these checks are complete, the deployment status is **not verified**. No d
 
 - [`AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql`](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql)
 - [`AI_CRYPTO_BOT_ARCHIVE_SCHEMA_ANALYSIS.md`](./AI_CRYPTO_BOT_ARCHIVE_SCHEMA_ANALYSIS.md)
-- [`20261031190000_create_agent_tables.sql`](../../supabase/migrations/20261031190000_create_agent_tables.sql)
-- [`20261031190100_seed_initial_data.sql`](../../supabase/migrations/20261031190100_seed_initial_data.sql)
-- [`20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql)
-- [`20261102130000_phase11_realtime_publication.sql`](../../supabase/migrations/20261102130000_phase11_realtime_publication.sql)
-- [`20261105104400_shadow_exit_scenarios.sql`](../../supabase/migrations/20261105104400_shadow_exit_scenarios.sql)
-- [`20261106120000_ai_analysis_database_mode.sql`](../../supabase/migrations/20261106120000_ai_analysis_database_mode.sql)
+- [`20261031190000_create_agent_tables.sql`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
+- [`20261031190100_seed_initial_data.sql`](../../PostgreSQL/migrations/20261031190100_seed_initial_data.sql)
+- [`20261101154600_phase08_paper_trading.sql`](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql)
+- [`20261102130000_phase11_realtime_publication.sql`](../../PostgreSQL/migrations/20261102130000_phase11_realtime_publication.sql)
+- [`20261105104400_shadow_exit_scenarios.sql`](../../PostgreSQL/migrations/20261105104400_shadow_exit_scenarios.sql)
+- [`20261106120000_ai_analysis_database_mode.sql`](../../PostgreSQL/migrations/20261106120000_ai_analysis_database_mode.sql)
 - [`DATABASE.md`](../DATABASE.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md), [`ARCHIVE_SERVER_CONNECTIVITY.md`](./ARCHIVE_SERVER_CONNECTIVITY.md)
 - Prior archive/retention assessments: [`SUPABASE_AI_CANDLE_HISTORY_ARCHIVE_FEASIBILITY_REPORT.md`](./SUPABASE_AI_CANDLE_HISTORY_ARCHIVE_FEASIBILITY_REPORT.md), [`SUPABASE_HISTORICAL_DATA_ARCHIVE_DESTINATION_ASSESSMENT.md`](./SUPABASE_HISTORICAL_DATA_ARCHIVE_DESTINATION_ASSESSMENT.md), and [`SUPABASE_DATA_RETENTION_AND_CLEANUP_ASSESSMENT.md`](./SUPABASE_DATA_RETENTION_AND_CLEANUP_ASSESSMENT.md)

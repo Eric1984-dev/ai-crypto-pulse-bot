@@ -72,7 +72,7 @@ No other table is a direct prerequisite for inserting decision rows:
 - A trade's foreign key points from `AI_Crypto_Bot_Trades` to a decision; trades do not need to be copied before decisions.
 - Profiles, portfolios, positions, candles, and market data are not direct parents of AI decision rows.
 
-The checked-in [archive schema](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql) contains DDL only and does not insert watched markets. The source [initial seed migration](../../supabase/migrations/20261031190100_seed_initial_data.sql) seeds five rows in Supabase; it does not seed the Raspberry Pi archive, nor does it establish that five symbols cover the full historical decision set.
+The checked-in [archive schema](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql) contains DDL only and does not insert watched markets. The source [initial seed migration](../../PostgreSQL/migrations/20261031190100_seed_initial_data.sql) seeds five rows in Supabase; it does not seed the Raspberry Pi archive, nor does it establish that five symbols cover the full historical decision set.
 
 ## 5. Archive market-row verification
 
@@ -120,6 +120,6 @@ Any one of the first four blocks a safe implementation. Together, they make this
 - [Archive schema validation](./AI_CRYPTO_BOT_ARCHIVE_SCHEMA_VALIDATION.md)
 - [Archive Server connectivity](./ARCHIVE_SERVER_CONNECTIVITY.md)
 - [Database documentation](../DATABASE.md)
-- [Source schema migration](../../supabase/migrations/20261031190000_create_agent_tables.sql)
-- [Initial market seed migration](../../supabase/migrations/20261031190100_seed_initial_data.sql)
+- [Source schema migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
+- [Initial market seed migration](../../PostgreSQL/migrations/20261031190100_seed_initial_data.sql)
 - [Archive schema DDL](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql)

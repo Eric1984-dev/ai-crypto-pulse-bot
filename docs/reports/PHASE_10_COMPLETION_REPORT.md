@@ -49,7 +49,7 @@ The dashboard retains its existing recent-trades summary and now links directly 
 - `js/formatters.js`
 - `js/history.js`
 - `js/portfolio.js`
-- `supabase/migrations/20261102120000_trade_history_stats.sql`
+- `PostgreSQL/migrations/20261102120000_trade_history_stats.sql`
 - `tests/database-migrations.test.js`
 - `tests/dashboard.test.js`
 - `tests/portfolio.test.js`

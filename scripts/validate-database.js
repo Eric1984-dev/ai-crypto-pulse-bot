@@ -5,7 +5,7 @@ const path = require("node:path");
 const markets = require("../config/markets.js");
 
 const rootDirectory = path.resolve(__dirname, "..");
-const migrationsDirectory = path.join(rootDirectory, "supabase", "migrations");
+const migrationsDirectory = path.join(rootDirectory, "PostgreSQL", "migrations");
 const requiredTables = [
   "AI_Crypto_Bot_Profiles",
   "AI_Crypto_Bot_Portfolios",
@@ -35,7 +35,7 @@ const requiredFunctions = [
 function validateDatabase() {
   const errors = [];
   if (!fs.existsSync(migrationsDirectory)) {
-    return [`Missing Supabase migration directory: ${path.relative(rootDirectory, migrationsDirectory)}`];
+    return [`Missing PostgreSQL migration directory: ${path.relative(rootDirectory, migrationsDirectory)}`];
   }
 
   const migrationFiles = fs.readdirSync(migrationsDirectory)
@@ -46,7 +46,7 @@ function validateDatabase() {
   }
   for (const file of migrationFiles) {
     if (!/^\d{14}_[a-z0-9_]+\.sql$/.test(file)) {
-      errors.push(`Invalid Supabase migration filename: ${file}`);
+      errors.push(`Invalid PostgreSQL migration filename: ${file}`);
     }
   }
 
@@ -108,11 +108,6 @@ function validateDatabase() {
         errors.push(`Database object does not use the required prefix: ${match[1]}`);
       }
     }
-  }
-
-  const configPath = path.join(rootDirectory, "supabase", "config.toml");
-  if (!fs.existsSync(configPath) || !/^\s*project_id\s*=/m.test(fs.readFileSync(configPath, "utf8"))) {
-    errors.push("Supabase project configuration is missing a project_id.");
   }
 
   const seedSql = migrationFiles

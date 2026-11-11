@@ -60,7 +60,7 @@ remains opt-in.
 ## Files changed
 
 - [lib/ai-engine.mjs](../../lib/ai-engine.mjs) — JavaScript scoring, confidence, required-input handling, and V2 decision identity.
-- [20261110120000_ai_engine_v2_replacement.sql](../../supabase/migrations/20261110120000_ai_engine_v2_replacement.sql) — replacement body for the existing database-analysis function.
+- [20261110120000_ai_engine_v2_replacement.sql](../../PostgreSQL/migrations/20261110120000_ai_engine_v2_replacement.sql) — replacement body for the existing database-analysis function.
 - [tests/ai-engine.test.mjs](../../tests/ai-engine.test.mjs) — V2 formula, diagnostic-only inputs, missing-input, and safety-gate coverage.
 - [tests/database-migrations.test.js](../../tests/database-migrations.test.js) — migration application, JavaScript/SQL parity, and missing-input coverage.
 - [README.md](../../README.md)

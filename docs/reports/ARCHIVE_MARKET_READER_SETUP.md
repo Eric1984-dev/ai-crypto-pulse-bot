@@ -146,7 +146,7 @@ If cleanup reports a dependency or active-session error, stop and inspect it; do
 - [Market seed execution guide](./MARKET_SEED_EXECUTION_GUIDE.md)
 - [Archive sync architecture](./ARCHIVE_SYNC_ARCHITECTURE.md)
 - [Database documentation](../DATABASE.md)
-- [Source schema/RLS migration](../../supabase/migrations/20261031190000_create_agent_tables.sql)
+- [Source schema/RLS migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
 - Supabase: [Postgres roles](https://supabase.com/docs/guides/database/postgres/roles)
 - Supabase: [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - Supabase: [Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres)

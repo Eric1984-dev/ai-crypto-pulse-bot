@@ -52,7 +52,7 @@ AI_Crypto_Bot_Candles_symbol_interval_timestamp_key
   UNIQUE BTREE (symbol, interval, timestamp)
 ```
 
-This is the same key created by the original schema migration ([migration definition](../../supabase/migrations/20261031190000_create_agent_tables.sql#L106)). It is also the candle upsert conflict key.
+This is the same key created by the original schema migration ([migration definition](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql#L106)). It is also the candle upsert conflict key.
 
 Live index statistics showed:
 

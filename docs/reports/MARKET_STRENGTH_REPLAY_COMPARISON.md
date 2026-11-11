@@ -123,8 +123,8 @@ Before using this evidence to change a production model, retain per-run market p
 ## Sources
 
 - [AI Engine](../../lib/ai-engine.mjs) — production score, confidence, and decision calculations.
-- [Paper-trading migration](../../supabase/migrations/20261101154600_phase08_paper_trading.sql) — execution lifecycle, position limits, fees, slippage, and drawdown checks.
-- [Confidence experiment migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql) — approved 67 BUY-entry confidence gate.
+- [Paper-trading migration](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql) — execution lifecycle, position limits, fees, slippage, and drawdown checks.
+- [Confidence experiment migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql) — approved 67 BUY-entry confidence gate.
 - [Risk management documentation](../RISK_MANAGEMENT.md) — documented production controls.
 
 No code changes, production writes, deployments, or tests were performed; this was a read-only production-data investigation.

@@ -8,7 +8,7 @@ const markets = require("../config/markets.js");
 const { requiredTables, validateDatabase } = require("../scripts/validate-database.js");
 
 const rootDirectory = path.resolve(__dirname, "..");
-const migrationsDirectory = path.join(rootDirectory, "supabase", "migrations");
+const migrationsDirectory = path.join(rootDirectory, "PostgreSQL", "migrations");
 const migrationFiles = fs.readdirSync(migrationsDirectory)
   .filter((file) => file.endsWith(".sql"))
   .sort();

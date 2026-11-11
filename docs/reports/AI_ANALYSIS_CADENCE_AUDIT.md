@@ -3,7 +3,7 @@
 **Date:** 2026-11-04
 **Observation window:** 2026-11-03 07:31:14 → 2026-11-04 07:26:19 UTC (24h; 287 complete batches × 102 markets = 29,274 stored decisions)
 **Scope:** Diagnosis only. No code, scheduler settings, or production data were changed.
-**Data sources:** Live Supabase (`AI_Crypto_Bot_AI_Decisions`, `AI_Crypto_Bot_Trades`, `AI_Crypto_Bot_Portfolio_Snapshots`, `AI_Crypto_Bot_Status`), repository code ([lib/ai-engine.mjs](../../lib/ai-engine.mjs), [20261101154600_phase08_paper_trading.sql](../../supabase/migrations/20261101154600_phase08_paper_trading.sql)), and the 2026-11-03 scheduler/CPU reports.
+**Data sources:** Live Supabase (`AI_Crypto_Bot_AI_Decisions`, `AI_Crypto_Bot_Trades`, `AI_Crypto_Bot_Portfolio_Snapshots`, `AI_Crypto_Bot_Status`), repository code ([lib/ai-engine.mjs](../../lib/ai-engine.mjs), [20261101154600_phase08_paper_trading.sql](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql)), and the 2026-11-03 scheduler/CPU reports.
 
 > **Historical recommendation only (clarified 2026-11-05):** The 10-minute recommendation below reflects this report's 24-hour replay and is not current approval to change schedules. The subsequent 5.5-hour validation returned Verdict B (additional validation required), and the latest market-universe investigation observed roughly five-minute decision spacing and advised keeping cadence unchanged during a market-universe pilot. Ten-minute cadence is not active, approved, or deployed. See the [current cadence clarification](./AI_ANALYSIS_CADENCE_STATUS_CLARIFICATION_2026-11-05.md).
 

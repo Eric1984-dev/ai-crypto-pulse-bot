@@ -2,10 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const rootDirectory = path.resolve(__dirname, "..");
-const isVercelBuild = process.env.VERCEL === "1";
 const requiredDirectories = [
   "api",
-  ...(!isVercelBuild ? ["archive-server"] : []),
   "css",
   "js",
   "lib",
@@ -103,27 +101,6 @@ function validateProject() {
     ]) {
       if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
         errors.push(`The environment template must declare ${variable}.`);
-      }
-    }
-  }
-
-  if (!isVercelBuild) {
-    const archiveEnvPath = path.join(rootDirectory, "archive-server", ".env.example");
-    if (!fs.existsSync(archiveEnvPath)) {
-      errors.push("Missing archive-server environment template.");
-    } else {
-      const archiveEnv = fs.readFileSync(archiveEnvPath, "utf8");
-      for (const variable of [
-        "ARCHIVE_DB_HOST",
-        "ARCHIVE_DB_PORT",
-        "ARCHIVE_DB_NAME",
-        "ARCHIVE_DB_USER",
-        "ARCHIVE_DB_PASSWORD",
-        "ARCHIVE_HEALTH_TOKEN"
-      ]) {
-        if (!new RegExp(`^${variable}=`, "m").test(archiveEnv)) {
-          errors.push(`The archive-server environment template must declare ${variable}.`);
-        }
       }
     }
   }

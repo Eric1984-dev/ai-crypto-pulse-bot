@@ -4,9 +4,9 @@
 
 This analysis and [AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql) are derived from the production schema migrations:
 
-- [`20261031190000_create_agent_tables.sql`](../../supabase/migrations/20261031190000_create_agent_tables.sql)
-- [`20261101154600_phase08_paper_trading.sql`](../../supabase/migrations/20261101154600_phase08_paper_trading.sql)
-- [`20261105104400_shadow_exit_scenarios.sql`](../../supabase/migrations/20261105104400_shadow_exit_scenarios.sql)
+- [`20261031190000_create_agent_tables.sql`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
+- [`20261101154600_phase08_paper_trading.sql`](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql)
+- [`20261105104400_shadow_exit_scenarios.sql`](../../PostgreSQL/migrations/20261105104400_shadow_exit_scenarios.sql)
 - [`DATABASE.md`](../DATABASE.md), for the documented inventory and Supabase-managed Auth dependency.
 
 The generated SQL contains all 18 `AI_Crypto_Bot_` tables, including the five priority tables and the supporting tables needed to preserve their referential dependencies and related historical data. It includes the production columns, types, defaults, primary/foreign/unique/check constraints, and explicit indexes. The later-added `Trades.ai_decision_id` column is kept at the end of the trade columns, matching its production addition order.

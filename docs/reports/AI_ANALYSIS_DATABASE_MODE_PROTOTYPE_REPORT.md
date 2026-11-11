@@ -126,7 +126,7 @@ The migration adds no tables, does not alter existing rows or trading safeguards
 - `docs/reports/AI_ANALYSIS_DATABASE_MODE_PROTOTYPE_REPORT.md`
 - `lib/ai-engine.mjs`
 - `scripts/validate-database.js`
-- `supabase/migrations/20261106120000_ai_analysis_database_mode.sql`
+- `PostgreSQL/migrations/20261106120000_ai_analysis_database_mode.sql`
 - `tests/ai-engine.test.mjs`
 - `tests/database-migrations.test.js`
 

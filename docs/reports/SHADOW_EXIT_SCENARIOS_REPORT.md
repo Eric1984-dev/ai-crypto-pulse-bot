@@ -51,7 +51,7 @@ No API route, Vercel Function, scheduler job, package dependency, or live-tradin
 
 ## Database migration and deployment status
 
-Added migration: `supabase/migrations/20261105104400_shadow_exit_scenarios.sql`.
+Added migration: `PostgreSQL/migrations/20261105104400_shadow_exit_scenarios.sql`.
 
 The migration adds the two shadow tables, constraints, indexes, RLS policies, evaluator RPC, locking, idempotency, and event/state handling. It does not alter existing paper-trading functions or actual trading data.
 
@@ -82,7 +82,7 @@ These are local automated tests. They do not prove that the migration has been a
 
 ## Files changed for this feature
 
-- `supabase/migrations/20261105104400_shadow_exit_scenarios.sql`
+- `PostgreSQL/migrations/20261105104400_shadow_exit_scenarios.sql`
 - `lib/shadow-exits.mjs`
 - `lib/paper-trading.mjs`
 - `api/dashboard-data.mjs`

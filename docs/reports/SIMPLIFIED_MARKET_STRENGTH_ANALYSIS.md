@@ -37,7 +37,7 @@ The 24h cutoff leaves enough time for a future 1-hour candle to be observed. The
 
 ## Model construction
 
-Indicator transformations follow the production calculations in [`lib/ai-engine.mjs`](../../lib/ai-engine.mjs) and [`20261106120000_ai_analysis_database_mode.sql`](../../supabase/migrations/20261106120000_ai_analysis_database_mode.sql). The persisted `marketStrength` value is used directly for Model A. Candidate scores are offline reconstructions from stored indicator fields; most are rounded in production, so reconstructed results can differ slightly from a fresh full-precision replay.
+Indicator transformations follow the production calculations in [`lib/ai-engine.mjs`](../../lib/ai-engine.mjs) and [`20261106120000_ai_analysis_database_mode.sql`](../../PostgreSQL/migrations/20261106120000_ai_analysis_database_mode.sql). The persisted `marketStrength` value is used directly for Model A. Candidate scores are offline reconstructions from stored indicator fields; most are rounded in production, so reconstructed results can differ slightly from a fresh full-precision replay.
 
 The normalized production component scores are:
 

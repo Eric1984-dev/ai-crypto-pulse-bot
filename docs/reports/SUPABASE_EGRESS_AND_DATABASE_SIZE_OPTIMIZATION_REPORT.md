@@ -116,7 +116,7 @@ The three-day window is a quantified proposal for review, not an approved policy
 ## Files changed
 
 - `lib/ai-engine.mjs`
-- `supabase/migrations/20261105120000_ai_candle_history_rpc.sql`
+- `PostgreSQL/migrations/20261105120000_ai_candle_history_rpc.sql`
 - `scripts/validate-database.js`
 - `tests/ai-engine.test.mjs`
 - `tests/database-migrations.test.js`

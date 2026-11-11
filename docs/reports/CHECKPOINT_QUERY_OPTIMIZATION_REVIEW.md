@@ -199,6 +199,6 @@ Before deploying an implementation, add/execute focused tests that:
 - [Checkpoint and batch implementation](../../lib/market-data.mjs#L386), [checkpoint lookup](../../lib/market-data.mjs#L599), [incremental refresh and overlap](../../lib/market-data.mjs#L519), and [merge-duplicates upsert](../../lib/market-data.mjs#L689).
 - [Existing candle-refresh API caller](../../api/candle-refresh.mjs#L67).
 - [AI candle fetch and freshness rules](../../lib/ai-engine.mjs#L18), [freshness predicate](../../lib/ai-engine.mjs#L432), and [separate candle reader](../../lib/ai-engine.mjs#L698).
-- [Candle uniqueness constraint](../../supabase/migrations/20261031190000_create_agent_tables.sql#L86).
+- [Candle uniqueness constraint](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql#L86).
 - [Incremental-range test](../../tests/market-data.test.mjs#L987) and [too-recent checkpoint skip test](../../tests/market-data.test.mjs#L1031).
 - [Candle Refresh Efficiency Audit](./CANDLE_REFRESH_EFFICIENCY_AUDIT.md) for the scheduler-derived daily row-volume estimate.

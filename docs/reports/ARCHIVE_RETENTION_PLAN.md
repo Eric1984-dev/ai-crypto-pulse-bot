@@ -165,4 +165,4 @@ For a copy-only stage, stop using the archive and leave Supabase unchanged. Afte
 - [Archive Server connectivity report](./ARCHIVE_SERVER_CONNECTIVITY.md)
 - [Archive Server monitoring report](./ARCHIVE_SERVER_MONITORING.md)
 - [AI Engine](../../lib/ai-engine.mjs), [market data](../../lib/market-data.mjs), [market scanner](../../lib/market-scanner.mjs), [Analytics](../../lib/analytics.mjs), [exports](../../lib/exports.mjs), [dashboard API](../../api/dashboard-data.mjs)
-- [Base database migration](../../supabase/migrations/20261031190000_create_agent_tables.sql), [paper-trading migration](../../supabase/migrations/20261101154600_phase08_paper_trading.sql), [database AI-analysis migration](../../supabase/migrations/20261106120000_ai_analysis_database_mode.sql)
+- [Base database migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql), [paper-trading migration](../../PostgreSQL/migrations/20261101154600_phase08_paper_trading.sql), [database AI-analysis migration](../../PostgreSQL/migrations/20261106120000_ai_analysis_database_mode.sql)

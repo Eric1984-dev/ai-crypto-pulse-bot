@@ -107,4 +107,4 @@ Reassess after **2026-11-05 08:42:29 UTC**, provided matched pre- and post-deplo
 - Read-only Supabase queries captured at 2026-11-04 08:56:02 UTC against `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Candles`, `AI_Crypto_Bot_Scanner_Events`, and `pg_stat_statements`.
 - Prior preliminary production snapshot and Vercel observations: [Checkpoint RPC post-deployment validation](./CHECKPOINT_RPC_POST_DEPLOYMENT_REPORT.md).
 - [Candle refresh scheduling contract](../SCHEDULING.md#phase-06-candle-refresh).
-- [Checkpoint RPC migration](../../supabase/migrations/20261102150000_candle_checkpoint_rpc.sql).
+- [Checkpoint RPC migration](../../PostgreSQL/migrations/20261102150000_candle_checkpoint_rpc.sql).

@@ -42,7 +42,7 @@ The timestamped migration adds the union of these existing tables to the managed
 
 - Auth and Realtime: `js/auth.js`, `js/realtime.js`
 - Page integration: `js/dashboard.js`, `js/portfolio.js`, `js/scanner.js`, `js/history.js`, `dashboard.html`, `portfolio.html`, `scanner.html`, `history.html`, `css/styles.css`
-- Database and tests: `supabase/migrations/20261102130000_phase11_realtime_publication.sql`, `tests/realtime.test.js`, `tests/database-migrations.test.js`
+- Database and tests: `PostgreSQL/migrations/20261102130000_phase11_realtime_publication.sql`, `tests/realtime.test.js`, `tests/database-migrations.test.js`
 - Documentation: `README.md`, `ROADMAP.md`, `docs/CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/TESTING.md`, and this report
 
 No API files changed.

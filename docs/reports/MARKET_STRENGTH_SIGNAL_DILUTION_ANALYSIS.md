@@ -29,7 +29,7 @@ The JavaScript engine computes these per-timeframe component scores and weights:
 | MACD | `clamp(round(histogram) / latestClose * 20000, -100, 100)` | 0.15 |
 | Volume | Existing direction-and-volume-ratio score | 0.15 |
 
-Unavailable features are omitted and the remaining feature weights are normalized. Timeframe scores are then averaged using the engine's configured interval weights. When current market data is available, final Market Strength is a 90% timeframe score plus a 10% market-context score. The source definitions are in [lib/ai-engine.mjs](../../lib/ai-engine.mjs) and the corresponding database-analysis implementation in [20261106120000_ai_analysis_database_mode.sql](../../supabase/migrations/20261106120000_ai_analysis_database_mode.sql).
+Unavailable features are omitted and the remaining feature weights are normalized. Timeframe scores are then averaged using the engine's configured interval weights. When current market data is available, final Market Strength is a 90% timeframe score plus a 10% market-context score. The source definitions are in [lib/ai-engine.mjs](../../lib/ai-engine.mjs) and the corresponding database-analysis implementation in [20261106120000_ai_analysis_database_mode.sql](../../PostgreSQL/migrations/20261106120000_ai_analysis_database_mode.sql).
 
 The nested comparisons use the existing component weights, renormalized after each added feature:
 

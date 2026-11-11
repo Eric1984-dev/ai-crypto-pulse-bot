@@ -174,7 +174,7 @@ WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
 ```
 
-The checked-in [schema migration](../../supabase/migrations/20261031190000_create_agent_tables.sql) enables RLS for these data tables and creates read policies for `authenticated`. It grants `SELECT` to `authenticated` and broad DML to `service_role`; it does not define ingestion-role `INSERT`/`UPDATE` policies. If the live Pi catalog confirms this same state, do not proceed on the assumption that the table grants below are sufficient. A `GRANT` alone does not bypass RLS, and enabling `BYPASSRLS` would make the runtime contract fail.
+The checked-in [schema migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql) enables RLS for these data tables and creates read policies for `authenticated`. It grants `SELECT` to `authenticated` and broad DML to `service_role`; it does not define ingestion-role `INSERT`/`UPDATE` policies. If the live Pi catalog confirms this same state, do not proceed on the assumption that the table grants below are sufficient. A `GRANT` alone does not bypass RLS, and enabling `BYPASSRLS` would make the runtime contract fail.
 
 ## Proposed SQL for a fresh dedicated role
 

@@ -72,7 +72,7 @@ The candle-related WAITs are consistent with the freshness and minimum-history s
 
 ## Confidence model and paper-entry gate
 
-The AI engine emits directional signals from confidence 65. The approved paper-trading experiment lowers the BUY-entry gate from 70 to **67**; the deployed database function was independently inspected and uses 67. SELL remains available to reduce exposure without the BUY-entry threshold. References: [`RISK_MANAGEMENT.md`](../RISK_MANAGEMENT.md#L27), [`ROADMAP.md`](../../ROADMAP.md#L571), and [`20261102140000_paper_trading_confidence_experiment.sql`](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql#L1).
+The AI engine emits directional signals from confidence 65. The approved paper-trading experiment lowers the BUY-entry gate from 70 to **67**; the deployed database function was independently inspected and uses 67. SELL remains available to reduce exposure without the BUY-entry threshold. References: [`RISK_MANAGEMENT.md`](../RISK_MANAGEMENT.md#L27), [`ROADMAP.md`](../../ROADMAP.md#L571), and [`20261102140000_paper_trading_confidence_experiment.sql`](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql#L1).
 
 Among the 1,425 BUY decisions:
 

@@ -68,6 +68,6 @@ Market breadth was limited: only **4 of 102 tracked markets** generated a BUY du
 - [Post-Fix Trade Generation Audit](./POST_FIX_TRADE_GENERATION_AUDIT.md)
 - [Risk management and one-position-per-market rules](../RISK_MANAGEMENT.md)
 - [AI signal-generation logic](../../lib/ai-engine.mjs)
-- [Confidence-threshold experiment migration](../../supabase/migrations/20261102140000_paper_trading_confidence_experiment.sql)
+- [Confidence-threshold experiment migration](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql)
 
 **Tests:** Not run; this is a read-only quantitative report.

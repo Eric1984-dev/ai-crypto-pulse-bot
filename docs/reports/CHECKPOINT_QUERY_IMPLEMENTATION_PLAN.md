@@ -21,7 +21,7 @@ The production query-plan sample in the [optimization review](./CHECKPOINT_QUERY
 | Location | Planned change |
 |---|---|
 | `lib/market-data.mjs` | Replace the table GET and per-symbol fallback in `getLatestStoredCandles()` with one authenticated RPC request. Map returned `symbol` and `latest_timestamp` into the existing `symbol:interval` timestamp map. Preserve error propagation into the existing checkpoint-read failure handler. No changes to refresh-worker calculations. |
-| `supabase/migrations/<timestamp>_candle_checkpoint_rpc.sql` | Add the versioned SQL function, restrict execution permissions, and wrap the migration in a transaction. The filename is illustrative; no migration is created in this plan. |
+| `PostgreSQL/migrations/<timestamp>_candle_checkpoint_rpc.sql` | Add the versioned SQL function, restrict execution permissions, and wrap the migration in a transaction. The filename is illustrative; no migration is created in this plan. |
 | `tests/market-data.test.mjs` | Extend the Supabase mock to recognize the RPC request and cover timestamp-map parity, missing history, large historical data, failures, and unchanged downstream provider arguments. |
 | `tests/database-migrations.test.js` | Load and apply the new migration in the PGlite setup; assert function behavior, read-only permissions, and grant restrictions. |
 | `README.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/DATABASE.md`, `docs/SCHEDULING.md`, and `docs/API.md` | Update only the directly related implementation/status and operational details after implementation. The candle-refresh URL and public API contract remain unchanged. |
@@ -33,7 +33,7 @@ The production query-plan sample in the [optimization review](./CHECKPOINT_QUERY
 - `vercel.json` and cron-job.org: no new Vercel Function, endpoint, scheduler task, or schedule change.
 - `scripts/validate-database.js`: it discovers and validates all SQL migration files automatically; verify this remains true, but no change is expected.
 
-The existing RPC call style in `lib/paper-trading.mjs` and `api/dashboard-data.mjs`, plus the existing migration pattern in `supabase/migrations/20261102120000_trade_history_stats.sql`, should be followed.
+The existing RPC call style in `lib/paper-trading.mjs` and `api/dashboard-data.mjs`, plus the existing migration pattern in `PostgreSQL/migrations/20261102120000_trade_history_stats.sql`, should be followed.
 
 ## 2. RPC design
 
@@ -188,5 +188,5 @@ This sequence keeps rollback independent of candle data and scheduler configurat
 
 - [Checkpoint implementation review](./CHECKPOINT_QUERY_OPTIMIZATION_REVIEW.md).
 - [Candle refresh service](../../lib/market-data.mjs), [existing candle-refresh endpoint](../../api/candle-refresh.mjs), and [AI Engine candle reader](../../lib/ai-engine.mjs).
-- [Existing service-role RPC call pattern](../../lib/paper-trading.mjs) and [existing `SECURITY INVOKER` migration pattern](../../supabase/migrations/20261102120000_trade_history_stats.sql).
+- [Existing service-role RPC call pattern](../../lib/paper-trading.mjs) and [existing `SECURITY INVOKER` migration pattern](../../PostgreSQL/migrations/20261102120000_trade_history_stats.sql).
 - [Market-data tests](../../tests/market-data.test.mjs), [migration tests](../../tests/database-migrations.test.js), [database validation script](../../scripts/validate-database.js), [database docs](../DATABASE.md), and [scheduling docs](../SCHEDULING.md).

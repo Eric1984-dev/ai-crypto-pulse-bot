@@ -8,7 +8,7 @@ Refresh freshness checks, overlap/start timestamps, bootstrap limits, candle wri
 
 ## Files changed
 
-- `supabase/migrations/20261102150000_candle_checkpoint_rpc.sql` — creates the stable, `SECURITY INVOKER` RPC, hardens `search_path`, validates supported intervals, and grants execution only to `service_role`.
+- `PostgreSQL/migrations/20261102150000_candle_checkpoint_rpc.sql` — creates the stable, `SECURITY INVOKER` RPC, hardens `search_path`, validates supported intervals, and grants execution only to `service_role`.
 - `lib/market-data.mjs` — replaces historical checkpoint reads and missing-symbol fallback reads with the RPC while preserving the `symbol:interval` map and storage error handling.
 - `tests/market-data.test.mjs` — covers parity, bootstrap without history, empty batches, histories exceeding 2,000 rows, RPC failures, and unchanged provider start/limit behavior.
 - `tests/database-migrations.test.js` — covers function creation, execution permissions, interval validation, and latest-timestamp results.

@@ -109,7 +109,7 @@ migration.
 ### Required new migration
 
 - [ ] **Create one additive migration**, proposed filename:
-  `supabase/migrations/20261109130000_ai_engine_v2_version_routing.sql`
+  `PostgreSQL/migrations/20261109130000_ai_engine_v2_version_routing.sql`
   (select the next unused timestamp after rechecking the migration directory
   when implementation begins).
 - [ ] Preserve the existing one-argument

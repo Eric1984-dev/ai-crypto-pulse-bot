@@ -22,9 +22,10 @@ The Vercel bridge is part of the checked-in dashboard contract; removing it woul
 | Legacy API routes | The remaining nine function files provide Supabase Auth/database access, Vercel-triggered ingestion/AI/trading, or obsolete market/status endpoints. The active browser uses the Pi API through the bridge, and the Pi runtime owns scheduled work. | Remove from `api/` so they are no longer deployed as Vercel functions. |
 | Dashboard data handler | The active path is the `path`-parameter proxy. The old default Supabase dashboard, analytics, export, recommendation, shadow-exit, and archive-health handlers are not called by current dashboard code. | Keep the function as a proxy only; remove the inactive Supabase fallback. |
 | Supabase application code | Root auth, admin, scheduler, market-data, analytics data-fetching, Supabase export services, shadow-exit, and paper-trading modules are tied to the retired Vercel runtime. The Pi API still imports shared market-scanner, analytics-export formatting, and recommendation helpers from root `lib/`. | Remove retired data-fetching services; retain only the shared domain/CSV helpers and their tests because active Pi routes depend on them. |
-| PostgreSQL migration history | `supabase/migrations/`, `config/markets.js`, and `scripts/validate-database.js` are used by local migration/contract tests and preserve schema and seed provenance. They do not connect to or modify a live Supabase project. | Retain as historical schema and test evidence; do not reapply migrations or alter production data. |
-| Archive service | `archive-server/` still contains the separately invoked copy-only archive CLI and its health service. Its retirement is not confirmed, and the user explicitly requires monitoring to remain. It is not part of trading execution. | Retain as an optional Pi-side utility. The current dashboard monitoring card reads the Pi runtime monitoring API, not the old Vercel archive-health proxy. |
-| Runtime configuration | Root `.env.example` contains legacy Supabase, Vercel scheduler, administrator-ID, and archive-proxy settings. The Pi and archive packages have their own active configuration templates. | Remove obsolete root variables; retain the Pi/archive-specific settings in their package templates. |
+| PostgreSQL migration history | `PostgreSQL/migrations/`, `config/markets.js`, and `scripts/validate-database.js` are used by local migration/contract tests and preserve historical schema and seed provenance. They do not connect to or modify a live Supabase project. | Retain only as local test evidence; do not apply these historical migrations to production. The legacy `PostgreSQL/config.toml` is not used by the runtime, validator, or tests. |
+| Supabase runtime | Supabase Auth, PostgREST, hosted database access, and Supabase project configuration are not used by the current application. | Retire Supabase runtime configuration and keep any Supabase-era SQL only as labeled historical test material. |
+| Archive service | The operator's `CleanUp` commit removed the separate archive CLI and health service. Current monitoring is provided by the Pi runtime API. | Do not require or document a separate archive service in current setup or validation. |
+| Runtime configuration | Root `.env.example` contained legacy Supabase, Vercel scheduler, administrator-ID, and archive-proxy settings. | Keep current root configuration limited to dashboard routing and the paper-mode safeguard; Pi-only credentials stay in the Pi environment. |
 | Scripts | `scripts/build-runtime-api-config.mjs` is invoked by the root build; `scripts/validate-project.js` and `scripts/validate-database.js` are invoked by build validation; the Pi password-hash utility is exposed by its package script. | Retain all remaining scripts; no other script was confirmed unused. |
 | Documentation | Root README, API, architecture, deployment, scheduling, and migration pages present old Supabase/Vercel runtime assumptions as current. Phase reports also preserve historical implementation evidence. | Update operational documentation and mark migration plans/reports as historical; preserve evidence rather than deleting it. |
 | Vercel deployment config | `vercel.json` protects pages and the three active functions; no Vercel Cron is configured. | Retain the protected-page routing and static deployment setup. Do not change project settings or initiate a manual deployment. |
@@ -45,8 +46,7 @@ Files retained:
 
 - The Raspberry Pi runtime, API, PostgreSQL repositories, scheduler, AI engine, paper-trading implementation, and monitoring.
 - The three active Vercel bridge functions and their shared runtime-proxy helper.
-- `archive-server/` and its package-specific credentials template; its use as a manual archive/monitoring utility is not confirmed retired.
-- Database migration SQL, default-market seed configuration, and local migration tests as historical schema provenance and validation fixtures.
+- `PostgreSQL/migrations/`, default-market seed configuration, and local migration tests as historical schema provenance and validation fixtures.
 - Historical phase and investigation reports.
 
 ## Documentation and configuration changes
@@ -54,8 +54,9 @@ Files retained:
 - Replaced the root README's old Supabase/Vercel runtime summary with the Pi-owned production topology and evidence boundary.
 - Updated root API, architecture, deployment, scheduling, testing, database, known-issues, changelog, and roadmap pages.
 - Marked pre-cutover migration design/status documents as historical and linked them to current operating documentation.
-- Replaced root `.env.example` with public dashboard-routing settings and the live-trading safety default. Archive-only Supabase reader settings remain isolated in `archive-server/.env.example`.
+- Replaced root `.env.example` with public dashboard-routing settings and the live-trading safety default.
 - Updated `scripts/validate-project.js` to require only the three active Vercel functions, the shared proxy, and the current root environment contract.
+- Removed archive-service requirements from project validation after the operator removed `archive-server/`; monitoring remains part of the Raspberry Pi runtime API.
 - Reduced `api/dashboard-data.mjs` to the authenticated Pi proxy; requests without exactly one supported Pi path now return `400` and never reach Supabase.
 
 ## Validation evidence
@@ -71,12 +72,22 @@ Files retained:
 - Production smoke checks: the dashboard domain served its public sign-in landing page, and `/api/v1/health/live` returned `{"data":{"status":"live"}}`.
 - No manual deployment or Vercel setting changes were made; the GitHub push triggered the configured deployment.
 
+## Follow-up after the operator's `CleanUp` commit
+
+The operator moved the historical migration files from `supabase/` to `PostgreSQL/` and removed `archive-server/`. The project and database validators and migration test now use `PostgreSQL/migrations/`; they no longer require a Supabase CLI project config. The obsolete archive-server directory checks and four tests that imported the removed service were also removed. Supabase remains absent from the current runtime; the SQL is retained only for local PGlite contract tests.
+
+- `npm.cmd run build` — passed.
+- `node --test tests/database-migrations.test.js tests/project-setup.test.js` — passed: 48 tests.
+- `npm.cmd test` — passed: 345 tests, 0 failures.
+- `node --check` on the changed scripts/tests and `git diff --check` — passed.
+- These follow-up local changes have not been pushed or deployed.
+
 ## Remaining risks and limitations
 
 - The production Pi, Cloudflare tunnel configuration, and PostgreSQL internals were not directly inspected. The public API health endpoint and dashboard landing page were reachable.
 - The external Cloudflare/Vercel settings and any manually configured third-party scheduled tasks were not inspected. No Vercel cron is present in the repository; the current scheduler owner is the Pi runtime.
-- The archive CLI still uses a separate, restricted Supabase source reader for its optional manual copy workflow. It was retained because its retirement was not confirmed; it is not part of the Pi trading runtime.
-- Supabase-named migration history is retained for reproducibility and local tests. No remote Supabase database, project, branch, migration, or data was changed.
+- The historical SQL migrations retain some former Supabase-specific constructs. They are local PGlite test fixtures only and must not be applied to the Pi production database.
+- No remote Supabase database, project, branch, migration, or data was changed.
 - A Git push may trigger the repository's configured Production deployment. No manual Vercel deployment or setting change is performed by this task.
 
 ## Readiness assessment

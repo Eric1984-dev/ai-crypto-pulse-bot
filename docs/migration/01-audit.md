@@ -30,7 +30,7 @@ De bedoelde markttabel is `public."AI_Crypto_Bot_Watched_Markets"`. Bestaande ar
 ### Applicatie
 
 - De gebruikersinterface bestaat uit statische HTML-, CSS- en JavaScript-bestanden. De browser gebruikt Supabase Auth en Supabase Realtime; eigen gegevensaanvragen verlopen grotendeels via same-origin `/api/*`-routes.
-- De backend bestaat uit Vercel Functions in `api/`, gedeelde Node.js-modules in `lib/` en PostgreSQL-functies/migraties in `supabase/migrations/`.
+- De backend bestaat uit Vercel Functions in `api/`, gedeelde Node.js-modules in `lib/` en PostgreSQL-functies/migraties in `PostgreSQL/migrations/`.
 - Server-side dataverzoeken gebruiken Supabase PostgREST. Geauthenticeerde gebruikersaanvragen sturen de gecontroleerde gebruikers-JWT mee zodat Supabase RLS van toepassing blijft. Geplande ingestie, analyse en paper trading gebruiken de service-role key uitsluitend server-side.
 - De root `package.json` heeft `node --test` en `node scripts/validate-project.js && node scripts/validate-database.js` als scripts; de applicatie heeft geen root-runtimeafhankelijkheid op de `pg`-driver.
 - Er zijn 12 `.mjs`-bestanden onder `api/`, gelijk aan de gedocumenteerde Vercel Hobby-limiet. Er zijn geen aparte routebestanden voor Raspberry Pi-archivering.

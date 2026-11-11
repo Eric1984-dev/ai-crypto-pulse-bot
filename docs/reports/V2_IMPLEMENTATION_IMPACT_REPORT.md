@@ -59,7 +59,7 @@ the Vercel Hobby function limit remains unchanged.
   risk-enforcement layer. It should remain authoritative and its position,
   confidence, cooldown, funds, drawdown, emergency-stop, freshness, fee,
   slippage, and idempotency behavior must not be changed by V2.
-- [`AI_Crypto_Bot_AI_Decisions`](../../supabase/migrations/20261031190000_create_agent_tables.sql)
+- [`AI_Crypto_Bot_AI_Decisions`](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
   already has the paired nullable `strategy_name` / `strategy_version`
   snapshot. `AI_Crypto_Bot_Trades` already links to the source AI decision.
 - [`V2_PAPER_TRADING_EXPERIMENT_PLAN.md`](./V2_PAPER_TRADING_EXPERIMENT_PLAN.md)
@@ -85,7 +85,7 @@ and the current database-mode notes in
 | [`api/ai-analysis.mjs`](../../api/ai-analysis.mjs) | Validate server-only `AI_ENGINE_VERSION` (`V1` when unset; reject invalid values) and pass it to the service. Invalid configuration must fail closed before creating decisions. |
 | [`api/paper-trading.mjs`](../../api/paper-trading.mjs) | Validate and pass the same engine selection to the existing paper-trading service. |
 | [`lib/paper-trading.mjs`](../../lib/paper-trading.mjs) | Send the selected version to the existing version-aware RPC, validate the response, and preserve the current sequential execution and shadow-exit isolation. |
-| [`supabase/migrations/`](../../supabase/migrations) | Add one timestamped migration for version-aware database analysis and paper execution. Do not edit already-applied migrations. Details are in the next section. |
+| [`PostgreSQL/migrations/`](../../PostgreSQL/migrations) | Add one timestamped migration for version-aware database analysis and paper execution. Do not edit already-applied migrations. Details are in the next section. |
 | [`tests/ai-engine.test.mjs`](../../tests/ai-engine.test.mjs) | Add V2 formula/input tests, exact V1 regression checks, invalid/missing-input fail-closed cases, and JS/database payload parity. |
 | [`tests/paper-trading.test.mjs`](../../tests/paper-trading.test.mjs) | Assert the RPC receives the selected version, rejects mismatches, and never falls back to another engine. |
 | [`tests/database-migrations.test.js`](../../tests/database-migrations.test.js) | Exercise the new SQL entrypoints, version filtering, service-role-only grants, no-argument compatibility behavior, and unchanged risk/idempotency regressions in PGlite. |

@@ -13,13 +13,13 @@ Browser
   -> existing PostgreSQL database
 ```
 
-The browser uses the existing Vercel bridge to preserve the single-admin session cookie. Vercel retains only three functions: auth/session proxy, protected-page delivery, and allowlisted Pi API proxy. The Pi runtime owns ingestion, AI, paper trading, scheduling, and monitoring. The API remains loopback-bound behind Cloudflare Tunnel; the dashboard is read-only.
+Supabase is no longer used by this project. The complete backend runs on the Raspberry Pi: API, PostgreSQL access, ingestion, AI, paper trading, scheduling, and monitoring. Vercel hosts the static dashboard and retains only three functions: auth/session proxy, protected-page delivery, and allowlisted Pi API proxy. The Pi API remains loopback-bound behind Cloudflare Tunnel; the dashboard is read-only.
 
-The separate `archive-server/` package is a retained optional manual archive-copy and health utility. It is not part of trading or scheduler execution, and the dashboard monitoring card reads the Pi runtime's `/api/v1/monitoring` route.
+The former standalone archive server is retired and is no longer used. The dashboard monitoring card reads the Pi runtime's `/api/v1/monitoring` route.
 
 The operator's live-state report is not an independent production check. See [deployment](./DEPLOYMENT.md), [API contracts](./API.md), the [Phase 9 authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md), and the [Phase 10 cleanup report](./post-migration-cleanup-report.md).
 
-> **Historical material:** Sections below retain the pre-migration Supabase/Vercel design and phase history. They are not current deployment instructions or descriptions of the active runtime.
+> **Historical material:** Sections below retain the pre-migration Supabase/Vercel design and phase history. Supabase is not part of the current project. These sections are not current deployment instructions or descriptions of the active runtime.
 
 ## Historical Supabase/Vercel implementation: Phase 11 (superseded)
 
@@ -268,7 +268,7 @@ AI_Crypto_Bot_
 
 prefix.
 
-The schema is managed only by timestamped files in `supabase/migrations/`. All application tables enable RLS. Authenticated users have read-only access filtered by ownership where applicable; server-side services perform writes. Supabase `service_role` credentials must remain server-only.
+The historical schema is represented by timestamped files in `PostgreSQL/migrations/`. All application tables enable RLS. Authenticated users have read-only access filtered by ownership where applicable; server-side services perform writes. Supabase `service_role` credentials must remain server-only.
 
 ---
 
@@ -613,7 +613,7 @@ The dashboard's Archive Server card requests `GET /api/dashboard-data?view=archi
 
 ### Manual AI decision archive pull
 
-The independent `archive-server/src/archive-ai-decisions.mjs` CLI implements the approved Pi-initiated, copy-only proof of concept for `AI_Crypto_Bot_AI_Decisions`. It reads through a direct Supabase PostgreSQL connection using a dedicated read-only role and writes to the existing `ai_crypto_bot_archive` database through a separate scoped writer. Both connections require verified TLS. The CLI has a fixed table/column contract, bounded batches, a stable per-run cutoff, timestamp-plus-ID keyset pagination, an atomic local checkpoint, an exclusive process lock, watched-market FK preflight, and idempotent upserts by original decision ID.
+Historical and removed: the former `archive-server/src/archive-ai-decisions.mjs` CLI was a Pi-initiated, copy-only proof of concept for `AI_Crypto_Bot_AI_Decisions`. It read through a direct Supabase PostgreSQL connection and wrote to the separate `ai_crypto_bot_archive` database. The archive utility is no longer in the repository or current architecture; Supabase is not used by this project.
 
 The source transaction is read-only: the agent does not insert, update, delete, or call RPCs in Supabase. It never deletes archive rows and does not create schema objects. Source and archive identities, grants, source RLS policy, schema, target triggers, and market anchors are validated before copying. Each archive batch is committed and read back before its checkpoint advances. Failure stops with a safe code; the application, dashboard, Vercel functions, health endpoint, scheduler, and paper-trading paths do not depend on archive availability. The user reports that the first manual sync completed successfully and copied data to PostgreSQL on the Pi; exact counts were not provided or independently verified. The CLI runs on the Pi, not on Vercel. Backup/restore and full copy metrics remain separate operational checks. See the [installation guide](./reports/AI_DECISION_ARCHIVE_AGENT_INSTALLATION.md) and [validation guide](./reports/AI_DECISION_ARCHIVE_AGENT_VALIDATION.md).
 

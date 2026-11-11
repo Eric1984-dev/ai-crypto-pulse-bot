@@ -108,5 +108,5 @@ Do **not** close the validation as a definitive “no regression” result yet. 
 - Vercel Observability, Functions, rolling one-hour view captured around 08:48 UTC.
 - cron-job.org dashboard and recent execution history captured around 09:48 Europe/Brussels.
 - Read-only Supabase queries against `AI_Crypto_Bot_Candles`, `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Scanner_Events`, `pg_stat_statements`, and `pg_stat_statements_info`.
-- [Candle refresh scheduling contract](../SCHEDULING.md#phase-06-candle-refresh), [checkpoint RPC migration](../../supabase/migrations/20261102150000_candle_checkpoint_rpc.sql), and [checkpoint implementation report](./CHECKPOINT_QUERY_IMPLEMENTATION_REPORT.md).
+- [Candle refresh scheduling contract](../SCHEDULING.md#phase-06-candle-refresh), [checkpoint RPC migration](../../PostgreSQL/migrations/20261102150000_candle_checkpoint_rpc.sql), and [checkpoint implementation report](./CHECKPOINT_QUERY_IMPLEMENTATION_REPORT.md).
 - Baseline freshness and checkpoint-query context: [Candle Refresh Efficiency Audit](./CANDLE_REFRESH_EFFICIENCY_AUDIT.md) and [Candle Checkpoint Query Optimization Review](./CHECKPOINT_QUERY_OPTIMIZATION_REVIEW.md).

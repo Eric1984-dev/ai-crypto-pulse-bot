@@ -116,6 +116,6 @@ No step above was executed in this assessment.
 - [Archive schema validation](./AI_CRYPTO_BOT_ARCHIVE_SCHEMA_VALIDATION.md)
 - [Archive Server connectivity](./ARCHIVE_SERVER_CONNECTIVITY.md)
 - [Database documentation](../DATABASE.md)
-- [Source schema migration](../../supabase/migrations/20261031190000_create_agent_tables.sql)
-- [Initial market seed migration](../../supabase/migrations/20261031190100_seed_initial_data.sql)
+- [Source schema migration](../../PostgreSQL/migrations/20261031190000_create_agent_tables.sql)
+- [Initial market seed migration](../../PostgreSQL/migrations/20261031190100_seed_initial_data.sql)
 - [Archive schema DDL](../../AI_CRYPTO_BOT_ARCHIVE_SCHEMA.sql)
