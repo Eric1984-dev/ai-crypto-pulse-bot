@@ -241,7 +241,7 @@ export function createPaperTradingService({
                   result.skipped += 1;
                   continue;
                 }
-                state = await repository.insertBuy(client, {
+                const tradeState = await repository.insertBuy(client, {
                   portfolioId: portfolio.id,
                   decisionId: decision.id,
                   idempotencyKey,
@@ -249,6 +249,7 @@ export function createPaperTradingService({
                   quote,
                   marketPrice: market.price
                 });
+                state = Object.freeze({ ...state, ...tradeState });
                 openPositions.push({
                   symbol: decision.symbol,
                   amount: quote.amount
@@ -271,7 +272,7 @@ export function createPaperTradingService({
                   amount: positionTotals.amount,
                   entryCostBasis: positionTotals.entryCostBasis
                 });
-                state = await repository.insertSell(client, {
+                const tradeState = await repository.insertSell(client, {
                   portfolioId: portfolio.id,
                   decisionId: decision.id,
                   idempotencyKey,
@@ -279,6 +280,7 @@ export function createPaperTradingService({
                   marketPrice: market.price,
                   quote
                 });
+                state = Object.freeze({ ...state, ...tradeState });
                 openPositions = openPositions.filter(
                   ({ symbol }) => symbol !== decision.symbol
                 );

@@ -48,6 +48,10 @@ The paper service reads only the reserved system profile and its portfolio under
 
 This permits ingestion and analysis to continue before explicit provisioning while preventing BUY/SELL execution until the system paper account is ready. Restarting the process only reads existing rows; it cannot reinitialize balances or recreate deleted state.
 
+### Post-provision trade-state fix
+
+The first reported paper cycle after provisioning failed with `PAPER_TRADING_NUMERIC_INVALID`. The repository intentionally returns only the updated balance, portfolio value, and open-position count after a fill; the service had replaced its full cycle state with that partial result. The subsequent peak/drawdown calculation then read a missing peak value (and later decisions would also lose their daily baseline). The service now merges returned trade values into the existing cycle state for both BUY and SELL, preserving drawdown baselines. Regression tests exercise partial trade-state returns and multiple decisions in one cycle.
+
 ## Validation procedure
 
 After operator-managed migration and provisioning, validate the database before restarting the service:
@@ -76,6 +80,7 @@ Expect one profile with a null email, one portfolio whose initial balance/value 
 
 - Raspberry Pi package tests: passed (`npm test`).
 - Repository tests: passed (`npm test`).
+- First post-provision runtime failure `PAPER_TRADING_NUMERIC_INVALID`: fixed by preserving portfolio drawdown state across partial trade results; regression coverage added for BUY, SELL, and multiple decisions.
 - Node.js syntax checks for Raspberry Pi `.mjs` and `.js` files: passed.
 - Migration and provisioning SQL: passed in an isolated PGlite fixture containing the legacy Auth FK, triggers, and user-scoped policies. The check confirmed removal of the Auth FK/triggers, atomic creation of the profile/portfolio/snapshot, and a repeat run preserving a changed portfolio balance.
 - `git diff --check`: passed.

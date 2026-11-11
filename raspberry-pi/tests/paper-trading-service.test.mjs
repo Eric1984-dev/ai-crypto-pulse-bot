@@ -62,13 +62,13 @@ function makeRepository(overrides = {}) {
     }),
     insertBuy: async () => {
       calls.push("buy");
-      state = {
-        ...state,
+      const tradeState = {
         availableBalance: "9899.64975",
         portfolioValue: "9999.64975",
         openPositions: 1
       };
-      return Object.freeze({ ...state });
+      state = { ...state, ...tradeState };
+      return Object.freeze(tradeState);
     },
     getOpenPositionTotals: async () => ({
       amount: "2",
@@ -82,13 +82,13 @@ function makeRepository(overrides = {}) {
     }),
     insertSell: async () => {
       calls.push("sell");
-      state = {
-        ...state,
+      const tradeState = {
         availableBalance: "10199.5",
         portfolioValue: "10199.5",
         openPositions: 0
       };
-      return Object.freeze({ ...state });
+      state = { ...state, ...tradeState };
+      return Object.freeze(tradeState);
     },
     setEmergencyStop: async () => calls.push("emergency-stop"),
     updateStatusInTransaction: async (_client, { status }) => {
@@ -143,6 +143,37 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
   assert.equal(result.status, "COMPLETED");
   assert.equal(result.tradesExecuted, 1);
   assert.deepEqual(repository.calls, ["buy"]);
+});
+
+test("multiple decisions retain drawdown baselines after partial trade-state updates", async () => {
+  const secondDecisionId = "00000000-0000-4000-8000-000000000004";
+  const repository = makeRepository({
+    listLatestDecisions: async () => [
+      {
+        id: DECISION_ID,
+        symbol: "BTC-EUR",
+        decision: "BUY",
+        confidence: "90",
+        created_at: NOW
+      },
+      {
+        id: secondDecisionId,
+        symbol: "ETH-EUR",
+        decision: "BUY",
+        confidence: "90",
+        created_at: NOW
+      }
+    ],
+    listMarketData: async () => [
+      { symbol: "BTC-EUR", price: "100", captured_at: NOW },
+      { symbol: "ETH-EUR", price: "100", captured_at: NOW }
+    ]
+  });
+
+  const result = await makeService(repository).run();
+
+  assert.equal(result.tradesExecuted, 2);
+  assert.deepEqual(repository.calls, ["buy", "buy"]);
 });
 
 test("paper trading skips safely when the system profile has not been provisioned", async () => {
