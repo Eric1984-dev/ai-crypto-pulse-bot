@@ -27,6 +27,19 @@ export const REQUIRED_READ_TABLES = Object.freeze([
   "AI_Crypto_Bot_Status"
 ]);
 
+export const DASHBOARD_READ_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Profiles",
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Trades",
+  "AI_Crypto_Bot_AI_Decisions",
+  "AI_Crypto_Bot_Status",
+  "AI_Crypto_Bot_Watched_Markets",
+  "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Portfolio_Snapshots",
+  "AI_Crypto_Bot_Emergency_State"
+]);
+
 export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
   AI_Crypto_Bot_Watched_Markets: Object.freeze({
     id: "uuid",
@@ -154,18 +167,7 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
   })
 });
 
-export const PAPER_TRADING_READ_TABLES = Object.freeze([
-  "AI_Crypto_Bot_Profiles",
-  "AI_Crypto_Bot_Portfolios",
-  "AI_Crypto_Bot_Positions",
-  "AI_Crypto_Bot_Trades",
-  "AI_Crypto_Bot_AI_Decisions",
-  "AI_Crypto_Bot_Status",
-  "AI_Crypto_Bot_Watched_Markets",
-  "AI_Crypto_Bot_Market_Data",
-  "AI_Crypto_Bot_Portfolio_Snapshots",
-  "AI_Crypto_Bot_Emergency_State"
-]);
+export const PAPER_TRADING_READ_TABLES = DASHBOARD_READ_TABLES;
 
 export const PAPER_TRADING_INSERT_TABLES = Object.freeze([
   "AI_Crypto_Bot_Portfolios",
@@ -223,7 +225,9 @@ function validateFunction(contract, functions, errors, required) {
   }
 }
 
-export function evaluateDatabaseContract(snapshot, expectedDatabaseName) {
+export function evaluateDatabaseContract(snapshot, expectedDatabaseName, {
+  requiredReadTables = REQUIRED_READ_TABLES
+} = {}) {
   const errors = [];
   const tables = new Set(snapshot.tables.map((row) => row.relation_name));
 
@@ -284,7 +288,7 @@ export function evaluateDatabaseContract(snapshot, expectedDatabaseName) {
   }
 
   for (const table of snapshot.tablePrivileges) {
-    if (!table.can_select && REQUIRED_READ_TABLES.includes(table.relation_name)) {
+    if (!table.can_select && requiredReadTables.includes(table.relation_name)) {
       errors.push(`MISSING_SELECT_PRIVILEGE:${table.relation_name}`);
     }
     if (table.is_owner || table.can_insert || table.can_update

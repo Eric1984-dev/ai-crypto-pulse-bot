@@ -1,5 +1,6 @@
 import { inspectDatabaseContract } from "../repositories/contract-repository.mjs";
 import {
+  DASHBOARD_READ_TABLES,
   evaluateDatabaseContract,
   evaluateIngestionDatabaseContract
 } from "./database-contracts.mjs";
@@ -19,7 +20,9 @@ export async function validateRuntimeContracts(pool, config, {
   logger = console
 } = {}) {
   const snapshot = await inspectDatabaseContract(pool, config.database.user, { logger });
-  const contract = evaluateDatabaseContract(snapshot, config.database.name);
+  const contract = evaluateDatabaseContract(snapshot, config.database.name, {
+    requiredReadTables: DASHBOARD_READ_TABLES
+  });
   if (!contract.valid) {
     throw new RuntimeContractError(contract.errors);
   }

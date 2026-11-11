@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import {
+  DASHBOARD_READ_TABLES,
+  PAPER_TRADING_READ_TABLES,
   REQUIRED_COLUMN_CONTRACTS,
   REQUIRED_FUNCTION_CONTRACTS,
   REQUIRED_READ_TABLES,
@@ -113,7 +115,8 @@ function createContractPool({
           return {
             relation_name,
             is_owner: isOwner,
-            can_select: REQUIRED_READ_TABLES.includes(relation_name)
+            can_select: (REQUIRED_READ_TABLES.includes(relation_name)
+              || PAPER_TRADING_READ_TABLES.includes(relation_name))
               && !noSelectTables.includes(relation_name),
             can_insert: allowIngestionWrites
               && ["AI_Crypto_Bot_Market_Data", "AI_Crypto_Bot_Candles"].includes(relation_name)
@@ -220,6 +223,19 @@ test("runtime preflight fails closed before market access when a required table 
   );
   assert.ok(!pool.queries.some((query) =>
     query.includes('FROM public."AI_Crypto_Bot_Watched_Markets"')));
+});
+
+test("runtime preflight requires dashboard table SELECT privileges", async () => {
+  const pool = createContractPool({
+    noSelectTables: ["AI_Crypto_Bot_Profiles"]
+  });
+
+  await assert.rejects(
+    validateRuntimeContracts(pool, config),
+    (error) => error.code === "RUNTIME_CONTRACT_INVALID"
+      && error.errors.includes("MISSING_SELECT_PRIVILEGE:AI_Crypto_Bot_Profiles")
+  );
+  assert.equal(DASHBOARD_READ_TABLES.includes("AI_Crypto_Bot_Profiles"), true);
 });
 
 test("ingestion preflight warns on legacy constraints and write-capable roles without requiring runtime functions", async () => {
