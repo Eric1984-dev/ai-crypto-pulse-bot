@@ -175,6 +175,55 @@ test("dashboard repository reads only the standalone system portfolio and bounde
   }
 });
 
+test("analytics aggregates large decision histories without loading every decision row", async () => {
+  const database = await createDatabase();
+  try {
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators,
+         strategy_name, strategy_version, created_at)
+      SELECT
+        ('00000000-0000-4000-8001-' || pg_catalog.lpad(sample.id::text, 12, '0'))::uuid,
+        CASE WHEN sample.id % 3 = 0 THEN 'ETH-EUR' ELSE 'BTC-EUR' END,
+        CASE WHEN sample.id % 2 = 0 THEN 'BUY' ELSE 'WAIT' END,
+        CASE WHEN sample.id % 2 = 0 THEN 82 ELSE 65 END,
+        'sample decision',
+        '{}'::jsonb,
+        'Trend',
+        'v1',
+        pg_catalog.now()
+      FROM pg_catalog.generate_series(1, 10001) AS sample(id)
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const analytics = await repository.getAnalytics({ period: "30d", now: new Date() });
+
+    assert.equal(analytics.aiPerformance.decisionCount, 10002);
+    assert.equal(analytics.aiPerformance.actions.BUY.decisionCount, 5000);
+    assert.equal(analytics.aiPerformance.actions.WAIT.decisionCount, 5001);
+    assert.equal(analytics.aiPerformance.actions.HOLD.decisionCount, 1);
+    assert.equal(
+      analytics.aiPerformance.confidenceBuckets.find(({ label }) => label === "80–85")
+        .decisionCount,
+      5001
+    );
+    assert.equal(
+      analytics.aiPerformance.bySymbol.find(({ label }) => label === "BTC-EUR")
+        .decisionCount,
+      6669
+    );
+  } finally {
+    await database.close();
+  }
+});
+
 test("trade history filtering and pagination preserve all-time sell statistics", async () => {
   const database = await createDatabase();
   try {

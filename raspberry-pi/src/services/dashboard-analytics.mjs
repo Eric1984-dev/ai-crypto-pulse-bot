@@ -19,6 +19,7 @@ export function buildDashboardAnalytics({
   positions,
   trades,
   decisions,
+  decisionSummary = null,
   snapshots
 }) {
   const generatedAt = now.toISOString();
@@ -30,7 +31,7 @@ export function buildDashboardAnalytics({
     trades,
     portfolio
   });
-  const aiPerformance = createAiPerformance(decisions, sellTrades);
+  const aiPerformance = createAiPerformance(decisions, sellTrades, decisionSummary);
   const portfolioAnalytics = createPortfolioAnalytics(portfolio, snapshots);
 
   return {
@@ -178,13 +179,13 @@ function getHoldDurations(trades) {
   };
 }
 
-function createAiPerformance(decisions, trades) {
+function createAiPerformance(decisions, trades, decisionSummary = null) {
   const buckets = BUCKETS.map(({ label }) => createDecisionGroup(label));
   const actions = Object.fromEntries(ACTIONS.map((action) => [action, createDecisionGroup(action)]));
   const strategies = new Map();
   const symbols = new Map();
   const decisionById = new Map();
-  let below70Count = 0;
+  let below70Count = decisionSummary?.below70Count ?? 0;
   let unmatchedDecisionTrades = 0;
 
   for (const decision of decisions) {
@@ -196,19 +197,39 @@ function createAiPerformance(decisions, trades) {
         : null
     };
     decisionById.set(String(decision.id), normalized);
-    actions[decision.decision].decisionCount += 1;
-    getGroup(symbols, normalized.symbol).decisionCount += 1;
-    const bucketIndex = BUCKETS.findIndex((bucket) =>
-      normalized.confidence >= bucket.min && normalized.confidence < bucket.max
-    );
-    if (bucketIndex < 0) {
-      below70Count += 1;
-    } else {
-      buckets[bucketIndex].decisionCount += 1;
+    if (!decisionSummary) {
+      actions[decision.decision].decisionCount += 1;
+      getGroup(symbols, normalized.symbol).decisionCount += 1;
+      const bucketIndex = BUCKETS.findIndex((bucket) =>
+        normalized.confidence >= bucket.min && normalized.confidence < bucket.max
+      );
+      if (bucketIndex < 0) {
+        below70Count += 1;
+      } else {
+        buckets[bucketIndex].decisionCount += 1;
+      }
+      if (normalized.strategy) {
+        const group = getGroup(strategies, normalized.strategy);
+        group.decisionCount += 1;
+      }
     }
-    if (normalized.strategy) {
-      const group = getGroup(strategies, normalized.strategy);
-      group.decisionCount += 1;
+  }
+
+  if (decisionSummary) {
+    for (const { label, decisionCount } of decisionSummary.actions) {
+      actions[label].decisionCount = decisionCount;
+    }
+    for (const { label, decisionCount } of decisionSummary.confidenceBuckets) {
+      const bucket = buckets.find((item) => item.label === label);
+      if (bucket) {
+        bucket.decisionCount = decisionCount;
+      }
+    }
+    for (const { label, decisionCount } of decisionSummary.strategies) {
+      getGroup(strategies, label).decisionCount = decisionCount;
+    }
+    for (const { label, decisionCount } of decisionSummary.bySymbol) {
+      getGroup(symbols, label).decisionCount = decisionCount;
     }
   }
 
@@ -236,7 +257,7 @@ function createAiPerformance(decisions, trades) {
   const finalizedBuckets = buckets.map(finalizeDecisionGroup);
   const scoredBuckets = finalizedBuckets.filter(({ scoredCount }) => scoredCount > 0);
   return {
-    decisionCount: decisions.length,
+    decisionCount: decisionSummary?.decisionCount ?? decisions.length,
     below70Count,
     unscoredHoldDecisions: 0,
     unmatchedDecisionTrades,

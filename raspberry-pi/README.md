@@ -121,7 +121,7 @@ npm start
 - `GET /api/v1/dashboard-data` — system portfolio, positions, recent trades, snapshots, watched markets, latest decisions and runtime state.
 - `GET /api/v1/dashboard-data?view=trade-history&page=1` — filtered, sorted and paginated trade history.
 - `GET /api/v1/dashboard-data?view=ai-history&page=1` — paginated AI decisions with reasoning and indicator payloads.
-- `GET /api/v1/dashboard-data?view=analytics&period=30d` — paper-trade, AI decision and portfolio analytics for `30d`, `90d` or `365d`.
+- `GET /api/v1/dashboard-data?view=analytics&period=30d` — paper-trade, AI decision and portfolio analytics for `30d`, `90d` or `365d`; decision counts are aggregated in PostgreSQL so high-volume history does not exceed the row-transfer limit.
 - `GET /api/v1/dashboard-data?view=recommendations&period=30d` — on-demand recommendations computed from current analytics; not persisted.
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.

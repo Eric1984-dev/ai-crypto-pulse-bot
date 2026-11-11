@@ -96,7 +96,8 @@ const EXPORT_QUERY_SCHEMA = Object.freeze({
 export function registerDataRoutes(router, repositories, {
   now = () => new Date(),
   getOperationalHealth = () => null,
-  getSystemMetrics = collectSystemMetrics
+  getSystemMetrics = collectSystemMetrics,
+  logger = console
 } = {}) {
   validateRepositories(repositories);
 
@@ -182,7 +183,8 @@ export function registerDataRoutes(router, repositories, {
             now: new Date(readClock(now))
           }),
           "ANALYTICS_UNAVAILABLE",
-          "Analytics data is temporarily unavailable."
+          "Analytics data is temporarily unavailable.",
+          { logger, requestId: context.requestId, view: query.view }
         );
         const exportData = getAnalyticsExportRows(exportType, analytics);
         if (query.view === "export-count") {
@@ -267,7 +269,8 @@ export function registerDataRoutes(router, repositories, {
           now: new Date(readClock(now))
         }),
         "ANALYTICS_UNAVAILABLE",
-        "Analytics data is temporarily unavailable."
+        "Analytics data is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: query.view }
       );
       if (query.view === "analytics") {
         analytics.exportCounts = getAnalyticsExportCounts(analytics);
@@ -467,15 +470,36 @@ function validateMarketRows(markets) {
   }
 }
 
-async function readRepository(operation, errorCode, message) {
+async function readRepository(operation, errorCode, message, {
+  logger = console,
+  requestId = null,
+  view = null
+} = {}) {
   try {
     return await operation();
   } catch (error) {
     if (error instanceof RepositoryUnavailableError || error instanceof RepositoryDataError) {
+      if (requestId !== null || view !== null) {
+        logger.error(JSON.stringify({
+          event: "dashboard_repository_failed",
+          requestId,
+          view,
+          code: error.code,
+          ...(error instanceof RepositoryDataError
+            ? { reason: error.reason }
+            : { databaseCode: safeDatabaseErrorCode(error.cause?.code) })
+        }));
+      }
       throw new ApiError(503, errorCode, message);
     }
     throw error;
   }
+}
+
+function safeDatabaseErrorCode(value) {
+  return typeof value === "string" && /^[A-Z0-9]{5}$/.test(value)
+    ? value
+    : "POSTGRES_QUERY_FAILED";
 }
 
 function validateRepositories(repositories) {

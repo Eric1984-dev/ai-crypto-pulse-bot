@@ -54,3 +54,11 @@ The API regression test exercises both views through the Pi HTTP server and conf
 Authenticated production API requests and browser-console inspection were not performed from this worktree. No Raspberry Pi deployment or production database access was performed. Therefore, local `200` responses and passing UI tests validate the implementation and contracts, but do not establish that the production Pi has received the change or that its live pages are now error-free.
 
 After deploying this commit to the Pi, verify both authenticated endpoints return `200` and inspect the Analytics and Recommendations pages in a browser. No Phase 9 work was started.
+
+## Follow-up — recurring Analytics unavailable response
+
+On 2026-11-12, the user reported that both tabs still returned `ANALYTICS_UNAVAILABLE`. They share `DashboardRepository.getAnalytics()`. The repository previously fetched every AI decision in the selected period, then returned an error when that query exceeded its 10,000-row cap. The Pi analyzes all enabled markets on each five-minute runtime cycle, so decision history can exceed this cap quickly. The exact live row count and cause for the supplied request IDs were not available from this workspace.
+
+The follow-up implementation aggregates decision counts by action, confidence band, strategy, and market in PostgreSQL. It loads only period-matched decisions referenced by the bounded trade result for outcome scoring, preserving the analytics response shape without transferring the full decision history. Analytics repository failures now also produce a safe diagnostic containing the request ID, view, and either the stored-data reason or PostgreSQL error code.
+
+The aggregate path was exercised with 10,001 additional decision rows. The targeted analytics/recommendation suite passed before the request-ID diagnostic test was added. A subsequent test rerun was denied, so the latest diagnostic-only changes and the full suites remain unverified. Production database row counts, Pi update, and live tab behavior were not verified.

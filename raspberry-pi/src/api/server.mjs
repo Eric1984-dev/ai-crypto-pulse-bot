@@ -76,7 +76,12 @@ export function createApiServer({
     });
   }
   if (dataRepositories) {
-    registerDataRoutes(router, dataRepositories, { now, getOperationalHealth, getSystemMetrics });
+    registerDataRoutes(router, dataRepositories, {
+      now,
+      getOperationalHealth,
+      getSystemMetrics,
+      logger
+    });
   }
   const rateLimiter = new FixedWindowRateLimiter({
     limit: rateLimitMaxRequests,

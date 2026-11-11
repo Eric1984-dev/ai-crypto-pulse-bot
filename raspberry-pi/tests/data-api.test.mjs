@@ -5,6 +5,7 @@ import { buildDashboardAnalytics } from "../src/services/dashboard-analytics.mjs
 import { AiDecisionsRepository } from "../src/repositories/ai-decisions-repository.mjs";
 import { MarketDataRepository } from "../src/repositories/market-data-repository.mjs";
 import { RuntimeStatusRepository } from "../src/repositories/runtime-status-repository.mjs";
+import { RepositoryDataError } from "../src/repositories/postgres-read.mjs";
 import {
   MAX_ENABLED_MARKETS,
   WatchedMarketsRepository
@@ -632,6 +633,33 @@ test("analytics and recommendations endpoints handle recommendation generator in
     assert.equal(recommendationsBody.data.insufficientData, false);
     assert.equal(recommendationsBody.data.recommendations.length, 3);
     assert.equal(recommendationsBody.data.categories.length, 5);
+  });
+});
+
+test("analytics failures retain a safe diagnostic linked to the response request ID", async () => {
+  const logs = [];
+  const repositories = createRepositories(createPool(), undefined, {
+    async getAnalytics() {
+      throw new RepositoryDataError("analytics decisions exceed the bounded query limit");
+    }
+  });
+  await withServer({
+    dataRepositories: repositories,
+    logger: {
+      info() {},
+      error(message) { logs.push(JSON.parse(message)); }
+    }
+  }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analytics&period=30d`
+    );
+    const body = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(body.error.code, "ANALYTICS_UNAVAILABLE");
+    const diagnostic = logs.find(({ event }) => event === "dashboard_repository_failed");
+    assert.equal(diagnostic.requestId, body.error.requestId);
+    assert.equal(diagnostic.view, "analytics");
+    assert.equal(diagnostic.reason, "analytics decisions exceed the bounded query limit");
   });
 });
 

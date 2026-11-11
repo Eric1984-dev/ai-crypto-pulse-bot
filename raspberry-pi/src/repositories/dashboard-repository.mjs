@@ -12,6 +12,7 @@ import {
 
 const MAX_ANALYTICS_ROWS = 10000;
 const MAX_EXPORT_ROWS = 10000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PORTFOLIO_SQL = `
   SELECT portfolio.id,
@@ -114,12 +115,65 @@ const ANALYTICS_TRADES_SQL = `
   ORDER BY symbol ASC, created_at ASC, id ASC
   LIMIT $3
 `;
-const ANALYTICS_DECISIONS_SQL = `
+const ANALYTICS_DECISION_SUMMARY_SQL = `
+  WITH decisions AS MATERIALIZED (
+    SELECT symbol, decision, confidence, strategy_name, strategy_version
+    FROM public."AI_Crypto_Bot_AI_Decisions"
+    WHERE created_at >= $1::timestamptz
+  )
+  SELECT 'total'::text AS dimension, NULL::text AS label, COUNT(*)::text AS decision_count
+  FROM decisions
+  UNION ALL
+  SELECT 'below70', NULL::text, COUNT(*)::text
+  FROM decisions
+  WHERE confidence < 70
+  UNION ALL
+  SELECT 'invalid', NULL::text, COUNT(*)::text
+  FROM decisions
+  WHERE decision IS NULL
+     OR decision NOT IN ('BUY', 'SELL', 'HOLD', 'WAIT')
+     OR confidence IS NULL
+     OR confidence < 0
+     OR confidence > 100
+     OR symbol IS NULL
+     OR symbol = ''
+     OR ((strategy_name IS NULL) <> (strategy_version IS NULL))
+     OR strategy_name = ''
+     OR strategy_version = ''
+  UNION ALL
+  SELECT 'action', decision, COUNT(*)::text
+  FROM decisions
+  GROUP BY decision
+  UNION ALL
+  SELECT
+    'confidence',
+    CASE
+      WHEN confidence < 75 THEN '70–75'
+      WHEN confidence < 80 THEN '75–80'
+      WHEN confidence < 85 THEN '80–85'
+      ELSE '85+'
+    END,
+    COUNT(*)::text
+  FROM decisions
+  WHERE confidence >= 70 AND confidence <= 100
+  GROUP BY 2
+  UNION ALL
+  SELECT 'strategy', strategy_name || ' · ' || strategy_version, COUNT(*)::text
+  FROM decisions
+  WHERE strategy_name IS NOT NULL AND strategy_version IS NOT NULL
+  GROUP BY strategy_name, strategy_version
+  UNION ALL
+  SELECT 'symbol', symbol, COUNT(*)::text
+  FROM decisions
+  GROUP BY symbol
+`;
+const ANALYTICS_LINKED_DECISIONS_SQL = `
   SELECT id, symbol, decision, confidence, strategy_name, strategy_version, created_at
   FROM public."AI_Crypto_Bot_AI_Decisions"
-  WHERE created_at >= $1::timestamptz
+  WHERE id = ANY($1::uuid[])
+    AND created_at >= $2::timestamptz
   ORDER BY symbol ASC, created_at ASC, id ASC
-  LIMIT $2
+  LIMIT $3
 `;
 const ANALYTICS_SNAPSHOTS_SQL = `
   SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
@@ -457,7 +511,7 @@ export class DashboardRepository {
       });
     }
 
-    const [positionsResult, tradesResult, decisionsResult, snapshotsResult] = await Promise.all([
+    const [positionsResult, tradesResult, decisionSummaryResult, snapshotsResult] = await Promise.all([
       queryReadOnly(
         this.pool,
         ANALYTICS_POSITIONS_SQL,
@@ -472,8 +526,8 @@ export class DashboardRepository {
       ),
       queryReadOnly(
         this.pool,
-        ANALYTICS_DECISIONS_SQL,
-        [cutoff, MAX_ANALYTICS_ROWS + 1],
+        ANALYTICS_DECISION_SUMMARY_SQL,
+        [cutoff],
         { logger: this.logger }
       ),
       queryReadOnly(
@@ -486,12 +540,14 @@ export class DashboardRepository {
     for (const [name, result] of [
       ["positions", positionsResult],
       ["trades", tradesResult],
-      ["decisions", decisionsResult],
       ["snapshots", snapshotsResult]
     ]) {
       if (result.rows.length > MAX_ANALYTICS_ROWS) {
         throw new RepositoryDataError(`analytics ${name} exceed the bounded query limit`);
       }
+    }
+    if (decisionSummaryResult.rows.length > MAX_ANALYTICS_ROWS) {
+      throw new RepositoryDataError("analytics decision groups exceed the bounded query limit");
     }
     const portfolio = {
       starting_balance: readFiniteNumber(portfolioRow.starting_balance, "starting balance"),
@@ -508,6 +564,21 @@ export class DashboardRepository {
       };
     });
     const trades = tradesResult.rows.map(normalizeTrade);
+    const decisionSummary = normalizeAnalyticsDecisionSummary(decisionSummaryResult.rows);
+    const decisionIds = [...new Set(trades
+      .map(({ ai_decision_id }) => ai_decision_id)
+      .filter((id) => typeof id === "string" && UUID_PATTERN.test(id)))];
+    const decisionsResult = decisionIds.length === 0
+      ? { rows: [] }
+      : await queryReadOnly(
+        this.pool,
+        ANALYTICS_LINKED_DECISIONS_SQL,
+        [decisionIds, cutoff, MAX_ANALYTICS_ROWS + 1],
+        { logger: this.logger }
+      );
+    if (decisionsResult.rows.length > MAX_ANALYTICS_ROWS) {
+      throw new RepositoryDataError("analytics linked decisions exceed the bounded query limit");
+    }
     const decisions = decisionsResult.rows.map(normalizeAnalyticsDecision);
     const snapshots = snapshotsResult.rows.map(normalizeSnapshot);
     return buildDashboardAnalytics({
@@ -517,6 +588,7 @@ export class DashboardRepository {
       positions,
       trades,
       decisions,
+      decisionSummary,
       snapshots
     });
   }
@@ -741,6 +813,66 @@ function normalizeAnalyticsDecision(row) {
     confidence,
     created_at: readTimestamp(row.created_at, "decision timestamp")
   };
+}
+
+function normalizeAnalyticsDecisionSummary(rows) {
+  const summary = {
+    decisionCount: null,
+    below70Count: null,
+    actions: [],
+    confidenceBuckets: [],
+    strategies: [],
+    bySymbol: []
+  };
+  const allowedActions = new Set(["BUY", "SELL", "HOLD", "WAIT"]);
+  const allowedBuckets = new Set(["70–75", "75–80", "80–85", "85+"]);
+  const seen = new Set();
+  let invalidCount = null;
+  for (const row of rows) {
+    const dimension = row.dimension;
+    const label = row.label;
+    const count = readCount(row.decision_count, "analytics decision count");
+    const key = `${dimension}:${label ?? ""}`;
+    if (seen.has(key)) {
+      throw new RepositoryDataError("duplicate analytics decision summary group");
+    }
+    seen.add(key);
+    if (dimension === "total" && label === null && summary.decisionCount === null) {
+      summary.decisionCount = count;
+    } else if (dimension === "below70" && label === null && summary.below70Count === null) {
+      summary.below70Count = count;
+    } else if (dimension === "invalid" && label === null && invalidCount === null) {
+      invalidCount = count;
+    } else if (dimension === "action"
+      && typeof label === "string" && allowedActions.has(label)) {
+      summary.actions.push({ label, decisionCount: count });
+    } else if (dimension === "confidence"
+      && typeof label === "string" && allowedBuckets.has(label)) {
+      summary.confidenceBuckets.push({ label, decisionCount: count });
+    } else if (dimension === "strategy" && typeof label === "string" && label.length > 0) {
+      summary.strategies.push({ label, decisionCount: count });
+    } else if (dimension === "symbol" && typeof label === "string" && label.length > 0) {
+      summary.bySymbol.push({ label, decisionCount: count });
+    } else {
+      throw new RepositoryDataError("invalid analytics decision summary");
+    }
+  }
+  if (summary.decisionCount === null || summary.below70Count === null || invalidCount !== 0
+    || summary.actions.reduce((total, row) => total + row.decisionCount, 0)
+      !== summary.decisionCount
+    || summary.confidenceBuckets.reduce((total, row) => total + row.decisionCount, 0)
+      + summary.below70Count !== summary.decisionCount
+    || summary.bySymbol.reduce((total, row) => total + row.decisionCount, 0)
+      !== summary.decisionCount) {
+    throw new RepositoryDataError("inconsistent analytics decision summary");
+  }
+  return Object.freeze({
+    ...summary,
+    actions: Object.freeze(summary.actions.map(Object.freeze)),
+    confidenceBuckets: Object.freeze(summary.confidenceBuckets.map(Object.freeze)),
+    strategies: Object.freeze(summary.strategies.map(Object.freeze)),
+    bySymbol: Object.freeze(summary.bySymbol.map(Object.freeze))
+  });
 }
 
 function normalizeSnapshot(row) {
