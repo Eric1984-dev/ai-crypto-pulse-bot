@@ -2,7 +2,7 @@
 
 ## Status
 
-The single-admin authentication implementation and local validation are complete. Production login is not yet validated: the Raspberry Pi must first be configured with the dashboard username and bcrypt hash, then restarted, and the Vercel Production deployment must be verified.
+The single-admin authentication implementation and local validation are complete. The Vercel Production deployment for commit `ee0e1dc` succeeded, `/login` returned `200`, and an unauthenticated `/dashboard` request redirected to login. Production login is not yet validated: the Raspberry Pi must first be configured with the dashboard username and bcrypt hash, then restarted.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ Dashboard HTML routes are sent through the existing protected-page function, whi
 - Added the login form, safe internal return paths, session checks, and logout behavior; disabled registration and password recovery.
 - Updated the root and Raspberry Pi READMEs, API/architecture/testing documentation, roadmap, and changelog.
 
-Validation executed locally:
+Validation executed:
 
 | Check | Result |
 |---|---:|
@@ -64,11 +64,15 @@ Validation executed locally:
 | JavaScript/module syntax validation | 174 files passed |
 | Vercel API function files | 12 of 12 |
 | `git diff --check` | Passed |
+| GitHub push to `main` | Passed (`ee0e1dc`) |
+| Vercel Production status for `ee0e1dc` | Success — deployment completed |
+| Production `/login` | HTTP `200` |
+| Production unauthenticated `/dashboard` | HTTP `302` to `/login.html` |
 
 Tests cover wrong-password rejection, session cookie attributes, refresh/session lookup, logout revocation, unauthenticated data denial, same-origin proxy forwarding, protected-page redirects, safe next paths, and no new Vercel function files.
 
 ## Production validation and limitations
 
-The live Pi `.env` was not inspected or modified, and the service was not restarted from this worktree. Therefore live login, browser cookie persistence, direct Pi API denial, the production Vercel function environment, and production deployment status remain unverified until the operator configures and validates them. A runtime restart invalidates all existing sessions, requiring the administrator to sign in again.
+The live Pi `.env` was not inspected or modified, and the service was not restarted from this worktree. Therefore credential validation, authenticated login/logout, browser cookie persistence, direct Pi API denial, and Vercel-to-Pi authenticated proxying remain unverified. The Vercel deployment and unauthenticated page protection were verified, but a successful static deployment does not prove Pi authentication is configured. A runtime restart invalidates all existing sessions, requiring the administrator to sign in again.
 
 This phase adds no database migration or write endpoint. The dashboard remains read-only and continues to use the shared system portfolio. The implementation is locally validated, but Phase 9 is not considered production-complete until the Vercel Production deployment and Raspberry Pi login/API checks above succeed.
