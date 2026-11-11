@@ -2,7 +2,16 @@
   "cleanUrls": true,
   "buildCommand": "npm run build",
   "outputDirectory": ".",
+  "functions": {
+    "api/protected-page.mjs": {
+      "includeFiles": "*.html"
+    }
+  },
   "routes": [
+    {
+      "src": "/(dashboard|portfolio|scanner|analytics|recommendations|history|exports|settings|admin)(\\.html)?$",
+      "dest": "/api/protected-page?page=$1"
+    },
     { "handle": "filesystem" }
   ]
 }

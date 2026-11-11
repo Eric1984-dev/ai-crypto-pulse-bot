@@ -1,23 +1,20 @@
 (function attachRuntimeApi(root) {
-  const config = root.CryptoPulseRuntimeConfig || {};
-
   function url(path) {
     if (typeof path !== "string" || !path.startsWith("/api/v1/")) {
       throw new TypeError("A Raspberry Pi runtime API path is required.");
     }
-    let origin;
+    let target;
     try {
-      origin = new URL(config.apiOrigin).origin;
-      const parsed = new URL(config.apiOrigin);
-      if ((parsed.protocol !== "https:" && parsed.hostname !== "localhost")
-        || parsed.username || parsed.password || parsed.pathname !== "/"
-        || parsed.search || parsed.hash) {
+      target = new URL(path, "https://dashboard.invalid");
+      if (target.origin !== "https://dashboard.invalid"
+        || !target.pathname.startsWith("/api/v1/")
+        || target.username || target.password || target.hash) {
         throw new Error();
       }
     } catch {
-      throw new Error("Raspberry Pi runtime API origin is not configured.");
+      throw new Error("Raspberry Pi runtime API path is invalid.");
     }
-    return `${origin}${path}`;
+    return `/api/dashboard-data?path=${encodeURIComponent(target.pathname + target.search)}`;
   }
 
   root.CryptoPulseRuntimeApi = Object.freeze({ url });

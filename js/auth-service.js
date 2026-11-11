@@ -1,10 +1,10 @@
-(function attachRuntimeAccess(root, createApi) {
+(function attachDashboardAuth(root, createApi) {
   const api = createApi();
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
   root.CryptoPulseAuth = api;
-})(globalThis, function createRuntimeAccessApi() {
+})(globalThis, function createDashboardAuthApi() {
   const protectedPaths = Object.freeze([
     "/dashboard.html",
     "/portfolio.html",
@@ -13,78 +13,91 @@
     "/recommendations.html",
     "/history.html",
     "/exports.html",
-    "/settings.html"
+    "/settings.html",
+    "/admin.html"
   ]);
+  const SESSION_ENDPOINT = "/api/auth-session";
 
   function safeNextPath(candidate) {
     if (typeof candidate !== "string") {
       return "/dashboard.html";
     }
-    let path;
     try {
       const url = new URL(candidate, "https://dashboard.invalid");
-      path = protectedPaths.includes(url.pathname) ? `${url.pathname}${url.search}` : null;
+      if (url.origin !== "https://dashboard.invalid" || !protectedPaths.includes(url.pathname)) {
+        return "/dashboard.html";
+      }
+      return `${url.pathname}${url.search}`;
     } catch {
-      path = null;
+      return "/dashboard.html";
     }
-    return path || "/dashboard.html";
   }
 
-  function createAccessLoginUrl(
-    apiOrigin,
-    audience,
-    returnTo,
-    dashboardOrigin = globalThis.location?.origin || "https://dashboard.invalid"
-  ) {
-    const origin = validateApiOrigin(apiOrigin);
-    if (typeof audience !== "string" || !audience.trim()) {
-      throw new Error("Cloudflare Access application audience is not configured.");
+  async function getSession(fetchImpl = globalThis.fetch) {
+    const response = await fetchImpl(SESSION_ENDPOINT, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+      cache: "no-store"
+    });
+    if (response.status === 401) {
+      return null;
     }
-    const destination = new URL(safeNextPath(returnTo), "https://dashboard.invalid");
-    const redirectUrl = new URL(
-      destination.pathname + destination.search,
-      dashboardOrigin
-    );
-    redirectUrl.searchParams.set("cp_access", "1");
-    const login = new URL(
-      `/cdn-cgi/access/login/${encodeURIComponent(audience.trim())}`,
-      origin
-    );
-    login.searchParams.set("redirect_url", redirectUrl.toString());
-    return login.toString();
+    if (!response.ok) {
+      throw new Error("Dashboard authentication is temporarily unavailable.");
+    }
+    return parseSessionResponse(response);
   }
 
-  function createAccessLogoutUrl(apiOrigin, returnTo) {
-    const origin = validateApiOrigin(apiOrigin);
-    const logout = new URL("/cdn-cgi/access/logout", origin);
-    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
-      logout.searchParams.set("returnTo", new URL(
-        returnTo,
-        globalThis.location?.origin || "https://dashboard.invalid"
-      ).toString());
+  async function login(username, password, fetchImpl = globalThis.fetch) {
+    const response = await fetchImpl(SESSION_ENDPOINT, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ username, password })
+    });
+    if (response.status === 401) {
+      throw new Error("Username or password is incorrect.");
     }
-    return logout.toString();
+    if (!response.ok) {
+      throw new Error("Dashboard sign-in is temporarily unavailable.");
+    }
+    return parseSessionResponse(response);
   }
 
-  function validateApiOrigin(value) {
-    let url;
+  async function logout(csrfToken, fetchImpl = globalThis.fetch) {
+    const response = await fetchImpl(SESSION_ENDPOINT, {
+      method: "DELETE",
+      credentials: "same-origin",
+      headers: {
+        accept: "application/json",
+        "x-csrf-token": csrfToken
+      },
+      cache: "no-store"
+    });
+    if (!response.ok && response.status !== 204) {
+      throw new Error("Dashboard sign-out could not be completed.");
+    }
+  }
+
+  async function parseSessionResponse(response) {
+    let payload;
     try {
-      url = new URL(value);
+      payload = await response.json();
     } catch {
-      throw new Error("Raspberry Pi runtime API origin is not configured.");
+      throw new Error("Dashboard authentication returned an invalid response.");
     }
-    if ((url.protocol !== "https:" && url.hostname !== "localhost")
-      || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-      throw new Error("Raspberry Pi runtime API origin is invalid.");
+    const data = payload?.data;
+    if (!data || typeof data.csrfToken !== "string"
+      || !/^[A-Za-z0-9_-]{43}$/.test(data.csrfToken)
+      || !Number.isFinite(data.expiresAt)) {
+      throw new Error("Dashboard authentication returned an invalid response.");
     }
-    return url.origin;
+    return Object.freeze({ csrfToken: data.csrfToken, expiresAt: data.expiresAt });
   }
 
-  return {
-    protectedPaths,
-    createAccessLoginUrl,
-    createAccessLogoutUrl,
-    safeNextPath,
-    validateApiOrigin
-  };
+  return Object.freeze({ protectedPaths, getSession, login, logout, safeNextPath });
 });

@@ -203,6 +203,8 @@ export async function startRuntime(config, {
       readiness,
       getOperationalHealth,
       dataRepositories,
+      sessionStore,
+      dashboardAuth: config.api.dashboardAuth,
       authenticationProvider,
       cloudflareAccess: config.api.cloudflareAccess,
       allowedOrigins: config.api.corsOrigins,

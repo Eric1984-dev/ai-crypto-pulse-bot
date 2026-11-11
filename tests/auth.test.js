@@ -10,194 +10,177 @@ const rootDirectory = path.resolve(__dirname, "..");
 
 function createBrowser({
   pageType = "protected",
-  href,
-  sessionValue = null,
-  accessEnabled = true,
-  accessAudience = "public-audience"
+  href = "https://dashboard.example.com/dashboard.html",
+  authApi = auth
 } = {}) {
   const redirects = [];
-  const messages = [];
-  const logoutButtons = [{
-    hidden: false,
-    addEventListener() {}
-  }];
-  const storage = new Map(sessionValue ? [["cryptopulse-access-authenticated", sessionValue]] : []);
   const listeners = new Map();
+  const message = { textContent: "", dataset: {}, setAttribute() {} };
+  const inputs = {
+    username: { value: "operator" },
+    password: { value: "unit-test-password" }
+  };
+  const submitButton = { disabled: false };
+  const form = {
+    elements: { namedItem: (name) => inputs[name] },
+    addEventListener(name, callback) { listeners.set(`form:${name}`, callback); },
+    querySelector() { return submitButton; }
+  };
+  const logoutButton = {
+    disabled: false,
+    addEventListener(name, callback) { listeners.set(`logout:${name}`, callback); }
+  };
   const document = {
     body: {
       dataset: { authPage: pageType },
-      prepend(element) {
-        messages.push(element);
-      }
+      prepend() {}
     },
     documentElement: {
       classList: {
-        remove(name) {
-          this.removed = name;
-        }
+        remove(name) { this.removed = name; }
       }
     },
     createElement() {
-      return {
-        setAttribute(name, value) {
-          this[name] = value;
-        },
-        textContent: ""
-      };
+      return { setAttribute() {}, textContent: "", dataset: {} };
     },
     querySelector(selector) {
-      return selector === "[data-auth-message]" ? null : null;
+      if (selector === "[data-auth-message]") return message;
+      if (selector === "[data-login-form]") return form;
+      return null;
     },
     querySelectorAll(selector) {
-      return selector === "[data-auth-logout]" ? logoutButtons : [];
+      return selector === "[data-auth-logout]" ? [logoutButton] : [];
     }
   };
-  const location = new URL(href || "https://dashboard.example.com/dashboard.html");
+  const location = new URL(href);
   location.replace = (value) => redirects.push(value);
-  const window = {
-    CryptoPulseAuth: auth,
-    CryptoPulseRuntimeConfig: {
-      apiOrigin: "https://runtime.example.com",
-      accessEnabled,
-      accessAudience
-    },
-    history: {
-      replaceState(_state, _title, url) {
-        location.pathname = url.split("?")[0].split("#")[0];
-        location.search = url.includes("?") ? `?${url.split("?")[1].split("#")[0]}` : "";
-        location.hash = url.includes("#") ? `#${url.split("#").at(-1)}` : "";
-      }
-    },
-    location,
-    sessionStorage: {
-      getItem(key) {
-        return storage.get(key) || null;
-      },
-      setItem(key, value) {
-        storage.set(key, value);
-      },
-      removeItem(key) {
-        storage.delete(key);
-      }
-    }
-  };
+  const window = { CryptoPulseAuth: authApi, location };
   vm.runInNewContext(fs.readFileSync(path.join(rootDirectory, "js/auth.js"), "utf8"), {
     document,
     window,
-    URL,
     URLSearchParams,
     Promise
   });
-  return { document, logoutButtons, messages, redirects, storage, window };
+  return {
+    document,
+    form,
+    inputs,
+    listeners,
+    logoutButton,
+    message,
+    redirects,
+    submitButton,
+    window
+  };
 }
 
-test("Cloudflare Access login URL uses configured API origin and a safe dashboard return path", () => {
-  const loginUrl = new URL(auth.createAccessLoginUrl(
-    "https://runtime.example.com",
-    "public-audience",
-    "/portfolio.html?tab=history",
-    "https://dashboard.example.com"
-  ));
-  assert.equal(loginUrl.origin, "https://runtime.example.com");
-  assert.equal(loginUrl.pathname, "/cdn-cgi/access/login/public-audience");
-  assert.equal(
-    loginUrl.searchParams.get("redirect_url"),
-    "https://dashboard.example.com/portfolio.html?tab=history&cp_access=1"
-  );
+test("safe dashboard return paths reject external and unprotected destinations", () => {
+  assert.equal(auth.safeNextPath("/portfolio.html?tab=history"), "/portfolio.html?tab=history");
   assert.equal(auth.safeNextPath("//attacker.example"), "/dashboard.html");
   assert.equal(auth.safeNextPath("/login.html"), "/dashboard.html");
 });
 
-test("runtime API URL requires configured HTTPS origin and only versioned read routes", () => {
+test("runtime API requests use the same-origin proxy and reject non-runtime paths", () => {
   const source = fs.readFileSync(path.join(rootDirectory, "js/runtime-api.js"), "utf8");
-  const context = {
-    CryptoPulseRuntimeConfig: { apiOrigin: "https://runtime.example.com" },
-    URL,
-    Object
-  };
+  const context = {};
   vm.runInNewContext(source, { globalThis: context, URL, Object });
   assert.equal(
-    context.CryptoPulseRuntimeApi.url("/api/v1/dashboard-data"),
-    "https://runtime.example.com/api/v1/dashboard-data"
+    context.CryptoPulseRuntimeApi.url("/api/v1/dashboard-data?view=analytics"),
+    "/api/dashboard-data?path=%2Fapi%2Fv1%2Fdashboard-data%3Fview%3Danalytics"
   );
   assert.throws(() => context.CryptoPulseRuntimeApi.url("/api/admin-actions"), /API path/);
-  context.CryptoPulseRuntimeConfig.apiOrigin = "";
-  assert.throws(
-    () => context.CryptoPulseRuntimeApi.url("/api/v1/dashboard-data"),
-    /origin is not configured/
-  );
+  assert.throws(() => context.CryptoPulseRuntimeApi.url("//attacker.example/api/v1/data"), /API path/);
 });
 
-test("protected pages complete the Access callback before releasing the dashboard", async () => {
-  const browser = createBrowser({
-    href: "https://dashboard.example.com/portfolio.html?tab=history&cp_access=1"
+test("session and login requests include same-origin credentials and reject unauthenticated sessions", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (options.method === "GET") {
+      return new Response("", { status: 401 });
+    }
+    return Response.json({ data: { csrfToken: "A".repeat(43), expiresAt: 123456 } });
+  };
+  assert.equal(await auth.getSession(fetchImpl), null);
+  const session = await auth.login("operator", "unit-test-password", fetchImpl);
+  assert.equal(session.csrfToken, "A".repeat(43));
+  assert.equal(calls[0].options.credentials, "same-origin");
+  assert.equal(calls[1].options.credentials, "same-origin");
+  assert.deepEqual(JSON.parse(calls[1].options.body), {
+    username: "operator",
+    password: "unit-test-password"
   });
-  await browser.window.CryptoPulseAuthReady;
-  assert.equal(browser.storage.get("cryptopulse-access-authenticated"), "1");
-  assert.equal(browser.window.location.search, "?tab=history");
-  assert.equal(browser.document.documentElement.classList.removed, "auth-pending");
-  assert.deepEqual(browser.redirects, []);
 });
 
-test("unauthenticated protected pages begin Cloudflare Access login", async () => {
+test("protected pages redirect unauthenticated visitors to the login form", async () => {
   const browser = createBrowser({
-    href: "https://dashboard.example.com/scanner.html?view=24h"
+    href: "https://dashboard.example.com/scanner.html?view=24h",
+    authApi: {
+      ...auth,
+      async getSession() { return null; }
+    }
   });
   await browser.window.CryptoPulseAuthReady;
   assert.equal(browser.redirects.length, 1);
-  const destination = new URL(browser.redirects[0]);
-  assert.equal(destination.origin, "https://runtime.example.com");
-  assert.equal(
-    destination.searchParams.get("redirect_url"),
-    "https://dashboard.example.com/scanner.html?view=24h&cp_access=1"
-  );
+  const destination = new URL(browser.redirects[0], "https://dashboard.example.com");
+  assert.equal(destination.pathname, "/login.html");
+  assert.equal(destination.searchParams.get("next"), "/scanner.html?view=24h");
 });
 
-test("protected pages allow read-only access when Cloudflare Access is disabled", async () => {
-  const browser = createBrowser({
-    accessEnabled: false,
-    href: "https://dashboard.example.com/dashboard.html"
-  });
-  await browser.window.CryptoPulseAuthReady;
-  assert.deepEqual(browser.redirects, []);
-  assert.equal(browser.document.documentElement.classList.removed, "auth-pending");
-  assert.equal(browser.logoutButtons[0].hidden, true);
-});
-
-test("legacy login routes return to the dashboard when Cloudflare Access is disabled", async () => {
+test("dashboard login submits credentials and redirects to the safe requested page", async () => {
+  const requests = [];
   const browser = createBrowser({
     pageType: "login",
-    accessEnabled: false,
-    href: "https://dashboard.example.com/login.html?next=%2Fhistory.html"
+    href: "https://dashboard.example.com/login.html?next=%2Fhistory.html",
+    authApi: {
+      ...auth,
+      async getSession() { return null; },
+      async login(username, password) {
+        requests.push({ username, password });
+        return { csrfToken: "B".repeat(43), expiresAt: 123456 };
+      }
+    }
   });
   await browser.window.CryptoPulseAuthReady;
+  await browser.listeners.get("form:submit")({ preventDefault() {} });
+  assert.deepEqual(requests, [{ username: "operator", password: "unit-test-password" }]);
   assert.deepEqual(browser.redirects, ["/history.html"]);
+  assert.equal(browser.submitButton.disabled, false);
 });
 
-test("legacy login routes hand off to Cloudflare Access without collecting Supabase credentials", async () => {
+test("authenticated dashboard pages bind logout and remove the server session", async () => {
+  const csrfTokens = [];
   const browser = createBrowser({
-    pageType: "login",
-    href: "https://dashboard.example.com/login.html?next=%2Fhistory.html"
+    authApi: {
+      ...auth,
+      async getSession() { return { csrfToken: "C".repeat(43), expiresAt: 123456 }; },
+      async logout(token) { csrfTokens.push(token); }
+    }
   });
   await browser.window.CryptoPulseAuthReady;
-  assert.equal(new URL(browser.redirects[0]).origin, "https://runtime.example.com");
-  assert.match(new URL(browser.redirects[0]).searchParams.get("redirect_url"), /history\.html/);
-
-  const authSource = fs.readFileSync(path.join(rootDirectory, "js/auth.js"), "utf8");
-  const serviceSource = fs.readFileSync(path.join(rootDirectory, "js/auth-service.js"), "utf8");
-  assert.doesNotMatch(authSource, /supabase|password|auth-session/i);
-  assert.doesNotMatch(serviceSource, /supabase|type=["']password["']/i);
+  await browser.listeners.get("logout:click")();
+  assert.deepEqual(csrfTokens, ["C".repeat(43)]);
+  assert.deepEqual(browser.redirects, ["/login.html"]);
 });
 
-test("Vercel dashboard pages are static and no write-action script is loaded", () => {
+test("Vercel routes protect dashboard HTML through the existing page function", () => {
   const vercel = JSON.parse(fs.readFileSync(path.join(rootDirectory, "vercel.json"), "utf8"));
-  assert.equal(JSON.stringify(vercel).includes("protected-page"), false);
+  assert.ok(vercel.routes.some((route) =>
+    route.src?.includes("dashboard") && route.dest?.startsWith("/api/protected-page?page=")));
+  assert.equal(vercel.functions?.["api/protected-page.mjs"]?.includeFiles, "*.html");
+  const apiFunctions = fs.readdirSync(path.join(rootDirectory, "api"))
+    .filter((name) => /\.(?:js|mjs|ts)$/.test(name));
+  assert.ok(apiFunctions.length <= 12);
   for (const page of [
     "dashboard.html", "portfolio.html", "scanner.html", "analytics.html",
     "recommendations.html", "history.html", "exports.html"
   ]) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");
     assert.match(html, /\/js\/runtime-api\.js/);
-    assert.doesNotMatch(html, /supabase-js|\/js\/admin\.js|protected-page/);
+    assert.doesNotMatch(html, /supabase-js|\/js\/admin\.js/);
   }
+  const login = fs.readFileSync(path.join(rootDirectory, "login.html"), "utf8");
+  assert.match(login, /data-login-form/);
+  assert.match(login, /type="password"/);
+  assert.doesNotMatch(login, /supabase/i);
 });

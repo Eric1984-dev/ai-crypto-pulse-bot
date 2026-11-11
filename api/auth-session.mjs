@@ -1,74 +1,65 @@
-import authSession from "../lib/auth-session.js";
-
-const {
+import {
   clearSessionCookie,
-  createSessionCookie,
-  getPublicConfig,
-  verifyAccessToken
-} = authSession;
+  proxyRuntimeApiRequest,
+  readSessionToken
+} from "../lib/runtime-api-proxy.mjs";
 
-export function createHandler({ env = process.env, verify = verifyAccessToken } = {}) {
+export function createHandler({
+  env = process.env,
+  fetchImpl = globalThis.fetch
+} = {}) {
   return async function handler(req, res) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    if (!["GET", "POST", "DELETE"].includes(req.method)) {
+      res.setHeader("Allow", "GET, POST, DELETE");
+      sendJson(res, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
+      return;
+    }
 
-    if (req.method === "DELETE") {
-      res.setHeader("Set-Cookie", clearSessionCookie({ secure: env.NODE_ENV === "production" }));
+    if (req.method === "DELETE" && !readSessionToken(req.headers?.cookie || "")) {
+      clearSessionCookie(res);
       res.statusCode = 204;
       res.end();
       return;
     }
 
-    if (req.method !== "POST") {
-      res.setHeader("Allow", "POST, DELETE");
-      sendJson(res, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
+    const body = req.method === "POST" ? serializeLoginBody(req.body) : undefined;
+    if (req.method === "POST" && body === null) {
+      sendJson(res, 400, { error: { code: "INVALID_LOGIN", message: "Enter a valid username and password." } });
       return;
     }
-
-    const config = getPublicConfig(env);
-    if (!config) {
-      sendJson(res, 503, { error: { code: "AUTH_NOT_CONFIGURED", message: "Supabase Authentication is not configured." } });
-      return;
-    }
-
-    const body = typeof req.body === "string" ? parseJson(req.body) : req.body;
-    const accessToken = body && typeof body.accessToken === "string" ? body.accessToken : "";
-    const expiresIn = body && Number.isFinite(body.expiresIn) ? Math.min(Math.max(Math.floor(body.expiresIn), 60), 86400) : 3600;
-
-    if (accessToken.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(accessToken)) {
-      sendJson(res, 400, { error: { code: "INVALID_SESSION", message: "A valid Supabase session is required." } });
-      return;
-    }
-
-    try {
-      if (!await verify(accessToken, config)) {
-        sendJson(res, 401, { error: { code: "INVALID_SESSION", message: "The Supabase session is invalid or expired." } });
-        return;
-      }
-    } catch {
-      sendJson(res, 503, { error: { code: "AUTH_SERVICE_UNAVAILABLE", message: "Supabase Authentication is temporarily unavailable." } });
-      return;
-    }
-
-    const secure = env.NODE_ENV === "production";
-    res.setHeader("Set-Cookie", createSessionCookie(accessToken, { maxAge: expiresIn, secure }));
-    res.statusCode = 204;
-    res.end();
+    await proxyRuntimeApiRequest(req, res, {
+      env,
+      fetchImpl,
+      path: req.method === "POST" ? "/api/v1/auth/login" : "/api/v1/auth/session",
+      method: req.method,
+      requireSession: req.method !== "POST",
+      ...(body === undefined ? {} : { body })
+    });
   };
+}
+
+function serializeLoginBody(body) {
+  let value = body;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return JSON.stringify(value);
 }
 
 function sendJson(res, statusCode, body) {
   res.statusCode = statusCode;
+  res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
-}
-
-function parseJson(value) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
 }
 
 export default createHandler();

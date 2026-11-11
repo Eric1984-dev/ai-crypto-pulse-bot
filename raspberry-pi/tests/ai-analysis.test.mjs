@@ -235,6 +235,8 @@ test("AI database configuration requires a separate writer identity", () => {
     DATABASE_NAME: "cryptopulse",
     DATABASE_USER: "runtime_reader",
     DATABASE_PASSWORD: "reader-password",
+    DASHBOARD_USERNAME: "operator",
+    DASHBOARD_PASSWORD_HASH: "$2a$10$mqVzXb8xEv/4khOjtskpme6LMSS9d/BQTwDX/LLAm7ig6xKOgptea",
     DATABASE_SSL: "false",
     AI_DATABASE_USER: "ai_writer",
     AI_DATABASE_PASSWORD: "writer-password"

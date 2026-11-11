@@ -10,6 +10,9 @@ function runtimeConfig({ cloudflareAccessEnabled = true } = {}) {
     DATABASE_NAME: "cryptopulse",
     DATABASE_USER: "runtime_reader",
     DATABASE_PASSWORD: "test-password",
+    DASHBOARD_USERNAME: "operator",
+    DASHBOARD_PASSWORD_HASH: "$2a$10$mqVzXb8xEv/4khOjtskpme6LMSS9d/BQTwDX/LLAm7ig6xKOgptea",
+    API_CORS_ORIGINS: "https://dashboard.example.com",
     DATABASE_SSL: "false",
     ...(cloudflareAccessEnabled ? {
       CLOUDFLARE_ACCESS_ENABLED: "true",
@@ -155,7 +158,7 @@ test("runtime fails closed and releases database resources when validation fails
   assert.equal(pool.ended, true);
 });
 
-test("runtime starts and serves read-only dashboard APIs when Cloudflare Access is disabled", async () => {
+test("runtime protects read-only dashboard APIs with the local session when Cloudflare Access is disabled", async () => {
   const runtime = await startRuntime(runtimeConfig({ cloudflareAccessEnabled: false }), {
     Pool: MockPool,
     validateContracts: async () => ({ contracts: "valid" }),
@@ -164,8 +167,23 @@ test("runtime starts and serves read-only dashboard APIs when Cloudflare Access 
     validatePaperContracts: async () => ({ contracts: "valid" })
   });
   try {
+    const baseUrl = `http://127.0.0.1:${runtime.server.address().port}`;
+    const anonymous = await fetch(`${baseUrl}/api/v1/markets`);
+    assert.equal(anonymous.status, 401);
+
+    const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        Origin: "https://dashboard.example.com",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ username: "operator", password: "unit-test-password" })
+    });
+    assert.equal(login.status, 200);
+    const cookie = login.headers.get("set-cookie").split(";", 1)[0];
     const markets = await fetch(
-      `http://127.0.0.1:${runtime.server.address().port}/api/v1/markets`
+      `${baseUrl}/api/v1/markets`,
+      { headers: { Cookie: cookie } }
     );
     assert.equal(markets.status, 200);
     assert.deepEqual(await markets.json(), { data: { count: 0, items: [] } });

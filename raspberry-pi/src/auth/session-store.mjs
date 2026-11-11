@@ -33,6 +33,7 @@ export function createSessionStore({
   }
 
   return Object.freeze({
+    ttlMs,
     create(principal) {
       const normalizedPrincipal = validatePrincipal(principal);
       const timestamp = now();

@@ -13,6 +13,15 @@ export function csrfMiddleware({ allowedOrigins = [] } = {}) {
     }
 
     const origin = context.request.headers.origin;
+    if (method === "POST" && context.pathname === "/api/v1/auth/login") {
+      if (!origin || !allowlist.has(origin)
+        || !/^application\/json(?:\s*;|$)/i.test(context.request.headers["content-type"] || "")) {
+        throw new ApiError(403, "CSRF_VALIDATION_FAILED", "Request validation failed.");
+      }
+      await next();
+      return;
+    }
+
     const expected = context.auth?.session?.csrfToken;
     const supplied = context.request.headers["x-csrf-token"];
     if (!origin || !allowlist.has(origin)

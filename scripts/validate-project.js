@@ -171,13 +171,23 @@ function validateProject() {
     errors.push("Missing server-side administrator authorization helper: lib/admin-auth.js");
   }
 
-  if ((vercelConfig?.routes || []).some((route) =>
-    typeof route.dest === "string" && route.dest.startsWith("/api/protected-page")
-  )) {
-    errors.push("Vercel must serve dashboard pages as static files; API authentication is enforced by the Raspberry Pi runtime.");
+  const protectedPageRoute = (vercelConfig?.routes || []).some((route) =>
+    typeof route.src === "string"
+      && route.src.includes("dashboard")
+      && typeof route.dest === "string"
+      && route.dest.startsWith("/api/protected-page?page=")
+  );
+  if (!protectedPageRoute) {
+    errors.push("Vercel must route protected dashboard pages through api/protected-page.mjs.");
   }
-  if (vercelConfig?.functions?.["api/protected-page.mjs"]) {
-    errors.push("Vercel must not bundle the legacy protected-page function for dashboard access.");
+  if (vercelConfig?.functions?.["api/protected-page.mjs"]?.includeFiles !== "*.html") {
+    errors.push("The protected-page function must bundle the HTML files it serves.");
+  }
+
+  const apiFunctionCount = fs.readdirSync(path.join(rootDirectory, "api"))
+    .filter((name) => /\.(?:js|mjs|ts)$/.test(name)).length;
+  if (apiFunctionCount > 12) {
+    errors.push(`Vercel Hobby supports at most 12 API functions; found ${apiFunctionCount}.`);
   }
 
   return errors;

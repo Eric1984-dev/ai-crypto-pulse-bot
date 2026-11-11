@@ -6,6 +6,14 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Raspberry Pi migration — Phase 9
+
+- Add a single-admin username/password login verified against a bcrypt hash configured only on the Raspberry Pi
+- Protect dashboard HTML and Pi read routes with an opaque in-memory session and secure HttpOnly cookie
+- Reuse existing Vercel functions for a same-origin login/session/data proxy without increasing the 12-function limit
+- Add CSRF checks for login/logout, password hash generation with hidden terminal input, and authentication tests
+- Record live Pi environment setup and production login validation as pending until the operator configures and verifies them
+
 ### Raspberry Pi migration — Phase 2
 
 - Add an isolated `raspberry-pi/` Node.js runtime package with bounded PostgreSQL pooling, verified TLS defaults, and read-only transactions

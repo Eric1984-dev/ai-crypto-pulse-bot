@@ -1,5 +1,7 @@
 # Phase 8 — Dashboard Migration and Cutover
 
+> Authentication note: this Phase 8 report records the original anonymous/optional-Cloudflare read-only deployment. Migration Phase 9 supersedes that access model with a required single-admin Pi session and same-origin Vercel proxy; see [Phase 9 dashboard authentication](phase-9-dashboard-authentication.md).
+
 ## Status and scope
 
 The existing Vercel dashboard reads the shared system portfolio from the Raspberry Pi runtime API. The operator reports that the live Pi runtime, PostgreSQL, scheduler, AI, paper trading, Cloudflare Tunnel and Quick Tunnel are operational, the dashboard migration is active, and all three required API endpoints return `200`. The API remains loopback-bound and exposes GET-only dashboard data routes.

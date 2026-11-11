@@ -19,6 +19,7 @@ import {
 import { generateRecommendations } from "../lib/recommendations.mjs";
 import { SHADOW_EXIT_RULES } from "../lib/shadow-exits.mjs";
 import { fetchArchiveServerHealth } from "../lib/archive-server-health.mjs";
+import { proxyRuntimeApiRequest } from "../lib/runtime-api-proxy.mjs";
 
 const {
   clearSessionCookie,
@@ -67,6 +68,28 @@ export function createHandler({
   return async function handler(req, res) {
     let requestContext = null;
     setResponseHeaders(res);
+    const runtimeProxyPath = readRuntimeProxyPath(req);
+    if (runtimeProxyPath.present) {
+      if (req.method !== "GET") {
+        res.setHeader("Allow", "GET");
+        sendJson(res, 405, {
+          error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." }
+        });
+        return;
+      }
+      if (runtimeProxyPath.path === null) {
+        sendJson(res, 400, {
+          error: { code: "INVALID_RUNTIME_API_PATH", message: "The runtime API path is invalid." }
+        });
+        return;
+      }
+      await proxyRuntimeApiRequest(req, res, {
+        env,
+        fetchImpl,
+        path: runtimeProxyPath.path
+      });
+      return;
+    }
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
       sendJson(res, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
@@ -1138,6 +1161,24 @@ function readExactCount(headers) {
 class InvalidSessionError extends Error {}
 class DashboardDataError extends Error {}
 class InvalidTradeHistoryRequestError extends Error {}
+
+function readRuntimeProxyPath(req) {
+  if (req.query && Object.hasOwn(req.query, "path")) {
+    return {
+      present: true,
+      path: typeof req.query.path === "string" ? req.query.path : null
+    };
+  }
+  try {
+    const values = new URL(req.url || "/", "http://localhost").searchParams.getAll("path");
+    if (values.length === 0) {
+      return { present: false, path: null };
+    }
+    return { present: true, path: values.length === 1 ? values[0] : null };
+  } catch {
+    return { present: true, path: null };
+  }
+}
 
 function setResponseHeaders(res) {
   res.setHeader("Cache-Control", "no-store");

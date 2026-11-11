@@ -4,9 +4,9 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. De 
 
 ## Huidige status
 
-- De afzonderlijke `raspberry-pi/`-package bevat de autonome runtime en read-only dashboard-API. De API bindt aan loopback; Cloudflare Access is optioneel en configureerbaar. Zonder Access geeft de API anonieme read-only toegang aan clients die de netwerkroute kunnen bereiken; met Access valideert de Pi JWT's en een operator-email-allowlist. Cloudflare Tunnel/API-host en de Vercel-integratie zijn niet live gevalideerd. Zie de [Phase 8 dashboard-cutoverrapportage](raspberry-pi/docs/phase-8-dashboard-cutover.md), [Phase 8.1/8.2-authenticatiedocumentatie](raspberry-pi/docs/phase-8.1-authentication-activation.md) en [Pi-runtimedocumentatie](raspberry-pi/README.md).
-- Er is geen Supabase Auth/profile-mapping in het Pi-dashboardpad; alle bezoekers zien hetzelfde read-only systeemportfolio. Cloudflare Access wordt aanbevolen wanneer de API via een gedeelde of publieke netwerkroute beschikbaar is; CORS is geen authenticatie.
-- Vercel serveert statische dashboardpagina's. De browserguard start een Cloudflare Access-login alleen wanneer die expliciet in de dashboardconfiguratie is ingeschakeld. Er zijn geen server-side Vercel protected-page rewrites nodig voor het dashboard.
+- De afzonderlijke `raspberry-pi/`-package bevat de autonome runtime en read-only dashboard-API. De operator meldt de Phase 8-runtime-, tunnel-, Vercel- en dashboardintegratie operationeel. Dashboarddata vereist nu één lokale administrator-login met een bcrypt-hash en een server-side Pi-sessie; de API bindt aan loopback. Cloudflare Access kan als extra netwerkgrens worden ingeschakeld; CORS is geen authenticatie. Phase 9 is lokaal getest, maar wacht nog op Pi-configuratie en live loginvalidatie. Zie de [Phase 9-authenticatierapportage](raspberry-pi/docs/phase-9-dashboard-authentication.md) en [Pi-runtimedocumentatie](raspberry-pi/README.md).
+- Er is geen Supabase Auth/profile-mapping in het actieve Pi-dashboardpad; alle geauthenticeerde bezoekers zien hetzelfde read-only systeemportfolio. Het wachtwoord staat alleen als bcrypt-hash in de Pi-runtimeconfiguratie; Vercel bewaart uitsluitend de runtime-API-origin.
+- Vercel levert de loginpagina en beschermt dashboardpagina's via de bestaande serverless functies. De browser gebruikt een same-origin proxy naar de Pi, zodat de `HttpOnly`, `Secure`, `SameSite=Lax`-sessiecookie bij dashboardrequests meegaat. Er zijn geen nieuwe Vercel API-functies toegevoegd.
 - Het Phase 03-schema en de latere uitbreidingen bevatten 18 `AI_Crypto_Bot_`-tabellen met migrations, foreign keys, indexes, seed data en RLS. Gebruikers hebben alleen geautoriseerde leesrechten; schrijfoperaties zijn server-side.
 - Het dashboard leest status, portfolio, posities, trades, watched markets, AI-beslissingen, analytics en scannerdata uit de read-only Pi API. De bestaande Open Position AI Status en dashboardindeling blijven behouden. De data wordt periodiek ververst; er zijn geen Supabase browserqueries of Realtime-kanalen meer. Verzoeken blijven `no-store`.
 - De monitoringkaart leest de Pi-runtime-API voor runtime/schedulerstatus, proces- en hostmetrics, PostgreSQL-grootte en geschatte aantallen candles, beslissingen, trades en posities. Deze monitoringroute rapporteert geen exacte tabeltellingen; hosttemperatuur en de eerste CPU-meting kunnen ontbreken.
@@ -42,19 +42,19 @@ CryptoPulse is een crypto-analyse- en paper-tradingplatform in ontwikkeling. De 
 ## Pagina's en projectstructuur
 
 ```text
-api/        Supabase-config, sessiecookie, beschermde routes, dashboard-, analytics-, export-, admin-, marktdata-, AI-analyse- en paper-trading-APIs
+api/        Bestaande Vercel-functies voor Pi-login, sessievalidatie, beschermde pagina's en de runtimeproxy, naast legacy API's
 config/     Centrale standaardmarktconfiguratie voor database-seeding
 css/        Gedeelde stijlen
 docs/       Projectdocumentatie en faserapporten
-js/ Browsercode, Cloudflare Access-redirect en Pi API-client, dashboard-, analytics-, scanner-, exports- en trade-history-rendering en statusgestuurde circuitvisualisatie
-lib/        Server-side analytics-, sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
+js/         Browserauthenticatie, same-origin Pi API-client, dashboard-, analytics-, scanner-, export- en history-rendering
+lib/        Server-side runtimeproxy, analytics-, sessie-, export-, admin-autorisatie-, marktdata-, scanner-, AI Engine- en paper-trading-services
 prompts/    Faseprompts
 scripts/    Statische projectvalidatie
 supabase/   Supabase-configuratie en versioned SQL migrations
 tests/      Node.js unit- en routetests
 ```
 
-Accountpagina's `login.html`, `register.html` en `reset-password.html` starten de Cloudflare Access-loginflow. Dashboardpagina's gebruiken alleen de ingestelde Pi API-origin; databasecredentials en Supabase service-role credentials staan nooit in browserconfiguratie. De legacy Supabase schema- en serverfuncties zijn niet door deze dashboard-cutover verwijderd.
+`login.html` biedt de single-admin aanmelding; registratie en wachtwoordherstel zijn niet beschikbaar. Beschermde dashboardpagina's vereisen een geldige Pi-sessie. De browser gebruikt de same-origin Vercel proxy; databasecredentials, bcrypt-hashes en sessietokens staan niet in browserconfiguratie. Legacy Supabase schema- en serverfuncties zijn niet door deze dashboard-cutover verwijderd.
 
 ## Configuratie en checks
 
@@ -90,6 +90,7 @@ Het rootbestand [`.vercelignore`](./.vercelignore) sluit `archive-server/` uit v
 - [Phase 8 dashboard cutover report](./raspberry-pi/docs/phase-8-dashboard-cutover.md)
 - [Phase 8.1/8.2 authentication configuration](./raspberry-pi/docs/phase-8.1-authentication-activation.md)
 - [Phase 8.7 permanent connectivity report](./raspberry-pi/docs/phase-8.7-permanent-connectivity.md)
+- [Phase 9 dashboard authentication report](./raspberry-pi/docs/phase-9-dashboard-authentication.md)
 - [Database](./docs/DATABASE.md)
 - [Architectuur](./docs/ARCHITECTURE.md)
 - [Authentication API](./docs/API.md)

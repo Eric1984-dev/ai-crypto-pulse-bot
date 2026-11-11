@@ -4,6 +4,17 @@ Testing is mandatory.
 
 All implemented functionality must be validated before a phase can be completed.
 
+## Raspberry Pi migration Phase 9 authentication
+
+The active dashboard authentication tests use Node's built-in test runner and local HTTP servers; they do not require a live Pi, Vercel deployment, or database. They cover bcrypt login rejection/success, secure session cookies, refresh/session lookup, CSRF-protected logout, unauthenticated Pi data denial, same-origin Vercel proxying, and protected-page redirects.
+
+```powershell
+node --test raspberry-pi/tests/auth-routes.test.mjs raspberry-pi/tests/runtime-config.test.mjs
+node --test tests/auth.test.js tests/runtime-api-proxy.test.mjs
+```
+
+These local tests do not prove the Pi's `.env` values, live tunnel, Vercel Production environment, or browser cookie behavior in production. Follow the [Phase 9 authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md) for deployment verification.
+
 ## Phase 02 validation
 
 Phase 02 uses the built-in Node.js test runner. Auth SDK operations are tested with a fake Supabase client; Vercel route handlers are tested with mocked Supabase verification responses. No package installation is required.

@@ -36,11 +36,17 @@
     <main class="page-shell">
       <p class="eyebrow">Account</p>
       <h1>Welcome back.</h1>
-      <p class="page-description">Operator access is provided by Cloudflare Access.</p>
+      <p class="page-description">Sign in with the dashboard administrator account.</p>
       <section class="auth-card" aria-labelledby="login-heading">
         <h2 id="login-heading">Sign In</h2>
         <p data-auth-message role="status" aria-live="polite"></p>
-        <p>Only operator email addresses configured by the service owner can access this read-only dashboard.</p>
+        <form data-login-form method="post" action="/api/auth-session">
+          <label for="dashboard-username">Username</label>
+          <input id="dashboard-username" name="username" type="text" autocomplete="username" maxlength="128" required>
+          <label for="dashboard-password">Password</label>
+          <input id="dashboard-password" name="password" type="password" autocomplete="current-password" maxlength="72" required>
+          <button class="button-link" type="submit">Sign In</button>
+        </form>
       </section>
     </main>
     <footer class="site-footer">

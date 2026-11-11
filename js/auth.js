@@ -1,51 +1,45 @@
-(function startRuntimeAccess(windowRef, documentRef) {
+(function startDashboardAuth(windowRef, documentRef) {
   const auth = windowRef.CryptoPulseAuth;
-  const runtimeConfig = windowRef.CryptoPulseRuntimeConfig || {};
   const pageType = documentRef.body?.dataset.authPage || "";
   const loginPagePath = "/login.html";
-
-  function showBootFailure(error) {
-    const message = documentRef.querySelector("[data-auth-message]");
-    if (message) {
-      message.textContent = error.message || "Runtime access could not be initialized.";
-      message.dataset.state = "error";
-    } else {
-      const alert = documentRef.createElement("p");
-      alert.setAttribute("role", "alert");
-      alert.textContent = error.message || "Runtime access could not be initialized.";
-      documentRef.body.prepend(alert);
-    }
-  }
+  let csrfToken = "";
 
   function setReady() {
     documentRef.documentElement.classList.remove("auth-pending");
   }
 
-  function startLogin(returnTo) {
-    const loginUrl = auth.createAccessLoginUrl(
-      runtimeConfig.apiOrigin,
-      runtimeConfig.accessAudience,
-      returnTo,
-      windowRef.location.origin
-    );
-    windowRef.location.replace(loginUrl);
+  function showMessage(message, state = "error") {
+    let target = documentRef.querySelector("[data-auth-message]");
+    if (!target) {
+      target = documentRef.createElement("p");
+      target.setAttribute("role", "alert");
+      documentRef.body.prepend(target);
+    }
+    target.textContent = message;
+    target.dataset.state = state;
   }
 
-  function initialize() {
+  function protectedDestination() {
+    const requestedPath = new URLSearchParams(windowRef.location.search).get("next");
+    return auth.safeNextPath(requestedPath);
+  }
+
+  async function initialize() {
     if (!auth) {
-      throw new Error("Runtime access support is unavailable.");
+      throw new Error("Dashboard authentication support is unavailable.");
     }
-    const hasAudience = typeof runtimeConfig.accessAudience === "string"
-      && runtimeConfig.accessAudience.trim().length > 0;
-    const accessEnabled = runtimeConfig.accessEnabled === true
-      || (runtimeConfig.accessEnabled !== false && hasAudience);
-    if (pageType === "login" || pageType === "register" || pageType === "reset") {
-      const requestedPath = new URLSearchParams(windowRef.location.search).get("next");
-      if (!accessEnabled) {
-        windowRef.location.replace(auth.safeNextPath(requestedPath));
+    if (pageType === "register" || pageType === "reset") {
+      windowRef.location.replace(loginPagePath);
+      return;
+    }
+    if (pageType === "login") {
+      const session = await auth.getSession();
+      if (session) {
+        windowRef.location.replace(protectedDestination());
         return;
       }
-      startLogin(auth.safeNextPath(requestedPath));
+      bindLogin();
+      setReady();
       return;
     }
     if (pageType !== "protected") {
@@ -56,43 +50,62 @@
       windowRef.location.replace("/dashboard.html");
       return;
     }
-    if (!accessEnabled) {
-      hideLogout();
-      setReady();
-      return;
-    }
 
-    const currentUrl = new URL(windowRef.location.href);
-    if (currentUrl.searchParams.get("cp_access") === "1") {
-      currentUrl.searchParams.delete("cp_access");
-      windowRef.history.replaceState(null, "", currentUrl.pathname + currentUrl.search + currentUrl.hash);
-      windowRef.sessionStorage.setItem("cryptopulse-access-authenticated", "1");
-    }
-    if (windowRef.sessionStorage.getItem("cryptopulse-access-authenticated") !== "1") {
-      startLogin(`${currentUrl.pathname}${currentUrl.search}`);
+    const session = await auth.getSession();
+    if (!session) {
+      const next = `${windowRef.location.pathname}${windowRef.location.search}`;
+      windowRef.location.replace(`${loginPagePath}?next=${encodeURIComponent(auth.safeNextPath(next))}`);
       return;
     }
+    csrfToken = session.csrfToken;
     bindLogout();
     setReady();
   }
 
+  function bindLogin() {
+    const form = documentRef.querySelector("[data-login-form]");
+    if (!form) {
+      throw new Error("The dashboard sign-in form is unavailable.");
+    }
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const username = form.elements.namedItem("username")?.value;
+      const password = form.elements.namedItem("password")?.value;
+      const submit = form.querySelector('[type="submit"]');
+      if (submit) {
+        submit.disabled = true;
+      }
+      try {
+        const session = await auth.login(username, password);
+        csrfToken = session.csrfToken;
+        windowRef.location.replace(protectedDestination());
+      } catch (error) {
+        showMessage(error.message || "Sign-in failed.");
+      } finally {
+        if (submit) {
+          submit.disabled = false;
+        }
+      }
+    });
+  }
+
   function bindLogout() {
     documentRef.querySelectorAll("[data-auth-logout]").forEach((button) => {
-      button.addEventListener("click", () => {
-        windowRef.sessionStorage.removeItem("cryptopulse-access-authenticated");
-        windowRef.location.replace(auth.createAccessLogoutUrl(
-          runtimeConfig.apiOrigin,
-          loginPagePath
-        ));
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          await auth.logout(csrfToken);
+          windowRef.location.replace(loginPagePath);
+        } catch (error) {
+          button.disabled = false;
+          showMessage(error.message || "Sign-out failed.");
+        }
       });
     });
   }
 
-  function hideLogout() {
-    documentRef.querySelectorAll("[data-auth-logout]").forEach((button) => {
-      button.hidden = true;
-    });
-  }
-
-  windowRef.CryptoPulseAuthReady = Promise.resolve().then(initialize).catch(showBootFailure);
+  windowRef.CryptoPulseAuthReady = Promise.resolve().then(initialize).catch((error) => {
+    showMessage(error.message || "Dashboard authentication could not be initialized.");
+    setReady();
+  });
 })(window, document);

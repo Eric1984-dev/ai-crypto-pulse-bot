@@ -149,8 +149,16 @@ export function readRuntimeConfig(env = process.env, {
   const databaseSslEnabled = readBoolean(env, "DATABASE_SSL", true);
   const databaseSslCaPath = env.DATABASE_SSL_CA_PATH?.trim() || "";
   const databaseSslServername = env.DATABASE_SSL_SERVERNAME?.trim() || "";
+  const dashboardUsername = requiredString(env, "DASHBOARD_USERNAME");
+  const dashboardPasswordHash = requiredString(env, "DASHBOARD_PASSWORD_HASH");
   const liveTradingEnabled = readBoolean(env, "ENABLE_LIVE_TRADING", false);
 
+  if (dashboardUsername.length > 128 || /[\u0000-\u001f\u007f]/.test(dashboardUsername)) {
+    throw new Error("Invalid runtime setting: DASHBOARD_USERNAME");
+  }
+  if (!/^\$2[aby]\$(1[0-4])\$[./A-Za-z0-9]{53}$/.test(dashboardPasswordHash)) {
+    throw new Error("DASHBOARD_PASSWORD_HASH must be a valid bcrypt hash with cost 10 through 14.");
+  }
   if (liveTradingEnabled) {
     throw new Error("Runtime startup requires ENABLE_LIVE_TRADING=false.");
   }
@@ -210,6 +218,10 @@ export function readRuntimeConfig(env = process.env, {
     api: Object.freeze({
       host: env.API_HOST?.trim() || DEFAULTS.apiHost,
       port: readInteger(env, "API_PORT", DEFAULTS.apiPort, { min: 1024, max: 65535 }),
+      dashboardAuth: Object.freeze({
+        username: dashboardUsername,
+        passwordHash: dashboardPasswordHash
+      }),
       corsOrigins: readCorsOrigins(env),
       cloudflareAccess: readCloudflareAccessConfig(env),
       sessionTtlMs: readInteger(

@@ -1,13 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import authSession from "../lib/auth-session.js";
-
-const {
+import {
   clearSessionCookie,
-  getPublicConfig,
-  readAccessToken,
-  verifyAccessToken
-} = authSession;
+  createSessionCookieHeader,
+  createRuntimeApiUrl,
+  readSessionToken
+} from "../lib/runtime-api-proxy.mjs";
 
 const protectedPages = new Set([
   "dashboard",
@@ -23,16 +21,12 @@ const protectedPages = new Set([
 
 export function createHandler({
   env = process.env,
-  verify = verifyAccessToken,
+  fetchImpl = globalThis.fetch,
   readFile = (filePath) => fs.readFileSync(filePath, "utf8"),
   projectRoot = process.cwd()
 } = {}) {
   return async function handler(req, res) {
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.setHeader("X-Frame-Options", "DENY");
-
+    setSecurityHeaders(res);
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET");
       res.statusCode = 405;
@@ -47,30 +41,39 @@ export function createHandler({
       return;
     }
 
-    const config = getPublicConfig(env);
-    if (!config) {
-      res.statusCode = 503;
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end("Supabase Authentication is not configured.");
-      return;
-    }
-
-    const accessToken = readAccessToken(req.headers.cookie || "");
-    if (!accessToken) {
+    if (!readSessionToken(req.headers?.cookie || "")) {
+      clearSessionCookie(res);
       redirectToLogin(res, page);
       return;
     }
 
+    let response;
     try {
-      if (!await verify(accessToken, config)) {
-        res.setHeader("Set-Cookie", clearSessionCookie({ secure: env.NODE_ENV === "production" }));
-        redirectToLogin(res, page);
-        return;
+      const url = createRuntimeApiUrl(env, "/api/v1/auth/session");
+      const headers = {
+        accept: "application/json",
+        cookie: createSessionCookieHeader(req.headers.cookie)
+      };
+      const accessToken = req.headers?.["cf-access-jwt-assertion"];
+      if (typeof accessToken === "string" && accessToken.length <= 8192) {
+        headers["cf-access-jwt-assertion"] = accessToken;
       }
+      response = await fetchImpl(url, {
+        method: "GET",
+        headers
+      });
     } catch {
-      res.statusCode = 503;
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end("Supabase Authentication is temporarily unavailable.");
+      sendUnavailable(res);
+      return;
+    }
+
+    if (response.status === 401) {
+      clearSessionCookie(res);
+      redirectToLogin(res, page);
+      return;
+    }
+    if (!response.ok) {
+      sendUnavailable(res);
       return;
     }
 
@@ -92,7 +95,6 @@ function getPageName(req) {
   if (req.query && typeof req.query.page === "string") {
     return req.query.page;
   }
-
   try {
     return new URL(req.url, "http://localhost").searchParams.get("page") || "";
   } catch {
@@ -101,10 +103,22 @@ function getPageName(req) {
 }
 
 function redirectToLogin(res, page) {
-  const next = `/${page}.html`;
   res.statusCode = 302;
-  res.setHeader("Location", `/login.html?next=${encodeURIComponent(next)}`);
+  res.setHeader("Location", `/login.html?next=${encodeURIComponent(`/${page}.html`)}`);
   res.end();
+}
+
+function sendUnavailable(res) {
+  res.statusCode = 503;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.end("Dashboard authentication could not be verified.");
+}
+
+function setSecurityHeaders(res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "DENY");
 }
 
 export default createHandler();

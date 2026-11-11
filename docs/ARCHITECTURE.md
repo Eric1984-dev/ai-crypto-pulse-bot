@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the current Vercel/Supabase implementation. The post-cutover Raspberry Pi runtime and its single-owner execution contract are specified in the [migration runtime execution specification](./migration/runtime-execution-spec.md); its browser/API boundary is specified in the [migration target API architecture](./migration/api-architecture.md). Both migration documents describe an unimplemented target.
+The active dashboard is served by Vercel and reads from the Raspberry Pi runtime API. Its Phase 9 single-admin authentication and same-origin proxy are described in the [dashboard authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md). The Vercel/Supabase sections below document legacy platform components and do not describe the active Pi dashboard request path.
 
 ## Current Implementation: Phase 11
 

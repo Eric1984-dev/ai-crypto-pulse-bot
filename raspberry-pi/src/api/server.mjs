@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { CloudflareAccessAuthenticationProvider } from "../auth/cloudflare-access-provider.mjs";
-import { DisabledAuthenticationProvider } from "../auth/authentication-provider.mjs";
+import {
+  DisabledAuthenticationProvider,
+  SessionAuthenticationProvider
+} from "../auth/authentication-provider.mjs";
 import { authenticationMiddleware } from "../auth/authentication-middleware.mjs";
 import { csrfMiddleware } from "./csrf-middleware.mjs";
 import { ApiError, toErrorResponse } from "./api-error.mjs";
@@ -9,6 +12,7 @@ import { createRequestContext } from "./request-context.mjs";
 import { composeMiddleware } from "./middleware-pipeline.mjs";
 import { FixedWindowRateLimiter, rateLimitMiddleware } from "./rate-limiter.mjs";
 import { registerHealthRoutes } from "./health-routes.mjs";
+import { registerAuthRoutes } from "./auth-routes.mjs";
 import { registerDataRoutes } from "./data-routes.mjs";
 import { ApiRouter, routerMiddleware } from "./router.mjs";
 import { corsMiddleware, securityHeadersMiddleware } from "./security-middleware.mjs";
@@ -18,6 +22,8 @@ export function createApiServer({
   readiness,
   getOperationalHealth,
   authenticationProvider,
+  sessionStore,
+  dashboardAuth,
   cloudflareAccess,
   dataRepositories,
   now,
@@ -30,11 +36,25 @@ export function createApiServer({
   createServerImpl = createServer
 }) {
   const cloudflareAccessEnabled = cloudflareAccess?.enabled === true;
-  const anonymousReadOnly = !authenticationProvider && !cloudflareAccessEnabled;
+  const anonymousReadOnly = !authenticationProvider && !sessionStore && !cloudflareAccessEnabled;
+  const sessionAuthenticationProvider = sessionStore
+    ? new SessionAuthenticationProvider(sessionStore)
+    : null;
+  const cloudflareAccessProvider = cloudflareAccessEnabled
+    ? new CloudflareAccessAuthenticationProvider(cloudflareAccess)
+    : null;
   const resolvedAuthenticationProvider = authenticationProvider || (
-    cloudflareAccessEnabled
-      ? new CloudflareAccessAuthenticationProvider(cloudflareAccess)
-      : new DisabledAuthenticationProvider()
+    sessionAuthenticationProvider
+      ? {
+        async authenticate(request) {
+          const identity = await sessionAuthenticationProvider.authenticate(request);
+          if (!identity || !cloudflareAccessProvider) {
+            return identity;
+          }
+          return await cloudflareAccessProvider.authenticate(request) ? identity : null;
+        }
+      }
+      : cloudflareAccessProvider || new DisabledAuthenticationProvider()
   );
   if (!resolvedAuthenticationProvider
     || typeof resolvedAuthenticationProvider.authenticate !== "function") {
@@ -45,6 +65,16 @@ export function createApiServer({
     readiness,
     getOperationalHealth
   });
+  if (sessionStore || dashboardAuth) {
+    if (!sessionStore || !dashboardAuth) {
+      throw new TypeError("Dashboard authentication requires both credentials and a session store.");
+    }
+    registerAuthRoutes(router, {
+      dashboardAuth,
+      sessionStore,
+      sessionTtlMs: sessionStore.ttlMs
+    });
+  }
   if (dataRepositories) {
     registerDataRoutes(router, dataRepositories, { now, getOperationalHealth, getSystemMetrics });
   }

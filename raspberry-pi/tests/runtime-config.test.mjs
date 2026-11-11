@@ -9,6 +9,8 @@ function validEnvironment(overrides = {}) {
     DATABASE_USER: "runtime_reader",
     DATABASE_PASSWORD: "test-password",
     DATABASE_SSL: "false",
+    DASHBOARD_USERNAME: "operator",
+    DASHBOARD_PASSWORD_HASH: "$2a$10$mqVzXb8xEv/4khOjtskpme6LMSS9d/BQTwDX/LLAm7ig6xKOgptea",
     ...overrides
   };
 }
@@ -19,6 +21,10 @@ test("runtime config defaults to loopback API and disables live trading", () => 
   assert.deepEqual(config.api, {
     host: "127.0.0.1",
     port: 3002,
+    dashboardAuth: {
+      username: "operator",
+      passwordHash: "$2a$10$mqVzXb8xEv/4khOjtskpme6LMSS9d/BQTwDX/LLAm7ig6xKOgptea"
+    },
     corsOrigins: [],
     cloudflareAccess: {
       enabled: false,
@@ -43,6 +49,22 @@ test("runtime config defaults to loopback API and disables live trading", () => 
   });
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
+});
+
+test("runtime config requires one dashboard username and a bounded bcrypt hash", () => {
+  assert.deepEqual(readRuntimeConfig(validEnvironment()).api.dashboardAuth, {
+    username: "operator",
+    passwordHash: "$2a$10$mqVzXb8xEv/4khOjtskpme6LMSS9d/BQTwDX/LLAm7ig6xKOgptea"
+  });
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    DASHBOARD_USERNAME: ""
+  })), /DASHBOARD_USERNAME/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    DASHBOARD_PASSWORD_HASH: "plain-text-password"
+  })), /valid bcrypt hash/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    DASHBOARD_USERNAME: "operator\nadmin"
+  })), /DASHBOARD_USERNAME/);
 });
 
 test("runtime config requires AI writer credentials as a pair", () => {

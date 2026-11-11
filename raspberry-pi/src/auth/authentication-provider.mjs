@@ -21,7 +21,7 @@ export class SessionAuthenticationProvider extends AuthenticationProvider {
   }
 
   async authenticate(request) {
-    const token = readCookie(request.headers.cookie, this.cookieName);
+    const token = readSessionCookie(request.headers.cookie, this.cookieName);
     if (!token) {
       return null;
     }
@@ -30,7 +30,7 @@ export class SessionAuthenticationProvider extends AuthenticationProvider {
   }
 }
 
-function readCookie(header, cookieName) {
+export function readSessionCookie(header, cookieName = "__Host-cp_session") {
   if (typeof header !== "string" || header.length > 8192) {
     return null;
   }

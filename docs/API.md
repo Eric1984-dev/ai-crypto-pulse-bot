@@ -1,41 +1,38 @@
 # API Endpoints
 
-> **Migration target:** this document describes the current Vercel/Supabase implementation. After an explicitly approved and validated cutover, the Pi-hosted endpoint, authentication, and polling contract in [the target API architecture](./migration/api-architecture.md) supersedes these transport-specific descriptions. The target is documentation only and is not active.
+> **Active dashboard transport:** the Vercel dashboard now uses the Raspberry Pi API and single-admin session described in the [Phase 9 authentication report](../raspberry-pi/docs/phase-9-dashboard-authentication.md). The older Vercel/Supabase endpoint contracts below are retained as historical/legacy API documentation and are not used by the active dashboard.
 
-## Phase 02 Authentication endpoints
+## Active dashboard authentication and proxy
 
-These Vercel Functions support Supabase Authentication only. The Supabase anon key is intentionally public for browser Auth requests; no service-role key or other server secret is returned.
-
-### GET /api/auth-config
-
-Returns `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the server environment with `Cache-Control: no-store`. This endpoint returns only the Supabase public anon key and URL.
+The browser uses the same-origin Vercel functions so its `__Host-cp_session` cookie is sent with dashboard requests. Vercel forwards only that opaque session cookie to the Pi; the Pi validates it against its in-memory session store. No password, bcrypt hash, or database credential is sent to the browser or Vercel.
 
 ### POST /api/auth-session
 
-Validates a Supabase access token against Supabase Auth and sets a short-lived, `HttpOnly`, `SameSite=Lax` session cookie.
+Proxies username/password login to `POST /api/v1/auth/login`. The Pi compares the password with `DASHBOARD_PASSWORD_HASH` and issues an opaque session cookie on success. Requests require JSON and an allowlisted `Origin`; invalid credentials return `401`.
 
-Request:
+### GET /api/auth-session
 
-```json
-{
-  "accessToken": "<Supabase access token>",
-  "expiresIn": 3600
-}
-```
-
-Success: `204 No Content`. Invalid session: `400` or `401`. Missing configuration or unavailable Auth service: `503`.
+Proxies `GET /api/v1/auth/session`, returning the CSRF token and session expiry to the same-origin dashboard. Missing or expired sessions return `401`.
 
 ### DELETE /api/auth-session
 
-Clears the server-side route-guard cookie. Success: `204 No Content`.
+Proxies `DELETE /api/v1/auth/session`. The request must include the session cookie, allowlisted `Origin`, and session-bound `X-CSRF-Token`; success revokes the in-memory session and clears the browser cookie.
 
 ### Protected page routes
 
-Vercel rewrites `dashboard.html`, `analytics.html`, `portfolio.html`, `scanner.html`, `history.html`, and `settings.html` to `/api/protected-page`. The function verifies the HttpOnly cookie with Supabase Auth before returning the page. Unauthenticated or invalid sessions receive a `302` redirect to `/login.html` with a safe internal `next` path. Supabase Auth unavailability fails closed with `503`.
+Vercel routes `/dashboard`, `/portfolio`, `/scanner`, `/analytics`, `/recommendations`, `/history`, `/exports`, `/settings`, and `/admin` through the existing `/api/protected-page` function. It verifies the session with the Pi before serving the HTML; missing/expired sessions receive a `302` redirect to `/login.html` with a safe internal `next` path. Pi unavailability fails closed with `503`.
 
-Registration, login, logout, password-reset email, and password updates use the Supabase JS Auth SDK directly. No application database, market, trading, or scanner API is implemented in Phase 02.
+### Dashboard data proxy
 
-## Phase 04 dashboard endpoint
+Browser calls to `/api/dashboard-data?path=<encoded-Pi-path>` use the existing dashboard-data function as a proxy to an allowlisted `/api/v1/` URL on the configured Pi origin. The Pi enforces authentication on dashboard data, market, monitoring, and operational routes. `GET /api/v1/health/live` and `/api/v1/health/ready` remain public health checks; no trading or portfolio-write endpoint is added.
+
+The Pi requires `DASHBOARD_USERNAME` and a bcrypt `DASHBOARD_PASSWORD_HASH`. Sessions use `HttpOnly; Secure; SameSite=Lax`, default to an eight-hour lifetime, and are held in memory; a runtime restart invalidates them. Configure `API_CORS_ORIGINS` to the exact Vercel origin. See the Phase 9 report for deployment and verification steps.
+
+## Legacy Phase 02 Authentication endpoints
+
+The following descriptions document the original Supabase authentication implementation; they are not the active Pi-dashboard login flow. Registration, Supabase session exchange, and password recovery are outside migration Phase 9.
+
+## Legacy Phase 04 Supabase dashboard endpoint
 
 ### GET /api/dashboard-data
 
