@@ -180,6 +180,57 @@ test("paper repository acquires its transaction lock and status updates use dist
   assert.equal(statements.at(-1).sql, "COMMIT");
 });
 
+test("paper repository evaluates shadow exits in a separate transaction", async () => {
+  const statements = [];
+  const evaluation = {
+    status: "COMPLETED",
+    positionsEvaluated: 2,
+    scenariosCreated: 1,
+    scenariosUpdated: 1,
+    scenariosTriggered: 0,
+    positionsFinalized: 0,
+    waitingForFreshData: 0
+  };
+  const repository = new PaperTradingRepository({
+    async connect() {
+      return {
+        async query(sql) {
+          statements.push(sql);
+          return sql.includes("AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios")
+            ? { rows: [{ evaluation }] }
+            : { rows: [] };
+        },
+        release() {}
+      };
+    }
+  });
+
+  assert.deepEqual(await repository.evaluateShadowExitScenarios(), evaluation);
+  assert.equal(statements[0], "BEGIN READ WRITE");
+  assert.match(statements[1], /SELECT public\."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"\(\)/);
+  assert.equal(statements[2], "COMMIT");
+});
+
+test("paper repository rejects malformed shadow-exit evaluator results", async () => {
+  const repository = new PaperTradingRepository({
+    async connect() {
+      return {
+        async query(sql) {
+          return sql.includes("AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios")
+            ? { rows: [{ evaluation: { status: "COMPLETED", scenariosCreated: -1 } }] }
+            : { rows: [] };
+        },
+        release() {}
+      };
+    }
+  });
+
+  await assert.rejects(
+    repository.evaluateShadowExitScenarios(),
+    { code: "SHADOW_EXIT_RESULT_INVALID" }
+  );
+});
+
 test("paper repository attaches emergency-state SELECT context to SQLSTATE errors", async () => {
   const denied = Object.assign(
     new Error('permission denied for table "AI_Crypto_Bot_Emergency_State"'),

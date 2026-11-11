@@ -51,6 +51,26 @@ The scheduler is process-local, UTC-aligned, non-overlapping, and guarded by a s
 
 The runtime requires a dedicated, non-owner `PAPER_DATABASE_USER` and `PAPER_DATABASE_PASSWORD`, distinct from the API, ingestion, and AI roles. `npm start` validates all four role contracts at startup. See the [Phase 7 implementation report](docs/phase-7-implementation-report.md) for exact existing-table grants, scheduler assumptions, systemd deployment steps, and validation status. The sample systemd unit is [deploy/cryptopulse-runtime.service](deploy/cryptopulse-runtime.service).
 
+## Shadow-exit simulation
+
+The paper-trading runtime invokes the existing `AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios()` database function before paper processing and again after a cycle that executes trades. Each invocation uses its own transaction and the function's advisory lock. Shadow exits only record hypothetical outcomes; they do not execute trades, modify real paper positions, or affect risk decisions. Evaluator failures are logged and surfaced as `lastCycle.stages.shadowExits` by `/api/v1/monitoring`, but do not roll back or block paper trading.
+
+Before restarting the runtime, confirm the evaluator and both shadow-exit tables are installed. Apply the [Phase 8.9 permission migration](migrations/phase-8.9-shadow-exit-runtime-permissions.sql) as the database schema owner, replacing the placeholder with the exact `PAPER_DATABASE_USER` role configured in the Pi's local `.env`:
+
+```sh
+cd raspberry-pi
+psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store <<'SQL'
+SELECT pg_catalog.set_config(
+  'cryptopulse.paper_database_user',
+  'YOUR_PAPER_DATABASE_USER',
+  false
+);
+\i migrations/phase-8.9-shadow-exit-runtime-permissions.sql
+SQL
+```
+
+The migration fails if the function is absent, has an unexpected signature/security configuration, or the configured paper role is privileged. It grants the paper role schema usage and function execution only; it does not grant direct access to either shadow-exit table, alter the function owner, or create database objects. If the function is missing, do not apply the legacy Supabase migration wholesale; resolve the database function installation separately before enabling the runtime integration. After migration, restart the Pi runtime and check `GET /api/v1/monitoring`; the latest cycle should report `shadowExits: "COMPLETED"` or `"SKIPPED"`. No rows are expected until there are open positions and fresh market data. See the [shadow-exit reactivation report](docs/reports/shadow-exit-reactivation.md) for implementation and local validation evidence.
+
 ## systemd deployment profile
 
 The checked-in [systemd unit](deploy/cryptopulse-runtime.service) matches the Raspberry Pi deployment reported as passing runtime validation, restart validation, and reboot validation:
@@ -94,7 +114,7 @@ npm start
 
 - `GET /api/v1/health/live` — process liveness only.
 - `GET /api/v1/health/ready` — coarse read-only database readiness; it does not expose database, schema, or market details.
-- `GET /api/v1/health/operational` — bounded runtime/resource counters and last-cycle ingestion, AI, and paper-trading stage outcomes, protected by the `admin` role and denied by default.
+- `GET /api/v1/health/operational` — bounded runtime/resource counters and last-cycle ingestion, AI, paper-trading, and shadow-exit stage outcomes, protected by the `admin` role and denied by default.
 - `POST /api/v1/auth/login`, `GET /api/v1/auth/session`, and `DELETE /api/v1/auth/session` — single-admin login, session lookup, and CSRF-protected session revocation.
 - `GET /api/v1/markets` — enabled watched-market rows, ordered by priority then symbol.
 - `GET /api/v1/market?symbol=BTC-EUR&interval=1m&limit=200` — one enabled market's stored snapshot and bounded newest-first candle history.
@@ -106,7 +126,7 @@ npm start
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
-- `GET /api/v1/monitoring` — runtime status, last-cycle stages, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
+- `GET /api/v1/monitoring` — runtime status, last-cycle stages including shadow-exit evaluation, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
 
 Dashboard authentication uses one administrator configured with `DASHBOARD_USERNAME` and a bcrypt `DASHBOARD_PASSWORD_HASH`. Runtime startup fails closed if either value is missing or the hash is invalid. Login creates an opaque in-memory session; data and operational routes require that session. The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after `API_SESSION_TTL_MS` (eight hours by default). Runtime restarts invalidate sessions, so the operator must sign in again.
 

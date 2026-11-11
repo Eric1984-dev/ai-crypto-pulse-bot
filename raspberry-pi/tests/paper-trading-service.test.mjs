@@ -145,6 +145,53 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
   assert.deepEqual(repository.calls, ["buy"]);
 });
 
+test("shadow exits run before the paper cycle and after executed trades", async () => {
+  const repository = makeRepository();
+  const events = [];
+  const insertBuy = repository.insertBuy;
+  repository.insertBuy = async (...args) => {
+    events.push("buy");
+    return insertBuy(...args);
+  };
+  repository.evaluateShadowExitScenarios = async () => {
+    events.push("shadow");
+    return {
+      status: "COMPLETED",
+      positionsEvaluated: 0,
+      scenariosCreated: 0,
+      scenariosUpdated: 0,
+      scenariosTriggered: 0,
+      positionsFinalized: 0,
+      waitingForFreshData: 0
+    };
+  };
+
+  const result = await makeService(repository).run();
+
+  assert.equal(result.tradesExecuted, 1);
+  assert.deepEqual(events, ["shadow", "buy", "shadow"]);
+  assert.equal(result.shadowExitEvaluation.status, "COMPLETED");
+});
+
+test("shadow-exit failures are logged and do not block paper trading", async () => {
+  const logs = [];
+  const repository = makeRepository({
+    evaluateShadowExitScenarios: async () => {
+      throw Object.assign(new Error("permission denied"), { code: "42501" });
+    }
+  });
+
+  const result = await makeService(repository, logs).run();
+
+  assert.equal(result.status, "COMPLETED");
+  assert.equal(result.tradesExecuted, 1);
+  assert.deepEqual(result.shadowExitEvaluation, {
+    status: "FAILED",
+    errorCode: "42501"
+  });
+  assert.equal(logs.filter(({ event }) => event === "shadow_exit_evaluation_failed").length, 2);
+});
+
 test("multiple decisions retain drawdown baselines after partial trade-state updates", async () => {
   const secondDecisionId = "00000000-0000-4000-8000-000000000004";
   const repository = makeRepository({

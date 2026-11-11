@@ -48,7 +48,8 @@ function safeCycle(cycle) {
     ? Object.freeze({
       ingestion: safeStatus(cycle.stages.ingestion, ["completed", "partial", "FAILED"]),
       aiAnalysis: safeStatus(cycle.stages.aiAnalysis, ["completed", "FAILED"]),
-      paperTrading: safeStatus(cycle.stages.paperTrading, ["COMPLETED", "SKIPPED", "FAILED"])
+      paperTrading: safeStatus(cycle.stages.paperTrading, ["COMPLETED", "SKIPPED", "FAILED"]),
+      shadowExits: safeStatus(cycle.stages.shadowExits, ["COMPLETED", "SKIPPED", "FAILED"])
     })
     : undefined;
   return Object.freeze({

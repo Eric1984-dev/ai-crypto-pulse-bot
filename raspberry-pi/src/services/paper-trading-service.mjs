@@ -81,7 +81,8 @@ export function createPaperTradingService({
     async run() {
       const currentTime = readTime(now());
       try {
-        return await repository.withTransaction(async (client) => {
+        const shadowExitBefore = await evaluateShadowExits(repository, logger);
+        const tradingResult = await repository.withTransaction(async (client) => {
           if (!await repository.tryAcquireRunLock(client)) {
             return skipped("RUN_IN_PROGRESS");
           }
@@ -293,6 +294,14 @@ export function createPaperTradingService({
           }
           return Object.freeze(result);
         });
+        const shadowExitAfter = Number.isSafeInteger(tradingResult?.tradesExecuted)
+          && tradingResult.tradesExecuted > 0
+          ? await evaluateShadowExits(repository, logger)
+          : null;
+        const shadowExitEvaluation = shadowExitAfter || shadowExitBefore;
+        return shadowExitEvaluation
+          ? Object.freeze({ ...tradingResult, shadowExitEvaluation })
+          : tradingResult;
       } catch (error) {
         const wrapped = error instanceof PaperTradingServiceError
           ? error
@@ -317,6 +326,37 @@ export function createPaperTradingService({
       });
     }
   });
+}
+
+async function evaluateShadowExits(repository, logger) {
+  if (typeof repository.evaluateShadowExitScenarios !== "function") {
+    return null;
+  }
+  try {
+    const result = await repository.evaluateShadowExitScenarios();
+    if (result?.status === "FAILED") {
+      logger.error(JSON.stringify({
+        event: "shadow_exit_evaluation_failed",
+        component: "shadow-exit-evaluator",
+        code: safeShadowExitCode(result.errorCode)
+      }));
+    }
+    return result;
+  } catch (error) {
+    const errorCode = safeShadowExitCode(error?.code);
+    logger.error(JSON.stringify({
+      event: "shadow_exit_evaluation_failed",
+      component: "shadow-exit-evaluator",
+      code: errorCode
+    }));
+    return Object.freeze({ status: "FAILED", errorCode });
+  }
+}
+
+function safeShadowExitCode(value) {
+  return typeof value === "string" && /^[A-Z0-9_]{1,64}$/.test(value)
+    ? value
+    : "SHADOW_EXIT_EVALUATION_FAILED";
 }
 
 export function createTradeIdempotencyKey(portfolioId, decisionId) {

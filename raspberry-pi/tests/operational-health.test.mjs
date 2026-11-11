@@ -14,7 +14,8 @@ test("operational health exposes bounded outcomes for each completed runtime sta
         stages: {
           ingestion: "partial",
           aiAnalysis: "completed",
-          paperTrading: "SKIPPED"
+          paperTrading: "SKIPPED",
+          shadowExits: "COMPLETED"
         }
       }
     },
@@ -29,7 +30,8 @@ test("operational health exposes bounded outcomes for each completed runtime sta
   assert.deepEqual(health.lastCycle.stages, {
     ingestion: "partial",
     aiAnalysis: "completed",
-    paperTrading: "SKIPPED"
+    paperTrading: "SKIPPED",
+    shadowExits: "COMPLETED"
   });
 });
 
@@ -44,7 +46,8 @@ test("operational health drops unrecognized stage status values", () => {
         stages: {
           ingestion: "unexpected",
           aiAnalysis: "completed",
-          paperTrading: "SKIPPED"
+          paperTrading: "SKIPPED",
+          shadowExits: "unexpected"
         }
       }
     },
@@ -56,4 +59,5 @@ test("operational health drops unrecognized stage status values", () => {
   });
 
   assert.equal(health.lastCycle.stages.ingestion, null);
+  assert.equal(health.lastCycle.stages.shadowExits, null);
 });

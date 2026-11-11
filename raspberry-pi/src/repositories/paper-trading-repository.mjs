@@ -10,6 +10,9 @@ const SYMBOL_PATTERN = /^[A-Z0-9]+-EUR$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUS_VALUES = new Set(["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"]);
 const EMERGENCY_VALUES = new Set(["NORMAL", "PAUSED", "EMERGENCY_STOP"]);
+const SHADOW_EXIT_EVALUATION_SQL = `
+  SELECT public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"() AS evaluation
+`;
 
 const SYSTEM_PROFILE_SQL = `
   SELECT id
@@ -365,6 +368,19 @@ export class PaperTradingRepository {
       (client) => operation(createPaperTradingQueryClient(client)),
       { logger: this.logger }
     );
+  }
+
+  evaluateShadowExitScenarios() {
+    return this.withTransaction(async (client) => {
+      const result = await client.query(SHADOW_EXIT_EVALUATION_SQL);
+      if (result.rows.length !== 1) {
+        throw new PaperTradingRepositoryError(
+          "The shadow-exit evaluator returned an invalid result.",
+          "SHADOW_EXIT_RESULT_INVALID"
+        );
+      }
+      return validateShadowExitEvaluation(result.rows[0].evaluation);
+    });
   }
 
   async tryAcquireRunLock(client) {
@@ -947,6 +963,42 @@ function validateStatusRow(row) {
       ? null
       : requireTimestamp(row.last_run, "runtime last-run timestamp")
   });
+}
+
+function validateShadowExitEvaluation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new PaperTradingRepositoryError(
+      "The shadow-exit evaluator returned an invalid result.",
+      "SHADOW_EXIT_RESULT_INVALID"
+    );
+  }
+  if (value.status === "SKIPPED" && value.reason === "RUN_IN_PROGRESS") {
+    return Object.freeze({ status: value.status, reason: value.reason });
+  }
+  if (value.status === "FAILED"
+    && typeof value.errorCode === "string"
+    && /^[0-9A-Z]{5}$/.test(value.errorCode)) {
+    return Object.freeze({ status: value.status, errorCode: value.errorCode });
+  }
+  const counters = [
+    "positionsEvaluated",
+    "scenariosCreated",
+    "scenariosUpdated",
+    "scenariosTriggered",
+    "positionsFinalized",
+    "waitingForFreshData"
+  ];
+  if (value.status === "COMPLETED"
+    && counters.every((key) => Number.isSafeInteger(value[key]) && value[key] >= 0)) {
+    return Object.freeze({
+      status: value.status,
+      ...Object.fromEntries(counters.map((key) => [key, value[key]]))
+    });
+  }
+  throw new PaperTradingRepositoryError(
+    "The shadow-exit evaluator returned an invalid result.",
+    "SHADOW_EXIT_RESULT_INVALID"
+  );
 }
 
 function validateUuidList(values) {

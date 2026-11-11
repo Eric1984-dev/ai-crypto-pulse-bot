@@ -38,7 +38,8 @@ export function createRuntimeCycle({
       const stages = {
         ingestion: null,
         aiAnalysis: null,
-        paperTrading: null
+        paperTrading: null,
+        shadowExits: null
       };
       try {
         await assertOwnership();
@@ -84,6 +85,7 @@ export function createRuntimeCycle({
           throw new RuntimeCycleError(stage);
         }
         stages.paperTrading = trading.status;
+        stages.shadowExits = trading.shadowExitEvaluation?.status || null;
 
         stage = "data-retention";
         const retention = retentionService.plan();
@@ -109,6 +111,7 @@ export function createRuntimeCycle({
           ingestionStatus: ingestion.status,
           analysisStatus: analysis.status,
           tradingStatus: trading.status,
+          shadowExitStatus: stages.shadowExits,
           retentionDeletionEnabled: retention.deletionEnabled
         }));
         return result;
