@@ -25,12 +25,16 @@ The dashboard monitoring card is labeled **Raspberry Pi**, including its accessi
 | Syntax checks for changed JavaScript modules | Passed: 5 modules |
 | `git diff --check` | Passed |
 
-Live Raspberry Pi validation was not run from this worktree. The local tests verify the status transitions and static dashboard labels; they do not establish live service or browser behavior on the Pi.
+After the merge to `main`, the dashboard integration tests (38 tests), full Raspberry Pi package tests (173 tests), syntax checks, and merge-patch whitespace checks were rerun successfully.
 
-## GitHub and Vercel Preview
+## Merge and deployment correction
 
-The user authorized pushing a feature branch to trigger GitHub and Vercel Preview validation. Remote checks are pending the initial push and will be recorded here after they complete.
+The implementation was initially committed as `d428f3462e7459ab5f886e3ffa3d05a0fd356f0d` on `phase-8.6-dashboard-ui-alignment`. The branch later advanced to `4474a8aeeff547850904c88f507ef58e5d0ba2f8`; that follow-up only added a trailing blank line to `raspberry-pi/src/api/api-error.mjs`. At the time of the deployment correction, `main` pointed to `16cb328` (`test commit`) and did not contain the Phase 8.6 implementation. The root cause was that the feature branch had never been merged into `main`.
+
+The feature branch was merged into `main` in commit `efb87747750df7a2ba27aa7a91f275a48f9d9906`, and the push to `origin/main` succeeded. GitHub reported the Vercel check as `success` for that merge commit: [Vercel deployment status](https://vercel.com/erics-projects-998b3609/ai-crypto-pulse-bot/3B5pXBFarRHkxBn6Vjp7K632z47y). Fetching the production dashboard confirmed that the visible infrastructure heading is **Raspberry Pi**.
+
+The Raspberry Pi runtime is separate from the Vercel static-site deployment. The checked-in systemd unit starts `node src/index.mjs` from the Pi's local working directory; it does not pull or deploy repository changes. A live `GET /api/v1/agent-status` request after the `main` merge still returned `{"data":{"status":"IDLE"}}`. No Pi-side code update or systemd restart was performed from this worktree, so the `ACTIVE` status change is merged and locally validated but is not yet live.
 
 ## Assessment
 
-The requested UI alignment is implemented and locally tested. This report does not mark the broader dashboard migration complete, assert live-Pi validation, or start Phase 9.
+The branch and merge root cause are resolved. The Raspberry Pi label is live on Vercel Production, and `main` contains the runtime status implementation. Phase 8.6 deployment acceptance remains incomplete until the updated runtime is installed and restarted on the Raspberry Pi and `/api/v1/agent-status` returns `ACTIVE` during healthy operation. No Phase 9 work was started.
