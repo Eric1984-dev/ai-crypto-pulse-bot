@@ -153,6 +153,10 @@ npm start
 
 The analytics API remains read-only. Analytics history is generated only by an explicit operator command; it is not generated on dashboard reads or by the scheduler:
 
+See the [Phase 11.1 analytics writer role activation procedure](docs/phase-11.1-analytics-role-activation.md)
+for the PostgreSQL role, minimum grants, Pi environment variables, migration,
+and validation steps.
+
 ```sh
 npm run analytics:generate -- --period=30d
 npm run analytics:generate -- --period=90d --as-of=2026-03-31T00:00:00.000Z
