@@ -5,7 +5,7 @@
 - Phases 1–9: the operator reports the Raspberry Pi runtime, database, scheduler, trading services, dashboard, single-admin authentication, and tunnel operational. See the [Phase 7.7 validation](raspberry-pi/docs/phase-7.7-operational-validation.md), [Phase 8 cutover](raspberry-pi/docs/phase-8-dashboard-cutover.md), and [Phase 9 authentication](raspberry-pi/docs/phase-9-dashboard-authentication.md).
 - Phase 10: conservative post-migration cleanup is being validated. See the [cleanup report](docs/post-migration-cleanup-report.md).
 - Phase 11: not started.
-- Shadow-exit runtime/dashboard support is implemented in the Pi code; production activation still requires the operator-applied Phase 8.9 and 8.10 permissions migrations and a runtime restart.
+- Shadow-exit runtime/dashboard support is implemented in the Pi code. A missing evaluator is installed by the operator-applied Phase 8.11 Pi migration; Phase 8.10 separately grants dashboard reads. Production activation and generated records still require operator migration/restart and live verification.
 
 Production status is operator-reported unless a specific live check is recorded. Do not infer deployment, database, or runtime verification from local tests.
 

@@ -11,6 +11,7 @@ All notable project changes should be documented here.
 - Read bounded shadow-exit scenarios and recent events through the existing authenticated Raspberry Pi dashboard API
 - Display canonical evaluator states (`TRIGGERED`, `TRACKING`, and data-quality status) correctly and show scenario event details
 - Add a separate read-only PostgreSQL permission migration for the configured dashboard API role; shadow-read failures remain isolated from portfolio data
+- Add a Pi-only evaluator installation migration for databases where the evaluator function is absent; the existing Phase 8.10 migration remains dashboard-read-only
 
 ### Raspberry Pi migration — Phase 10 post-migration cleanup
 

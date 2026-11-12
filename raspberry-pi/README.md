@@ -55,7 +55,7 @@ The runtime requires a dedicated, non-owner `PAPER_DATABASE_USER` and `PAPER_DAT
 
 The paper-trading runtime invokes the existing `AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios()` database function before paper processing and again after a cycle that executes trades. Each invocation uses its own transaction and the function's advisory lock. Shadow exits only record hypothetical outcomes; they do not execute trades, modify real paper positions, or affect risk decisions. Evaluator failures are logged and surfaced as `lastCycle.stages.shadowExits` by `/api/v1/monitoring`, but do not roll back or block paper trading.
 
-Before restarting the runtime, confirm the evaluator and both shadow-exit tables are installed. Apply the [Phase 8.9 permission migration](migrations/phase-8.9-shadow-exit-runtime-permissions.sql) as the database schema owner, replacing the placeholder with the exact `PAPER_DATABASE_USER` role configured in the Pi's local `.env`:
+Phase 8.10 only grants the dashboard API read access; it does not install the evaluator. If the evaluator is missing (for example, PostgreSQL returns SQLSTATE `42883`), apply the [Phase 8.11 evaluator installation migration](migrations/phase-8.11-shadow-exit-evaluator-installation.sql) as the database schema owner. It installs only the Pi-compatible function and grants execution to the exact `PAPER_DATABASE_USER` role configured in the Pi's local `.env`:
 
 ```sh
 cd raspberry-pi
@@ -65,11 +65,11 @@ SELECT pg_catalog.set_config(
   'YOUR_PAPER_DATABASE_USER',
   false
 );
-\i migrations/phase-8.9-shadow-exit-runtime-permissions.sql
+\i migrations/phase-8.11-shadow-exit-evaluator-installation.sql
 SQL
 ```
 
-The migration fails if the function is absent, has an unexpected signature/security configuration, or the configured paper role is privileged. It grants the paper role schema usage and function execution only; it does not grant direct access to either shadow-exit table, alter the function owner, or create database objects. If the function is missing, do not apply the legacy Supabase migration wholesale; resolve the database function installation separately before enabling the runtime integration. After migration, restart the Pi runtime and check `GET /api/v1/monitoring`; the latest cycle should report `shadowExits: "COMPLETED"` or `"SKIPPED"`. No rows are expected until there are open positions and fresh market data. See the [shadow-exit reactivation report](docs/reports/shadow-exit-reactivation.md) for implementation and local validation evidence.
+The migration requires the existing positions, trades, market-data, and shadow-exit tables; it does not create or alter tables. It fails if the evaluator already exists, the migration owner cannot securely access its required tables, or the configured paper role is privileged. The function is installed as `SECURITY DEFINER` with a pinned empty `search_path`; the paper role receives schema usage and function execution only, not direct shadow-table access. Do not apply the legacy Supabase migration wholesale to the Pi. If the evaluator already exists, use the [Phase 8.9 permission migration](migrations/phase-8.9-shadow-exit-runtime-permissions.sql) instead. After applying the appropriate migration, restart the Pi runtime and check `GET /api/v1/monitoring`; the latest cycle should report `shadowExits: "COMPLETED"` or `"SKIPPED"`. No rows are expected until there are open positions and fresh market data. See the [shadow-exit reactivation report](docs/reports/shadow-exit-reactivation.md) for implementation and local validation evidence.
 
 The authenticated dashboard reads these records through the API's read-only `DATABASE_USER`. Apply the [Phase 8.10 dashboard-read permission migration](migrations/phase-8.10-shadow-exit-dashboard-read.sql) as the database schema owner, setting `cryptopulse.dashboard_database_user` to the exact `DATABASE_USER` configured on the Pi:
 
