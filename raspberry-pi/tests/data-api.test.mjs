@@ -5,7 +5,10 @@ import { buildDashboardAnalytics } from "../src/services/dashboard-analytics.mjs
 import { AiDecisionsRepository } from "../src/repositories/ai-decisions-repository.mjs";
 import { MarketDataRepository } from "../src/repositories/market-data-repository.mjs";
 import { RuntimeStatusRepository } from "../src/repositories/runtime-status-repository.mjs";
-import { RepositoryDataError } from "../src/repositories/postgres-read.mjs";
+import {
+  RepositoryDataError,
+  RepositoryUnavailableError
+} from "../src/repositories/postgres-read.mjs";
 import {
   MAX_ENABLED_MARKETS,
   WatchedMarketsRepository
@@ -179,6 +182,9 @@ function createRepositories(pool, logger = { error() {} }, dashboardOverrides = 
           emergencyState: { status: "NORMAL" },
           lastMarketDataAt: null
         };
+      },
+      async getShadowExitScenarios() {
+        return { status: "AVAILABLE", positions: [] };
       },
       async getTradeHistory({ page, pageSize }) {
         return {
@@ -494,8 +500,32 @@ test("market summary and dashboard expose bounded stored data without synthesizi
     assert.equal(body.data.marketData.count, 1);
     assert.equal(body.data.portfolio.count, 0);
     assert.equal(body.data.openPositions.count, 0);
+    assert.deepEqual(body.data.shadowExitScenarios, {
+      status: "AVAILABLE",
+      positions: []
+    });
     assert.equal(body.data.recentTrades.count, 0);
     assert.equal(body.data.emergencyState.status, "NORMAL");
+  });
+});
+
+test("shadow-exit dashboard read failures are explicit without failing dashboard data", async () => {
+  const pool = createPool();
+  await withServer({
+    dataRepositories: createRepositories(pool, { error() {} }, {
+      async getShadowExitScenarios() {
+        throw new RepositoryUnavailableError(new Error("permission denied"));
+      }
+    })
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/dashboard-data`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.data.shadowExitScenarios, {
+      status: "UNAVAILABLE",
+      positions: []
+    });
+    assert.equal(body.data.portfolio.count, 0);
   });
 });
 

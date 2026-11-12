@@ -383,23 +383,31 @@ test("dashboard displays prospective shadow rule outcomes separately from actual
             rule_name: "Fixed take-profit · +5%",
             rule_version: "1.0.0",
             parameters: { targetGainPct: 5 },
-            status: "TRIGGERED_HYPOTHETICALLY",
+            status: "TRIGGERED",
             tracking_started_at: "2026-03-20T10:01:00.000Z",
             triggered_at: "2026-03-20T10:20:00.000Z",
             trigger_mark: 95,
             modeled_net_pnl: 4.25,
-            data_quality_status: "FRESH"
+            data_quality_status: "FRESH",
+            events: [{
+              event_type: "HYPOTHETICAL_TRIGGERED",
+              event_at: "2026-03-20T10:20:00.000Z",
+              observed_mark: 95,
+              data_quality_status: "FRESH",
+              error_code: null
+            }]
           },
           {
             rule_id: "trailing_stop_5",
             rule_name: "Trailing stop · arm +5%, retrace 5%",
             rule_version: "1.0.0",
             parameters: { armGainPct: 5, drawdownPct: 5 },
-            status: "WAITING_FOR_FRESH_DATA",
+            status: "TRACKING",
             tracking_started_at: "2026-03-20T10:01:00.000Z",
             last_mark: 94,
             last_mark_captured_at: "2026-03-20T10:19:00.000Z",
-            data_quality_status: "STALE"
+            data_quality_status: "STALE",
+            events: []
           }
         ]
       },
@@ -430,6 +438,7 @@ test("dashboard displays prospective shadow rule outcomes separately from actual
   const positionCards = elements.get("[data-shadow-exit-list]")[0].children;
   assert.equal(positionCards.length, 2);
   assert.match(positionCards[0].textContent, /Fixed take-profit · \+5%.*Triggered hypothetically · no trade placed.*\+€4\.25/);
+  assert.match(positionCards[0].textContent, /Hypothetical exit triggered.*Observed mark €95\.00/);
   assert.match(positionCards[0].textContent, /last valid state retained.*€94\.00/);
   assert.match(positionCards[1].textContent, /Actual close time.*Actual SELL execution price.*Actual net P&L.*-€8\.50/);
   assert.equal(

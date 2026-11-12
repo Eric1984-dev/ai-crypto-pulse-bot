@@ -301,6 +301,19 @@ export function registerDataRoutes(router, repositories, {
       "DASHBOARD_DATA_UNAVAILABLE",
       "Dashboard data is temporarily unavailable."
     );
+    let shadowExitScenarios = { status: "UNAVAILABLE", positions: [] };
+    try {
+      shadowExitScenarios = await readRepository(
+        () => repositories.dashboard.getShadowExitScenarios(),
+        "SHADOW_EXIT_DATA_UNAVAILABLE",
+        "Shadow exit scenario data is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: "shadow-exits" }
+      );
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== "SHADOW_EXIT_DATA_UNAVAILABLE") {
+        throw error;
+      }
+    }
 
     sendJson(context, 200, {
       data: {
@@ -309,6 +322,7 @@ export function registerDataRoutes(router, repositories, {
         emergencyState: accountData.emergencyState,
         portfolio: accountData.portfolio,
         openPositions: accountData.openPositions,
+        shadowExitScenarios,
         openPositionAiStatus: accountData.openPositionAiStatus,
         recentTrades: accountData.recentTrades,
         portfolioSnapshots: accountData.portfolioSnapshots,
@@ -514,6 +528,7 @@ function validateRepositories(repositories) {
     aiDecisions: ["listRecent", "listHistory"],
     dashboard: [
       "getSystemDashboardData",
+      "getShadowExitScenarios",
       "getTradeHistory",
       "getAnalytics",
       "getExportRecordCount",

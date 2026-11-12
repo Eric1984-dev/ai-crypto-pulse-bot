@@ -44,3 +44,13 @@ Before restarting the Pi runtime:
 The migration intentionally fails if the function is absent or does not meet the expected security contract. Do not apply the legacy Supabase migration wholesale to the Pi. If the function is absent, its database installation must be resolved separately before the runtime integration can activate.
 
 No historical hypothetical price path can be reconstructed by this change. Scenarios begin from evaluations performed after activation; no rows are expected until eligible positions and fresh market data are available. Live activation and data generation remain operator-verified acceptance checks.
+
+## Dashboard visibility follow-up
+
+The initial runtime integration did not wire the shadow tables into the Pi dashboard repository/API response, so the existing dashboard component received no scenario records even when the database had them. The component also expected the legacy display state `TRIGGERED_HYPOTHETICALLY`, while the evaluator stores `TRIGGERED`; this made a real trigger render as ordinary tracking.
+
+The follow-up adds a bounded dashboard read for open positions and tracked positions closed in the last 30 days, includes up to ten recent events per scenario, and maps the canonical evaluator states correctly. Shadow-query failures are logged and surfaced as `shadowExitScenarios.status: "UNAVAILABLE"` without turning the whole dashboard request into an error. The new Phase 8.10 migration grants the configured read-only `DATABASE_USER` `SELECT` on the two shadow tables only.
+
+Follow-up validation: 28 targeted Raspberry Pi API/repository/auth/migration tests passed, 28 dashboard rendering tests passed, and `git diff --check` passed. No full-suite, live-database, Pi runtime, or Vercel deployment validation was performed for this follow-up.
+
+Production still requires applying both the Phase 8.9 paper-role function permission migration and the Phase 8.10 dashboard-read migration, then restarting the Pi runtime. No production database query, migration, or restart was available from this workspace. The evaluator does not use historical candles or intrabar highs/lows, so it cannot backfill a +6% peak that happened before tracking was active or between observed marks.

@@ -4,7 +4,7 @@
 
 The package is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. The Phase 4 API remains read-only. Phase 5's one-shot Bitvavo ingestion and Phase 6's one-shot AI command remain available for explicit operation; Phase 7 also wires them into the long-running Node.js runtime with paper-only trade processing.
 
-The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and existing PostgreSQL tables. It does not assume or invoke project PostgreSQL runtime functions. The API, ingestion, AI, and paper-trading roles are separately validated; the latter three use bounded worker connections. No schema creation, migration, seed, live trade, or private exchange API is used.
+The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and existing PostgreSQL tables. The paper worker invokes only the existing, simulation-only shadow-exit evaluator; it does not invoke database AI or trade-execution functions. The API, ingestion, AI, and paper-trading roles are separately validated; the latter three use bounded worker connections. No schema creation, migration, seed, live trade, or private exchange API is performed by the runtime.
 
 ## Lifecycle and database access
 
@@ -13,7 +13,7 @@ The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and 
 3. Validate ingestion and AI identities/contracts with one short-lived connection each. Open a one-connection paper writer pool and validate its exact existing-table grants.
 4. Require the singleton status row. A leftover `ANALYZING` state is changed to `ERROR`; `STOPPED` is never cleared automatically.
 5. Start the API and an in-process scheduler. UTC cycles run every five minutes and do not replay missed slots. The API pool is capped at two connections including its reserved owner-lock connection, the paper pool at one, and the sequential worker pool at one; total concurrent PostgreSQL connections remain at most four.
-6. Each cycle runs market ingestion, AI analysis, paper trading, then a non-destructive retention plan. A failed ingestion or AI stage skips dependent downstream stages; safely partial per-market ingestion can continue to AI.
+6. Each cycle runs market ingestion, AI analysis, paper trading (including isolated shadow-exit evaluation), then a non-destructive retention plan. A failed ingestion or AI stage skips dependent downstream stages; safely partial per-market ingestion can continue to AI.
 7. On `SIGINT` or `SIGTERM`, stop scheduling, wait up to 120 seconds for the active cycle, preserve `STOPPED`, set status to `IDLE` only when safe, release the lock, and close pools.
 
 The `npm run ingest:market-data -- --intervals=...` command separately validates the existing ingestion contract, reads enabled watched markets, and runs one snapshot/candle pass. It uses no Vercel function, HTTP trigger, external scheduler, or `systemd` timer. Each write uses an explicit `BEGIN READ WRITE` transaction; API repositories continue to use `BEGIN READ ONLY`. No write targets the watched-market table. Database/provider failures are logged with safe codes; credentials and raw error details are never logged.
@@ -36,6 +36,7 @@ The systemd sample is `deploy/cryptopulse-runtime.service`. systemd starts and r
 | Market data and candles | `AI_Crypto_Bot_Watched_Markets`, `AI_Crypto_Bot_Market_Data`, `AI_Crypto_Bot_Candles` | At most 500 snapshots and 500 candles; one market query is constrained to an enabled symbol. |
 | AI decisions | `AI_Crypto_Bot_AI_Decisions` | Most recent 5 for dashboard foundation; repository hard cap 100. |
 | Runtime status | `AI_Crypto_Bot_Status` | At most one singleton row. |
+| Shadow exits | `AI_Crypto_Bot_Shadow_Exit_Scenarios`, `AI_Crypto_Bot_Shadow_Exit_Events` | Up to 350 scenario rows, with up to 10 latest events per scenario; dashboard queries are read-only and optional failures are reported independently. |
 | Ingestion snapshots | `AI_Crypto_Bot_Market_Data` | Upsert the latest snapshot for each existing symbol; the existing unique symbol key prevents snapshot history. |
 | Ingestion candles | `AI_Crypto_Bot_Candles` | At most 500 fetched candles per market/interval and 100 stored rows per write chunk. |
 | Ingestion failure events | `AI_Crypto_Bot_Scanner_Events` | Best-effort, bounded event inserts for missing/invalid provider data and persistence failures. |
@@ -50,7 +51,7 @@ All data endpoints use the existing authentication middleware and return the com
 |---|---|
 | `GET /api/v1/markets` | Returns `{ "data": { "count": n, "items": [...] } }` for enabled watched-market rows. |
 | `GET /api/v1/market?symbol=BTC-EUR&interval=1m&limit=200` | Returns the existing market shape: `symbol`, `interval`, `marketData` (nullable), `candles` (newest first), and `refreshStatus: "read-only"`. Defaults are `1m` and `200`; supported intervals are `1m`, `5m`, `15m`, `1h`, `4h`, `1d`; the maximum candle limit is 500. Missing/malformed symbol is `400`; disabled and nonexistent symbols both return `404 MARKET_NOT_TRACKED`. |
-| `GET /api/v1/dashboard-data` | Returns the existing `generatedAt`, `agentStatus`, `lastMarketDataAt`, `watchedMarkets`, and `aiDecisions` shapes plus bounded `marketData`. It is intentionally partial: it does not fabricate portfolio, positions, trades, emergency, snapshots, shadow-exit, or analytics values. |
+| `GET /api/v1/dashboard-data` | Returns portfolio and current dashboard data, plus up to 350 shadow-exit scenario rows grouped by position and the latest 10 events per scenario. It includes open positions awaiting their first fresh mark and tracked positions closed within 30 days. Shadow data failures return `shadowExitScenarios.status: "UNAVAILABLE"` without hiding actual portfolio data. |
 | `GET /api/v1/agent-status` | Returns `{ "data": { "status": "ACTIVE\|ANALYZING\|IDLE\|STOPPED\|ERROR" } }`; missing or unknown status is `null`. |
 | `GET /api/v1/market-summary` | Returns stored active/data-bearing counts, market snapshot items, `refreshedAt`, and `refreshStatus: "read-only"`. No scanner rankings or refresh is performed. |
 

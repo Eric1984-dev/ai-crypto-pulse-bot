@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Shadow-exit dashboard visibility
+
+- Read bounded shadow-exit scenarios and recent events through the existing authenticated Raspberry Pi dashboard API
+- Display canonical evaluator states (`TRIGGERED`, `TRACKING`, and data-quality status) correctly and show scenario event details
+- Add a separate read-only PostgreSQL permission migration for the configured dashboard API role; shadow-read failures remain isolated from portfolio data
+
 ### Raspberry Pi migration — Phase 10 post-migration cleanup
 
 - Remove the nine obsolete Vercel Supabase/runtime API functions and keep only the three active authentication, protected-page, and Pi API bridge functions

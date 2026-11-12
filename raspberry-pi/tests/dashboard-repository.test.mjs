@@ -56,6 +56,41 @@ async function createDatabase() {
       reason text,
       created_at timestamptz NOT NULL
     );
+    CREATE TABLE public."AI_Crypto_Bot_Shadow_Exit_Scenarios" (
+      id uuid PRIMARY KEY,
+      position_id uuid NOT NULL,
+      portfolio_id uuid NOT NULL,
+      symbol text NOT NULL,
+      position_opened_at timestamptz NOT NULL,
+      rule_id text NOT NULL,
+      rule_version text NOT NULL,
+      parameters jsonb NOT NULL,
+      status text NOT NULL,
+      data_quality_status text NOT NULL,
+      tracking_started_at timestamptz,
+      last_evaluated_at timestamptz NOT NULL,
+      last_mark numeric,
+      last_mark_captured_at timestamptz,
+      high_water_mark numeric,
+      trailing_armed boolean NOT NULL,
+      activated_at timestamptz,
+      triggered_at timestamptz,
+      trigger_mark numeric,
+      modeled_exit_price numeric,
+      modeled_net_pnl numeric,
+      actual_closed_at timestamptz,
+      actual_close_price numeric,
+      actual_net_pnl numeric
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Shadow_Exit_Events" (
+      id uuid PRIMARY KEY,
+      scenario_id uuid NOT NULL,
+      event_type text NOT NULL,
+      event_at timestamptz NOT NULL,
+      observed_mark numeric,
+      data_quality_status text,
+      error_code text
+    );
     CREATE TABLE public."AI_Crypto_Bot_Market_Data" (
       symbol text PRIMARY KEY,
       price numeric NOT NULL,
@@ -170,6 +205,58 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.ok(Array.isArray(analytics.portfolio.drawdownHistory));
     assert.equal(exportCount, 1);
     assert.equal(exportRows[0].symbol, "BTC-EUR");
+  } finally {
+    await database.close();
+  }
+});
+
+test("dashboard repository returns tracked positions, scenario states, and recent events", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Scenarios" (
+        id, position_id, portfolio_id, symbol, position_opened_at, rule_id,
+        rule_version, parameters, status, data_quality_status, tracking_started_at,
+        last_evaluated_at, last_mark, last_mark_captured_at, high_water_mark,
+        trailing_armed, trigger_mark, modeled_exit_price, modeled_net_pnl
+      )
+      VALUES (
+        '00000000-0000-4000-8000-000000000800',
+        '00000000-0000-4000-8000-000000000300',
+        '00000000-0000-4000-8000-000000000200',
+        'BTC-EUR', NOW(), 'fixed_tp_5', '1.0.0', '{"targetGainPct":5}',
+        'TRIGGERED', 'FRESH', NOW(), NOW(), 53000, NOW(), 53000,
+        false, 53000, 52947, 40
+      );
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Events" (
+        id, scenario_id, event_type, event_at, observed_mark, data_quality_status
+      )
+      VALUES (
+        '00000000-0000-4000-8000-000000000801',
+        '00000000-0000-4000-8000-000000000800',
+        'HYPOTHETICAL_TRIGGERED', NOW(), 53000, 'FRESH'
+      );
+    `);
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+
+    const result = await repository.getShadowExitScenarios();
+
+    assert.equal(result.status, "AVAILABLE");
+    assert.equal(result.positions.length, 1);
+    assert.equal(result.positions[0].isOpen, true);
+    assert.equal(result.positions[0].symbol, "BTC-EUR");
+    assert.equal(result.positions[0].scenarios[0].status, "TRIGGERED");
+    assert.equal(result.positions[0].scenarios[0].modeled_net_pnl, 40);
+    assert.equal(result.positions[0].scenarios[0].events[0].event_type, "HYPOTHETICAL_TRIGGERED");
+    assert.equal(result.positions[0].scenarios[0].events[0].observed_mark, 53000);
   } finally {
     await database.close();
   }

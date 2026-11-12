@@ -22,6 +22,7 @@ The operator reports that the Pi runtime, PostgreSQL, ingestion, AI analysis, sc
 ## Runtime and dashboard
 
 - The [Raspberry Pi package](raspberry-pi/) owns the API, PostgreSQL repositories, market ingestion, deterministic AI, risk-managed paper trading, scheduler, and operational monitoring.
+- Shadow exit scenarios are evaluated as simulation-only PostgreSQL records and read by the authenticated dashboard; they never execute trades or modify actual paper positions.
 - The dashboard uses a single administrator account configured on the Pi. Passwords are checked against a bcrypt hash, and the browser receives only the secure session cookie.
 - Monitoring reads the Pi runtime API, including scheduler, process, host, and database metrics. The former archive server is retired and is no longer used.
 - `PostgreSQL/migrations/` and `config/markets.js` remain as historical schema/seed provenance and inputs to local PGlite validation. They do not configure a live Supabase runtime.

@@ -585,9 +585,10 @@
           const parameters = documentRef.createElement("p");
           const version = documentRef.createElement("p");
           const details = documentRef.createElement("dl");
+          let eventList = null;
           ruleItem.className = "shadow-exit-rule";
           ruleHeading.className = "shadow-exit-rule-heading";
-          ruleHeading.textContent = scenario.rule_name || scenario.rule_id || "Shadow rule";
+          ruleHeading.textContent = scenario.rule_name || describeShadowRuleName(scenario.rule_id);
           parameters.className = "shadow-exit-rule-parameters";
           parameters.textContent = describeShadowRuleParameters(scenario);
           version.className = "shadow-exit-rule-version";
@@ -627,7 +628,7 @@
             formatters.formatSignedCurrency(scenario.modeled_net_pnl),
             scenario.modeled_net_pnl
           );
-          if (scenario.status === "WAITING_FOR_FRESH_DATA" && scenario.last_mark !== null) {
+          if (scenario.data_quality_status !== "FRESH" && scenario.last_mark !== null) {
             appendShadowExitField(
               documentRef,
               details,
@@ -636,8 +637,31 @@
               `${formatters.formatPrice(scenario.last_mark)} · ${formatShadowTimestamp(scenario.last_mark_captured_at)}`
             );
           }
+          if (Array.isArray(scenario.events) && scenario.events.length > 0) {
+            eventList = documentRef.createElement("ul");
+            eventList.className = "shadow-exit-event-list";
+            eventList.setAttribute("aria-label", "Recent shadow exit events");
+            for (const event of scenario.events) {
+              const eventItem = documentRef.createElement("li");
+              const pieces = [
+                describeShadowExitEvent(event.event_type),
+                formatShadowTimestamp(event.event_at)
+              ];
+              if (event.observed_mark !== null && event.observed_mark !== undefined) {
+                pieces.push(`Observed mark ${formatters.formatPrice(event.observed_mark)}`);
+              }
+              if (event.error_code) {
+                pieces.push(`Error ${event.error_code}`);
+              }
+              eventItem.textContent = pieces.join(" · ");
+              eventList.append(eventItem);
+            }
+          }
 
           ruleItem.append(ruleHeading, parameters, version, details);
+          if (eventList) {
+            ruleItem.append(eventList);
+          }
           ruleList.append(ruleItem);
         }
 
@@ -684,19 +708,45 @@
     return "Rule parameters unavailable";
   }
 
+  function describeShadowRuleName(ruleId) {
+    const names = {
+      fixed_tp_5: "Fixed take-profit · +5%",
+      fixed_tp_10: "Fixed take-profit · +10%",
+      fixed_tp_15: "Fixed take-profit · +15%",
+      fixed_tp_20: "Fixed take-profit · +20%",
+      trailing_stop_5: "Trailing stop · arm +5%, retrace 5%",
+      trailing_stop_10: "Trailing stop · arm +5%, retrace 10%",
+      trailing_stop_15: "Trailing stop · arm +5%, retrace 15%"
+    };
+    return names[ruleId] || "Shadow rule";
+  }
+
   function describeShadowScenarioStatus(scenario) {
-    if (scenario.status === "TRIGGERED_HYPOTHETICALLY") {
+    if (scenario.status === "TRIGGERED" || scenario.status === "TRIGGERED_HYPOTHETICALLY") {
       return "Triggered hypothetically · no trade placed";
     }
     if (scenario.status === "CLOSED_WITHOUT_TRIGGER") {
       return "Closed without trigger";
     }
-    if (scenario.status === "WAITING_FOR_FRESH_DATA") {
+    if (scenario.status === "WAITING_FOR_FRESH_DATA"
+      || scenario.data_quality_status !== "FRESH") {
       return scenario.tracking_started_at
         ? "Waiting for fresh data · last valid state retained"
         : "Waiting for first fresh mark · tracking not started";
     }
     return "Tracking";
+  }
+
+  function describeShadowExitEvent(eventType) {
+    const descriptions = {
+      TRACKING_STARTED: "Tracking started",
+      TRAILING_STOP_ARMED: "Trailing stop armed",
+      HYPOTHETICAL_TRIGGERED: "Hypothetical exit triggered",
+      ACTUAL_POSITION_CLOSED: "Actual position closed",
+      DATA_QUALITY_CHANGED: "Market-data quality changed",
+      EVALUATION_FAILED: "Shadow evaluation failed"
+    };
+    return descriptions[eventType] || "Shadow exit event";
   }
 
   function formatShadowTimestamp(value) {

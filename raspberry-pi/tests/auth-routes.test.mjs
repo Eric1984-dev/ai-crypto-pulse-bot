@@ -23,6 +23,7 @@ const dataRepositories = {
   },
   dashboard: {
     async getSystemDashboardData() { return {}; },
+    async getShadowExitScenarios() { return { status: "AVAILABLE", positions: [] }; },
     async getTradeHistory() { return { items: [], total: 0 }; },
     async getAnalytics() { return {}; },
     async getExportRecordCount() { return 0; },

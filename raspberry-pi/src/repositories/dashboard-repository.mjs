@@ -100,6 +100,62 @@ const LATEST_EMERGENCY_SQL = `
   ORDER BY created_at DESC, id DESC
   LIMIT 1
 `;
+const SHADOW_EXIT_SCENARIOS_SQL = `
+  SELECT position.id AS position_id,
+         position.symbol,
+         position.status AS position_status,
+         position.created_at AS position_opened_at,
+         scenario.id AS scenario_id,
+         scenario.rule_id,
+         scenario.rule_version,
+         scenario.parameters,
+         scenario.status AS scenario_status,
+         scenario.data_quality_status,
+         scenario.tracking_started_at,
+         scenario.last_evaluated_at,
+         scenario.last_mark,
+         scenario.last_mark_captured_at,
+         scenario.high_water_mark,
+         scenario.trailing_armed,
+         scenario.activated_at,
+         scenario.triggered_at,
+         scenario.trigger_mark,
+         scenario.modeled_exit_price,
+         scenario.modeled_net_pnl,
+         scenario.actual_closed_at,
+         scenario.actual_close_price,
+         scenario.actual_net_pnl,
+         COALESCE(recent_events.events, '[]'::jsonb) AS events
+  FROM public."AI_Crypto_Bot_Positions" AS position
+  LEFT JOIN public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+    ON scenario.position_id = position.id
+  LEFT JOIN LATERAL (
+    SELECT pg_catalog.jsonb_agg(
+             pg_catalog.jsonb_build_object(
+               'event_type', event.event_type,
+               'event_at', event.event_at,
+               'observed_mark', event.observed_mark,
+               'data_quality_status', event.data_quality_status,
+               'error_code', event.error_code
+             )
+             ORDER BY event.event_at ASC, event.id ASC
+           ) AS events
+    FROM (
+      SELECT id, event_type, event_at, observed_mark, data_quality_status, error_code
+      FROM public."AI_Crypto_Bot_Shadow_Exit_Events"
+      WHERE scenario_id = scenario.id
+      ORDER BY event_at DESC, id DESC
+      LIMIT 10
+    ) AS event
+  ) AS recent_events ON TRUE
+  WHERE position.portfolio_id = $1::uuid
+    AND (
+      position.status = 'OPEN'
+      OR scenario.actual_closed_at >= pg_catalog.now() - INTERVAL '30 days'
+    )
+  ORDER BY position.created_at DESC, scenario.rule_id ASC NULLS LAST
+  LIMIT $2
+`;
 const ANALYTICS_POSITIONS_SQL = `
   SELECT symbol, status, unrealized_pnl
   FROM public."AI_Crypto_Bot_Positions"
@@ -378,6 +434,24 @@ export class DashboardRepository {
         ? readTimestamp(currentMarketAt, "latest market-data timestamp")
         : null
     };
+  }
+
+  async getShadowExitScenarios({ limit = 350 } = {}) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 350) {
+      throw new TypeError("The shadow-exit row limit must be between 1 and 350.");
+    }
+
+    const portfolioId = await this.#systemPortfolioId();
+    if (!portfolioId) {
+      return Object.freeze({ status: "AVAILABLE", positions: Object.freeze([]) });
+    }
+    const result = await queryReadOnly(
+      this.pool,
+      SHADOW_EXIT_SCENARIOS_SQL,
+      [portfolioId, limit],
+      { logger: this.logger }
+    );
+    return normalizeShadowExitScenarios(result.rows);
   }
 
   async getTradeHistory({
@@ -787,6 +861,134 @@ function normalizePosition(row) {
   }
   row.created_at = readTimestamp(row.created_at, "position timestamp");
   return row;
+}
+
+function normalizeShadowExitScenarios(rows) {
+  const positions = new Map();
+  for (const row of rows) {
+    if (typeof row.position_id !== "string" || !UUID_PATTERN.test(row.position_id)
+      || typeof row.symbol !== "string" || !["OPEN", "CLOSED"].includes(row.position_status)) {
+      throw new RepositoryDataError("invalid shadow-exit position");
+    }
+    let position = positions.get(row.position_id);
+    if (!position) {
+      position = {
+        id: row.position_id,
+        symbol: row.symbol,
+        isOpen: row.position_status === "OPEN",
+        positionOpenedAt: readTimestamp(row.position_opened_at, "shadow position timestamp"),
+        actualClosedAt: null,
+        actualClosePrice: null,
+        actualNetPnl: null,
+        scenarios: []
+      };
+      positions.set(row.position_id, position);
+    }
+
+    if (row.actual_closed_at !== null && row.actual_closed_at !== undefined) {
+      position.actualClosedAt = readTimestamp(row.actual_closed_at, "shadow actual-close timestamp");
+      position.actualClosePrice = readNullableNumber(
+        row.actual_close_price,
+        "shadow actual-close price"
+      );
+      position.actualNetPnl = readNullableNumber(row.actual_net_pnl, "shadow actual net P&L");
+    }
+    if (row.scenario_id === null || row.scenario_id === undefined) {
+      continue;
+    }
+    if (typeof row.scenario_id !== "string" || !UUID_PATTERN.test(row.scenario_id)
+      || typeof row.rule_id !== "string" || typeof row.rule_version !== "string"
+      || !["TRACKING", "TRIGGERED", "CLOSED_WITHOUT_TRIGGER"].includes(row.scenario_status)
+      || !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+        .includes(row.data_quality_status)
+      || typeof row.trailing_armed !== "boolean") {
+      throw new RepositoryDataError("invalid shadow-exit scenario");
+    }
+    const scenario = {
+      id: row.scenario_id,
+      rule_id: row.rule_id,
+      rule_version: row.rule_version,
+      parameters: normalizeJsonObject(row.parameters, "shadow scenario parameters"),
+      status: row.scenario_status,
+      data_quality_status: row.data_quality_status,
+      tracking_started_at: readNullableTimestamp(
+        row.tracking_started_at,
+        "shadow tracking timestamp"
+      ),
+      last_evaluated_at: readTimestamp(row.last_evaluated_at, "shadow evaluation timestamp"),
+      last_mark: readNullableNumber(row.last_mark, "shadow last mark"),
+      last_mark_captured_at: readNullableTimestamp(
+        row.last_mark_captured_at,
+        "shadow last-mark timestamp"
+      ),
+      high_water_mark: readNullableNumber(row.high_water_mark, "shadow high-water mark"),
+      trailing_armed: row.trailing_armed,
+      activated_at: readNullableTimestamp(row.activated_at, "shadow activation timestamp"),
+      triggered_at: readNullableTimestamp(row.triggered_at, "shadow trigger timestamp"),
+      trigger_mark: readNullableNumber(row.trigger_mark, "shadow trigger mark"),
+      modeled_exit_price: readNullableNumber(row.modeled_exit_price, "shadow exit price"),
+      modeled_net_pnl: readNullableNumber(row.modeled_net_pnl, "shadow net P&L"),
+      events: normalizeShadowExitEvents(row.events)
+    };
+    position.scenarios.push(Object.freeze(scenario));
+  }
+
+  return Object.freeze({
+    status: "AVAILABLE",
+    positions: Object.freeze([...positions.values()].map((position) =>
+      Object.freeze({
+        ...position,
+        scenarios: Object.freeze(position.scenarios)
+      })))
+  });
+}
+
+function normalizeShadowExitEvents(value) {
+  const events = typeof value === "string" ? parseJson(value, "shadow scenario events") : value;
+  if (!Array.isArray(events) || events.length > 10) {
+    throw new RepositoryDataError("invalid shadow scenario events");
+  }
+  return Object.freeze(events.map((event) => {
+    if (!event || typeof event !== "object" || Array.isArray(event)
+      || typeof event.event_type !== "string"
+      || !["TRACKING_STARTED", "TRAILING_STOP_ARMED", "HYPOTHETICAL_TRIGGERED",
+        "ACTUAL_POSITION_CLOSED", "DATA_QUALITY_CHANGED", "EVALUATION_FAILED"]
+        .includes(event.event_type)
+      || event.data_quality_status !== null
+        && !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+          .includes(event.data_quality_status)
+      || event.error_code !== null
+        && (typeof event.error_code !== "string" || !/^[0-9A-Z]{5,32}$/.test(event.error_code))) {
+      throw new RepositoryDataError("invalid shadow-exit event");
+    }
+    return Object.freeze({
+      event_type: event.event_type,
+      event_at: readTimestamp(event.event_at, "shadow event timestamp"),
+      observed_mark: readNullableNumber(event.observed_mark, "shadow event mark"),
+      data_quality_status: event.data_quality_status,
+      error_code: event.error_code
+    });
+  }));
+}
+
+function normalizeJsonObject(value, field) {
+  const parsed = typeof value === "string" ? parseJson(value, field) : value;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new RepositoryDataError(`invalid ${field}`);
+  }
+  return Object.freeze({ ...parsed });
+}
+
+function parseJson(value, field) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new RepositoryDataError(`invalid ${field}`);
+  }
+}
+
+function readNullableTimestamp(value, field) {
+  return value === null || value === undefined ? null : readTimestamp(value, field);
 }
 
 function normalizeTrade(row) {

@@ -71,6 +71,22 @@ SQL
 
 The migration fails if the function is absent, has an unexpected signature/security configuration, or the configured paper role is privileged. It grants the paper role schema usage and function execution only; it does not grant direct access to either shadow-exit table, alter the function owner, or create database objects. If the function is missing, do not apply the legacy Supabase migration wholesale; resolve the database function installation separately before enabling the runtime integration. After migration, restart the Pi runtime and check `GET /api/v1/monitoring`; the latest cycle should report `shadowExits: "COMPLETED"` or `"SKIPPED"`. No rows are expected until there are open positions and fresh market data. See the [shadow-exit reactivation report](docs/reports/shadow-exit-reactivation.md) for implementation and local validation evidence.
 
+The authenticated dashboard reads these records through the API's read-only `DATABASE_USER`. Apply the [Phase 8.10 dashboard-read permission migration](migrations/phase-8.10-shadow-exit-dashboard-read.sql) as the database schema owner, setting `cryptopulse.dashboard_database_user` to the exact `DATABASE_USER` configured on the Pi:
+
+```sh
+cd raspberry-pi
+psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store <<'SQL'
+SELECT pg_catalog.set_config(
+  'cryptopulse.dashboard_database_user',
+  'YOUR_DATABASE_USER',
+  false
+);
+\i migrations/phase-8.10-shadow-exit-dashboard-read.sql
+SQL
+```
+
+This grants `SELECT` only on the two shadow-exit tables and fails if the configured API role is privileged, owns either table, or has table-write privileges. It does not grant shadow-table access to the browser or dashboard session. The dashboard shows current open positions, recently closed tracked positions, scenario states, and recent per-scenario events; it cannot reconstruct a price peak that occurred before tracking began or between observed market snapshots.
+
 ## systemd deployment profile
 
 The checked-in [systemd unit](deploy/cryptopulse-runtime.service) matches the Raspberry Pi deployment reported as passing runtime validation, restart validation, and reboot validation:
