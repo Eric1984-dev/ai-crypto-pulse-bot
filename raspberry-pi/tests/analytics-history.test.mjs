@@ -77,6 +77,7 @@ test("Phase 11 migration creates prefixed history with isolated role privileges"
       paper_select: false
     });
 
+    await database.exec("SET ROLE analytics_writer");
     const result = await persistAnalyticsRun(
       { async connect() {
         return {
@@ -98,6 +99,7 @@ test("Phase 11 migration creates prefixed history with isolated role privileges"
     );
     assert.equal(duplicate.inserted, false);
     assert.equal(duplicate.id, result.id);
+    await database.exec("RESET ROLE");
     const saved = await database.query(
       'SELECT calculation_version, period, source_counts, analytics_summary, insights '
         + 'FROM public."AI_Crypto_Bot_Analytics_Runs"'

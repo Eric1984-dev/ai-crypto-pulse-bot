@@ -34,6 +34,11 @@ receive `SELECT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, or `TRIGGER`
 on the analytics table. It must not be a superuser or inherit permissions
 through role memberships. Do not grant source-table access.
 
+The generator uses untargeted `ON CONFLICT DO NOTHING` for retry
+idempotency. Do not change it to `ON CONFLICT (id)`: PostgreSQL requires
+`SELECT` on an explicitly named conflict-target column, which would violate
+the writer's INSERT-only privilege model.
+
 ## 1. Create the PostgreSQL login
 
 Run as an authorized PostgreSQL role administrator. Use the actual configured

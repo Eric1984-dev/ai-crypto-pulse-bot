@@ -10,7 +10,7 @@ const INSERT_ANALYTICS_RUN_SQL = `
     $1::uuid, $2::text, $3::text, $4::timestamptz, $5::timestamptz,
     $6::timestamptz, $7::jsonb, $8::jsonb, $9::jsonb
   )
-  ON CONFLICT (id) DO NOTHING
+  ON CONFLICT DO NOTHING
 `;
 
 export class AnalyticsRunWriterError extends Error {
