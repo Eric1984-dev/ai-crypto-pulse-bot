@@ -38,6 +38,14 @@
     return globalThis.CryptoPulseRuntimeApi.url(path);
   };
 
+  function getExportFolderName(date = new Date()) {
+    const pad = (value) => String(value).padStart(2, "0");
+    const timestamp = `${pad(date.getDate())}${pad(date.getMonth() + 1)}`
+      + `${date.getFullYear()}${pad(date.getHours())}${pad(date.getMinutes())}`
+      + pad(date.getSeconds());
+    return `${analysisExportFilePrefix}-${timestamp}`;
+  }
+
   function buildAnalysisExportUrl(view, { source, asOf, cursor } = {}) {
     if (!["analysis-export-manifest", "analysis-export-page"].includes(view)) {
       throw new TypeError("A valid analysis export view is required.");
@@ -276,15 +284,22 @@
     fetchImpl,
     directoryHandle,
     signal,
-    onProgress = () => {},
-    runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    onProgress = () => {}
   }) {
     if (typeof fetchImpl !== "function" || !directoryHandle
       || typeof directoryHandle.getDirectoryHandle !== "function") {
       throw new TypeError("A fetch implementation and writable directory are required.");
     }
     const manifest = await requestAnalysisExportManifest(fetchImpl, signal);
-    const outputDirectoryName = `${analysisExportFilePrefix}-${runId}`;
+    const outputDirectoryName = getExportFolderName();
+    try {
+      await directoryHandle.getDirectoryHandle(outputDirectoryName, { create: false });
+      throw new Error(`The export folder ${outputDirectoryName} already exists. Wait a second and retry.`);
+    } catch (error) {
+      if (error.name !== "NotFoundError") {
+        throw error;
+      }
+    }
     const outputDirectory = await directoryHandle.getDirectoryHandle(outputDirectoryName, {
       create: true
     });

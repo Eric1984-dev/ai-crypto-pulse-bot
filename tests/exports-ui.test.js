@@ -31,8 +31,13 @@ function createMemoryDirectory() {
   const files = new Map();
   const directories = new Map();
   const directoryHandle = {
-    async getDirectoryHandle(name) {
+    async getDirectoryHandle(name, options = {}) {
       if (!directories.has(name)) {
+        if (!options.create) {
+          const error = new Error("Directory does not exist.");
+          error.name = "NotFoundError";
+          throw error;
+        }
         directories.set(name, createDirectory());
       }
       return directories.get(name);
@@ -92,7 +97,7 @@ function createExportsDocument() {
 }
 
 test("full-history export paginates sequentially, retries rate limits, and splits bounded JSONL files", async () => {
-  const { directoryHandle, files } = createMemoryDirectory();
+  const { directoryHandle, files, directories } = createMemoryDirectory();
   const asOf = "2026-11-12T20:00:00.000Z";
   const sources = [
     "trades",
@@ -178,13 +183,13 @@ test("full-history export paginates sequentially, retries rate limits, and split
 
   const result = await exportsPage.exportFullHistory({
     fetchImpl,
-    directoryHandle,
-    runId: "test-run"
+    directoryHandle
   });
   assert.equal(result.manifest.exportStatus, "complete");
   assert.equal(result.manifest.sourceCounts.trades.records, 2);
   assert.equal(result.manifest.sourceCounts.candleWindows.records, 6);
   assert.equal(maximumActiveRequests, 1);
+  assert.match([...directories.keys()][0], /^cryptopulse-analysis-\d{14}$/);
   assert.ok(requests.some((url) => url.includes("view=analysis-export-page")));
   const runFiles = files;
   const manifest = JSON.parse(runFiles.get("manifest.json"));
@@ -231,8 +236,7 @@ test("full-history export leaves a cancelled status in the manifest", async () =
   const exportPromise = exportsPage.exportFullHistory({
     fetchImpl,
     directoryHandle,
-    signal: controller.signal,
-    runId: "cancelled-run"
+    signal: controller.signal
   });
   await requestStarted;
   controller.abort();
