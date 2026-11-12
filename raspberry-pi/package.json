@@ -11,6 +11,7 @@
     "validate": "node --env-file=.env src/validate.mjs",
     "ingest:market-data": "node --env-file=.env src/ingest-market-data.mjs",
     "ai:analyze": "node --env-file=.env src/analyze-ai.mjs",
+    "analytics:generate": "node --env-file=.env src/generate-analytics.mjs",
     "auth:hash-password": "node scripts/hash-dashboard-password.mjs",
     "test": "node --test"
   },

@@ -1,7 +1,8 @@
 import { ApiError } from "./api-error.mjs";
 import { requireDashboardReadAccess } from "../auth/authentication-middleware.mjs";
 import { buildMarketScannerSummary } from "../../../lib/market-scanner.mjs";
-import { generateRecommendations } from "../../../lib/recommendations.mjs";
+import { createAnalyticsInsights } from "../services/analytics-insights.mjs";
+import { PAPER_TRADING_RULES } from "../services/paper-trading-service.mjs";
 import {
   getAnalyticsExportCounts,
   getAnalyticsExportRows,
@@ -69,9 +70,22 @@ const AI_HISTORY_QUERY_SCHEMA = Object.freeze({
     parse: Number })
 });
 const ANALYTICS_QUERY_SCHEMA = Object.freeze({
-  view: Object.freeze({ validate: (value) => ["analytics", "recommendations"].includes(value) }),
+  view: Object.freeze({
+    validate: (value) =>
+      ["analytics", "recommendations", "analytics-history"].includes(value)
+  }),
   period: Object.freeze({
     validate: (value) => SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(value)
+  })
+});
+const ANALYSIS_BUNDLE_QUERY_SCHEMA = Object.freeze({
+  view: Object.freeze({ validate: (value) => value === "analysis-bundle" }),
+  period: Object.freeze({
+    validate: (value) => SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(value)
+  }),
+  limit: Object.freeze({
+    validate: (value) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 1000,
+    parse: Number
   })
 });
 const EXPORT_TYPES = Object.freeze([
@@ -163,7 +177,9 @@ export function registerDataRoutes(router, repositories, {
         ? TRADE_HISTORY_QUERY_SCHEMA
         : rawView === "ai-history"
           ? AI_HISTORY_QUERY_SCHEMA
-      : rawView === "analytics" || rawView === "recommendations"
+      : rawView === "analysis-bundle"
+        ? ANALYSIS_BUNDLE_QUERY_SCHEMA
+      : rawView === "analytics" || rawView === "recommendations" || rawView === "analytics-history"
         ? ANALYTICS_QUERY_SCHEMA
         : Object.freeze({});
     const query = validateQuery(context.request, querySchema);
@@ -173,6 +189,39 @@ export function registerDataRoutes(router, repositories, {
       const period = query.period || (
         isAnalyticsExportType(exportType) ? "30d" : "all"
       );
+      if (exportType === "recommendation-history") {
+        if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)) {
+          throw new ApiError(
+            400,
+            "INVALID_EXPORT_PERIOD",
+            "Recommendation history exports require a 30d, 90d, or 365d history window."
+          );
+        }
+        const history = await readRepository(
+          () => repositories.dashboard.getAnalyticsRunHistory({
+            period,
+            now: new Date(readClock(now)),
+            limit: 100
+          }),
+          "ANALYTICS_HISTORY_UNAVAILABLE",
+          "Analytics history is temporarily unavailable.",
+          { logger, requestId: context.requestId, view: query.view }
+        );
+        const rows = mapRecommendationHistory(history.items, history.truncated);
+        const headers = [
+          "Run ID", "Calculation Version", "Period", "Period Start", "Period End",
+          "Generated At", "Category", "Title", "Confidence Level", "Sample Size",
+          "Trend Direction", "Supporting Metrics", "Limitations", "History Truncated"
+        ];
+        if (query.view === "export-count") {
+          sendJson(context, 200, {
+            data: { exportType, period, recordCount: rows.length, truncated: history.truncated }
+          });
+        } else {
+          await streamCsvRows(context.response, exportType, period, headers, rows);
+        }
+        return;
+      }
       if (isAnalyticsExportType(exportType)) {
         if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)) {
           throw new ApiError(400, "INVALID_EXPORT_PERIOD", "The export period is invalid.");
@@ -262,6 +311,68 @@ export function registerDataRoutes(router, repositories, {
       sendJson(context, 200, { data: history });
       return;
     }
+    if (query.view === "analysis-bundle") {
+      const generatedAt = new Date(readClock(now));
+      const [bundle, markets] = await readRepository(
+        () => Promise.all([
+          repositories.dashboard.getAnalysisBundle({
+            period: query.period || "30d",
+            now: generatedAt,
+            limit: query.limit || 500
+          }),
+          repositories.watchedMarkets.listEnabled()
+        ]),
+        "ANALYSIS_BUNDLE_UNAVAILABLE",
+        "The historical analysis bundle is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: query.view }
+      );
+      validateMarketRows(markets);
+      const priorRun = bundle.analyticsHistory.find((run) =>
+        run.period === bundle.manifest.requestedRange.period
+        && Date.parse(run.periodEnd) < generatedAt.getTime());
+      const insights = createAnalyticsInsights(bundle.analytics, priorRun);
+      sendJson(context, 200, {
+        data: {
+          ...bundle,
+          insights,
+          manifest: {
+            ...bundle.manifest,
+            activeMarkets: markets.map(({ symbol }) => symbol),
+            strategyVersions: bundle.analytics.strategyVersionPerformance.versions.map(
+              ({ strategyName, strategyVersion }) => ({ strategyName, strategyVersion })
+            ),
+            tradingMode: "PAPER",
+            liveTradingEnabled: false,
+            riskSettings: {
+              maxPositionSizeFraction: PAPER_TRADING_RULES.maxPositionSizeFraction,
+              maxOpenPositions: PAPER_TRADING_RULES.maxOpenPositions,
+              minimumConfidence: PAPER_TRADING_RULES.minimumConfidence,
+              cooldownMs: PAPER_TRADING_RULES.cooldownMs,
+              feeRate: PAPER_TRADING_RULES.feeRate,
+              slippageRate: PAPER_TRADING_RULES.slippageRate,
+              dailyDrawdownFraction: PAPER_TRADING_RULES.dailyDrawdownFraction,
+              maxPortfolioDrawdownFraction: PAPER_TRADING_RULES.maxPortfolioDrawdownFraction,
+              emergencyDrawdownFraction: PAPER_TRADING_RULES.emergencyDrawdownFraction
+            }
+          }
+        }
+      });
+      return;
+    }
+    if (query.view === "analytics-history") {
+      const history = await readRepository(
+        () => repositories.dashboard.getAnalyticsRunHistory({
+          period: query.period || "30d",
+          now: new Date(readClock(now)),
+          limit: 50
+        }),
+        "ANALYTICS_HISTORY_UNAVAILABLE",
+        "Analytics history is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: query.view }
+      );
+      sendJson(context, 200, { data: history });
+      return;
+    }
     if (query.view === "analytics" || query.view === "recommendations") {
       const analytics = await readRepository(
         () => repositories.dashboard.getAnalytics({
@@ -274,9 +385,33 @@ export function registerDataRoutes(router, repositories, {
       );
       if (query.view === "analytics") {
         analytics.exportCounts = getAnalyticsExportCounts(analytics);
+        const recommendationHistory = await readRepository(
+          () => repositories.dashboard.getRecommendationHistoryExportCount({
+            period: analytics.period,
+            now: new Date(analytics.generatedAt)
+          }),
+          "ANALYTICS_HISTORY_UNAVAILABLE",
+          "Analytics recommendation history is temporarily unavailable.",
+          { logger, requestId: context.requestId, view: query.view }
+        );
+        analytics.exportCounts["recommendation-history"] = recommendationHistory.recordCount;
+        analytics.exportCountTruncation = {
+          "recommendation-history": recommendationHistory.truncated
+        };
         sendJson(context, 200, { data: analytics });
       } else {
-        sendJson(context, 200, { data: generateRecommendations(analytics) });
+        const priorRun = await readRepository(
+          () => repositories.dashboard.getLatestAnalyticsRun({
+            period: analytics.period,
+            before: new Date(analytics.generatedAt)
+          }),
+          "ANALYTICS_HISTORY_UNAVAILABLE",
+          "Analytics recommendation history is temporarily unavailable.",
+          { logger, requestId: context.requestId, view: query.view }
+        );
+        sendJson(context, 200, {
+          data: createAnalyticsInsights(analytics, priorRun)
+        });
       }
       return;
     }
@@ -631,6 +766,49 @@ function mapExportRow(exportType, row, accountData) {
 }
 
 const DECIMAL_SCALE = 10n ** 12n;
+
+function mapRecommendationHistory(runs, truncated) {
+  const rows = [];
+  for (const run of runs) {
+    const recommendations = run.insights?.recommendations;
+    if (!Array.isArray(recommendations)) {
+      throw new ApiError(
+        503,
+        "ANALYTICS_HISTORY_UNAVAILABLE",
+        "Stored analytics recommendations do not match the supported history format."
+      );
+    }
+    for (const recommendation of recommendations) {
+      if (!recommendation || typeof recommendation !== "object"
+        || typeof recommendation.title !== "string"
+        || !Array.isArray(recommendation.metrics)
+        || !Array.isArray(recommendation.limitations)) {
+        throw new ApiError(
+          503,
+          "ANALYTICS_HISTORY_UNAVAILABLE",
+          "Stored analytics recommendations do not match the supported history format."
+        );
+      }
+      rows.push([
+        run.id,
+        run.calculationVersion,
+        run.period,
+        run.periodStart,
+        run.periodEnd,
+        run.generatedAt,
+        recommendation.category,
+        recommendation.title,
+        recommendation.confidenceLevel,
+        recommendation.supportingSampleSize,
+        recommendation.historicalTrend?.direction,
+        JSON.stringify(recommendation.metrics),
+        JSON.stringify(recommendation.limitations),
+        truncated ? "true" : "false"
+      ]);
+    }
+  }
+  return rows;
+}
 
 function decimalToScaled(value) {
   const text = String(value);

@@ -13,6 +13,9 @@ import {
 const MAX_ANALYTICS_ROWS = 10000;
 const MAX_EXPORT_ROWS = 10000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CONFIDENCE_BAND_LABELS = Object.freeze([
+  "[50,60)", "[60,70)", "[70,80)", "[80,90)", "[90,100]"
+]);
 
 const PORTFOLIO_SQL = `
   SELECT portfolio.id,
@@ -164,21 +167,28 @@ const ANALYTICS_POSITIONS_SQL = `
   LIMIT $2
 `;
 const ANALYTICS_TRADES_SQL = `
-  SELECT id, ai_decision_id, symbol, side, price, quantity, fees, realized_pnl, created_at
+  SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
+         realized_pnl, created_at
   FROM public."AI_Crypto_Bot_Trades"
   WHERE portfolio_id = $1::uuid
     AND created_at >= $2::timestamptz
+    AND created_at <= $3::timestamptz
   ORDER BY symbol ASC, created_at ASC, id ASC
-  LIMIT $3
+  LIMIT $4
 `;
 const ANALYTICS_DECISION_SUMMARY_SQL = `
   WITH decisions AS MATERIALIZED (
     SELECT symbol, decision, confidence, strategy_name, strategy_version
     FROM public."AI_Crypto_Bot_AI_Decisions"
     WHERE created_at >= $1::timestamptz
+      AND created_at <= $2::timestamptz
   )
   SELECT 'total'::text AS dimension, NULL::text AS label, COUNT(*)::text AS decision_count
   FROM decisions
+  UNION ALL
+  SELECT 'below50', NULL::text, COUNT(*)::text
+  FROM decisions
+  WHERE confidence < 50
   UNION ALL
   SELECT 'below70', NULL::text, COUNT(*)::text
   FROM decisions
@@ -204,6 +214,34 @@ const ANALYTICS_DECISION_SUMMARY_SQL = `
   SELECT
     'confidence',
     CASE
+      WHEN confidence < 60 THEN '[50,60)'
+      WHEN confidence < 70 THEN '[60,70)'
+      WHEN confidence < 80 THEN '[70,80)'
+      WHEN confidence < 90 THEN '[80,90)'
+      ELSE '[90,100]'
+    END,
+    COUNT(*)::text
+  FROM decisions
+  WHERE confidence >= 50 AND confidence <= 100
+  GROUP BY 2
+  UNION ALL
+  SELECT
+    'confidence-action',
+    decision || '|' || CASE
+      WHEN confidence < 60 THEN '[50,60)'
+      WHEN confidence < 70 THEN '[60,70)'
+      WHEN confidence < 80 THEN '[70,80)'
+      WHEN confidence < 90 THEN '[80,90)'
+      ELSE '[90,100]'
+    END,
+    COUNT(*)::text
+  FROM decisions
+  WHERE confidence >= 50 AND confidence <= 100
+  GROUP BY decision, 2
+  UNION ALL
+  SELECT
+    'legacy-confidence',
+    CASE
       WHEN confidence < 75 THEN '70–75'
       WHEN confidence < 80 THEN '75–80'
       WHEN confidence < 85 THEN '80–85'
@@ -219,25 +257,269 @@ const ANALYTICS_DECISION_SUMMARY_SQL = `
   WHERE strategy_name IS NOT NULL AND strategy_version IS NOT NULL
   GROUP BY strategy_name, strategy_version
   UNION ALL
+  SELECT
+    'strategy-version',
+    strategy_name || ' · ' || strategy_version,
+    COUNT(*)::text
+  FROM decisions
+  WHERE strategy_name IS NOT NULL AND strategy_version IS NOT NULL
+  GROUP BY strategy_name, strategy_version
+  UNION ALL
   SELECT 'symbol', symbol, COUNT(*)::text
   FROM decisions
   GROUP BY symbol
 `;
 const ANALYTICS_LINKED_DECISIONS_SQL = `
-  SELECT id, symbol, decision, confidence, strategy_name, strategy_version, created_at
+  SELECT id, symbol, decision, confidence, indicators,
+         strategy_name, strategy_version, created_at
   FROM public."AI_Crypto_Bot_AI_Decisions"
   WHERE id = ANY($1::uuid[])
     AND created_at >= $2::timestamptz
+    AND created_at <= $3::timestamptz
   ORDER BY symbol ASC, created_at ASC, id ASC
-  LIMIT $3
+  LIMIT $4
 `;
 const ANALYTICS_SNAPSHOTS_SQL = `
+  WITH period_snapshots AS (
+    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
+    FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+    WHERE portfolio_id = $1::uuid
+      AND captured_at >= $2::timestamptz
+      AND captured_at <= $3::timestamptz
+    ORDER BY captured_at ASC, id ASC
+    LIMIT $4
+  ),
+  baseline_snapshot AS (
+    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
+    FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+    WHERE portfolio_id = $1::uuid
+      AND captured_at < $2::timestamptz
+    ORDER BY captured_at DESC, id DESC
+    LIMIT 1
+  )
+  SELECT * FROM baseline_snapshot
+  UNION ALL
+  SELECT * FROM period_snapshots
+  ORDER BY captured_at ASC, id ASC
+  LIMIT $5
+`;
+const ANALYTICS_SOURCE_COUNTS_SQL = `
+  SELECT
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Positions"
+     WHERE portfolio_id = $1::uuid)::text AS positions,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Trades"
+     WHERE portfolio_id = $1::uuid
+       AND created_at >= $2::timestamptz AND created_at <= $3::timestamptz)::text
+      AS trades,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_AI_Decisions"
+     WHERE created_at >= $2::timestamptz AND created_at <= $3::timestamptz)::text
+      AS decisions,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+     WHERE portfolio_id = $1::uuid
+       AND captured_at >= $2::timestamptz AND captured_at <= $3::timestamptz)::text
+      AS snapshots,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+     WHERE scenario.portfolio_id = $1::uuid
+       AND (
+         scenario.position_opened_at BETWEEN $2::timestamptz AND $3::timestamptz
+         OR scenario.actual_closed_at BETWEEN $2::timestamptz AND $3::timestamptz
+         OR scenario.last_evaluated_at BETWEEN $2::timestamptz AND $3::timestamptz
+       ))::text AS shadow_exit_scenarios,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Events" AS event
+     JOIN public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+       ON scenario.id = event.scenario_id
+     WHERE scenario.portfolio_id = $1::uuid
+       AND event.event_at >= $2::timestamptz AND event.event_at <= $3::timestamptz)::text
+      AS shadow_exit_events
+`;
+const ANALYTICS_SHADOW_EXIT_SQL = `
+  SELECT scenario.symbol,
+         scenario.rule_id,
+         scenario.rule_version,
+         scenario.status,
+         scenario.data_quality_status,
+         scenario.modeled_net_pnl,
+         scenario.actual_net_pnl,
+         scenario.actual_closed_at,
+         scenario.position_opened_at
+  FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+  WHERE scenario.portfolio_id = $1::uuid
+    AND (
+      scenario.position_opened_at BETWEEN $2::timestamptz AND $3::timestamptz
+      OR scenario.actual_closed_at BETWEEN $2::timestamptz AND $3::timestamptz
+      OR scenario.last_evaluated_at BETWEEN $2::timestamptz AND $3::timestamptz
+    )
+  ORDER BY scenario.symbol ASC, scenario.rule_id ASC, scenario.position_opened_at ASC
+  LIMIT $4
+`;
+const ANALYTICS_RUN_HISTORY_SQL = `
+  SELECT id, calculation_version, period, period_start, period_end, generated_at,
+         source_counts, analytics_summary, insights
+  FROM public."AI_Crypto_Bot_Analytics_Runs"
+  WHERE generated_at >= $1::timestamptz
+    AND generated_at <= $2::timestamptz
+  ORDER BY generated_at DESC, id DESC
+  LIMIT $3
+`;
+const RECOMMENDATION_HISTORY_COUNT_SQL = `
+  WITH recent_runs AS (
+    SELECT insights
+    FROM public."AI_Crypto_Bot_Analytics_Runs"
+    WHERE generated_at >= $1::timestamptz
+      AND generated_at <= $2::timestamptz
+    ORDER BY generated_at DESC, id DESC
+    LIMIT $3
+  )
+  SELECT COALESCE(SUM(
+           CASE
+             WHEN pg_catalog.jsonb_typeof(insights -> 'recommendations') = 'array'
+             THEN pg_catalog.jsonb_array_length(insights -> 'recommendations')
+             ELSE 0
+           END
+         ), 0)::text AS recommendation_count,
+         (
+           SELECT COUNT(*) FROM public."AI_Crypto_Bot_Analytics_Runs"
+           WHERE generated_at >= $1::timestamptz
+             AND generated_at <= $2::timestamptz
+         ) > COUNT(*) AS truncated
+  FROM recent_runs
+`;
+const LATEST_ANALYTICS_RUN_SQL = `
+  SELECT id, calculation_version, period, period_start, period_end, generated_at,
+         source_counts, analytics_summary, insights
+  FROM public."AI_Crypto_Bot_Analytics_Runs"
+  WHERE period = $1::text
+    AND period_end < $2::timestamptz
+  ORDER BY period_end DESC, generated_at DESC, id DESC
+  LIMIT 1
+`;
+const BUNDLE_TRADES_SQL = `
+  SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
+         realized_pnl, created_at
+  FROM public."AI_Crypto_Bot_Trades"
+  WHERE portfolio_id = $1::uuid
+    AND created_at >= $2::timestamptz
+    AND created_at <= $3::timestamptz
+  ORDER BY created_at ASC, id ASC
+  LIMIT $4
+`;
+const BUNDLE_DECISIONS_SQL = `
+  SELECT id, symbol, decision, confidence, indicators, reason,
+         strategy_name, strategy_version, created_at
+  FROM public."AI_Crypto_Bot_AI_Decisions"
+  WHERE created_at >= $1::timestamptz
+    AND created_at <= $2::timestamptz
+  ORDER BY created_at ASC, id ASC
+  LIMIT $3
+`;
+const BUNDLE_LINKED_DECISIONS_SQL = `
+  SELECT id, symbol, decision, confidence, indicators, reason,
+         strategy_name, strategy_version, created_at
+  FROM public."AI_Crypto_Bot_AI_Decisions"
+  WHERE id = ANY($1::uuid[])
+  ORDER BY created_at ASC, id ASC
+  LIMIT $2
+`;
+const BUNDLE_SNAPSHOTS_SQL = `
   SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
   FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
   WHERE portfolio_id = $1::uuid
     AND captured_at >= $2::timestamptz
+    AND captured_at <= $3::timestamptz
   ORDER BY captured_at ASC, id ASC
+  LIMIT $4
+`;
+const BUNDLE_SHADOW_SCENARIOS_SQL = `
+  SELECT scenario.id, scenario.position_id, scenario.symbol, scenario.rule_id,
+         scenario.rule_version, scenario.parameters, scenario.status,
+         scenario.data_quality_status, scenario.position_opened_at,
+         scenario.tracking_started_at, scenario.triggered_at,
+         scenario.modeled_exit_price, scenario.modeled_net_pnl,
+         scenario.actual_closed_at, scenario.actual_close_price, scenario.actual_net_pnl
+  FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+  WHERE scenario.portfolio_id = $1::uuid
+    AND (
+      scenario.position_opened_at BETWEEN $2::timestamptz AND $3::timestamptz
+      OR scenario.actual_closed_at BETWEEN $2::timestamptz AND $3::timestamptz
+      OR scenario.last_evaluated_at BETWEEN $2::timestamptz AND $3::timestamptz
+    )
+  ORDER BY scenario.position_opened_at ASC, scenario.id ASC
+  LIMIT $4
+`;
+const BUNDLE_SHADOW_EVENTS_SQL = `
+  SELECT id, scenario_id, event_type, event_at, observed_mark,
+         data_quality_status, error_code
+  FROM public."AI_Crypto_Bot_Shadow_Exit_Events"
+  WHERE scenario_id = ANY($1::uuid[])
+    AND event_at >= $2::timestamptz
+    AND event_at <= $3::timestamptz
+  ORDER BY event_at ASC, id ASC
+  LIMIT $4
+`;
+const BUNDLE_CANDLES_SQL = `
+  WITH anchors AS (
+    SELECT refs.symbol, refs.anchor_at, intervals.interval
+    FROM pg_catalog.jsonb_to_recordset($1::jsonb)
+      AS refs(symbol text, anchor_at timestamptz)
+    CROSS JOIN pg_catalog.unnest(
+      ARRAY['1m', '5m', '15m', '1h', '4h', '1d']::text[]
+    ) AS intervals(interval)
+  )
+  SELECT anchors.symbol, anchors.interval, anchors.anchor_at,
+         candle.open, candle.high, candle.low, candle.close, candle.volume, candle.timestamp
+  FROM anchors
+  CROSS JOIN LATERAL (
+    SELECT window_candle.open, window_candle.high, window_candle.low,
+           window_candle.close, window_candle.volume, window_candle.timestamp
+    FROM (
+      (
+        SELECT source.open, source.high, source.low, source.close, source.volume, source.timestamp
+        FROM public."AI_Crypto_Bot_Candles" AS source
+        WHERE source.symbol = anchors.symbol
+          AND source.interval = anchors.interval
+          AND source.timestamp <= anchors.anchor_at
+        ORDER BY source.timestamp DESC
+        LIMIT ($2::integer / 2)
+      )
+      UNION ALL
+      (
+        SELECT source.open, source.high, source.low, source.close, source.volume, source.timestamp
+        FROM public."AI_Crypto_Bot_Candles" AS source
+        WHERE source.symbol = anchors.symbol
+          AND source.interval = anchors.interval
+          AND source.timestamp > anchors.anchor_at
+          AND source.timestamp <= $4::timestamptz
+        ORDER BY source.timestamp ASC
+        LIMIT ($2::integer / 2)
+      )
+    ) AS window_candle
+  ) AS candle
+  ORDER BY anchors.anchor_at ASC, anchors.symbol ASC, anchors.interval ASC, candle.timestamp ASC
   LIMIT $3
+`;
+const BUNDLE_SOURCE_COUNTS_SQL = `
+  SELECT
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Trades"
+     WHERE portfolio_id = $1::uuid AND created_at >= $2::timestamptz
+       AND created_at <= $3::timestamptz)::text AS trades,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_AI_Decisions"
+     WHERE created_at >= $2::timestamptz AND created_at <= $3::timestamptz)::text
+       AS decisions,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+     WHERE portfolio_id = $1::uuid AND captured_at >= $2::timestamptz
+       AND captured_at <= $3::timestamptz)::text AS snapshots,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+     WHERE portfolio_id = $1::uuid AND (
+       position_opened_at BETWEEN $2::timestamptz AND $3::timestamptz
+       OR actual_closed_at BETWEEN $2::timestamptz AND $3::timestamptz
+       OR last_evaluated_at BETWEEN $2::timestamptz AND $3::timestamptz
+     ))::text AS shadow_exit_scenarios,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Events" AS event
+     JOIN public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+       ON scenario.id = event.scenario_id
+     WHERE scenario.portfolio_id = $1::uuid
+       AND event.event_at >= $2::timestamptz AND event.event_at <= $3::timestamptz)::text
+       AS shadow_exit_events
 `;
 const MONITORING_SQL = `
   SELECT
@@ -570,7 +852,7 @@ export class DashboardRepository {
       throw new RepositoryDataError("multiple system portfolios");
     }
     const portfolioRow = portfolioResult.rows[0];
-    const cutoff = new Date(
+    const periodStart = new Date(
       now.getTime() - (period === "30d" ? 30 : period === "90d" ? 90 : 365) * 86400000
     ).toISOString();
     if (!portfolioRow) {
@@ -581,11 +863,14 @@ export class DashboardRepository {
         positions: [],
         trades: [],
         decisions: [],
-        snapshots: []
+        snapshots: [],
+        sourceCounts: null
       });
     }
 
-    const [positionsResult, tradesResult, decisionSummaryResult, snapshotsResult] = await Promise.all([
+    const periodEnd = now.toISOString();
+    const [positionsResult, tradesResult, decisionSummaryResult, snapshotsResult,
+      sourceCountsResult, shadowExitResult] = await Promise.all([
       queryReadOnly(
         this.pool,
         ANALYTICS_POSITIONS_SQL,
@@ -595,29 +880,43 @@ export class DashboardRepository {
       queryReadOnly(
         this.pool,
         ANALYTICS_TRADES_SQL,
-        [portfolioRow.id, cutoff, MAX_ANALYTICS_ROWS + 1],
+        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1],
         { logger: this.logger }
       ),
       queryReadOnly(
         this.pool,
         ANALYTICS_DECISION_SUMMARY_SQL,
-        [cutoff],
+        [periodStart, periodEnd],
         { logger: this.logger }
       ),
       queryReadOnly(
         this.pool,
         ANALYTICS_SNAPSHOTS_SQL,
-        [portfolioRow.id, cutoff, MAX_ANALYTICS_ROWS + 1],
+        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1,
+          MAX_ANALYTICS_ROWS + 1],
+        { logger: this.logger }
+      ),
+      queryReadOnly(
+        this.pool,
+        ANALYTICS_SOURCE_COUNTS_SQL,
+        [portfolioRow.id, periodStart, periodEnd],
+        { logger: this.logger }
+      ),
+      queryReadOnly(
+        this.pool,
+        ANALYTICS_SHADOW_EXIT_SQL,
+        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1],
         { logger: this.logger }
       )
     ]);
     for (const [name, result] of [
       ["positions", positionsResult],
       ["trades", tradesResult],
-      ["snapshots", snapshotsResult]
+      ["snapshots", snapshotsResult],
+      ["shadow exits", shadowExitResult]
     ]) {
-      if (result.rows.length > MAX_ANALYTICS_ROWS) {
-        throw new RepositoryDataError(`analytics ${name} exceed the bounded query limit`);
+      if (result.rows.length > MAX_ANALYTICS_ROWS + 1) {
+        throw new RepositoryDataError(`analytics ${name} exceeded the query guard`);
       }
     }
     if (decisionSummaryResult.rows.length > MAX_ANALYTICS_ROWS) {
@@ -627,7 +926,7 @@ export class DashboardRepository {
       starting_balance: readFiniteNumber(portfolioRow.starting_balance, "starting balance"),
       portfolio_value: readFiniteNumber(portfolioRow.portfolio_value, "portfolio value")
     };
-    const positions = positionsResult.rows.map((row) => {
+    const positions = positionsResult.rows.slice(0, MAX_ANALYTICS_ROWS).map((row) => {
       if (!["OPEN", "CLOSED"].includes(row.status) || typeof row.symbol !== "string") {
         throw new RepositoryDataError("invalid analytics position");
       }
@@ -637,8 +936,11 @@ export class DashboardRepository {
         unrealized_pnl: readFiniteNumber(row.unrealized_pnl, "position unrealized P&L")
       };
     });
-    const trades = tradesResult.rows.map(normalizeTrade);
+    const trades = tradesResult.rows.slice(0, MAX_ANALYTICS_ROWS).map(normalizeTrade);
     const decisionSummary = normalizeAnalyticsDecisionSummary(decisionSummaryResult.rows);
+    if (decisionSummary.invalidCount !== 0) {
+      throw new RepositoryDataError("analytics decision summary contains invalid source rows");
+    }
     const decisionIds = [...new Set(trades
       .map(({ ai_decision_id }) => ai_decision_id)
       .filter((id) => typeof id === "string" && UUID_PATTERN.test(id)))];
@@ -647,14 +949,16 @@ export class DashboardRepository {
       : await queryReadOnly(
         this.pool,
         ANALYTICS_LINKED_DECISIONS_SQL,
-        [decisionIds, cutoff, MAX_ANALYTICS_ROWS + 1],
+        [decisionIds, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1],
         { logger: this.logger }
       );
-    if (decisionsResult.rows.length > MAX_ANALYTICS_ROWS) {
-      throw new RepositoryDataError("analytics linked decisions exceed the bounded query limit");
+    const decisions = decisionsResult.rows.slice(0, MAX_ANALYTICS_ROWS)
+      .map(normalizeAnalyticsDecision);
+    const snapshots = snapshotsResult.rows.slice(0, MAX_ANALYTICS_ROWS).map(normalizeSnapshot);
+    const sourceRow = sourceCountsResult.rows[0];
+    if (!sourceRow) {
+      throw new RepositoryDataError("analytics source counts are unavailable");
     }
-    const decisions = decisionsResult.rows.map(normalizeAnalyticsDecision);
-    const snapshots = snapshotsResult.rows.map(normalizeSnapshot);
     return buildDashboardAnalytics({
       period,
       now,
@@ -663,7 +967,240 @@ export class DashboardRepository {
       trades,
       decisions,
       decisionSummary,
-      snapshots
+      snapshots,
+      sourceCounts: Object.freeze({
+        positions: readCount(sourceRow.positions, "analytics position source count"),
+        trades: readCount(sourceRow.trades, "analytics trade source count"),
+        decisions: readCount(sourceRow.decisions, "analytics decision source count"),
+        snapshots: readCount(sourceRow.snapshots, "analytics snapshot source count"),
+        shadowExitScenarios: readCount(
+          sourceRow.shadow_exit_scenarios,
+          "analytics shadow scenario source count"
+        ),
+        shadowExitEvents: readCount(
+          sourceRow.shadow_exit_events,
+          "analytics shadow event source count"
+        )
+      }),
+      shadowExitAnalytics: normalizeAnalyticsShadowRows(
+        shadowExitResult.rows.slice(0, MAX_ANALYTICS_ROWS)
+      ),
+      truncatedSources: Object.freeze({
+        positions: positionsResult.rows.length > MAX_ANALYTICS_ROWS,
+        trades: tradesResult.rows.length > MAX_ANALYTICS_ROWS,
+        linkedDecisions: decisionsResult.rows.length > MAX_ANALYTICS_ROWS,
+        snapshots: snapshotsResult.rows.length > MAX_ANALYTICS_ROWS,
+        shadowExitScenarios: shadowExitResult.rows.length > MAX_ANALYTICS_ROWS
+      })
+    });
+  }
+
+  async getAnalyticsRunHistory({ period = "30d", now = new Date(), limit = 50 } = {}) {
+    if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)
+      || !(now instanceof Date) || !Number.isFinite(now.getTime())
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new TypeError("Analytics history filters are invalid.");
+    }
+    const cutoff = new Date(now.getTime() - (period === "30d" ? 30 : period === "90d" ? 90 : 365)
+      * 86400000).toISOString();
+    const result = await queryReadOnly(
+      this.pool,
+      ANALYTICS_RUN_HISTORY_SQL,
+      [cutoff, now.toISOString(), limit + 1],
+      { logger: this.logger }
+    );
+    if (result.rows.length > limit) {
+      return Object.freeze({
+        items: Object.freeze(result.rows.slice(0, limit).map(normalizeAnalyticsRun)),
+        limit,
+        truncated: true
+      });
+    }
+    return Object.freeze({
+      items: Object.freeze(result.rows.map(normalizeAnalyticsRun)),
+      limit,
+      truncated: false
+    });
+  }
+
+  async getLatestAnalyticsRun({ period = "30d", before = new Date() } = {}) {
+    if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)
+      || !(before instanceof Date) || !Number.isFinite(before.getTime())) {
+      throw new TypeError("The analytics history lookup is invalid.");
+    }
+    const result = await queryReadOnly(
+      this.pool,
+      LATEST_ANALYTICS_RUN_SQL,
+      [period, before.toISOString()],
+      { logger: this.logger }
+    );
+    return result.rows[0] ? normalizeAnalyticsRun(result.rows[0]) : null;
+  }
+
+  async getRecommendationHistoryExportCount({ period = "30d", now = new Date() } = {}) {
+    if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)
+      || !(now instanceof Date) || !Number.isFinite(now.getTime())) {
+      throw new TypeError("Recommendation history filters are invalid.");
+    }
+    const cutoff = new Date(now.getTime() - (period === "30d" ? 30 : period === "90d" ? 90 : 365)
+      * 86400000).toISOString();
+    const result = await queryReadOnly(
+      this.pool,
+      RECOMMENDATION_HISTORY_COUNT_SQL,
+      [cutoff, now.toISOString(), 100],
+      { logger: this.logger }
+    );
+    const row = result.rows[0];
+    if (!row || typeof row.truncated !== "boolean") {
+      throw new RepositoryDataError("recommendation history export count is unavailable");
+    }
+    return Object.freeze({
+      recordCount: readCount(row.recommendation_count, "recommendation history export count"),
+      truncated: row.truncated
+    });
+  }
+
+  async getAnalysisBundle({ period = "30d", now = new Date(), limit = 500 } = {}) {
+    if (!SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(period)
+      || !(now instanceof Date) || !Number.isFinite(now.getTime())
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+      throw new TypeError("Analysis bundle filters are invalid.");
+    }
+    const portfolioResult = await queryReadOnly(
+      this.pool,
+      PORTFOLIO_SQL,
+      [SYSTEM_PROFILE_ID],
+      { logger: this.logger }
+    );
+    if (portfolioResult.rows.length > 1) {
+      throw new RepositoryDataError("multiple system portfolios");
+    }
+    const periodStart = new Date(
+      now.getTime() - (period === "30d" ? 30 : period === "90d" ? 90 : 365) * 86400000
+    );
+    const from = periodStart.toISOString();
+    const to = now.toISOString();
+    const portfolioId = portfolioResult.rows[0]?.id;
+    const analytics = await this.getAnalytics({ period, now });
+    if (!portfolioId) {
+      return createEmptyAnalysisBundle({
+        analytics,
+        period,
+        from,
+        to,
+        limit
+      });
+    }
+
+    const [tradesResult, decisionsResult, snapshotsResult, scenariosResult, countsResult] =
+      await Promise.all([
+        queryReadOnly(this.pool, BUNDLE_TRADES_SQL,
+          [portfolioId, from, to, limit + 1], { logger: this.logger }),
+        queryReadOnly(this.pool, BUNDLE_DECISIONS_SQL,
+          [from, to, limit + 1], { logger: this.logger }),
+        queryReadOnly(this.pool, BUNDLE_SNAPSHOTS_SQL,
+          [portfolioId, from, to, limit + 1], { logger: this.logger }),
+        queryReadOnly(this.pool, BUNDLE_SHADOW_SCENARIOS_SQL,
+          [portfolioId, from, to, limit + 1], { logger: this.logger }),
+        queryReadOnly(this.pool, BUNDLE_SOURCE_COUNTS_SQL,
+          [portfolioId, from, to], { logger: this.logger })
+      ]);
+    const selectedTrades = tradesResult.rows.slice(0, limit).map(normalizeTrade);
+    const selectedDecisions = decisionsResult.rows.slice(0, limit).map(normalizeBundleDecision);
+    const linkedDecisionIds = [...new Set(selectedTrades
+      .map(({ ai_decision_id }) => ai_decision_id)
+      .filter((id) => typeof id === "string" && UUID_PATTERN.test(id)))];
+    const selectedIds = new Set(selectedDecisions.map(({ id }) => String(id)));
+    const missingLinkedIds = linkedDecisionIds.filter((id) => !selectedIds.has(id));
+    const linkedResult = missingLinkedIds.length
+      ? await queryReadOnly(
+        this.pool,
+        BUNDLE_LINKED_DECISIONS_SQL,
+        [missingLinkedIds, limit + 1],
+        { logger: this.logger }
+      )
+      : { rows: [] };
+    const linkedDecisions = linkedResult.rows.slice(0, limit).map(normalizeBundleDecision);
+    const snapshots = snapshotsResult.rows.slice(0, limit).map(normalizeSnapshot);
+    const scenarios = scenariosResult.rows.slice(0, limit).map(normalizeBundleShadowScenario);
+    const scenarioIds = scenarios.map(({ id }) => id);
+    const eventsResult = scenarioIds.length
+      ? await queryReadOnly(
+        this.pool,
+        BUNDLE_SHADOW_EVENTS_SQL,
+        [scenarioIds, from, to, limit + 1],
+        { logger: this.logger }
+      )
+      : { rows: [] };
+    const allAnchors = createCandleAnchors(selectedTrades, selectedDecisions, 51);
+    const anchors = allAnchors.slice(0, 50);
+    const candlesResult = anchors.length
+      ? await queryReadOnly(
+        this.pool,
+        BUNDLE_CANDLES_SQL,
+        [JSON.stringify(anchors), 20, 6001, to],
+        { logger: this.logger }
+      )
+      : { rows: [] };
+    const counts = countsResult.rows[0];
+    if (!counts) {
+      throw new RepositoryDataError("analysis bundle source counts are unavailable");
+    }
+    const bundleHistory = await this.getAnalyticsRunHistory({ period, now, limit: 50 });
+    const rowCounts = {
+      trades: readCount(counts.trades, "bundle trade source count"),
+      decisions: readCount(counts.decisions, "bundle decision source count"),
+      snapshots: readCount(counts.snapshots, "bundle snapshot source count"),
+      shadowExitScenarios: readCount(
+        counts.shadow_exit_scenarios,
+        "bundle shadow scenario source count"
+      ),
+      shadowExitEvents: readCount(counts.shadow_exit_events, "bundle shadow event source count")
+    };
+    const candleWindows = candlesResult.rows.slice(0, 6000).map(normalizeBundleCandle);
+    return Object.freeze({
+      manifest: Object.freeze({
+        requestedRange: Object.freeze({ period, from, to, timezone: "UTC" }),
+        generatedAt: to,
+        calculationVersion: analytics.calculationVersion,
+        sourceCounts: Object.freeze(rowCounts),
+        includedCounts: Object.freeze({
+          trades: selectedTrades.length,
+          decisions: selectedDecisions.length,
+          linkedDecisions: linkedDecisions.length,
+          portfolioSnapshots: snapshots.length,
+          candleRows: candleWindows.length,
+          candleAnchorCount: anchors.length,
+          shadowExitScenarios: scenarios.length,
+          shadowExitEvents: Math.min(eventsResult.rows.length, limit)
+        }),
+        limits: Object.freeze({
+          rowsPerSource: limit,
+          candleAnchorLimit: 50,
+          candlesPerIntervalPerAnchor: 20,
+          candleRowLimit: 6000
+        }),
+        truncation: Object.freeze({
+          trades: tradesResult.rows.length > limit,
+          decisions: decisionsResult.rows.length > limit,
+          portfolioSnapshots: snapshotsResult.rows.length > limit,
+          linkedDecisions: linkedResult.rows.length > limit,
+          candleWindows: allAnchors.length > 50 || candlesResult.rows.length > 6000,
+          shadowExitScenarios: scenariosResult.rows.length > limit,
+          shadowExitEvents: eventsResult.rows.length > limit,
+          analyticsHistory: bundleHistory.truncated
+        })
+      }),
+      analytics,
+      analyticsHistory: bundleHistory.items,
+      trades: Object.freeze(selectedTrades),
+      decisions: Object.freeze([...selectedDecisions, ...linkedDecisions]),
+      portfolioSnapshots: Object.freeze(snapshots),
+      candleWindows: Object.freeze(candleWindows),
+      shadowExitScenarios: Object.freeze(scenarios),
+      shadowExitEvents: Object.freeze(
+        eventsResult.rows.slice(0, limit).map(normalizeBundleShadowEvent)
+      )
     });
   }
 
@@ -995,6 +1532,9 @@ function normalizeTrade(row) {
   for (const field of ["price", "quantity", "fees", "realized_pnl"]) {
     row[field] = readFiniteNumber(row[field], `trade ${field}`);
   }
+  if (row.slippage !== undefined) {
+    row.slippage = readFiniteNumber(row.slippage, "trade slippage");
+  }
   if (typeof row.symbol !== "string" || !["BUY", "SELL"].includes(row.side)) {
     throw new RepositoryDataError("invalid trade row");
   }
@@ -1013,6 +1553,7 @@ function normalizeAnalyticsDecision(row) {
   return {
     ...row,
     confidence,
+    indicators: normalizeJsonObject(row.indicators, "analytics decision indicators"),
     created_at: readTimestamp(row.created_at, "decision timestamp")
   };
 }
@@ -1020,14 +1561,19 @@ function normalizeAnalyticsDecision(row) {
 function normalizeAnalyticsDecisionSummary(rows) {
   const summary = {
     decisionCount: null,
+    below50Count: null,
     below70Count: null,
     actions: [],
     confidenceBuckets: [],
+    confidenceBands: [],
+    confidenceBandsByAction: [],
     strategies: [],
+    strategyVersions: [],
     bySymbol: []
   };
   const allowedActions = new Set(["BUY", "SELL", "HOLD", "WAIT"]);
   const allowedBuckets = new Set(["70–75", "75–80", "80–85", "85+"]);
+  const allowedBands = new Set(["[50,60)", "[60,70)", "[70,80)", "[80,90)", "[90,100]"]);
   const seen = new Set();
   let invalidCount = null;
   for (const row of rows) {
@@ -1041,6 +1587,8 @@ function normalizeAnalyticsDecisionSummary(rows) {
     seen.add(key);
     if (dimension === "total" && label === null && summary.decisionCount === null) {
       summary.decisionCount = count;
+    } else if (dimension === "below50" && label === null && summary.below50Count === null) {
+      summary.below50Count = count;
     } else if (dimension === "below70" && label === null && summary.below70Count === null) {
       summary.below70Count = count;
     } else if (dimension === "invalid" && label === null && invalidCount === null) {
@@ -1051,29 +1599,188 @@ function normalizeAnalyticsDecisionSummary(rows) {
     } else if (dimension === "confidence"
       && typeof label === "string" && allowedBuckets.has(label)) {
       summary.confidenceBuckets.push({ label, decisionCount: count });
+    } else if (dimension === "legacy-confidence"
+      && typeof label === "string" && allowedBuckets.has(label)) {
+      summary.confidenceBuckets.push({ label, decisionCount: count });
+    } else if (dimension === "confidence"
+      && typeof label === "string" && allowedBands.has(label)) {
+      summary.confidenceBands.push({ label, decisionCount: count });
+    } else if (dimension === "confidence-action" && typeof label === "string") {
+      const separatorIndex = label.indexOf("|");
+      const action = label.slice(0, separatorIndex);
+      const bandLabel = label.slice(separatorIndex + 1);
+      if (separatorIndex < 1 || !allowedActions.has(action) || !allowedBands.has(bandLabel)) {
+        throw new RepositoryDataError("invalid action confidence-band summary group");
+      }
+      summary.confidenceBandsByAction.push({
+        action,
+        label: bandLabel,
+        decisionCount: count
+      });
     } else if (dimension === "strategy" && typeof label === "string" && label.length > 0) {
       summary.strategies.push({ label, decisionCount: count });
+    } else if (dimension === "strategy-version"
+      && typeof label === "string" && label.length > 0) {
+      const separatorIndex = label.lastIndexOf(" · ");
+      if (separatorIndex < 1 || separatorIndex + 3 >= label.length) {
+        throw new RepositoryDataError("invalid strategy-version summary group");
+      }
+      summary.strategyVersions.push({
+        label,
+        strategyName: label.slice(0, separatorIndex),
+        strategyVersion: label.slice(separatorIndex + 3),
+        decisionCount: count
+      });
     } else if (dimension === "symbol" && typeof label === "string" && label.length > 0) {
       summary.bySymbol.push({ label, decisionCount: count });
     } else {
       throw new RepositoryDataError("invalid analytics decision summary");
     }
   }
-  if (summary.decisionCount === null || summary.below70Count === null || invalidCount !== 0
+  if (summary.decisionCount === null || summary.below50Count === null
+    || summary.below70Count === null || invalidCount === null
     || summary.actions.reduce((total, row) => total + row.decisionCount, 0)
       !== summary.decisionCount
     || summary.confidenceBuckets.reduce((total, row) => total + row.decisionCount, 0)
       + summary.below70Count !== summary.decisionCount
+    || summary.confidenceBands.reduce((total, row) => total + row.decisionCount, 0)
+      + summary.below50Count !== summary.decisionCount
+    || CONFIDENCE_BAND_LABELS.some((label) => {
+      const overall = summary.confidenceBands.find((row) => row.label === label)?.decisionCount ?? 0;
+      const byAction = summary.confidenceBandsByAction
+        .filter((row) => row.label === label)
+        .reduce((total, row) => total + row.decisionCount, 0);
+      return overall !== byAction;
+    })
     || summary.bySymbol.reduce((total, row) => total + row.decisionCount, 0)
-      !== summary.decisionCount) {
+      !== summary.decisionCount
+    || invalidCount !== 0) {
     throw new RepositoryDataError("inconsistent analytics decision summary");
   }
   return Object.freeze({
     ...summary,
+    invalidCount,
     actions: Object.freeze(summary.actions.map(Object.freeze)),
     confidenceBuckets: Object.freeze(summary.confidenceBuckets.map(Object.freeze)),
+    confidenceBands: Object.freeze(summary.confidenceBands.map(Object.freeze)),
+    confidenceBandsByAction: Object.freeze(
+      summary.confidenceBandsByAction.map(Object.freeze)
+    ),
     strategies: Object.freeze(summary.strategies.map(Object.freeze)),
+    strategyVersions: Object.freeze(summary.strategyVersions.map(Object.freeze)),
     bySymbol: Object.freeze(summary.bySymbol.map(Object.freeze))
+  });
+}
+
+function normalizeAnalyticsShadowRows(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (typeof row.symbol !== "string" || typeof row.rule_id !== "string"
+      || typeof row.rule_version !== "string"
+      || !["TRACKING", "TRIGGERED", "CLOSED_WITHOUT_TRIGGER"].includes(row.status)
+      || !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+        .includes(row.data_quality_status)) {
+      throw new RepositoryDataError("invalid shadow analytics row");
+    }
+    const modeledPnl = readNullableNumber(row.modeled_net_pnl, "shadow modeled P&L");
+    const actualPnl = readNullableNumber(row.actual_net_pnl, "shadow actual P&L");
+    const key = `${row.rule_id}\u0000${row.rule_version}\u0000${row.symbol}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        ruleId: row.rule_id,
+        ruleVersion: row.rule_version,
+        symbol: row.symbol,
+        scenarios: [],
+        comparisons: []
+      });
+    }
+    const group = groups.get(key);
+    if (modeledPnl !== null) {
+      group.scenarios.push(modeledPnl);
+    }
+    if (modeledPnl !== null && actualPnl !== null) {
+      group.comparisons.push({ modeledPnl, actualPnl });
+    }
+  }
+
+  const groupsByRule = new Map();
+  const markets = [];
+  for (const group of groups.values()) {
+    const scenarioCount = group.scenarios.length;
+    const comparisons = group.comparisons;
+    const improvementDeltas = comparisons.map(({ modeledPnl, actualPnl }) => modeledPnl - actualPnl);
+    const result = {
+      ruleId: group.ruleId,
+      ruleVersion: group.ruleVersion,
+      symbol: group.symbol,
+      scenarioSampleSize: scenarioCount,
+      scenarioWinRate: scenarioCount
+        ? group.scenarios.filter((pnl) => pnl > 0).length / scenarioCount * 100
+        : null,
+      averageScenarioOutcome: scenarioCount
+        ? group.scenarios.reduce((total, pnl) => total + pnl, 0) / scenarioCount
+        : null,
+      actualComparisonSampleSize: comparisons.length,
+      averageActualOutcome: comparisons.length
+        ? comparisons.reduce((total, row) => total + row.actualPnl, 0) / comparisons.length
+        : null,
+      averageImprovementOverActual: improvementDeltas.length
+        ? improvementDeltas.reduce((total, delta) => total + delta, 0) / improvementDeltas.length
+        : null,
+      improvementCount: improvementDeltas.filter((delta) => delta > 0).length,
+      deteriorationCount: improvementDeltas.filter((delta) => delta < 0).length,
+      confidenceIndicator: comparisons.length >= 10 ? "MODERATE_SAMPLE"
+        : comparisons.length >= 5 ? "LIMITED_SAMPLE"
+          : comparisons.length > 0 ? "LOW_SAMPLE" : "NO_ACTUAL_COMPARISONS"
+    };
+    markets.push(result);
+    const ruleKey = `${group.ruleId}\u0000${group.ruleVersion}`;
+    if (!groupsByRule.has(ruleKey)) {
+      groupsByRule.set(ruleKey, {
+        ruleId: group.ruleId,
+        ruleVersion: group.ruleVersion,
+        scenarios: [],
+        comparisons: []
+      });
+    }
+    groupsByRule.get(ruleKey).scenarios.push(...group.scenarios);
+    groupsByRule.get(ruleKey).comparisons.push(...group.comparisons);
+  }
+
+  const summarize = (group) => {
+    const comparisonCount = group.comparisons.length;
+    const differences = group.comparisons.map((item) => item.modeledPnl - item.actualPnl);
+    return {
+      ruleId: group.ruleId,
+      ruleVersion: group.ruleVersion,
+      scenarioSampleSize: group.scenarios.length,
+      scenarioWinRate: group.scenarios.length
+        ? group.scenarios.filter((pnl) => pnl > 0).length / group.scenarios.length * 100
+        : null,
+      averageScenarioOutcome: group.scenarios.length
+        ? group.scenarios.reduce((total, pnl) => total + pnl, 0) / group.scenarios.length
+        : null,
+      actualComparisonSampleSize: comparisonCount,
+      averageImprovementOverActual: comparisonCount
+        ? differences.reduce((total, value) => total + value, 0) / comparisonCount
+        : null,
+      improvementCount: differences.filter((value) => value > 0).length,
+      deteriorationCount: differences.filter((value) => value < 0).length,
+      confidenceIndicator: comparisonCount >= 10 ? "MODERATE_SAMPLE"
+        : comparisonCount >= 5 ? "LIMITED_SAMPLE"
+          : comparisonCount > 0 ? "LOW_SAMPLE" : "NO_ACTUAL_COMPARISONS"
+    };
+  };
+  return Object.freeze({
+    status: "AVAILABLE",
+    strategyVersionAttribution: Object.freeze({
+      status: "UNAVAILABLE",
+      reason: "Shadow scenarios do not persist a validated link to a strategy version."
+    }),
+    byRuleVersion: Object.freeze([...groupsByRule.values()].map(summarize)),
+    byMarket: Object.freeze(markets),
+    sampleSizeAware: true,
+    comparisonDefinition: "modeled net P&L minus actual net P&L for the same scenario after an actual closure"
   });
 }
 
@@ -1086,4 +1793,192 @@ function normalizeSnapshot(row) {
   }
   row.captured_at = readTimestamp(row.captured_at, "snapshot timestamp");
   return row;
+}
+
+function normalizeAnalyticsRun(row) {
+  if (typeof row.id !== "string" || !UUID_PATTERN.test(row.id)
+    || typeof row.calculation_version !== "string"
+    || !SUPPORTED_DASHBOARD_ANALYTICS_PERIODS.includes(row.period)) {
+    throw new RepositoryDataError("invalid analytics run");
+  }
+  return Object.freeze({
+    id: row.id,
+    calculationVersion: row.calculation_version,
+    period: row.period,
+    periodStart: readTimestamp(row.period_start, "analytics run period start"),
+    periodEnd: readTimestamp(row.period_end, "analytics run period end"),
+    generatedAt: readTimestamp(row.generated_at, "analytics run generation time"),
+    sourceCounts: normalizeJsonObject(row.source_counts, "analytics run source counts"),
+    analyticsSummary: normalizeJsonObject(row.analytics_summary, "analytics run summary"),
+    insights: normalizeJsonValue(row.insights, "analytics run insights")
+  });
+}
+
+function normalizeBundleDecision(row) {
+  const decision = normalizeAnalyticsDecision(row);
+  if (typeof row.reason !== "string" || row.reason.length > 4000) {
+    throw new RepositoryDataError("invalid bundled decision reason");
+  }
+  return Object.freeze({
+    ...decision,
+    indicators: Object.freeze({ ...decision.indicators })
+  });
+}
+
+function normalizeBundleShadowScenario(row) {
+  if (typeof row.id !== "string" || !UUID_PATTERN.test(row.id)
+    || typeof row.position_id !== "string" || !UUID_PATTERN.test(row.position_id)
+    || typeof row.symbol !== "string" || typeof row.rule_id !== "string"
+    || typeof row.rule_version !== "string"
+    || !["TRACKING", "TRIGGERED", "CLOSED_WITHOUT_TRIGGER"].includes(row.status)
+    || !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+      .includes(row.data_quality_status)) {
+    throw new RepositoryDataError("invalid bundled shadow-exit scenario");
+  }
+  return Object.freeze({
+    id: row.id,
+    positionId: row.position_id,
+    symbol: row.symbol,
+    ruleId: row.rule_id,
+    ruleVersion: row.rule_version,
+    parameters: normalizeJsonObject(row.parameters, "bundle shadow parameters"),
+    status: row.status,
+    dataQualityStatus: row.data_quality_status,
+    positionOpenedAt: readTimestamp(row.position_opened_at, "bundle shadow open time"),
+    trackingStartedAt: readNullableTimestamp(row.tracking_started_at, "bundle shadow tracking time"),
+    triggeredAt: readNullableTimestamp(row.triggered_at, "bundle shadow trigger time"),
+    modeledExitPrice: readNullableNumber(row.modeled_exit_price, "bundle shadow exit price"),
+    modeledNetPnl: readNullableNumber(row.modeled_net_pnl, "bundle shadow modeled P&L"),
+    actualClosedAt: readNullableTimestamp(row.actual_closed_at, "bundle actual close time"),
+    actualClosePrice: readNullableNumber(row.actual_close_price, "bundle actual close price"),
+    actualNetPnl: readNullableNumber(row.actual_net_pnl, "bundle actual net P&L")
+  });
+}
+
+function normalizeBundleShadowEvent(row) {
+  const types = new Set([
+    "TRACKING_STARTED",
+    "TRAILING_STOP_ARMED",
+    "HYPOTHETICAL_TRIGGERED",
+    "ACTUAL_POSITION_CLOSED",
+    "DATA_QUALITY_CHANGED",
+    "EVALUATION_FAILED"
+  ]);
+  if (typeof row.id !== "string" || !UUID_PATTERN.test(row.id)
+    || typeof row.scenario_id !== "string" || !UUID_PATTERN.test(row.scenario_id)
+    || !types.has(row.event_type)
+    || row.data_quality_status !== null
+      && !["AWAITING_FIRST_FRESH_MARK", "FRESH", "STALE", "INVALID", "UNAVAILABLE"]
+        .includes(row.data_quality_status)
+    || row.error_code !== null
+      && (typeof row.error_code !== "string" || !/^[0-9A-Z]{5,32}$/.test(row.error_code))) {
+    throw new RepositoryDataError("invalid bundled shadow-exit event");
+  }
+  return Object.freeze({
+    id: row.id,
+    scenarioId: row.scenario_id,
+    eventType: row.event_type,
+    eventAt: readTimestamp(row.event_at, "bundle shadow event time"),
+    observedMark: readNullableNumber(row.observed_mark, "bundle shadow observed mark"),
+    dataQualityStatus: row.data_quality_status,
+    errorCode: row.error_code
+  });
+}
+
+function normalizeBundleCandle(row) {
+  if (typeof row.symbol !== "string"
+    || !["1m", "5m", "15m", "1h", "4h", "1d"].includes(row.interval)) {
+    throw new RepositoryDataError("invalid bundled candle identity");
+  }
+  const candle = {
+    symbol: row.symbol,
+    interval: row.interval,
+    anchorAt: readTimestamp(row.anchor_at, "bundle candle anchor time"),
+    timestamp: readTimestamp(row.timestamp, "bundle candle timestamp")
+  };
+  for (const field of ["open", "high", "low", "close", "volume"]) {
+    candle[field] = readFiniteNumber(row[field], `bundle candle ${field}`);
+  }
+  return Object.freeze(candle);
+}
+
+function normalizeJsonValue(value, field) {
+  if (typeof value !== "string") {
+    if (value === null || typeof value !== "object") {
+      throw new RepositoryDataError(`invalid ${field}`);
+    }
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new RepositoryDataError(`invalid ${field}`);
+  }
+}
+
+function createCandleAnchors(trades, decisions, limit) {
+  const anchors = new Map();
+  for (const row of [...trades, ...decisions].sort((left, right) =>
+    Date.parse(left.created_at) - Date.parse(right.created_at)
+  )) {
+    const key = `${row.symbol}\u0000${row.created_at}`;
+    if (!anchors.has(key)) {
+      anchors.set(key, { symbol: row.symbol, anchor_at: row.created_at });
+    }
+    if (anchors.size >= limit) {
+      break;
+    }
+  }
+  return [...anchors.values()];
+}
+
+function createEmptyAnalysisBundle({ analytics, period, from, to, limit }) {
+  return Object.freeze({
+    manifest: Object.freeze({
+      requestedRange: Object.freeze({ period, from, to, timezone: "UTC" }),
+      generatedAt: to,
+      calculationVersion: analytics.calculationVersion,
+      sourceCounts: Object.freeze({
+        trades: 0,
+        decisions: 0,
+        snapshots: 0,
+        shadowExitScenarios: 0,
+        shadowExitEvents: 0
+      }),
+      includedCounts: Object.freeze({
+        trades: 0,
+        decisions: 0,
+        linkedDecisions: 0,
+        portfolioSnapshots: 0,
+        candleRows: 0,
+        candleAnchorCount: 0,
+        shadowExitScenarios: 0,
+        shadowExitEvents: 0
+      }),
+      limits: Object.freeze({
+        rowsPerSource: limit,
+        candleAnchorLimit: 50,
+        candlesPerIntervalPerAnchor: 20,
+        candleRowLimit: 6000
+      }),
+      truncation: Object.freeze({
+        trades: false,
+        decisions: false,
+        portfolioSnapshots: false,
+        linkedDecisions: false,
+        candleWindows: false,
+        shadowExitScenarios: false,
+        shadowExitEvents: false,
+        analyticsHistory: false
+      })
+    }),
+    analytics,
+    analyticsHistory: Object.freeze([]),
+    trades: Object.freeze([]),
+    decisions: Object.freeze([]),
+    portfolioSnapshots: Object.freeze([]),
+    candleWindows: Object.freeze([]),
+    shadowExitScenarios: Object.freeze([]),
+    shadowExitEvents: Object.freeze([])
+  });
 }

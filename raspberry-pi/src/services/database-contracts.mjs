@@ -16,7 +16,8 @@ export const REQUIRED_TABLES = Object.freeze([
   "AI_Crypto_Bot_Scanner_Events",
   "AI_Crypto_Bot_Emergency_State",
   "AI_Crypto_Bot_Shadow_Exit_Scenarios",
-  "AI_Crypto_Bot_Shadow_Exit_Events"
+  "AI_Crypto_Bot_Shadow_Exit_Events",
+  "AI_Crypto_Bot_Analytics_Runs"
 ]);
 
 export const REQUIRED_READ_TABLES = Object.freeze([
@@ -37,7 +38,10 @@ export const DASHBOARD_READ_TABLES = Object.freeze([
   "AI_Crypto_Bot_Watched_Markets",
   "AI_Crypto_Bot_Market_Data",
   "AI_Crypto_Bot_Portfolio_Snapshots",
-  "AI_Crypto_Bot_Emergency_State"
+  "AI_Crypto_Bot_Emergency_State",
+  "AI_Crypto_Bot_Shadow_Exit_Scenarios",
+  "AI_Crypto_Bot_Shadow_Exit_Events",
+  "AI_Crypto_Bot_Analytics_Runs"
 ]);
 
 export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
@@ -86,6 +90,17 @@ export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
     status: "text",
     last_run: "timestamp with time zone",
     updated_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Analytics_Runs: Object.freeze({
+    id: "uuid",
+    calculation_version: "text",
+    period: "text",
+    period_start: "timestamp with time zone",
+    period_end: "timestamp with time zone",
+    generated_at: "timestamp with time zone",
+    source_counts: "jsonb",
+    analytics_summary: "jsonb",
+    insights: "jsonb"
   })
 });
 
@@ -167,7 +182,18 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
   })
 });
 
-export const PAPER_TRADING_READ_TABLES = DASHBOARD_READ_TABLES;
+export const PAPER_TRADING_READ_TABLES = Object.freeze([
+  "AI_Crypto_Bot_Profiles",
+  "AI_Crypto_Bot_Portfolios",
+  "AI_Crypto_Bot_Positions",
+  "AI_Crypto_Bot_Trades",
+  "AI_Crypto_Bot_AI_Decisions",
+  "AI_Crypto_Bot_Status",
+  "AI_Crypto_Bot_Watched_Markets",
+  "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Portfolio_Snapshots",
+  "AI_Crypto_Bot_Emergency_State"
+]);
 
 export const PAPER_TRADING_INSERT_TABLES = Object.freeze([
   "AI_Crypto_Bot_Portfolios",

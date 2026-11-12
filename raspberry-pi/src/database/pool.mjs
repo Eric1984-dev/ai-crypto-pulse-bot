@@ -4,13 +4,18 @@ import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnost
 
 export function createPostgresPool(config, {
   Pool = pg.Pool,
-  logger = console
+  logger = console,
+  readOnly = true
 } = {}) {
   if (typeof Pool !== "function") {
     throw new TypeError("A PostgreSQL Pool implementation is required.");
   }
 
-  const pool = new Pool(createPoolOptions(config));
+  const options = createPoolOptions(config);
+  if (!readOnly) {
+    options.options = "-c default_transaction_read_only=off";
+  }
+  const pool = new Pool(options);
   pool.on("error", (error) => {
     logger.error(JSON.stringify({
       event: "postgres_pool_error",

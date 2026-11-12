@@ -117,7 +117,8 @@ function createContractPool({
           return {
             relation_name,
             is_owner: isOwner,
-            can_select: (REQUIRED_READ_TABLES.includes(relation_name)
+            can_select: (DASHBOARD_READ_TABLES.includes(relation_name)
+              || REQUIRED_READ_TABLES.includes(relation_name)
               || PAPER_TRADING_READ_TABLES.includes(relation_name))
               && !noSelectTables.includes(relation_name),
             can_insert: allowIngestionWrites

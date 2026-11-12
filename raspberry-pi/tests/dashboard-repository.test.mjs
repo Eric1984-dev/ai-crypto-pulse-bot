@@ -39,6 +39,7 @@ async function createDatabase() {
       price numeric NOT NULL,
       quantity numeric NOT NULL,
       fees numeric NOT NULL,
+      slippage numeric NOT NULL DEFAULT 0,
       realized_pnl numeric NOT NULL,
       created_at timestamptz NOT NULL
     );
@@ -106,6 +107,27 @@ async function createDatabase() {
       strategy_name text,
       strategy_version text,
       created_at timestamptz NOT NULL
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Analytics_Runs" (
+      id uuid PRIMARY KEY,
+      calculation_version text NOT NULL,
+      period text NOT NULL,
+      period_start timestamptz NOT NULL,
+      period_end timestamptz NOT NULL,
+      generated_at timestamptz NOT NULL,
+      source_counts jsonb NOT NULL,
+      analytics_summary jsonb NOT NULL,
+      insights jsonb NOT NULL
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Candles" (
+      symbol text NOT NULL,
+      interval text NOT NULL,
+      open numeric NOT NULL,
+      high numeric NOT NULL,
+      low numeric NOT NULL,
+      close numeric NOT NULL,
+      volume numeric NOT NULL,
+      timestamp timestamptz NOT NULL
     );
     INSERT INTO public."AI_Crypto_Bot_Profiles" (id, email)
     VALUES ('${SYSTEM_PROFILE_ID}', NULL);
@@ -194,12 +216,13 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(analytics.aiPerformance.decisionCount, 1);
     assert.ok(["BUY", "SELL", "HOLD", "WAIT"].every((action) =>
       analytics.aiPerformance.actions[action]));
+    assert.equal(analytics.aiPerformance.actions.HOLD.scoredCount, 0);
     assert.equal(
-      analytics.aiPerformance.confidenceBuckets.reduce((count, bucket) =>
-        count + bucket.tradeCount, 0),
-      1
+      analytics.aiPerformance.confidenceBands.reduce((count, band) =>
+        count + band.tradeCount, 0),
+      0
     );
-    assert.equal(analytics.portfolio.maxDrawdown, 0);
+    assert.equal(analytics.portfolio.maxDrawdown, null);
     assert.equal(analytics.portfolio.snapshotCount, 1);
     assert.equal(analytics.portfolio.equityCurve.length, 1);
     assert.ok(Array.isArray(analytics.portfolio.drawdownHistory));
@@ -306,6 +329,142 @@ test("analytics aggregates large decision histories without loading every decisi
         .decisionCount,
       6669
     );
+  } finally {
+    await database.close();
+  }
+});
+
+test("analytics SQL assigns confidence boundary values to non-overlapping bands", async () => {
+  const database = await createDatabase();
+  try {
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      VALUES
+        ('00000000-0000-4000-8000-000000000701', 'BTC-EUR', 'WAIT', 50, 'boundary', '{}', NOW()),
+        ('00000000-0000-4000-8000-000000000702', 'BTC-EUR', 'WAIT', 60, 'boundary', '{}', NOW()),
+        ('00000000-0000-4000-8000-000000000703', 'BTC-EUR', 'WAIT', 70, 'boundary', '{}', NOW()),
+        ('00000000-0000-4000-8000-000000000704', 'BTC-EUR', 'WAIT', 80, 'boundary', '{}', NOW()),
+        ('00000000-0000-4000-8000-000000000705', 'BTC-EUR', 'WAIT', 90, 'boundary', '{}', NOW()),
+        ('00000000-0000-4000-8000-000000000706', 'BTC-EUR', 'WAIT', 100, 'boundary', '{}', NOW())
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const analytics = await repository.getAnalytics({ period: "30d", now: new Date() });
+
+    assert.deepEqual(analytics.aiPerformance.confidenceBands.map(({ label, decisionCount }) =>
+      [label, decisionCount]), [
+      ["[50,60)", 1],
+      ["[60,70)", 1],
+      ["[70,80)", 1],
+      ["[80,90)", 2],
+      ["[90,100]", 2]
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
+test("shadow-exit analytics compares only matched actual closures and exposes attribution limits", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Scenarios" (
+        id, position_id, portfolio_id, symbol, position_opened_at, rule_id,
+        rule_version, parameters, status, data_quality_status, last_evaluated_at,
+        trailing_armed, modeled_net_pnl, actual_closed_at, actual_net_pnl
+      )
+      VALUES (
+        '00000000-0000-4000-8000-000000000810',
+        '00000000-0000-4000-8000-000000000300',
+        '00000000-0000-4000-8000-000000000200',
+        'BTC-EUR', NOW(), 'fixed_tp_5', '1.0.0', '{}',
+        'TRIGGERED', 'FRESH', NOW(), false, 15, NOW(), 10
+      );
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const analytics = await repository.getAnalytics({ period: "30d", now: new Date() });
+
+    assert.equal(analytics.shadowExitAnalytics.status, "AVAILABLE");
+    assert.equal(analytics.shadowExitAnalytics.byRuleVersion[0].actualComparisonSampleSize, 1);
+    assert.equal(analytics.shadowExitAnalytics.byRuleVersion[0].averageImprovementOverActual, 5);
+    assert.equal(analytics.shadowExitAnalytics.byRuleVersion[0].confidenceIndicator, "LOW_SAMPLE");
+    assert.equal(analytics.shadowExitAnalytics.strategyVersionAttribution.status, "UNAVAILABLE");
+  } finally {
+    await database.close();
+  }
+});
+
+test("historical analysis bundle bounds linked records and includes anchored candle windows", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Candles"
+        (symbol, interval, open, high, low, close, volume, timestamp)
+      VALUES ('BTC-EUR', '1m', 50000, 50100, 49900, 50050, 1, NOW() - INTERVAL '1 minute');
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, portfolio_id, symbol, side, price, quantity, fees, realized_pnl, created_at)
+      VALUES (
+        '00000000-0000-4000-8000-000000000901',
+        '00000000-0000-4000-8000-000000000200',
+        'ETH-EUR', 'SELL', 3000, 0.1, 0.75, 4.25, NOW() - INTERVAL '1 hour'
+      );
+      INSERT INTO public."AI_Crypto_Bot_Analytics_Runs" (
+        id, calculation_version, period, period_start, period_end, generated_at,
+        source_counts, analytics_summary, insights
+      )
+      VALUES (
+        '00000000-0000-4000-8000-000000000900',
+        'phase-11.1',
+        '30d',
+        NOW() - INTERVAL '30 days',
+        NOW(),
+        NOW(),
+        '{"trades":1}'::jsonb,
+        '{"tradePerformance":{"closedTrades":1}}'::jsonb,
+        '{"recommendations":[]}'::jsonb
+      );
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const now = new Date();
+    const history = await repository.getAnalyticsRunHistory({ period: "30d", now, limit: 10 });
+    const bundle = await repository.getAnalysisBundle({ period: "30d", now, limit: 1 });
+
+    assert.equal(history.items.length, 1);
+    assert.equal(history.items[0].calculationVersion, "phase-11.1");
+    assert.equal(bundle.manifest.requestedRange.timezone, "UTC");
+    assert.equal(bundle.manifest.limits.rowsPerSource, 1);
+    assert.equal(bundle.manifest.sourceCounts.trades, 2);
+    assert.equal(bundle.trades.length, 1);
+    assert.equal(bundle.decisions.length, 1);
+    assert.equal(bundle.candleWindows.length, 1);
+    assert.equal(bundle.candleWindows[0].interval, "1m");
+    assert.equal(bundle.shadowExitScenarios.length, 0);
+    assert.equal(bundle.manifest.includedCounts.trades, 1);
+    assert.equal(bundle.manifest.truncation.trades, true);
   } finally {
     await database.close();
   }

@@ -50,6 +50,10 @@ test("runtime config defaults to loopback API and disables live trading", () => 
     databaseUser: "",
     databasePassword: ""
   });
+  assert.deepEqual(config.analytics, {
+    databaseUser: "",
+    databasePassword: ""
+  });
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
 });
@@ -102,6 +106,23 @@ test("runtime config requires paper-writer credentials as a pair", () => {
   assert.throws(() => readRuntimeConfig(validEnvironment({
     PAPER_DATABASE_PASSWORD: "paper-password"
   })), /PAPER_DATABASE_USER and PAPER_DATABASE_PASSWORD/);
+});
+
+test("runtime config accepts isolated analytics writer credentials only as a pair", () => {
+  const config = readRuntimeConfig(validEnvironment({
+    ANALYTICS_DATABASE_USER: "analytics_writer",
+    ANALYTICS_DATABASE_PASSWORD: "analytics-password"
+  }));
+  assert.deepEqual(config.analytics, {
+    databaseUser: "analytics_writer",
+    databasePassword: "analytics-password"
+  });
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ANALYTICS_DATABASE_USER: "analytics_writer"
+  })), /ANALYTICS_DATABASE_USER and ANALYTICS_DATABASE_PASSWORD/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ANALYTICS_DATABASE_PASSWORD: "analytics-password"
+  })), /ANALYTICS_DATABASE_USER and ANALYTICS_DATABASE_PASSWORD/);
 });
 
 test("runtime config requires explicit boolean opt-in for ingestion table ownership", () => {

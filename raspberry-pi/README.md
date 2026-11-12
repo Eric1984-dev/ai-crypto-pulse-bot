@@ -111,6 +111,7 @@ These are validated host-specific settings, not portable defaults. The live serv
 - Network access from the Pi runtime to the already-existing PostgreSQL instance
 - PostgreSQL settings for the existing database. Keep `DATABASE_USER` read-only for the API; configure separate paired credentials for ingestion, AI analysis, and paper trading. `INGESTION_ALLOW_TABLE_OWNER` defaults to `false`; set it to `true` only when the ingestion login is intentionally the owner of the existing project tables.
 - PostgreSQL connection settings provisioned locally; do not copy credentials into Vercel or Git
+- Optional paired `ANALYTICS_DATABASE_USER` and `ANALYTICS_DATABASE_PASSWORD` for the manual analytics-history generator only
 
 The runtime never creates a database, applies migrations, seeds markets, or changes the existing market list. It treats the installed schema and its contents as the authority.
 
@@ -140,11 +141,44 @@ npm start
 - `GET /api/v1/dashboard-data?view=trade-history&page=1` — filtered, sorted and paginated trade history.
 - `GET /api/v1/dashboard-data?view=ai-history&page=1` — paginated AI decisions with reasoning and indicator payloads.
 - `GET /api/v1/dashboard-data?view=analytics&period=30d` — paper-trade, AI decision and portfolio analytics for `30d`, `90d` or `365d`; decision counts are aggregated in PostgreSQL so high-volume history does not exceed the row-transfer limit.
-- `GET /api/v1/dashboard-data?view=recommendations&period=30d` — on-demand recommendations computed from current analytics; not persisted.
+- `GET /api/v1/dashboard-data?view=recommendations&period=30d` — advisory recommendations computed from current analytics, with sample-size confidence and comparison to the latest earlier matching run when available.
+- `GET /api/v1/dashboard-data?view=analytics-history&period=30d` — bounded read-only history of persisted analytics and recommendation generations.
+- `GET /api/v1/dashboard-data?view=analysis-bundle&period=30d&limit=500` — authenticated JSON bundle with manifest, bounded linked source rows, decision-anchored candle windows, shadow-exit comparisons and stored run history.
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
 - `GET /api/v1/monitoring` — runtime status, last-cycle stages including shadow-exit evaluation, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
+
+## Phase 11 historical analytics
+
+The analytics API remains read-only. Analytics history is generated only by an explicit operator command; it is not generated on dashboard reads or by the scheduler:
+
+```sh
+npm run analytics:generate -- --period=30d
+npm run analytics:generate -- --period=90d --as-of=2026-03-31T00:00:00.000Z
+```
+
+The command reads source records with the existing read-only `DATABASE_USER` and writes one summary row with a separate `ANALYTICS_DATABASE_USER`. That writer must be a restricted login, distinct from the API, ingestion, AI-analysis, and paper-trading roles. It receives `INSERT` only on `AI_Crypto_Bot_Analytics_Runs`; it cannot read or modify source data. The API role receives `SELECT` only on the history table. Neither role owns the table or can create public-schema objects. Leave the optional analytics credentials unset for normal runtime operation; generation fails explicitly until the migration and writer role are configured.
+
+Apply the Phase 11 migration as the existing database schema owner, setting the exact configured role names:
+
+```sh
+cd raspberry-pi
+psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store <<'SQL'
+SELECT pg_catalog.set_config('cryptopulse.dashboard_database_user', 'YOUR_DATABASE_USER', false);
+SELECT pg_catalog.set_config('cryptopulse.analytics_database_user', 'YOUR_ANALYTICS_DATABASE_USER', false);
+SELECT pg_catalog.set_config('cryptopulse.paper_trading_database_user', 'YOUR_PAPER_DATABASE_USER', false);
+\i migrations/phase-11-analytics-history.sql
+SQL
+```
+
+The migration intentionally fails on an existing table/index collision. It creates only the prefixed analytics-run table and generated-at index, and verifies the dashboard `SELECT`-only and analytics-writer `INSERT`-only grants. The paper-trading role is not granted access to analytics history.
+
+Generation uses a UTC window ending at the supplied `--as-of` timestamp. A deterministic run ID and unique calculation-version/window key make retries of the same window idempotent; use the same `--as-of` to reproduce a run key. Runs retain the analytics calculation version, period boundaries, generation time, source counts, calculated metrics, strategy-version metrics and advisory insights. Runs are retained indefinitely; there is no automatic pruning or raw-source duplication.
+
+The metric contract uses SELL `realized_pnl` as recorded (the paper engine already deducts fees and execution slippage), reports fees and slippage separately, and reports open-position unrealized P&L at generation time. BUY outcomes are attributed only when a BUY decision is linked to a BUY trade and the period's FIFO trade history can match that entry to a later SELL; unmatched or pre-window entries are not silently attributed. HOLD and WAIT outcomes remain unscored. Confidence bands are `[50,60)`, `[60,70)`, `[70,80)`, `[80,90)`, and `[90,100]`. Indicator results are descriptive associations, not causal claims. Strategy-version comparisons require at least five linked SELL outcomes per version. Shadow-exit comparisons require both modeled and actual net P&L; direct scenario-to-strategy-version linkage is unavailable and is reported as such.
+
+The analysis bundle is the canonical historical export. It has a maximum of 1,000 rows per source type, 50 candle anchors with at most 20 surrounding candles per interval (six intervals), and a 6,000-candle cap. The manifest reports exact source counts and truncation flags. Candle windows contain up to ten candles before and ten after each decision/trade anchor, limited to data available by the generation time. Trades, decisions, snapshots, shadow scenarios/events, and prior generated insights are included only within their requested bounds, plus explicitly linked decision rows. The legacy `recommendation-history` CSV export now reads persisted insight runs; analytics-summary, trade, portfolio, AI, and current recommendation CSVs remain for compatibility, but the JSON bundle is preferred for historical analysis. Exports never contain credentials, cookies, or arbitrary query access.
 
 Dashboard authentication uses one administrator configured with `DASHBOARD_USERNAME` and a bcrypt `DASHBOARD_PASSWORD_HASH`. Runtime startup fails closed if either value is missing or the hash is invalid. Login creates an opaque session; only its SHA-256 token hash and session metadata are stored in the persistent file configured by `API_SESSION_STORE_PATH`. The systemd unit places this file at `/var/lib/cryptopulse/dashboard-sessions.json` with directory mode `0700` and file mode `0600`; it survives runtime restarts and package deployments. The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after `API_SESSION_TTL_MS` (eight hours by default). Logout revokes the persisted session, and changing the dashboard username or password hash invalidates existing sessions.
 

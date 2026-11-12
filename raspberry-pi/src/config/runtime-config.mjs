@@ -153,6 +153,13 @@ export function readRuntimeConfig(env = process.env, {
   if (Boolean(aiDatabaseUser) !== Boolean(aiDatabasePassword)) {
     throw new Error("AI_DATABASE_USER and AI_DATABASE_PASSWORD must be set together.");
   }
+  const analyticsDatabaseUser = env.ANALYTICS_DATABASE_USER?.trim() || "";
+  const analyticsDatabasePassword = env.ANALYTICS_DATABASE_PASSWORD || "";
+  if (Boolean(analyticsDatabaseUser) !== Boolean(analyticsDatabasePassword)) {
+    throw new Error(
+      "ANALYTICS_DATABASE_USER and ANALYTICS_DATABASE_PASSWORD must be set together."
+    );
+  }
   const paperDatabaseUser = env.PAPER_DATABASE_USER?.trim() || "";
   const paperDatabasePassword = env.PAPER_DATABASE_PASSWORD || "";
   if (Boolean(paperDatabaseUser) !== Boolean(paperDatabasePassword)) {
@@ -268,6 +275,10 @@ export function readRuntimeConfig(env = process.env, {
     aiAnalysis: Object.freeze({
       databaseUser: aiDatabaseUser,
       databasePassword: aiDatabasePassword
+    }),
+    analytics: Object.freeze({
+      databaseUser: analyticsDatabaseUser,
+      databasePassword: analyticsDatabasePassword
     }),
     paperTrading: Object.freeze({
       databaseUser: paperDatabaseUser,

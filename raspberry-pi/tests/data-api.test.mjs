@@ -215,6 +215,48 @@ function createRepositories(pool, logger = { error() {} }, dashboardOverrides = 
           dataQuality: {}
         };
       },
+      async getAnalyticsRunHistory() {
+        return { items: [], limit: 50, truncated: false };
+      },
+      async getLatestAnalyticsRun() {
+        return null;
+      },
+      async getRecommendationHistoryExportCount() {
+        return { recordCount: 0, truncated: false };
+      },
+      async getAnalysisBundle({ period, now, limit }) {
+        const bundleAnalytics = buildDashboardAnalytics({
+          period,
+          now,
+          portfolio: null,
+          positions: [],
+          trades: [],
+          decisions: [],
+          snapshots: []
+        });
+        return {
+          manifest: {
+            requestedRange: {
+              period,
+              from: bundleAnalytics.periodStart,
+              to: bundleAnalytics.generatedAt,
+              timezone: "UTC"
+            },
+            sourceCounts: {},
+            includedCounts: {},
+            truncation: {},
+            limits: { rowsPerSource: limit }
+          },
+          analytics: bundleAnalytics,
+          analyticsHistory: [],
+          trades: [],
+          decisions: [],
+          portfolioSnapshots: [],
+          candleWindows: [],
+          shadowExitScenarios: [],
+          shadowExitEvents: []
+        };
+      },
       async getExportRecordCount() {
         return 1;
       },
@@ -550,7 +592,7 @@ test("analytics endpoint returns the page's chart and metric contract", async ()
     decisions: [{
       id: "decision-1",
       symbol: "BTC-EUR",
-      decision: "BUY",
+      decision: "SELL",
       confidence: 82,
       strategy_name: null,
       strategy_version: null,
@@ -663,6 +705,26 @@ test("analytics and recommendations endpoints handle recommendation generator in
     assert.equal(recommendationsBody.data.insufficientData, false);
     assert.equal(recommendationsBody.data.recommendations.length, 3);
     assert.equal(recommendationsBody.data.categories.length, 5);
+    assert.ok(recommendationsBody.data.recommendations.every((item) =>
+      item.confidenceLevel && item.supportingSampleSize !== undefined
+      && item.lastGenerationTimestamp && item.historicalTrend && item.limitations.length));
+
+    const historyResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analytics-history&period=30d`
+    );
+    assert.equal(historyResponse.status, 200);
+    assert.deepEqual((await historyResponse.json()).data.items, []);
+
+    const bundleResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analysis-bundle&period=30d&limit=50`
+    );
+    assert.equal(bundleResponse.status, 200);
+    const bundleBody = await bundleResponse.json();
+    assert.equal(bundleBody.data.manifest.requestedRange.timezone, "UTC");
+    assert.deepEqual(bundleBody.data.manifest.activeMarkets, ["BTC-EUR", "ETH-EUR"]);
+    assert.equal(bundleBody.data.manifest.tradingMode, "PAPER");
+    assert.equal(bundleBody.data.manifest.liveTradingEnabled, false);
+    assert.equal(bundleBody.data.manifest.riskSettings.feeRate, 0.0025);
   });
 });
 
@@ -690,6 +752,47 @@ test("analytics failures retain a safe diagnostic linked to the response request
     assert.equal(diagnostic.requestId, body.error.requestId);
     assert.equal(diagnostic.view, "analytics");
     assert.equal(diagnostic.reason, "analytics decisions exceed the bounded query limit");
+  });
+});
+
+test("recommendation-history CSV exports stored generated insights rather than recomputing them", async () => {
+  const repositories = createRepositories(createPool(), undefined, {
+    async getAnalyticsRunHistory() {
+      return {
+        items: [{
+          id: "run-1",
+          calculationVersion: "phase-11.1",
+          period: "30d",
+          periodStart: "2026-10-01T00:00:00.000Z",
+          periodEnd: "2026-10-31T00:00:00.000Z",
+          generatedAt: "2026-10-31T00:00:00.000Z",
+          insights: {
+            recommendations: [{
+              category: "Market Selection",
+              title: "Review BTC-EUR",
+              confidenceLevel: "Preliminary",
+              supportingSampleSize: 10,
+              historicalTrend: { direction: "INCREASING" },
+              metrics: [{ label: "Realized P&L", value: -1, format: "currency" }],
+              limitations: ["Advisory only."]
+            }]
+          }
+        }],
+        limit: 100,
+        truncated: false
+      };
+    }
+  });
+  await withServer({ dataRepositories: repositories }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=export&type=recommendation-history&period=30d`
+    );
+    assert.equal(response.status, 200);
+    const csv = await response.text();
+    assert.match(csv, /run-1/);
+    assert.match(csv, /Review BTC-EUR/);
+    assert.match(csv, /INCREASING/);
+    assert.match(csv, /Advisory only/);
   });
 });
 
