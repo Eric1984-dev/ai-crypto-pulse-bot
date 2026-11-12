@@ -614,17 +614,20 @@ a:focus-visible {
 }
 
 .dashboard-list-panel > .panel-heading,
+.archive-health-panel > .panel-heading,
 .shadow-exit-panel > .panel-heading {
   cursor: pointer;
   list-style: none;
 }
 
 .dashboard-list-panel > .panel-heading::-webkit-details-marker,
+.archive-health-panel > .panel-heading::-webkit-details-marker,
 .shadow-exit-panel > .panel-heading::-webkit-details-marker {
   display: none;
 }
 
 .dashboard-list-panel > .panel-heading::after,
+.archive-health-panel > .panel-heading::after,
 .shadow-exit-panel > .panel-heading::after {
   width: 8px;
   height: 8px;
@@ -637,6 +640,7 @@ a:focus-visible {
 }
 
 .dashboard-list-panel[open] > .panel-heading::after,
+.archive-health-panel[open] > .panel-heading::after,
 .shadow-exit-panel[open] > .panel-heading::after {
   border-color: var(--accent);
   filter: drop-shadow(0 0 5px rgb(91 156 255 / 70%));
@@ -644,12 +648,14 @@ a:focus-visible {
 }
 
 .dashboard-list-panel > .panel-heading:hover::after,
+.archive-health-panel > .panel-heading:hover::after,
 .shadow-exit-panel > .panel-heading:hover::after {
   border-color: var(--accent);
   filter: drop-shadow(0 0 5px rgb(91 156 255 / 70%));
 }
 
 .dashboard-list-panel > .panel-heading:focus-visible,
+.archive-health-panel > .panel-heading:focus-visible,
 .shadow-exit-panel > .panel-heading:focus-visible {
   border-radius: 4px;
   outline: 2px solid var(--accent);
@@ -657,6 +663,7 @@ a:focus-visible {
 }
 
 .dashboard-list-panel:not([open]) > .panel-heading,
+.archive-health-panel:not([open]) > .panel-heading,
 .shadow-exit-panel:not([open]) > .panel-heading {
   margin-bottom: 0;
 }
