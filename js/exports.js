@@ -18,6 +18,16 @@
     "analyticsRuns",
     "candleWindows"
   ]);
+  const analysisExportSourceLabels = Object.freeze({
+    trades: "TRADES",
+    positions: "POSITIONS",
+    decisions: "AI DECISIONS",
+    portfolioSnapshots: "PORTFOLIO SNAPSHOTS",
+    shadowExitScenarios: "SHADOW-EXIT SCENARIOS",
+    shadowExitEvents: "SHADOW-EXIT EVENTS",
+    analyticsRuns: "ANALYTICS RUNS",
+    candleWindows: "CANDLES"
+  });
   const analysisExportFilePrefix = "cryptopulse-analysis";
   const utf8Encoder = new TextEncoder();
   const countFormat = new Intl.NumberFormat("en-GB");
@@ -440,6 +450,12 @@
     const analysisExportProgress = documentRef.querySelector(
       "[data-analysis-export-progress]"
     );
+    const analysisExportSource = documentRef.querySelector(
+      "[data-analysis-export-source]"
+    );
+    const analysisExportDetail = documentRef.querySelector(
+      "[data-analysis-export-detail]"
+    );
     const analysisExportStatus = documentRef.querySelector(
       "[data-analysis-export-status]"
     );
@@ -450,6 +466,24 @@
       if (analysisExportStatus) {
         analysisExportStatus.textContent = message;
         analysisExportStatus.dataset.state = state;
+      }
+    }
+
+    function setAnalysisExportProgress(message, state = "", source = "") {
+      if (!analysisExportProgress) {
+        return;
+      }
+      analysisExportProgress.dataset.state = state;
+      if (analysisExportSource) {
+        analysisExportSource.textContent = source;
+        analysisExportSource.hidden = !source;
+      }
+      if (analysisExportDetail) {
+        analysisExportDetail.textContent = message;
+      } else {
+        analysisExportProgress.textContent = source
+          ? `Exporting ${source}: ${message}`
+          : message;
       }
     }
 
@@ -469,13 +503,13 @@
       activeExportController = new AbortControllerConstructor();
       if (startAnalysisExportButton) {
         startAnalysisExportButton.disabled = true;
+        startAnalysisExportButton.dataset.exporting = "true";
+        startAnalysisExportButton.setAttribute?.("aria-busy", "true");
       }
       if (cancelAnalysisExportButton) {
         cancelAnalysisExportButton.hidden = false;
       }
-      if (analysisExportProgress) {
-        analysisExportProgress.textContent = "Choose a destination folder for the export.";
-      }
+      setAnalysisExportProgress("Choose a destination folder for the export.", "active");
       setAnalysisExportStatus("");
       try {
         const directoryHandle = await windowRef.showDirectoryPicker({ mode: "readwrite" });
@@ -487,17 +521,18 @@
           directoryHandle,
           signal: activeExportController.signal,
           onProgress({ source, pages, records, completedSources }) {
-            if (analysisExportProgress) {
-              analysisExportProgress.textContent =
-                `Exporting ${source}: ${countFormat.format(records)} records in ${pages} page(s); `
-                + `${completedSources} of ${analysisExportSources.length} sources complete.`;
-            }
+            const label = analysisExportSourceLabels[source] || source.toUpperCase();
+            setAnalysisExportProgress(
+              `${countFormat.format(records)} records in ${pages} page(s); `
+                + `${completedSources} of ${analysisExportSources.length} sources complete.`,
+              "active",
+              label
+            );
           }
         });
-        if (analysisExportProgress) {
-          analysisExportProgress.textContent =
-            `${analysisExportSources.length} sources exported. Files are in ${result.directoryName}.`;
-        }
+        setAnalysisExportProgress(
+          `${analysisExportSources.length} sources exported. Files are in ${result.directoryName}.`
+        );
         setAnalysisExportStatus("Historical export completed.", "success");
       } catch (error) {
         if (error.status === 401 && typeof windowRef.location?.assign === "function") {
@@ -514,6 +549,14 @@
         activeExportController = null;
         if (startAnalysisExportButton) {
           startAnalysisExportButton.disabled = false;
+          delete startAnalysisExportButton.dataset.exporting;
+          startAnalysisExportButton.removeAttribute?.("aria-busy");
+        }
+        if (analysisExportProgress) {
+          analysisExportProgress.dataset.state = "";
+        }
+        if (analysisExportSource) {
+          analysisExportSource.hidden = true;
         }
         if (cancelAnalysisExportButton) {
           cancelAnalysisExportButton.hidden = true;

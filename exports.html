@@ -58,7 +58,10 @@
           </div>
         </div>
         <p class="card-description">Writes all available trades, positions, AI decisions, portfolio snapshots, shadow-exit scenarios and events, stored analytics runs, and bounded candle windows to JSONL files in a folder you choose. Candle windows are collected around every trade and AI-decision timestamp. Requests run one at a time; large sources are split into files no larger than 5 MiB. The manifest records the fixed as-of time and any limitations. Use a current desktop Chromium browser with folder access enabled; no AI upload occurs.</p>
-        <p class="export-record-count" data-analysis-export-progress role="status" aria-live="polite">Ready to export all available history.</p>
+        <p class="export-record-count" data-analysis-export-progress role="status" aria-live="polite">
+          <strong class="export-source-indicator" data-analysis-export-source hidden></strong>
+          <span data-analysis-export-detail>Ready to export all available history.</span>
+        </p>
         <button class="history-search-button" data-analysis-export-start type="button">Export Complete History</button>
         <button class="history-search-button" data-analysis-export-cancel type="button" hidden>Cancel Export</button>
         <p class="export-status" data-analysis-export-status role="status" aria-live="polite"></p>
