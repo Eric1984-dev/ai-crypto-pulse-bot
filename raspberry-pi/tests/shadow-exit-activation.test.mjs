@@ -151,12 +151,25 @@ test("Pi evaluator migration installs a restricted evaluator that creates scenar
     new URL("../migrations/phase-8.11-shadow-exit-evaluator-installation.sql", import.meta.url),
     "utf8"
   );
-  await database.exec(migration);
-  await database.exec("SET ROLE paper_runtime");
+  assert.match(migration, /pg_try_advisory_xact_lock\(882018083\)/);
+  await database.exec(migration.replace(
+    "pg_try_advisory_xact_lock(882018083)",
+    "pg_try_advisory_xact_lock(882018082)"
+  ));
+  const lockMigration = await readFile(
+    new URL("../migrations/phase-8.12-shadow-exit-lock-isolation.sql", import.meta.url),
+    "utf8"
+  );
+  await database.exec(lockMigration);
+  await database.exec(`
+    BEGIN;
+    SELECT pg_catalog.pg_advisory_xact_lock(882018082);
+    SET ROLE paper_runtime;
+  `);
   const evaluation = await database.query(`
     SELECT public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"() AS result
   `);
-  await database.exec("RESET ROLE");
+  await database.exec("RESET ROLE; COMMIT");
 
   assert.equal(evaluation.rows[0].result.status, "COMPLETED");
   assert.equal(evaluation.rows[0].result.positionsEvaluated, 1);

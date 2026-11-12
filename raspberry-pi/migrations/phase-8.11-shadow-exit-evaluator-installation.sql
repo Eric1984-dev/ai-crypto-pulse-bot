@@ -166,7 +166,7 @@ DECLARE
   v_positions_finalized integer := 0;
   v_waiting_for_fresh_data integer := 0;
 BEGIN
-  IF NOT pg_catalog.pg_try_advisory_xact_lock(882018082) THEN
+  IF NOT pg_catalog.pg_try_advisory_xact_lock(882018083) THEN
     RETURN pg_catalog.jsonb_build_object('status', 'SKIPPED', 'reason', 'RUN_IN_PROGRESS');
   END IF;
 

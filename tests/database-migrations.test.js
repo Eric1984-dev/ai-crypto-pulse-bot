@@ -370,7 +370,7 @@ test("shadow exit migration adds prefixed, constrained, indexed, RLS-protected s
   assert.match(shadowExitMigration, /AI_Crypto_Bot_Shadow_Exit_Events_select_own/);
   assert.match(shadowExitMigration, /REVOKE ALL ON FUNCTION[\s\S]+FROM PUBLIC, anon, authenticated/);
   assert.match(shadowExitMigration, /GRANT EXECUTE ON FUNCTION[\s\S]+TO service_role/);
-  assert.match(shadowExitMigration, /pg_try_advisory_xact_lock\(882018082\)/);
+  assert.match(shadowExitMigration, /pg_try_advisory_xact_lock\(882018083\)/);
 
   const database = await createDatabase();
   try {

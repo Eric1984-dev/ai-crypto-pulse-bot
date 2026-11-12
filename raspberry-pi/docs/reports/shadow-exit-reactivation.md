@@ -10,6 +10,12 @@ The Raspberry Pi schema contract listed the shadow-exit scenario and event table
 
 The operator's runtime log reports SQLSTATE `42883` (`undefined_function`) from the zero-argument evaluator call. This indicates the function is absent or not visible under that signature. The operator confirmed applying Phase 8.10, but that migration only grants dashboard `SELECT` and does not install the evaluator.
 
+## Advisory-lock collision
+
+The reported monitoring response showed `shadowExits: "SKIPPED"` while the runtime cycle completed. Inspection found the Phase 8.11 evaluator used advisory-lock key `882018082`, which is also held for the lifetime of the runtime scheduler connection. PostgreSQL therefore rejected the evaluator's transaction-level attempt to acquire that same lock. The evaluator now uses distinct key `882018083`; Phase 8.12 updates already-installed Pi functions without changing runtime ownership or paper-trading locks.
+
+Apply `raspberry-pi/migrations/phase-8.12-shadow-exit-lock-isolation.sql` as the owner of the installed evaluator. The database function update takes effect immediately; no runtime deployment or restart is required. Verify the next scheduled cycle reports `shadowExits: "COMPLETED"`. Production migration and runtime verification remain operator-controlled and have not been performed from this workspace.
+
 ## Changes
 
 - Added a repository method that calls the existing zero-argument JSONB evaluator in its own transaction and validates the bounded result.
