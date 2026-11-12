@@ -257,6 +257,23 @@ function createRepositories(pool, logger = { error() {} }, dashboardOverrides = 
           shadowExitEvents: []
         };
       },
+      getAnalysisExportManifest({ now }) {
+        return {
+          formatVersion: "cryptopulse-analysis-export-v1",
+          generatedAt: now.toISOString(),
+          asOf: now.toISOString(),
+          sources: ["trades", "candleWindows"]
+        };
+      },
+      async getAnalysisExportPage({ source, asOf, cursor }) {
+        return {
+          source,
+          asOf: asOf.toISOString(),
+          items: [],
+          hasMore: false,
+          nextCursor: cursor
+        };
+      },
       async getExportRecordCount() {
         return 1;
       },
@@ -725,6 +742,46 @@ test("analytics and recommendations endpoints handle recommendation generator in
     assert.equal(bundleBody.data.manifest.tradingMode, "PAPER");
     assert.equal(bundleBody.data.manifest.liveTradingEnabled, false);
     assert.equal(bundleBody.data.manifest.riskSettings.feeRate, 0.0025);
+  });
+});
+
+test("full-history export routes return a fixed manifest and bounded source pages", async () => {
+  const asOf = "2026-11-12T20:00:00.000Z";
+  const repositories = createRepositories(createPool());
+  await withServer({ dataRepositories: repositories, now: () => new Date(asOf) }, async (baseUrl) => {
+    const manifestResponse = await fetch(
+      `${baseUrl}/api/v1/dashboard-data?view=analysis-export-manifest`
+    );
+    assert.equal(manifestResponse.status, 200);
+    const manifest = (await manifestResponse.json()).data;
+    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v1");
+    assert.equal(manifest.asOf, asOf);
+    assert.deepEqual(manifest.activeMarkets, ["BTC-EUR", "ETH-EUR"]);
+    assert.equal(manifest.tradingMode, "PAPER");
+    assert.equal(manifest.liveTradingEnabled, false);
+    assert.equal(manifest.riskSettings.feeRate, 0.0025);
+
+    const params = new URLSearchParams({
+      view: "analysis-export-page",
+      source: "trades",
+      asOf
+    });
+    const pageResponse = await fetch(`${baseUrl}/api/v1/dashboard-data?${params}`);
+    assert.equal(pageResponse.status, 200);
+    const page = (await pageResponse.json()).data;
+    assert.equal(page.source, "trades");
+    assert.equal(page.asOf, asOf);
+    assert.deepEqual(page.items, []);
+    assert.equal(page.hasMore, false);
+
+    for (const invalidQuery of [
+      "view=analysis-export-page&source=unknown&asOf=2026-11-12T20%3A00%3A00.000Z",
+      "view=analysis-export-page&source=trades&asOf=invalid",
+      "view=analysis-export-page&source=trades&asOf=2026-11-12T20%3A00%3A00.000Z&cursor=!"
+    ]) {
+      const response = await fetch(`${baseUrl}/api/v1/dashboard-data?${invalidQuery}`);
+      assert.equal(response.status, 400);
+    }
   });
 });
 

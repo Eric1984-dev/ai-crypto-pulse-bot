@@ -646,3 +646,164 @@ test("trade history filtering and pagination preserve all-time sell statistics",
     await database.close();
   }
 });
+
+test("full-history export paginates every source and deduplicates candle anchors across pages", async () => {
+  const database = await createDatabase();
+  try {
+    const anchorTimes = Array.from({ length: 11 }, (_, index) =>
+      new Date(Date.UTC(2026, 2, 20, index)).toISOString());
+    await database.query(`
+      UPDATE public."AI_Crypto_Bot_Trades"
+      SET created_at = $1
+      WHERE id = '00000000-0000-4000-8000-000000000400'
+    `, [anchorTimes[0]]);
+    await database.query(`
+      UPDATE public."AI_Crypto_Bot_AI_Decisions"
+      SET created_at = $1
+      WHERE id = '00000000-0000-4000-8000-000000000700'
+    `, [anchorTimes[0]]);
+
+    for (let index = 1; index < anchorTimes.length; index += 1) {
+      const suffix = String(709 + index).padStart(12, "0");
+      const symbol = index % 2 === 0 ? "BTC-EUR" : "ETH-EUR";
+      await database.query(`
+        INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+          (id, symbol, decision, confidence, reason, indicators, created_at)
+        VALUES ($1::uuid, $2, 'HOLD', 70, 'Recorded for export pagination.', '{}', $3)
+      `, [`00000000-0000-4000-8000-${suffix}`, symbol, anchorTimes[index]]);
+      await database.query(`
+        INSERT INTO public."AI_Crypto_Bot_Candles"
+          (symbol, interval, open, high, low, close, volume, timestamp)
+        VALUES ($1, '1m', 10, 11, 9, 10.5, 2, $2)
+      `, [symbol, anchorTimes[index]]);
+    }
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Candles"
+        (symbol, interval, open, high, low, close, volume, timestamp)
+      VALUES ('BTC-EUR', '1m', 10, 11, 9, 10.5, 2, $1)
+    `, [anchorTimes[0]]);
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+        (id, position_id, portfolio_id, symbol, position_opened_at, rule_id,
+         rule_version, parameters, status, data_quality_status, last_evaluated_at,
+         trailing_armed)
+      VALUES ('00000000-0000-4000-8000-000000000800',
+        '00000000-0000-4000-8000-000000000300',
+        '00000000-0000-4000-8000-000000000200',
+        'BTC-EUR', $1, 'test-rule', '1', '{}', 'TRACKING', 'FRESH', $1, false)
+    `, [anchorTimes[0]]);
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Events"
+        (id, scenario_id, event_type, event_at, observed_mark, data_quality_status, error_code)
+      VALUES ('00000000-0000-4000-8000-000000000801',
+        '00000000-0000-4000-8000-000000000800',
+        'TRACKING_STARTED', $1, 10, 'FRESH', NULL)
+    `, [anchorTimes[0]]);
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Analytics_Runs"
+        (id, calculation_version, period, period_start, period_end, generated_at,
+         source_counts, analytics_summary, insights)
+      VALUES ('00000000-0000-4000-8000-000000000802',
+        'phase-11.1', '30d', $1, $1, $1, '{}', '{}', '[]')
+    `, [anchorTimes[0]]);
+
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+    const asOf = new Date("2099-01-01T00:00:00.000Z");
+    const manifest = repository.getAnalysisExportManifest({ now: asOf });
+    assert.equal(manifest.asOf, asOf.toISOString());
+    assert.equal(manifest.limits.rowsPerRequest, 250);
+    assert.equal(manifest.limits.candleAnchorsPerRequest, 10);
+    assert.ok(manifest.sources.includes("analyticsRuns"));
+
+    for (const [source, expected] of [
+      ["trades", 1],
+      ["positions", 1],
+      ["decisions", 11],
+      ["portfolioSnapshots", 1],
+      ["shadowExitScenarios", 1],
+      ["shadowExitEvents", 1],
+      ["analyticsRuns", 1]
+    ]) {
+      const page = await repository.getAnalysisExportPage({ source, asOf });
+      assert.equal(page.items.length, expected, `${source} rows are exported`);
+      assert.equal(page.hasMore, false);
+    }
+
+    const anchorPages = [];
+    let cursor = null;
+    do {
+      const page = await repository.getAnalysisExportPage({
+        source: "candleWindows",
+        asOf,
+        cursor
+      });
+      anchorPages.push(page);
+      cursor = page.nextCursor;
+      assert.ok(page.candleWindows.length <= 1200);
+    } while (cursor);
+    const uniqueAnchors = new Set(anchorPages.flatMap(({ anchors }) =>
+      anchors.map(({ symbol, anchorAt }) => `${symbol}\u0000${anchorAt}`)));
+    assert.equal(uniqueAnchors.size, 11);
+    assert.ok(anchorPages.length > 1);
+    assert.ok(anchorPages.every(({ hasMore }) => typeof hasMore === "boolean"));
+  } finally {
+    await database.close();
+  }
+});
+
+test("full-history export decision pages use stable keyset cursors without gaps", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      DELETE FROM public."AI_Crypto_Bot_AI_Decisions"
+      WHERE id = '00000000-0000-4000-8000-000000000700';
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      SELECT ('00000000-0000-4000-8000-' || lpad(sequence_number::text, 12, '0'))::uuid,
+             'BTC-EUR', 'HOLD', 70, 'Keyset pagination fixture.', '{}',
+             '2026-03-20T00:00:00.000Z'::timestamptz
+      FROM generate_series(1, 251) AS values(sequence_number)
+    `);
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+    const asOf = new Date("2099-01-01T00:00:00.000Z");
+    const firstPage = await repository.getAnalysisExportPage({
+      source: "decisions",
+      asOf
+    });
+    const secondPage = await repository.getAnalysisExportPage({
+      source: "decisions",
+      asOf,
+      cursor: firstPage.nextCursor
+    });
+    const beforeHistory = await repository.getAnalysisExportPage({
+      source: "decisions",
+      asOf: new Date("2026-03-19T00:00:00.000Z")
+    });
+
+    assert.equal(firstPage.items.length, 250);
+    assert.equal(firstPage.hasMore, true);
+    assert.ok(firstPage.nextCursor);
+    assert.equal(secondPage.items.length, 1);
+    assert.equal(secondPage.hasMore, false);
+    assert.equal(new Set([...firstPage.items, ...secondPage.items].map(({ id }) => id)).size, 251);
+    assert.equal(beforeHistory.items.length, 0);
+  } finally {
+    await database.close();
+  }
+});

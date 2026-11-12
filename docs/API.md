@@ -29,11 +29,15 @@ The Pi runtime is the sole application API and validates the session, request, a
 | `GET /api/v1/dashboard-data` | Portfolio, positions, recent trades, decisions, snapshots, current system data, and bounded shadow-exit scenarios/events. Shadow data reports `UNAVAILABLE` independently if its read grant or tables are unavailable. |
 | `GET /api/v1/dashboard-data?view=analytics` | On-demand analytics data. |
 | `GET /api/v1/dashboard-data?view=trade-history` | Filtered and paginated trade history. |
+| `GET /api/v1/dashboard-data?view=analysis-export-manifest` | Fixed `asOf` boundary, source definitions, row/file limits, active markets, and paper-risk metadata for a full-history export. |
+| `GET /api/v1/dashboard-data?view=analysis-export-page&source=trades&asOf=<UTC timestamp>&cursor=<opaque>` | Authenticated bounded keyset page for one allowlisted export source; pages are read sequentially by the browser. `candleWindows` pages return up to ten unique anchors and at most 1,200 candles. |
 | `GET /api/v1/markets`, `/api/v1/market`, `/api/v1/market-summary` | Watched markets, market detail, and scanner rankings. |
 | `GET /api/v1/agent-status` | Current agent status. |
 | `GET /api/v1/monitoring` | Pi runtime, scheduler, process, host, and database monitoring. |
 
 Data endpoints require the single-admin session and return no-store responses. The monitoring card uses `/api/v1/monitoring`; it does not call the retired Vercel archive-health handler. Current contracts and bounds are maintained in the [Pi API implementation](../raspberry-pi/src/api/).
+
+The full-history export uses the existing `/api/v1/dashboard-data` route and the existing Vercel proxy function; it adds no serverless function or write endpoint. The browser saves bounded JSONL parts and a manifest locally, honors `Retry-After` on rate limiting, and does not upload data to an AI service. The fixed `asOf` boundary does not create a transactionally consistent database snapshot.
 
 ## Retired API surface
 

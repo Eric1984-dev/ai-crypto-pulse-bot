@@ -32,6 +32,17 @@ const dataRepositories = {
     async getAnalytics() { return {}; },
     async getExportRecordCount() { return 0; },
     async getExportRecords() { return []; },
+    getAnalysisExportManifest({ now }) {
+      return {
+        formatVersion: "cryptopulse-analysis-export-v1",
+        generatedAt: now.toISOString(),
+        asOf: now.toISOString(),
+        sources: []
+      };
+    },
+    async getAnalysisExportPage({ source, asOf }) {
+      return { source, asOf: asOf.toISOString(), items: [], hasMore: false, nextCursor: null };
+    },
     async getMonitoringMetrics() { return {}; }
   },
   runtimeStatus: {

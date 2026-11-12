@@ -20,6 +20,8 @@ npm.cmd run validate --prefix raspberry-pi
 
 The Pi tests cover the active API, authentication, PostgreSQL repositories, scheduler, market ingestion, AI engine, paper trading, monitoring, and runtime lifecycle. Tests use controlled local fixtures and do not claim that a live Pi/database was reached.
 
+The full-history export regressions cover source keyset pagination, deduplicated trade/decision candle anchors, fixed as-of filtering, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation manifests. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer.
+
 ## Dashboard and authentication
 
 ```powershell

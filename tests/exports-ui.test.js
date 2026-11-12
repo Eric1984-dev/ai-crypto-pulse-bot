@@ -27,231 +27,291 @@ function createControl(value = "") {
   };
 }
 
-function createExportCard(type) {
-  const nodes = {
-    "[data-export-period]": createControl("24h"),
-    "[data-export-count]": createControl(),
-    "[data-export-empty]": createControl(),
-    "[data-export-download]": createControl(),
-    "[data-export-status]": createControl()
+function createMemoryDirectory() {
+  const files = new Map();
+  const directories = new Map();
+  const directoryHandle = {
+    async getDirectoryHandle(name) {
+      if (!directories.has(name)) {
+        directories.set(name, createDirectory());
+      }
+      return directories.get(name);
+    }
   };
-  return {
-    dataset: { exportCard: type },
-    querySelector(selector) {
-      return nodes[selector] || null;
-    },
-    nodes
-  };
+  function createDirectory() {
+    return {
+      async getFileHandle(name) {
+        return {
+          async createWritable() {
+            files.set(name, "");
+            return {
+              async write(chunk) {
+                files.set(name, files.get(name) + chunk);
+              },
+              async close() {}
+            };
+          }
+        };
+      }
+    };
+  }
+  return { directoryHandle, files, directories };
 }
 
-function createAnalyticsExportCard(type) {
-  const nodes = {
-    "[data-export-period]": createControl("30d"),
-    "[data-export-count]": createControl(),
-    "[data-export-empty]": createControl(),
-    "[data-export-download]": createControl(),
-    "[data-export-status]": createControl()
-  };
+function jsonResponse(data, status = 200, headers = {}) {
   return {
-    dataset: { exportCard: type },
-    querySelector(selector) {
-      return nodes[selector] || null;
-    },
-    nodes
-  };
-}
-
-function createExportsDocument(cards) {
-  const appended = [];
-  const cardList = Array.isArray(cards) ? cards : [cards];
-  return {
-    body: {
-      append(element) {
-        appended.push(element);
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {
+      get(name) {
+        return headers[name] || null;
       }
     },
-    appended,
-    querySelector(selector) {
-      if (selector === "[data-exports-page]") {
-        return {};
-      }
-      return null;
-    },
-    querySelectorAll(selector) {
-      return selector === "[data-export-card]" ? cardList : [];
-    },
-    createElement(tagName) {
-      return {
-        tagName,
-        click() {
-          this.clicked = true;
-        },
-        remove() {
-          this.removed = true;
-        }
-      };
+    async json() {
+      return { data };
     }
   };
 }
 
-test("export UI builds Raspberry Pi API count and stream URLs", () => {
-  const countUrl = new URL(exportsPage.buildExportUrl("trades", "7d"), "https://cryptopulse.local");
-  assert.equal(countUrl.pathname, "/api/v1/dashboard-data");
-  assert.equal(countUrl.searchParams.get("view"), "export-count");
-  assert.equal(countUrl.searchParams.get("type"), "trades");
-  assert.equal(countUrl.searchParams.get("period"), "7d");
-
-  const downloadUrl = new URL(exportsPage.buildExportUrl("positions", "all", "export"), "https://cryptopulse.local");
-  assert.equal(downloadUrl.searchParams.get("view"), "export");
-  assert.equal(downloadUrl.searchParams.get("type"), "positions");
-  assert.throws(() => exportsPage.buildExportUrl("trades", "invalid"), TypeError);
-});
-
-test("export page displays counts, empty states, download status, and failures", async () => {
-  const card = createExportCard("trades");
-  const documentRef = createExportsDocument(card);
-  const requests = [];
-  const windowRef = {
-    fetch: async (url) => {
-      requests.push(url);
-      if (url.includes("period=7d")) {
-        return { status: 503, ok: false };
+function createExportsDocument() {
+  const analysisExportControls = {
+    "[data-analysis-export-start]": createControl(),
+    "[data-analysis-export-cancel]": createControl(),
+    "[data-analysis-export-progress]": createControl(),
+    "[data-analysis-export-status]": createControl()
+  };
+  return {
+    analysisExportControls,
+    querySelector(selector) {
+      if (selector === "[data-exports-page]") {
+        return {};
       }
-      return {
-        status: 200,
-        ok: true,
-        async json() {
-          return { data: { exportType: "trades", period: "24h", recordCount: 3 } };
-        }
-      };
+      return analysisExportControls[selector] || null;
     },
-    addEventListener() {},
-    removeEventListener() {}
+  };
+}
+
+test("full-history export paginates sequentially, retries rate limits, and splits bounded JSONL files", async () => {
+  const { directoryHandle, files } = createMemoryDirectory();
+  const asOf = "2026-11-12T20:00:00.000Z";
+  const sources = [
+    "trades",
+    "positions",
+    "decisions",
+    "portfolioSnapshots",
+    "shadowExitScenarios",
+    "shadowExitEvents",
+    "analyticsRuns",
+    "candleWindows"
+  ];
+  const requests = [];
+  let activeRequests = 0;
+  let maximumActiveRequests = 0;
+  let rateLimitSent = false;
+  const anchors = ["2026-11-12T10:00:00.000Z", "2026-11-12T11:00:00.000Z",
+    "2026-11-12T12:00:00.000Z"].map((anchorAt) => ({ symbol: "BTC-EUR", anchorAt }));
+  const fetchImpl = async (url) => {
+    activeRequests += 1;
+    maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+    requests.push(url);
+    try {
+      await new Promise((resolve) => setImmediate(resolve));
+      const params = new URL(url, "https://cryptopulse.local").searchParams;
+      if (params.get("view") === "analysis-export-manifest") {
+        return jsonResponse({
+          formatVersion: "cryptopulse-analysis-export-v1",
+          asOf,
+          sources,
+          limits: { maxFileBytes: 1024 }
+        });
+      }
+      const source = params.get("source");
+      const cursor = params.get("cursor");
+      if (source === "trades" && !cursor && !rateLimitSent) {
+        rateLimitSent = true;
+        return {
+          status: 429,
+          ok: false,
+          headers: { get: () => "0" }
+        };
+      }
+      if (source === "trades") {
+        return jsonResponse({
+          source,
+          asOf,
+          items: [{ id: cursor ? "2" : "1", detail: "x".repeat(700) }],
+          hasMore: !cursor,
+          nextCursor: cursor ? null : "page-2"
+        });
+      }
+      if (source === "candleWindows") {
+        const pageAnchors = cursor ? anchors.slice(1) : anchors.slice(0, 2);
+        return jsonResponse({
+          source,
+          asOf,
+          items: [],
+          anchors: pageAnchors,
+          candleWindows: pageAnchors.map((anchor) => ({
+            ...anchor,
+            interval: "1m",
+            timestamp: anchor.anchorAt,
+            open: 1,
+            high: 2,
+            low: 0.5,
+            close: 1.5,
+            volume: 5
+          })),
+          hasMore: !cursor,
+          nextCursor: cursor ? null : "candle-page-2"
+        });
+      }
+      return jsonResponse({
+        source,
+        asOf,
+        items: [],
+        hasMore: false,
+        nextCursor: null
+      });
+    } finally {
+      activeRequests -= 1;
+    }
   };
 
-  const cleanup = exportsPage.startExports({ windowRef, documentRef });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(card.nodes["[data-export-count]"].textContent, "3 records available");
-  assert.equal(card.nodes["[data-export-download]"].disabled, false);
-
-  await card.nodes["[data-export-download]"].trigger("click");
-  assert.equal(documentRef.appended[0].clicked, true);
-  assert.equal(documentRef.appended[0].href, "/api/v1/dashboard-data?view=export&type=trades&period=24h");
-  assert.match(card.nodes["[data-export-status]"].textContent, /download requested/i);
-  assert.equal(card.nodes["[data-export-status]"].dataset.state, "success");
-
-  card.nodes["[data-export-period]"].value = "7d";
-  await card.nodes["[data-export-period]"].trigger("change");
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(card.nodes["[data-export-download]"].disabled, true);
-  assert.equal(card.nodes["[data-export-status]"].dataset.state, "error");
-  assert.ok(requests.some((url) => url.includes("period=7d")));
-  cleanup();
+  const result = await exportsPage.exportFullHistory({
+    fetchImpl,
+    directoryHandle,
+    runId: "test-run"
+  });
+  assert.equal(result.manifest.exportStatus, "complete");
+  assert.equal(result.manifest.sourceCounts.trades.records, 2);
+  assert.equal(result.manifest.sourceCounts.candleWindows.records, 6);
+  assert.equal(maximumActiveRequests, 1);
+  assert.ok(requests.some((url) => url.includes("view=analysis-export-page")));
+  const runFiles = files;
+  const manifest = JSON.parse(runFiles.get("manifest.json"));
+  assert.equal(manifest.exportStatus, "complete");
+  const tradeFiles = [...runFiles.entries()].filter(([name]) => name.startsWith("trades-"));
+  assert.equal(tradeFiles.length, 2);
+  assert.ok(tradeFiles.every(([, contents]) => new TextEncoder().encode(contents).byteLength <= 1024));
+  const anchorFile = runFiles.get("candle-anchors-0001.jsonl");
+  const candleFile = runFiles.get("candle-windows-0001.jsonl");
+  assert.equal(anchorFile.trim().split("\n").length, 3);
+  assert.equal(candleFile.trim().split("\n").length, 3);
 });
 
-test("analytics export cards use independent ranges for their counts and downloads", async () => {
-  const types = [
-    "analytics-summary",
-    "trade-analytics",
-    "portfolio-analytics",
-    "ai-analytics",
-    "recommendations",
-    "recommendation-history"
+test("full-history export leaves a cancelled status in the manifest", async () => {
+  const { directoryHandle, files } = createMemoryDirectory();
+  const controller = new AbortController();
+  const asOf = "2026-11-12T20:00:00.000Z";
+  let started;
+  const requestStarted = new Promise((resolve) => {
+    started = resolve;
+  });
+  const fetchImpl = async (url, options) => {
+    const params = new URL(url, "https://cryptopulse.local").searchParams;
+    if (params.get("view") === "analysis-export-manifest") {
+      return jsonResponse({
+        formatVersion: "cryptopulse-analysis-export-v1",
+        asOf,
+        sources: [
+          "trades", "positions", "decisions", "portfolioSnapshots",
+          "shadowExitScenarios", "shadowExitEvents", "analyticsRuns", "candleWindows"
+        ],
+        limits: { maxFileBytes: 1024 }
+      });
+    }
+    started();
+    return new Promise((resolve, reject) => {
+      options.signal.addEventListener("abort", () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    });
+  };
+  const exportPromise = exportsPage.exportFullHistory({
+    fetchImpl,
+    directoryHandle,
+    signal: controller.signal,
+    runId: "cancelled-run"
+  });
+  await requestStarted;
+  controller.abort();
+  await assert.rejects(exportPromise, { name: "AbortError" });
+  assert.equal(JSON.parse(files.get("manifest.json")).exportStatus, "cancelled");
+});
+
+test("Exports page wires folder selection and displays completed export status", async () => {
+  const documentRef = createExportsDocument();
+  const { directoryHandle } = createMemoryDirectory();
+  const asOf = "2026-11-12T20:00:00.000Z";
+  const sources = [
+    "trades",
+    "positions",
+    "decisions",
+    "portfolioSnapshots",
+    "shadowExitScenarios",
+    "shadowExitEvents",
+    "analyticsRuns",
+    "candleWindows"
   ];
-  const cards = types.map(createAnalyticsExportCard);
-  const documentRef = createExportsDocument(cards);
-  const requests = [];
+  let pickerCalls = 0;
   const windowRef = {
     fetch: async (url) => {
-      requests.push(url);
-      const period = new URL(url, "https://cryptopulse.local").searchParams.get("period");
-      return {
-        status: 200,
-        ok: true,
-        async json() {
-          return {
-            data: {
-              exportCounts: Object.fromEntries(types.map((type) => [type, 3])),
-              period
-            }
-          };
-        }
-      };
+      const params = new URL(url, "https://cryptopulse.local").searchParams;
+      if (params.get("view") === "analysis-export-manifest") {
+        return jsonResponse({
+          formatVersion: "cryptopulse-analysis-export-v1",
+          asOf,
+          sources,
+          limits: { maxFileBytes: 1024 }
+        });
+      }
+      return jsonResponse({
+        source: params.get("source"),
+        asOf,
+        items: [],
+        ...(params.get("source") === "candleWindows"
+          ? { anchors: [], candleWindows: [] }
+          : {}),
+        hasMore: false,
+        nextCursor: null
+      });
+    },
+    showDirectoryPicker: async () => {
+      pickerCalls += 1;
+      return directoryHandle;
     },
     addEventListener() {},
     removeEventListener() {}
   };
-
   const cleanup = exportsPage.startExports({ windowRef, documentRef });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data?view=analytics&period=30d").length, 1);
-  for (const card of cards) {
-    assert.equal(card.nodes["[data-export-count]"].textContent, "3 report rows available");
-    assert.equal(card.nodes["[data-export-download]"].disabled, false);
-  }
-  await cards[0].nodes["[data-export-download]"].trigger("click");
+  await documentRef.analysisExportControls["[data-analysis-export-start]"].trigger("click");
+  assert.equal(pickerCalls, 1);
   assert.equal(
-    documentRef.appended[0].href,
-    "/api/v1/dashboard-data?view=export&type=analytics-summary&period=30d"
+    documentRef.analysisExportControls["[data-analysis-export-status]"].dataset.state,
+    "success"
   );
-
-  cards[0].nodes["[data-export-period]"].value = "90d";
-  await cards[0].nodes["[data-export-period]"].trigger("change");
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests.filter((url) => url === "/api/v1/dashboard-data?view=analytics&period=90d").length, 1);
-  await cards[0].nodes["[data-export-download]"].trigger("click");
-  assert.equal(
-    documentRef.appended[1].href,
-    "/api/v1/dashboard-data?view=export&type=analytics-summary&period=90d"
-  );
-  assert.equal(cards[1].nodes["[data-export-period]"].value, "30d");
-  await cards[1].nodes["[data-export-download]"].trigger("click");
-  assert.equal(
-    documentRef.appended[2].href,
-    "/api/v1/dashboard-data?view=export&type=trade-analytics&period=30d"
+  assert.match(
+    documentRef.analysisExportControls["[data-analysis-export-progress]"].textContent,
+    /8 sources exported/i
   );
   cleanup();
 });
 
-test("Exports page is English, protected, and links to the existing data API", () => {
+test("Exports page shows only the primary complete-history export", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "exports.html"), "utf8");
   const script = fs.readFileSync(path.join(rootDirectory, "js", "exports.js"), "utf8");
 
   assert.match(html, /<html lang="en"/);
   assert.match(html, /data-auth-page="protected"/);
   assert.match(html, /href="\/exports\.html">Exports<\/a>/);
-  assert.match(html, /Trade Exports/);
-  assert.match(html, /Portfolio Exports/);
-  assert.match(html, /AI Decision Exports/);
-  assert.match(html, /Position Exports/);
-  assert.doesNotMatch(html, /data-analytics-export-period/);
-  const dataExportSection = html.match(
-    /<section class="dashboard-section" aria-labelledby="data-exports-heading">([\s\S]*?)<\/section>\s*<section id="analytics-exports"/
-  );
-  assert.ok(dataExportSection, "core data exports have their own section");
-  assert.match(dataExportSection[1], /<h2 id="data-exports-heading">Data Exports<\/h2>/);
-  assert.deepEqual(
-    [...dataExportSection[1].matchAll(/data-export-card="([^"]+)"/g)].map(([, type]) => type),
-    ["trades", "positions", "portfolio", "decisions"]
-  );
-  for (const type of [
-    "analytics-summary",
-    "trade-analytics",
-    "portfolio-analytics",
-    "ai-analytics",
-    "recommendations",
-    "recommendation-history"
-  ]) {
-    const card = html.match(new RegExp(`data-export-card="${type}"[\\s\\S]*?<\\/section>`));
-    assert.ok(card, `${type} export card exists`);
-    assert.match(card[0], /<select data-export-period>/);
-    for (const period of ["30d", "90d", "365d"]) {
-      assert.match(card[0], new RegExp(`value="${period}"`));
-    }
-  }
-  for (const period of ["24h", "7d", "30d", "all"]) {
-    assert.match(html, new RegExp(`value="${period}"`));
-  }
+  assert.match(html, /Complete Historical Export/);
+  assert.match(html, /data-analysis-export-start/);
+  assert.match(html, /data-analysis-export-cancel/);
+  assert.doesNotMatch(html, /data-export-card|Download CSV|Data Exports|Recommendation History/);
+  assert.doesNotMatch(script, /data-export-card|buildExportUrl|requestExportCount/);
   assert.match(script, /\/api\/v1\/dashboard-data/);
-  assert.doesNotMatch(script, /\/api\/exports/);
+  assert.match(script, /Retry-After/);
+  assert.match(script, /showDirectoryPicker/);
 });

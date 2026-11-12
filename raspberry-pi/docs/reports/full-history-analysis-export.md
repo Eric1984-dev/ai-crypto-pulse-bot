@@ -1,0 +1,68 @@
+# Full-History AI Analysis Export
+
+## Change
+
+The Exports page now presents a complete historical JSONL export as its sole
+export UI. The browser requests one bounded page at a time from the existing
+authenticated Pi dashboard-data route and writes the output into a user-selected
+local folder. No new Vercel function, database object, write API, or automatic
+AI upload was added.
+
+The export contains all available system-portfolio trades, position rows,
+recorded AI decisions, portfolio snapshots, shadow-exit scenarios and events,
+and persisted analytics runs through one fixed `asOf` time. Candle data is
+restricted to windows around every trade and decision timestamp: up to ten
+candles before and ten after each unique symbol/timestamp for each of the six
+supported intervals.
+
+The folder contains a manifest and separate JSONL files per source; candle
+anchors and candle rows have separate files. Files are split at 5 MiB. Requests
+are sequential and limited to 250 ordinary rows or ten candle anchors (at most
+1,200 candle rows) per page. The client honors `Retry-After`, supports
+cancellation, records completed-source counts, and writes a partial/failed
+status to the manifest when it can finalize the run.
+
+All overlapping CSV and recommendation-history cards and their explanatory
+copy were removed from the Exports page because the full-history JSONL bundle
+already includes those analysis sources. Existing CSV API endpoints remain
+available for compatibility; no endpoint or server-side export behavior was
+removed.
+
+## Limitations
+
+- Candle history is not exported as a full table; only the documented
+  trade/decision windows are included.
+- Position rows reflect their stored current state, not a complete position
+  state-change log.
+- A fixed `asOf` boundary is not a transactionally consistent database
+  snapshot. Mutable position/scenario rows can change during a long export.
+- An interrupted export cannot resume. User cancellation writes a cancelled
+  manifest, but abrupt browser/process termination can leave an in-progress
+  manifest and partial files.
+- If an individual record exceeds 5 MiB, the export fails instead of producing
+  an oversized file.
+- Saving a directory requires the browser File System Access API; the UI
+  supports a current desktop Chromium browser.
+- A Pi/Vercel production export has not been run or deployed from this change.
+
+## Validation
+
+| Check | Result |
+|---|---|
+| Focused export/API/repository/auth tests | Passed: 42 tests |
+| Raspberry Pi package test suite | Passed: 214 tests |
+| Root repository test suite | 382 passed, 1 failed. The remaining failure is the existing dashboard test expecting a `<section class="dashboard-panel shadow-exit-panel">`; `dashboard.html` uses a `<details>` element. The test also fails when run alone; the export change does not touch either file. |
+| `npm.cmd run build` | Passed static project and database migration validation |
+| `node --check` on changed JavaScript modules | Passed |
+| `git diff --check` | Passed |
+
+These are local results. Live Pi database performance, production proxy timing,
+and supported-browser folder access remain unverified; no deployment was
+performed.
+
+## Export UI Cleanup Follow-up
+
+The overlapping export cards and CSV-specific browser logic have since been
+removed; the existing CSV API endpoints remain unchanged for compatibility.
+After this UI-only change, `node --test tests/exports-ui.test.js` passed all
+four tests, `node --check js/exports.js` passed, and `git diff --check` passed.

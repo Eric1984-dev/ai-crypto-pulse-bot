@@ -9,6 +9,9 @@ import {
   isAnalyticsExportType
 } from "../../../lib/analytics-exports.mjs";
 import {
+  ANALYSIS_EXPORT_SOURCE_TYPES
+} from "../repositories/dashboard-repository.mjs";
+import {
   EXPORT_DEFINITIONS,
   streamCsvRows
 } from "../../../lib/dashboard-exports.mjs";
@@ -87,6 +90,19 @@ const ANALYSIS_BUNDLE_QUERY_SCHEMA = Object.freeze({
     validate: (value) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 1000,
     parse: Number
   })
+});
+const ANALYSIS_EXPORT_MANIFEST_QUERY_SCHEMA = Object.freeze({
+  view: Object.freeze({ validate: (value) => value === "analysis-export-manifest" })
+});
+const ANALYSIS_EXPORT_PAGE_QUERY_SCHEMA = Object.freeze({
+  view: Object.freeze({ validate: (value) => value === "analysis-export-page" }),
+  source: Object.freeze({ required: true, validate: (value) => ANALYSIS_EXPORT_SOURCE_TYPES.includes(value) }),
+  asOf: Object.freeze({
+    required: true,
+    validate: (value) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)
+      && Number.isFinite(Date.parse(value))
+  }),
+  cursor: Object.freeze({ validate: (value) => /^[A-Za-z0-9_-]{1,512}$/.test(value) })
 });
 const EXPORT_TYPES = Object.freeze([
   ...Object.keys(EXPORT_DEFINITIONS),
@@ -179,6 +195,10 @@ export function registerDataRoutes(router, repositories, {
           ? AI_HISTORY_QUERY_SCHEMA
       : rawView === "analysis-bundle"
         ? ANALYSIS_BUNDLE_QUERY_SCHEMA
+      : rawView === "analysis-export-manifest"
+        ? ANALYSIS_EXPORT_MANIFEST_QUERY_SCHEMA
+      : rawView === "analysis-export-page"
+        ? ANALYSIS_EXPORT_PAGE_QUERY_SCHEMA
       : rawView === "analytics" || rawView === "recommendations" || rawView === "analytics-history"
         ? ANALYTICS_QUERY_SCHEMA
         : Object.freeze({});
@@ -343,20 +363,47 @@ export function registerDataRoutes(router, repositories, {
             ),
             tradingMode: "PAPER",
             liveTradingEnabled: false,
-            riskSettings: {
-              maxPositionSizeFraction: PAPER_TRADING_RULES.maxPositionSizeFraction,
-              maxOpenPositions: PAPER_TRADING_RULES.maxOpenPositions,
-              minimumConfidence: PAPER_TRADING_RULES.minimumConfidence,
-              cooldownMs: PAPER_TRADING_RULES.cooldownMs,
-              feeRate: PAPER_TRADING_RULES.feeRate,
-              slippageRate: PAPER_TRADING_RULES.slippageRate,
-              dailyDrawdownFraction: PAPER_TRADING_RULES.dailyDrawdownFraction,
-              maxPortfolioDrawdownFraction: PAPER_TRADING_RULES.maxPortfolioDrawdownFraction,
-              emergencyDrawdownFraction: PAPER_TRADING_RULES.emergencyDrawdownFraction
-            }
+            riskSettings: getPaperTradingRiskSettings()
           }
         }
       });
+      return;
+    }
+    if (query.view === "analysis-export-manifest") {
+      const generatedAt = new Date(readClock(now));
+      const [manifest, markets] = await readRepository(
+        () => Promise.all([
+          repositories.dashboard.getAnalysisExportManifest({ now: generatedAt }),
+          repositories.watchedMarkets.listEnabled()
+        ]),
+        "ANALYSIS_EXPORT_UNAVAILABLE",
+        "The historical analysis export is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: query.view }
+      );
+      validateMarketRows(markets);
+      sendJson(context, 200, {
+        data: {
+          ...manifest,
+          activeMarkets: markets.map(({ symbol }) => symbol),
+          tradingMode: "PAPER",
+          liveTradingEnabled: false,
+          riskSettings: getPaperTradingRiskSettings()
+        }
+      });
+      return;
+    }
+    if (query.view === "analysis-export-page") {
+      const page = await readRepository(
+        () => repositories.dashboard.getAnalysisExportPage({
+          source: query.source,
+          asOf: new Date(query.asOf),
+          cursor: query.cursor || null
+        }),
+        "ANALYSIS_EXPORT_UNAVAILABLE",
+        "A historical analysis export page is temporarily unavailable.",
+        { logger, requestId: context.requestId, view: query.view }
+      );
+      sendJson(context, 200, { data: page });
       return;
     }
     if (query.view === "analytics-history") {
@@ -651,6 +698,20 @@ function safeDatabaseErrorCode(value) {
     : "POSTGRES_QUERY_FAILED";
 }
 
+function getPaperTradingRiskSettings() {
+  return {
+    maxPositionSizeFraction: PAPER_TRADING_RULES.maxPositionSizeFraction,
+    maxOpenPositions: PAPER_TRADING_RULES.maxOpenPositions,
+    minimumConfidence: PAPER_TRADING_RULES.minimumConfidence,
+    cooldownMs: PAPER_TRADING_RULES.cooldownMs,
+    feeRate: PAPER_TRADING_RULES.feeRate,
+    slippageRate: PAPER_TRADING_RULES.slippageRate,
+    dailyDrawdownFraction: PAPER_TRADING_RULES.dailyDrawdownFraction,
+    maxPortfolioDrawdownFraction: PAPER_TRADING_RULES.maxPortfolioDrawdownFraction,
+    emergencyDrawdownFraction: PAPER_TRADING_RULES.emergencyDrawdownFraction
+  };
+}
+
 function validateRepositories(repositories) {
   const requiredMethods = {
     watchedMarkets: ["listEnabled", "findEnabledBySymbol"],
@@ -668,6 +729,8 @@ function validateRepositories(repositories) {
       "getAnalytics",
       "getExportRecordCount",
       "getExportRecords",
+      "getAnalysisExportManifest",
+      "getAnalysisExportPage",
       "getMonitoringMetrics"
     ],
     runtimeStatus: ["getStatus"]
