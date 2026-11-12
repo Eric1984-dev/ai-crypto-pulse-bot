@@ -147,3 +147,32 @@ test("analytics writer requires credentials distinct from all runtime roles", ()
     analytics: { databaseUser: "paper", databasePassword: "writer-password" }
   }, { INGESTION_DATABASE_USER: "ingestion" }), /must be distinct/);
 });
+
+test("analytics writer errors expose a safe cause code without logging database messages", async () => {
+  const databaseFailure = Object.assign(new Error("sensitive database detail"), {
+    code: "42501"
+  });
+  const pool = {
+    async connect() {
+      return {
+        async query(sql) {
+          if (sql.includes("INSERT INTO public.\"AI_Crypto_Bot_Analytics_Runs\"")) {
+            throw databaseFailure;
+          }
+          return { rowCount: 0 };
+        },
+        release() {}
+      };
+    }
+  };
+
+  await assert.rejects(
+    persistAnalyticsRun(pool, { analytics, insights, logger: { error() {} } }),
+    (error) => {
+      assert.equal(error.code, "ANALYTICS_RUN_WRITE_FAILED");
+      assert.equal(error.causeCode, "42501");
+      assert.equal(error.cause.message, "sensitive database detail");
+      return true;
+    }
+  );
+});

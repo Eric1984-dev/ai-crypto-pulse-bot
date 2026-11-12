@@ -153,7 +153,8 @@ if (isDirectExecution()) {
     console.error(JSON.stringify({
       event: "analytics_run_generation_failed",
       code: safeCode(error?.code) || "ANALYTICS_GENERATION_FAILED",
-      component: typeof error?.component === "string" ? error.component : "analytics-generation"
+      component: typeof error?.component === "string" ? error.component : "analytics-generation",
+      causeCode: safeCode(error?.causeCode ?? error?.cause?.code)
     }));
     process.exitCode = 1;
   });

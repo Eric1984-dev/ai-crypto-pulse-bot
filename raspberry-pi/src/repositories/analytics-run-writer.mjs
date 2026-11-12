@@ -19,6 +19,7 @@ export class AnalyticsRunWriterError extends Error {
     this.name = "AnalyticsRunWriterError";
     this.code = "ANALYTICS_RUN_WRITE_FAILED";
     this.component = "analytics-run-writer";
+    this.causeCode = safeCode(cause?.code);
   }
 }
 

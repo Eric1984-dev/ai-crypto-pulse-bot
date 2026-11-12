@@ -217,6 +217,13 @@ Finally, using an authenticated dashboard session, request
 run is returned. The analytics writer itself should not be able to query the
 history table.
 
+If generation fails with `ANALYTICS_RUN_WRITE_FAILED`, the
+`analytics_run_generation_failed` event now includes a sanitized `causeCode`
+(for example, PostgreSQL SQLSTATE `42501`) without logging the database error
+message or credentials. Use that code to distinguish authentication,
+connection, and privilege failures; do not share passwords or connection
+strings when reporting the result.
+
 ## Operational notes
 
 - The API continues to use `DATABASE_USER=ai_crypto_bot_runtime_reader`.
