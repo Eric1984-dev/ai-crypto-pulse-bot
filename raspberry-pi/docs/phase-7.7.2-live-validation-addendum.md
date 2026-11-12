@@ -39,7 +39,7 @@ EnvironmentFile=/home/eric/ai-crypto-pulse-bot/raspberry-pi/.env
 ProtectHome=false
 ```
 
-The checked-in `deploy/cryptopulse-runtime.service` now matches this validated host configuration. These account and path values are specific to the current Raspberry Pi and should not be assumed for other installations.
+The checked-in `deploy/cryptopulse-runtime.service` retains these validated account and path values. It now also declares `StateDirectory=cryptopulse` for persistent dashboard sessions; that additional state-directory behavior has not yet been verified on the live Pi. These account and path values are specific to the current Raspberry Pi and should not be assumed for other installations.
 
 Before this correction, the checked-in unit had these unvalidated assumptions:
 

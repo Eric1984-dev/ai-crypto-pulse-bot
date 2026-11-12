@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { createPoolOptions, readRuntimeConfig } from "../src/config/runtime-config.mjs";
 
 function validEnvironment(overrides = {}) {
@@ -34,6 +36,7 @@ test("runtime config defaults to loopback API and disables live trading", () => 
     },
     sessionTtlMs: 28800000,
     sessionMax: 1000,
+    sessionStorePath: join(homedir(), ".local", "state", "cryptopulse", "dashboard-sessions.json"),
     rateLimitWindowMs: 60000,
     rateLimitMaxRequests: 60
   });
@@ -128,6 +131,16 @@ test("runtime config rejects remote plaintext DB, public API binding, and live t
 test("runtime config rejects out-of-range pool and port settings", () => {
   assert.throws(() => readRuntimeConfig(validEnvironment({ PG_POOL_MAX: "5" })), /PG_POOL_MAX/);
   assert.throws(() => readRuntimeConfig(validEnvironment({ DATABASE_PORT: "0" })), /DATABASE_PORT/);
+});
+
+test("runtime config accepts only absolute persistent dashboard session paths", () => {
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    API_SESSION_STORE_PATH: "relative/sessions.json"
+  })), /Invalid runtime setting: API_SESSION_STORE_PATH/);
+  const filePath = resolve(homedir(), "cryptopulse", "sessions.json");
+  assert.equal(readRuntimeConfig(validEnvironment({
+    API_SESSION_STORE_PATH: filePath
+  })).api.sessionStorePath, filePath);
 });
 
 test("runtime config validates origins and bounded API controls", () => {

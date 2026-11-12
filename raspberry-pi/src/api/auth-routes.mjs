@@ -39,7 +39,7 @@ export function registerAuthRoutes(router, {
 
     let created;
     try {
-      created = sessionStore.create({ subject: "dashboard-admin", roles: ["admin"] });
+      created = await sessionStore.create({ subject: "dashboard-admin", roles: ["admin"] });
     } catch (error) {
       if (error instanceof SessionCapacityError) {
         throw new ApiError(503, "SESSION_CAPACITY_EXCEEDED", "Dashboard login is temporarily unavailable.");
@@ -74,7 +74,7 @@ export function registerAuthRoutes(router, {
     validateQuery(context.request);
     requireAuthenticated(context);
     const token = readSessionCookie(context.request.headers.cookie);
-    if (!token || !sessionStore.delete(token)) {
+    if (!token || !await sessionStore.delete(token)) {
       throw new ApiError(401, "UNAUTHENTICATED", "Dashboard authentication is required.");
     }
     context.response.setHeader("Set-Cookie", clearSessionCookie());

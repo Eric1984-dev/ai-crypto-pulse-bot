@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 const DEFAULTS = Object.freeze({
   databasePort: 5432,
@@ -51,6 +53,16 @@ function readBoolean(env, name, fallback) {
     return false;
   }
   throw new Error(`Invalid runtime setting: ${name}`);
+}
+
+function readSessionStorePath(env) {
+  const configured = env.API_SESSION_STORE_PATH?.trim();
+  const filePath = configured
+    || join(homedir(), ".local", "state", "cryptopulse", "dashboard-sessions.json");
+  if (!isAbsolute(filePath)) {
+    throw new Error("Invalid runtime setting: API_SESSION_STORE_PATH");
+  }
+  return filePath;
 }
 
 function readCorsOrigins(env) {
@@ -236,6 +248,7 @@ export function readRuntimeConfig(env = process.env, {
         DEFAULTS.sessionMax,
         { min: 1, max: 10000 }
       ),
+      sessionStorePath: readSessionStorePath(env),
       rateLimitWindowMs: readInteger(
         env,
         "API_RATE_LIMIT_WINDOW_MS",

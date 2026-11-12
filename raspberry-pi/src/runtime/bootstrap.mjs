@@ -1,5 +1,5 @@
 import { createApiServer } from "../api/server.mjs";
-import { createSessionStore } from "../auth/session-store.mjs";
+import { createPersistentSessionStore } from "../auth/persistent-session-store.mjs";
 import { createPostgresPool } from "../database/pool.mjs";
 import { createOperationalHealthSnapshot } from "../monitoring/operational-health.mjs";
 import { createRequestMetrics } from "../monitoring/request-metrics.mjs";
@@ -72,6 +72,7 @@ export async function startRuntime(config, {
   validateAIContracts = validateAIAnalysisRuntimeContracts,
   validatePaperContracts = validatePaperTradingRuntimeContracts,
   authenticationProvider,
+  createSessionStoreImpl = createPersistentSessionStore,
   env = process.env,
   fetchImpl = globalThis.fetch,
   onFatal
@@ -183,9 +184,11 @@ export async function startRuntime(config, {
       logger
     });
     const requestMetrics = createRequestMetrics();
-    const sessionStore = createSessionStore({
+    const sessionStore = await createSessionStoreImpl({
+      filePath: config.api.sessionStorePath,
       ttlMs: config.api.sessionTtlMs,
-      maxSessions: config.api.sessionMax
+      maxSessions: config.api.sessionMax,
+      dashboardAuth: config.api.dashboardAuth
     });
     const getOperationalHealth = () => createOperationalHealthSnapshot({
       pool,

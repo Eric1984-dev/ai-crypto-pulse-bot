@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { createApiServer } from "../src/api/server.mjs";
+import { createPersistentSessionStore } from "../src/auth/persistent-session-store.mjs";
 import { createSessionStore } from "../src/auth/session-store.mjs";
 
 const origin = "https://dashboard.example.com";
@@ -35,8 +39,7 @@ const dataRepositories = {
   }
 };
 
-async function withServer(run) {
-  const sessionStore = createSessionStore();
+async function withServer(run, { sessionStore = createSessionStore() } = {}) {
   const server = createApiServer({
     readiness: { async check() { return true; } },
     getOperationalHealth: () => ({ status: "healthy" }),
@@ -54,6 +57,46 @@ async function withServer(run) {
       error ? reject(error) : resolve()));
   }
 }
+
+test("dashboard session remains valid after recreating the API server and persistent store", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "cryptopulse-auth-restart-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "dashboard-sessions.json");
+  const dashboardAuth = { username: "operator", passwordHash };
+  const firstStore = await createPersistentSessionStore({ filePath, dashboardAuth });
+  let cookie;
+  let session;
+
+  await withServer(async (baseUrl) => {
+    const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { Origin: origin, "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "operator", password: "unit-test-password" })
+    });
+    assert.equal(login.status, 200);
+    cookie = login.headers.get("set-cookie").split(";", 1)[0];
+    session = (await login.json()).data;
+  }, { sessionStore: firstStore });
+
+  const restartedStore = await createPersistentSessionStore({ filePath, dashboardAuth });
+  await withServer(async (baseUrl) => {
+    const current = await fetch(`${baseUrl}/api/v1/auth/session`, {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(current.status, 200);
+    assert.deepEqual((await current.json()).data, session);
+
+    const logout = await fetch(`${baseUrl}/api/v1/auth/session`, {
+      method: "DELETE",
+      headers: {
+        Cookie: cookie,
+        Origin: origin,
+        "X-CSRF-Token": session.csrfToken
+      }
+    });
+    assert.equal(logout.status, 204);
+  }, { sessionStore: restartedStore });
+});
 
 test("dashboard login rejects incorrect credentials without issuing a session", async () => {
   await withServer(async (baseUrl) => {

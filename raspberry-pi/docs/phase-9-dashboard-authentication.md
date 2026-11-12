@@ -26,7 +26,7 @@ Dashboard HTML routes are sent through the existing protected-page function, whi
 - `GET /api/v1/auth/session` returns a session-bound CSRF token and expiry only to the same-origin dashboard.
 - `DELETE /api/v1/auth/session` verifies the session, exact allowed `Origin`, and CSRF token, revokes the session, and clears the cookie.
 - The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, path `/`, and uses the `__Host-` prefix.
-- Session tokens are random and stored as SHA-256 hashes in a bounded in-memory session store. The default lifetime is eight hours (`API_SESSION_TTL_MS`); sessions are invalidated when the Pi runtime restarts.
+- Session tokens are random and only SHA-256 hashes are stored in a bounded, atomic, file-backed session store. The systemd-managed `/var/lib/cryptopulse/dashboard-sessions.json` is restricted to the runtime user and survives process restarts and application deployments. The default lifetime is eight hours (`API_SESSION_TTL_MS`); logout revokes the record, and changing the dashboard username or bcrypt hash invalidates existing sessions.
 - Bcrypt passwords are limited to 72 UTF-8 bytes. `npm run auth:hash-password` prompts without echo and emits a cost-12 hash.
 
 ## Configuration and deployment procedure
@@ -42,7 +42,7 @@ Dashboard HTML routes are sent through the existing protected-page function, whi
 3. Set `API_CORS_ORIGINS` to the exact dashboard origin, keep `API_HOST=127.0.0.1`, and keep `ENABLE_LIVE_TRADING=false`.
 4. Configure `CRYPTOPULSE_RUNTIME_API_ORIGIN` in Vercel for both the Production build and function runtime. The value is an HTTPS Pi API origin without a path. It is routing configuration, not a credential.
 5. If Cloudflare Access is enabled for the Pi API, also protect the Vercel dashboard origin with the corresponding Access application so its assertion can be forwarded by the existing proxy. Otherwise leave `CLOUDFLARE_ACCESS_ENABLED=false`.
-6. Install the updated Raspberry Pi package dependencies and restart `cryptopulse-runtime.service`.
+6. Install the updated Raspberry Pi package and systemd unit. The unit's `StateDirectory=cryptopulse` creates `/var/lib/cryptopulse` with restricted permissions and makes it writable despite `ProtectSystem=strict`. Reload systemd and restart `cryptopulse-runtime.service`.
 7. Verify an unauthenticated dashboard-page request redirects to `/login.html`; wrong credentials return `401`; valid credentials set the secure cookie; refresh retains the session; logout returns `204`; and subsequent page/API access requires another login.
 8. Verify `GET /api/v1/health/live`, `GET /api/v1/markets`, and `GET /api/v1/dashboard-data` through the Vercel same-origin route. Health liveness is public; dashboard data must return `401` without a session and `200` with a valid session.
 
@@ -73,6 +73,12 @@ Tests cover wrong-password rejection, session cookie attributes, refresh/session
 
 ## Production validation and limitations
 
-The live Pi `.env` was not inspected or modified, and the service was not restarted from this worktree. Therefore credential validation, authenticated login/logout, browser cookie persistence, direct Pi API denial, and Vercel-to-Pi authenticated proxying remain unverified. The Vercel deployment and unauthenticated page protection were verified, but a successful static deployment does not prove Pi authentication is configured. A runtime restart invalidates all existing sessions, requiring the administrator to sign in again.
+The live Pi `.env` was not inspected or modified, and the service was not restarted from this worktree. Therefore credential validation, authenticated login/logout, browser cookie persistence, direct Pi API denial, and Vercel-to-Pi authenticated proxying remain unverified. The Vercel deployment and unauthenticated page protection were verified, but a successful static deployment does not prove Pi authentication is configured. The persistent-session follow-up preserves valid sessions across restarts once the updated systemd unit and runtime package are installed.
+
+## Persistent-session follow-up
+
+The runtime now stores sessions outside the code checkout at `/var/lib/cryptopulse/dashboard-sessions.json`. The updated systemd unit provisions that directory as `StateDirectory=cryptopulse` and grants it to the runtime user despite `ProtectSystem=strict`. The file contains SHA-256 token hashes rather than browser tokens and is written atomically with restrictive permissions. No database migration or Vercel function was added.
+
+The Raspberry Pi test suite verifies that a session remains valid after recreating the store and API server, that logout and credential changes invalidate sessions, and that malformed session data fails closed. These are local tests only; the updated unit and restart behavior still require operator deployment and live verification. Existing in-memory sessions cannot be migrated, so one login is required after the first installation of this change; subsequent runtime restarts should preserve the session until logout, expiry, or dashboard credential changes.
 
 This phase adds no database migration or write endpoint. The dashboard remains read-only and continues to use the shared system portfolio. The implementation is locally validated, but Phase 9 is not considered production-complete until the Vercel Production deployment and Raspberry Pi login/API checks above succeed.

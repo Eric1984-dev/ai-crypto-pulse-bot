@@ -6,6 +6,12 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Persistent dashboard sessions
+
+- Persist dashboard session token hashes outside the application checkout so Pi runtime restarts and deployments no longer force a new login
+- Keep logout revocation, session expiry, credential-change invalidation, and restrictive file permissions
+- Use systemd `StateDirectory` for the persistent `/var/lib/cryptopulse` session store without adding a database table or Vercel function
+
 ### Shadow-exit dashboard visibility
 
 - Read bounded shadow-exit scenarios and recent events through the existing authenticated Raspberry Pi dashboard API

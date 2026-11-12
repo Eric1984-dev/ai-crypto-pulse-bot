@@ -5,7 +5,7 @@ const ROLE_PATTERN = /^[a-z][a-z0-9:_-]{0,63}$/;
 
 export class SessionCapacityError extends Error {
   constructor() {
-    super("The in-memory session capacity has been reached.");
+    super("The dashboard session capacity has been reached.");
     this.name = "SessionCapacityError";
     this.code = "SESSION_CAPACITY_EXCEEDED";
   }
@@ -35,7 +35,7 @@ export function createSessionStore({
   return Object.freeze({
     ttlMs,
     create(principal) {
-      const normalizedPrincipal = validatePrincipal(principal);
+      const normalizedPrincipal = normalizeSessionPrincipal(principal);
       const timestamp = now();
       removeExpired(timestamp);
       if (sessions.size >= maxSessions) {
@@ -43,7 +43,7 @@ export function createSessionStore({
       }
 
       const token = randomToken();
-      if (typeof token !== "string" || !TOKEN_PATTERN.test(token)) {
+      if (!isSessionToken(token)) {
         throw new TypeError("The session token generator returned an invalid token.");
       }
       const csrfToken = randomBytes(32).toString("base64url");
@@ -53,14 +53,14 @@ export function createSessionStore({
         createdAt: new Date(timestamp).toISOString(),
         expiresAt: timestamp + ttlMs
       });
-      sessions.set(hashToken(token), entry);
+      sessions.set(hashSessionToken(token), entry);
       return Object.freeze({ token, session: entry });
     },
     get(token) {
-      if (typeof token !== "string" || !TOKEN_PATTERN.test(token)) {
+      if (!isSessionToken(token)) {
         return null;
       }
-      const hash = hashToken(token);
+      const hash = hashSessionToken(token);
       const entry = sessions.get(hash);
       if (!entry) {
         return null;
@@ -72,10 +72,10 @@ export function createSessionStore({
       return entry;
     },
     delete(token) {
-      if (typeof token !== "string" || !TOKEN_PATTERN.test(token)) {
+      if (!isSessionToken(token)) {
         return false;
       }
-      return sessions.delete(hashToken(token));
+      return sessions.delete(hashSessionToken(token));
     },
     get size() {
       removeExpired(now());
@@ -84,7 +84,7 @@ export function createSessionStore({
   });
 }
 
-function validatePrincipal(principal) {
+export function normalizeSessionPrincipal(principal) {
   if (!principal || typeof principal.subject !== "string"
     || principal.subject.trim() === "" || principal.subject.length > 256
     || !Array.isArray(principal.roles)
@@ -97,6 +97,10 @@ function validatePrincipal(principal) {
   });
 }
 
-function hashToken(token) {
+export function isSessionToken(token) {
+  return typeof token === "string" && TOKEN_PATTERN.test(token);
+}
+
+export function hashSessionToken(token) {
   return createHash("sha256").update(token).digest("hex");
 }

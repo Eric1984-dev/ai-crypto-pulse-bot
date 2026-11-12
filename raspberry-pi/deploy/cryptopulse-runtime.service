@@ -11,6 +11,7 @@ Group=eric
 WorkingDirectory=/home/eric/ai-crypto-pulse-bot/raspberry-pi
 EnvironmentFile=/home/eric/ai-crypto-pulse-bot/raspberry-pi/.env
 Environment=NODE_ENV=production
+Environment=API_SESSION_STORE_PATH=/var/lib/cryptopulse/dashboard-sessions.json
 ExecStart=/usr/bin/node src/index.mjs
 Restart=always
 RestartSec=10s
@@ -20,6 +21,8 @@ KillMode=mixed
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=false
+StateDirectory=cryptopulse
+StateDirectoryMode=0700
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true

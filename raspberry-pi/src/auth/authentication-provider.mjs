@@ -25,7 +25,7 @@ export class SessionAuthenticationProvider extends AuthenticationProvider {
     if (!token) {
       return null;
     }
-    const session = this.sessionStore.get(token);
+    const session = await this.sessionStore.get(token);
     return session ? { principal: session.principal, session } : null;
   }
 }

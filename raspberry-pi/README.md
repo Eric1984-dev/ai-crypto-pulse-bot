@@ -144,7 +144,17 @@ npm start
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
 - `GET /api/v1/monitoring` — runtime status, last-cycle stages including shadow-exit evaluation, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
 
-Dashboard authentication uses one administrator configured with `DASHBOARD_USERNAME` and a bcrypt `DASHBOARD_PASSWORD_HASH`. Runtime startup fails closed if either value is missing or the hash is invalid. Login creates an opaque in-memory session; data and operational routes require that session. The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after `API_SESSION_TTL_MS` (eight hours by default). Runtime restarts invalidate sessions, so the operator must sign in again.
+Dashboard authentication uses one administrator configured with `DASHBOARD_USERNAME` and a bcrypt `DASHBOARD_PASSWORD_HASH`. Runtime startup fails closed if either value is missing or the hash is invalid. Login creates an opaque session; only its SHA-256 token hash and session metadata are stored in the persistent file configured by `API_SESSION_STORE_PATH`. The systemd unit places this file at `/var/lib/cryptopulse/dashboard-sessions.json` with directory mode `0700` and file mode `0600`; it survives runtime restarts and package deployments. The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and expires after `API_SESSION_TTL_MS` (eight hours by default). Logout revokes the persisted session, and changing the dashboard username or password hash invalidates existing sessions.
+
+Install the updated [systemd unit](deploy/cryptopulse-runtime.service) so systemd creates and grants the runtime access to its persistent state directory:
+
+```sh
+sudo cp deploy/cryptopulse-runtime.service /etc/systemd/system/cryptopulse-runtime.service
+sudo systemctl daemon-reload
+sudo systemctl restart cryptopulse-runtime.service
+```
+
+`API_SESSION_STORE_PATH` is optional for other deployments and defaults to `~/.local/state/cryptopulse/dashboard-sessions.json`; the parent directory must be persistent and writable by the runtime user. The checked-in systemd unit overrides it to the managed `/var/lib/cryptopulse` state directory because the service runs with `ProtectSystem=strict`.
 
 Generate a cost-12 bcrypt hash without echoing the password by running `npm run auth:hash-password` from this package in an interactive terminal. Put the resulting hash and the single username in the Pi `.env`; never place the plaintext password or hash in Vercel variables, source code, logs, or shell arguments. Bcrypt passwords are limited to 72 UTF-8 bytes.
 
@@ -185,7 +195,7 @@ The Vercel build generates `js/runtime-api-config.js` from these values. The ori
 - `src/runtime/` — API startup, worker-stage orchestration, bounded pools, lock ownership, and graceful lifecycle.
 - `src/services/` — database contracts, public Bitvavo ingestion, deterministic AI analysis, paper trading, UTC scheduling, and non-destructive retention planning.
 - `src/repositories/` — parameterized, bounded PostgreSQL access for API reads, ingestion, AI decisions, and paper portfolios/positions/trades.
-- `src/auth/` — provider-neutral authentication and authorization interfaces, optional Cloudflare Access JWT validation, and in-memory session support.
+- `src/auth/` — provider-neutral authentication and authorization interfaces, optional Cloudflare Access JWT validation, bounded in-memory test sessions, and persistent file-backed dashboard sessions.
 - `src/database/` — bounded `pg` pool plus explicit read-only and write transaction helpers.
 - `src/monitoring/` — health responses, bounded operational snapshots, and request counters.
 - `src/config/` — strict runtime environment parsing.

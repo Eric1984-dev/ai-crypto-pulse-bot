@@ -6,6 +6,7 @@
 - Phase 10: conservative post-migration cleanup is being validated. See the [cleanup report](docs/post-migration-cleanup-report.md).
 - Phase 11: not started.
 - Shadow-exit runtime/dashboard support is implemented in the Pi code. A missing evaluator is installed by the operator-applied Phase 8.11 Pi migration; Phase 8.10 separately grants dashboard reads. Production activation and generated records still require operator migration/restart and live verification.
+- Dashboard sessions are persisted in the Pi systemd state directory; rollout of the updated unit is required to preserve logins across runtime restarts.
 
 Production status is operator-reported unless a specific live check is recorded. Do not infer deployment, database, or runtime verification from local tests.
 

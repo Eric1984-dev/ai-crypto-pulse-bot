@@ -1,8 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { startRuntime, validateRuntime } from "../src/runtime/bootstrap.mjs";
+import { startRuntime as startRuntimeImpl, validateRuntime } from "../src/runtime/bootstrap.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
+import { createSessionStore } from "../src/auth/session-store.mjs";
+
+async function startRuntime(config, options = {}) {
+  return startRuntimeImpl(config, {
+    createSessionStoreImpl: ({ ttlMs, maxSessions }) =>
+      createSessionStore({ ttlMs, maxSessions }),
+    ...options
+  });
+}
 
 function runtimeConfig({ cloudflareAccessEnabled = true } = {}) {
   const config = readRuntimeConfig({
