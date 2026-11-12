@@ -404,13 +404,41 @@ const BUNDLE_TRADES_SQL = `
   LIMIT $4
 `;
 const BUNDLE_DECISIONS_SQL = `
+  WITH decision_population AS MATERIALIZED (
+    SELECT decision.id, decision.symbol, decision.decision, decision.confidence,
+           decision.indicators, decision.reason, decision.strategy_name,
+           decision.strategy_version, decision.created_at,
+           (decision.created_at AT TIME ZONE 'UTC')::date AS utc_day,
+           CASE
+             WHEN decision.confidence < 50 THEN '[0,50)'
+             WHEN decision.confidence < 60 THEN '[50,60)'
+             WHEN decision.confidence < 70 THEN '[60,70)'
+             WHEN decision.confidence < 80 THEN '[70,80)'
+             WHEN decision.confidence < 90 THEN '[80,90)'
+             ELSE '[90,100]'
+           END AS confidence_band
+    FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
+    WHERE decision.created_at >= $1::timestamptz
+      AND decision.created_at <= $2::timestamptz
+      AND NOT (decision.id = ANY($3::uuid[]))
+  ),
+  stratified_decisions AS (
+    SELECT decision_population.*,
+           pg_catalog.row_number() OVER (
+             PARTITION BY utc_day, symbol, decision, confidence_band,
+                          strategy_name, strategy_version
+             ORDER BY created_at ASC, id ASC
+           ) AS stratum_rank,
+           pg_catalog.md5(pg_catalog.jsonb_build_array(
+             utc_day, symbol, decision, confidence_band, strategy_name, strategy_version
+           )::text) AS stratum_order
+    FROM decision_population
+  )
   SELECT id, symbol, decision, confidence, indicators, reason,
          strategy_name, strategy_version, created_at
-  FROM public."AI_Crypto_Bot_AI_Decisions"
-  WHERE created_at >= $1::timestamptz
-    AND created_at <= $2::timestamptz
-  ORDER BY created_at ASC, id ASC
-  LIMIT $3
+  FROM stratified_decisions
+  ORDER BY stratum_rank ASC, stratum_order ASC, created_at ASC, id ASC
+  LIMIT $4
 `;
 const BUNDLE_LINKED_DECISIONS_SQL = `
   SELECT id, symbol, decision, confidence, indicators, reason,
@@ -1092,12 +1120,10 @@ export class DashboardRepository {
       });
     }
 
-    const [tradesResult, decisionsResult, snapshotsResult, scenariosResult, countsResult] =
+    const [tradesResult, snapshotsResult, scenariosResult, countsResult] =
       await Promise.all([
         queryReadOnly(this.pool, BUNDLE_TRADES_SQL,
           [portfolioId, from, to, limit + 1], { logger: this.logger }),
-        queryReadOnly(this.pool, BUNDLE_DECISIONS_SQL,
-          [from, to, limit + 1], { logger: this.logger }),
         queryReadOnly(this.pool, BUNDLE_SNAPSHOTS_SQL,
           [portfolioId, from, to, limit + 1], { logger: this.logger }),
         queryReadOnly(this.pool, BUNDLE_SHADOW_SCENARIOS_SQL,
@@ -1106,21 +1132,30 @@ export class DashboardRepository {
           [portfolioId, from, to], { logger: this.logger })
       ]);
     const selectedTrades = tradesResult.rows.slice(0, limit).map(normalizeTrade);
-    const selectedDecisions = decisionsResult.rows.slice(0, limit).map(normalizeBundleDecision);
     const linkedDecisionIds = [...new Set(selectedTrades
       .map(({ ai_decision_id }) => ai_decision_id)
       .filter((id) => typeof id === "string" && UUID_PATTERN.test(id)))];
-    const selectedIds = new Set(selectedDecisions.map(({ id }) => String(id)));
-    const missingLinkedIds = linkedDecisionIds.filter((id) => !selectedIds.has(id));
-    const linkedResult = missingLinkedIds.length
+    const linkedResult = linkedDecisionIds.length
       ? await queryReadOnly(
         this.pool,
         BUNDLE_LINKED_DECISIONS_SQL,
-        [missingLinkedIds, limit + 1],
+        [linkedDecisionIds, limit + 1],
         { logger: this.logger }
       )
       : { rows: [] };
     const linkedDecisions = linkedResult.rows.slice(0, limit).map(normalizeBundleDecision);
+    const sampledDecisionLimit = Math.max(0, limit - linkedDecisions.length);
+    const sampledResult = sampledDecisionLimit
+      ? await queryReadOnly(
+        this.pool,
+        BUNDLE_DECISIONS_SQL,
+        [from, to, linkedDecisionIds, sampledDecisionLimit + 1],
+        { logger: this.logger }
+      )
+      : { rows: [] };
+    const sampledDecisions = sampledResult.rows
+      .slice(0, sampledDecisionLimit)
+      .map(normalizeBundleDecision);
     const snapshots = snapshotsResult.rows.slice(0, limit).map(normalizeSnapshot);
     const scenarios = scenariosResult.rows.slice(0, limit).map(normalizeBundleShadowScenario);
     const scenarioIds = scenarios.map(({ id }) => id);
@@ -1132,21 +1167,10 @@ export class DashboardRepository {
         { logger: this.logger }
       )
       : { rows: [] };
-    const allAnchors = createCandleAnchors(selectedTrades, selectedDecisions, 51);
-    const anchors = allAnchors.slice(0, 50);
-    const candlesResult = anchors.length
-      ? await queryReadOnly(
-        this.pool,
-        BUNDLE_CANDLES_SQL,
-        [JSON.stringify(anchors), 20, 6001, to],
-        { logger: this.logger }
-      )
-      : { rows: [] };
     const counts = countsResult.rows[0];
     if (!counts) {
       throw new RepositoryDataError("analysis bundle source counts are unavailable");
     }
-    const bundleHistory = await this.getAnalyticsRunHistory({ period, now, limit: 50 });
     const rowCounts = {
       trades: readCount(counts.trades, "bundle trade source count"),
       decisions: readCount(counts.decisions, "bundle decision source count"),
@@ -1157,6 +1181,32 @@ export class DashboardRepository {
       ),
       shadowExitEvents: readCount(counts.shadow_exit_events, "bundle shadow event source count")
     };
+    const decisionSampling = createDecisionSamplingSummary({
+      sourceCount: rowCounts.decisions,
+      sampledDecisions,
+      linkedDecisions,
+      from,
+      to,
+      unresolvedTradeDecisionLinkCount: Math.max(
+        0,
+        linkedDecisionIds.length - linkedDecisions.length
+      )
+    });
+    const candleSelection = createCandleAnchors(
+      selectedTrades,
+      linkedDecisions,
+      sampledDecisions,
+      50
+    );
+    const candlesResult = candleSelection.anchors.length
+      ? await queryReadOnly(
+        this.pool,
+        BUNDLE_CANDLES_SQL,
+        [JSON.stringify(candleSelection.anchors), 20, 6001, to],
+        { logger: this.logger }
+      )
+      : { rows: [] };
+    const bundleHistory = await this.getAnalyticsRunHistory({ period, now, limit: 50 });
     const candleWindows = candlesResult.rows.slice(0, 6000).map(normalizeBundleCandle);
     return Object.freeze({
       manifest: Object.freeze({
@@ -1166,14 +1216,16 @@ export class DashboardRepository {
         sourceCounts: Object.freeze(rowCounts),
         includedCounts: Object.freeze({
           trades: selectedTrades.length,
-          decisions: selectedDecisions.length,
+          decisions: sampledDecisions.length,
           linkedDecisions: linkedDecisions.length,
           portfolioSnapshots: snapshots.length,
           candleRows: candleWindows.length,
-          candleAnchorCount: anchors.length,
+          candleAnchorCount: candleSelection.anchors.length,
           shadowExitScenarios: scenarios.length,
           shadowExitEvents: Math.min(eventsResult.rows.length, limit)
         }),
+        decisionSampling,
+        candleSampling: candleSelection.summary,
         limits: Object.freeze({
           rowsPerSource: limit,
           candleAnchorLimit: 50,
@@ -1182,10 +1234,12 @@ export class DashboardRepository {
         }),
         truncation: Object.freeze({
           trades: tradesResult.rows.length > limit,
-          decisions: decisionsResult.rows.length > limit,
+          decisions: decisionSampling.truncated,
           portfolioSnapshots: snapshotsResult.rows.length > limit,
           linkedDecisions: linkedResult.rows.length > limit,
-          candleWindows: allAnchors.length > 50 || candlesResult.rows.length > 6000,
+          candleWindows: candleSelection.summary.omittedTradeRelatedAnchors > 0
+            || candleSelection.summary.omittedSampledDecisionAnchors > 0
+            || candlesResult.rows.length > 6000,
           shadowExitScenarios: scenariosResult.rows.length > limit,
           shadowExitEvents: eventsResult.rows.length > limit,
           analyticsHistory: bundleHistory.truncated
@@ -1194,7 +1248,7 @@ export class DashboardRepository {
       analytics,
       analyticsHistory: bundleHistory.items,
       trades: Object.freeze(selectedTrades),
-      decisions: Object.freeze([...selectedDecisions, ...linkedDecisions]),
+      decisions: Object.freeze([...sampledDecisions, ...linkedDecisions]),
       portfolioSnapshots: Object.freeze(snapshots),
       candleWindows: Object.freeze(candleWindows),
       shadowExitScenarios: Object.freeze(scenarios),
@@ -1916,17 +1970,142 @@ function normalizeJsonValue(value, field) {
   }
 }
 
-function createCandleAnchors(trades, decisions, limit) {
+function createDecisionSamplingSummary({
+  sourceCount,
+  sampledDecisions,
+  from,
+  to,
+  linkedDecisions,
+  unresolvedTradeDecisionLinkCount
+}) {
+  const inWindow = (decision) => {
+    const timestamp = Date.parse(decision.created_at);
+    return Number.isFinite(timestamp)
+      && timestamp >= Date.parse(from)
+      && timestamp <= Date.parse(to);
+  };
+  const linkedInWindowCount = linkedDecisions.filter(inWindow).length;
+  const includedInWindowCount = sampledDecisions.length + linkedInWindowCount;
+  return Object.freeze({
+    method: "trade-linked-first; deterministic round-robin by UTC day, market, action, confidence band, strategy name and version",
+    sourceCount,
+    includedInWindowCount,
+    sampledDecisionCount: sampledDecisions.length,
+    linkedDecisionCount: linkedDecisions.length,
+    linkedDecisionInWindowCount: linkedInWindowCount,
+    linkedDecisionOutsideWindowCount: linkedDecisions.length - linkedInWindowCount,
+    unresolvedTradeDecisionLinkCount,
+    omittedInWindowCount: Math.max(0, sourceCount - includedInWindowCount),
+    truncated: sourceCount > includedInWindowCount,
+    sampleDistribution: Object.freeze({
+      utcDays: countDecisionDimension(
+        sampledDecisions,
+        (decision) => decision.created_at.slice(0, 10)
+      ),
+      markets: countDecisionDimension(sampledDecisions, (decision) => decision.symbol),
+      actions: countDecisionDimension(sampledDecisions, (decision) => decision.decision),
+      confidenceBands: countDecisionDimension(
+        sampledDecisions,
+        (decision) => decisionConfidenceBand(decision.confidence)
+      ),
+      strategyVersions: countStrategyVersions(sampledDecisions)
+    })
+  });
+}
+
+function countDecisionDimension(decisions, getValue) {
+  const counts = new Map();
+  for (const decision of decisions) {
+    const value = getValue(decision) ?? "UNSPECIFIED";
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return Object.freeze([...counts.entries()]
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .map(([value, count]) => Object.freeze({ value, count })));
+}
+
+function countStrategyVersions(decisions) {
+  const counts = new Map();
+  for (const decision of decisions) {
+    const key = JSON.stringify([decision.strategy_name, decision.strategy_version]);
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(key, {
+        strategyName: decision.strategy_name ?? null,
+        strategyVersion: decision.strategy_version ?? null,
+        count: 1
+      });
+    }
+  }
+  return Object.freeze([...counts.values()]
+    .sort((left, right) => {
+      const leftKey = JSON.stringify([left.strategyName, left.strategyVersion]);
+      const rightKey = JSON.stringify([right.strategyName, right.strategyVersion]);
+      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+    })
+    .map((item) => Object.freeze(item)));
+}
+
+function decisionConfidenceBand(confidence) {
+  if (confidence < 50) return "[0,50)";
+  if (confidence < 60) return "[50,60)";
+  if (confidence < 70) return "[60,70)";
+  if (confidence < 80) return "[70,80)";
+  if (confidence < 90) return "[80,90)";
+  return "[90,100]";
+}
+
+function createCandleAnchors(trades, linkedDecisions, sampledDecisions, limit) {
+  const tradeRelatedAnchors = getUniqueCandleAnchors([...trades, ...linkedDecisions]);
+  const sampledAnchors = getUniqueCandleAnchors(sampledDecisions);
+  const anchors = tradeRelatedAnchors.slice(0, limit);
+  const includedKeys = new Set(anchors.map(({ symbol, anchor_at }) => `${symbol}\u0000${anchor_at}`));
+  for (const anchor of sampledAnchors) {
+    const key = `${anchor.symbol}\u0000${anchor.anchor_at}`;
+    if (!includedKeys.has(key) && anchors.length < limit) {
+      anchors.push(anchor);
+      includedKeys.add(key);
+    }
+  }
+  const includedSampledDecisionAnchors = sampledAnchors
+    .filter(({ symbol, anchor_at }) => includedKeys.has(`${symbol}\u0000${anchor_at}`))
+    .length;
+  return Object.freeze({
+    anchors: Object.freeze(anchors),
+    summary: Object.freeze({
+      method: "trade and linked-decision anchors first; then sampled-decision anchors in chronological order",
+      limit,
+      tradeRelatedAnchorCount: tradeRelatedAnchors.length,
+      includedTradeRelatedAnchors: Math.min(tradeRelatedAnchors.length, limit),
+      sampledDecisionAnchorCount: sampledAnchors.length,
+      includedSampledDecisionAnchors,
+      omittedTradeRelatedAnchors: Math.max(0, tradeRelatedAnchors.length - limit),
+      omittedSampledDecisionAnchors: Math.max(
+        0,
+        sampledAnchors.length - includedSampledDecisionAnchors
+      )
+    })
+  });
+}
+
+function getUniqueCandleAnchors(rows) {
+  const sorted = [...rows].sort((left, right) => {
+    const timeDifference = Date.parse(left.created_at) - Date.parse(right.created_at);
+    if (timeDifference !== 0) return timeDifference;
+    const leftSymbol = String(left.symbol);
+    const rightSymbol = String(right.symbol);
+    if (leftSymbol !== rightSymbol) return leftSymbol < rightSymbol ? -1 : 1;
+    const leftId = String(left.id);
+    const rightId = String(right.id);
+    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  });
   const anchors = new Map();
-  for (const row of [...trades, ...decisions].sort((left, right) =>
-    Date.parse(left.created_at) - Date.parse(right.created_at)
-  )) {
+  for (const row of sorted) {
     const key = `${row.symbol}\u0000${row.created_at}`;
     if (!anchors.has(key)) {
       anchors.set(key, { symbol: row.symbol, anchor_at: row.created_at });
-    }
-    if (anchors.size >= limit) {
-      break;
     }
   }
   return [...anchors.values()];
@@ -1955,6 +2134,15 @@ function createEmptyAnalysisBundle({ analytics, period, from, to, limit }) {
         shadowExitScenarios: 0,
         shadowExitEvents: 0
       }),
+      decisionSampling: createDecisionSamplingSummary({
+        sourceCount: 0,
+        sampledDecisions: [],
+        linkedDecisions: [],
+        from,
+        to,
+        unresolvedTradeDecisionLinkCount: 0
+      }),
+      candleSampling: createCandleAnchors([], [], [], 50).summary,
       limits: Object.freeze({
         rowsPerSource: limit,
         candleAnchorLimit: 50,

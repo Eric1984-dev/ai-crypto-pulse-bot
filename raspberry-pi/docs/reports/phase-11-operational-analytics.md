@@ -139,8 +139,15 @@ windows. Its manifest records the requested UTC window, generation time,
 calculation version, active markets, strategy versions, PAPER mode, risk
 settings, source/included counts, limits, and truncation flags.
 
-The bundle accepts at most 1,000 rows per source, 50 candle anchors, up to 20
-candles per interval per anchor across six intervals, and 6,000 candle rows.
+The bundle accepts at most 1,000 decision rows, 1,000 rows for each other
+source, 50 candle anchors, up to 20 candles per interval per anchor across
+six intervals, and 6,000 candle rows. Trade-linked decisions are selected
+first; remaining decision capacity is filled deterministically, one row at a
+time across combined strata keyed by UTC day, market, action, confidence band, strategy
+name, and strategy version. The manifest records the method, counts,
+unresolved trade-decision links, truncation, and the sampled distribution for
+each dimension. Candle anchors for trades and linked decisions have priority
+over sampled-decision anchors. The manifest reports any omitted anchors.
 Only bounded candle windows around selected decisions and trades are
 included, and future candle rows are excluded. The response is generated
 from current source data and does not provide arbitrary SQL access.

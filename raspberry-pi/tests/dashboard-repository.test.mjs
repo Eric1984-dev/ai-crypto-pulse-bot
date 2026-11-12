@@ -470,6 +470,122 @@ test("historical analysis bundle bounds linked records and includes anchored can
   }
 });
 
+test("analysis bundle samples decisions across dimensions and prioritizes trade-linked data", async () => {
+  const database = await createDatabase();
+  try {
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators,
+         strategy_name, strategy_version, created_at)
+      VALUES
+        ('00000000-0000-4000-8000-000000000701', 'MARKET-1-EUR', 'BUY', 50, 'sample', '{}', 'Strategy-1', 'v1', NOW() - INTERVAL '1 day'),
+        ('00000000-0000-4000-8000-000000000702', 'MARKET-2-EUR', 'SELL', 60, 'sample', '{}', 'Strategy-2', 'v1', NOW() - INTERVAL '2 days'),
+        ('00000000-0000-4000-8000-000000000703', 'MARKET-3-EUR', 'HOLD', 70, 'sample', '{}', 'Strategy-3', 'v1', NOW() - INTERVAL '3 days'),
+        ('00000000-0000-4000-8000-000000000704', 'MARKET-4-EUR', 'WAIT', 80, 'sample', '{}', 'Strategy-4', 'v1', NOW() - INTERVAL '4 days'),
+        ('00000000-0000-4000-8000-000000000705', 'MARKET-5-EUR', 'BUY', 90, 'sample', '{}', 'Strategy-5', 'v1', NOW() - INTERVAL '5 days'),
+        ('00000000-0000-4000-8000-000000000706', 'MARKET-6-EUR', 'SELL', 100, 'sample', '{}', 'Strategy-6', 'v1', NOW() - INTERVAL '6 days')
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const now = new Date();
+    const bundle = await repository.getAnalysisBundle({ period: "30d", now, limit: 4 });
+    const repeated = await repository.getAnalysisBundle({ period: "30d", now, limit: 4 });
+    const completeSample = await repository.getAnalysisBundle({ period: "30d", now, limit: 7 });
+    const sampling = bundle.manifest.decisionSampling;
+    const sampleDistribution = sampling.sampleDistribution;
+
+    assert.deepEqual(
+      bundle.decisions.map(({ id }) => id),
+      repeated.decisions.map(({ id }) => id)
+    );
+    assert.ok(bundle.decisions.some(({ id }) =>
+      id === "00000000-0000-4000-8000-000000000700"
+    ));
+    assert.equal(sampling.method.startsWith("trade-linked-first; deterministic round-robin"), true);
+    assert.equal(sampling.sourceCount, 7);
+    assert.equal(sampling.includedInWindowCount, 4);
+    assert.equal(sampling.sampledDecisionCount, 3);
+    assert.equal(sampling.linkedDecisionCount, 1);
+    assert.equal(sampling.omittedInWindowCount, 3);
+    assert.equal(sampling.truncated, true);
+    assert.equal(bundle.manifest.truncation.decisions, true);
+    assert.equal(sampleDistribution.utcDays.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(sampleDistribution.markets.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(sampleDistribution.actions.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(sampleDistribution.confidenceBands.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(sampleDistribution.strategyVersions.reduce((sum, item) => sum + item.count, 0), 3);
+    assert.equal(bundle.manifest.candleSampling.includedTradeRelatedAnchors, 1);
+    assert.equal(bundle.manifest.candleSampling.includedSampledDecisionAnchors, 3);
+
+    assert.deepEqual(
+      completeSample.manifest.decisionSampling.sampleDistribution.confidenceBands,
+      [
+        { value: "[50,60)", count: 1 },
+        { value: "[60,70)", count: 1 },
+        { value: "[70,80)", count: 1 },
+        { value: "[80,90)", count: 1 },
+        { value: "[90,100]", count: 2 }
+      ]
+    );
+    assert.equal(completeSample.manifest.decisionSampling.truncated, false);
+  } finally {
+    await database.close();
+  }
+});
+
+test("analysis bundle reserves candle anchors for trade-linked activity before sampled decisions", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, portfolio_id, symbol, side, price, quantity, fees, realized_pnl, created_at)
+      SELECT
+        ('00000000-0000-4000-8000-' || pg_catalog.lpad(sample.id::text, 12, '0'))::uuid,
+        '00000000-0000-4000-8000-000000000200',
+        'TRADE-' || sample.id::text || '-EUR',
+        'BUY', 100, 1, 0, 0, NOW() - (sample.id * INTERVAL '1 minute')
+      FROM pg_catalog.generate_series(1, 49) AS sample(id);
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      VALUES (
+        '00000000-0000-4000-8000-000000000750',
+        'SAMPLED-EUR', 'WAIT', 60, 'sampled decision', '{}', NOW() - INTERVAL '1 hour'
+      )
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+
+    const bundle = await repository.getAnalysisBundle({
+      period: "30d",
+      now: new Date(),
+      limit: 100
+    });
+
+    assert.equal(bundle.trades.length, 50);
+    assert.equal(bundle.manifest.candleSampling.tradeRelatedAnchorCount, 50);
+    assert.equal(bundle.manifest.candleSampling.includedTradeRelatedAnchors, 50);
+    assert.equal(bundle.manifest.candleSampling.sampledDecisionAnchorCount, 1);
+    assert.equal(bundle.manifest.candleSampling.includedSampledDecisionAnchors, 0);
+    assert.equal(bundle.manifest.candleSampling.omittedSampledDecisionAnchors, 1);
+    assert.equal(bundle.manifest.truncation.candleWindows, true);
+  } finally {
+    await database.close();
+  }
+});
+
 test("trade history filtering and pagination preserve all-time sell statistics", async () => {
   const database = await createDatabase();
   try {
