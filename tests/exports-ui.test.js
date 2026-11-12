@@ -149,7 +149,6 @@ test("full-history export paginates sequentially, retries rate limits, and split
         return jsonResponse({
           source,
           asOf,
-          items: [],
           anchors: pageAnchors,
           candleWindows: pageAnchors.map((anchor) => ({
             ...anchor,
@@ -270,7 +269,7 @@ test("Exports page wires folder selection and displays completed export status",
       return jsonResponse({
         source: params.get("source"),
         asOf,
-        items: [],
+        ...(params.get("source") === "candleWindows" ? {} : { items: [] }),
         ...(params.get("source") === "candleWindows"
           ? { anchors: [], candleWindows: [] }
           : {}),

@@ -66,3 +66,16 @@ The overlapping export cards and CSV-specific browser logic have since been
 removed; the existing CSV API endpoints remain unchanged for compatibility.
 After this UI-only change, `node --test tests/exports-ui.test.js` passed all
 four tests, `node --check js/exports.js` passed, and `git diff --check` passed.
+
+## Candle-Page Validation Fix
+
+The browser previously required every source page to include `items`, while
+the Pi API's `candleWindows` page correctly returns `anchors` and
+`candleWindows` instead. This caused the export to fail as it advanced from
+analytics runs to candle windows. The client now validates the source-specific
+candle response shape, and the export test fixture matches the actual API
+contract.
+
+Validation after the fix: the export UI tests passed (4/4), the Pi API and
+dashboard repository tests passed (31/31), `node --check js/exports.js` passed,
+and `git diff --check` passed.

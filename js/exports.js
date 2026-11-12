@@ -154,14 +154,15 @@
     );
     const isCandlePage = source === "candleWindows";
     if (page.source !== source || page.asOf !== asOf
-      || !Array.isArray(page.items)
+      || (!isCandlePage && !Array.isArray(page.items))
       || typeof page.hasMore !== "boolean"
       || (page.nextCursor !== null && typeof page.nextCursor !== "string")
       || page.hasMore !== Boolean(page.nextCursor)
       || (page.hasMore && page.nextCursor === cursor)
       || (page.nextCursor !== null
         && (page.nextCursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(page.nextCursor)))
-      || page.items.some((item) => !item || typeof item !== "object" || Array.isArray(item))
+      || (!isCandlePage
+        && page.items.some((item) => !item || typeof item !== "object" || Array.isArray(item)))
       || (isCandlePage && (
         !Array.isArray(page.anchors) || !Array.isArray(page.candleWindows)
         || page.anchors.some((anchor) => !anchor
@@ -172,7 +173,7 @@
           || !Number.isFinite(Date.parse(candle.anchorAt || ""))
           || !Number.isFinite(Date.parse(candle.timestamp || "")))
       ))) {
-      throw new Error("The historical export page is invalid.");
+      throw new Error(`The historical export page for ${source} is invalid.`);
     }
     return page;
   }
