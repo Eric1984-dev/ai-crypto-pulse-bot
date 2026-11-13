@@ -26,7 +26,7 @@ The Pi runtime is the sole application API and validates the session, request, a
 | `GET /api/v1/auth/session` | Session validation and CSRF-token retrieval. |
 | `DELETE /api/v1/auth/session` | CSRF-protected session revocation. |
 | `GET /api/v1/health/live` and `/api/v1/health/ready` | Public liveness/readiness checks. |
-| `GET /api/v1/dashboard-data` | Portfolio, positions, recent trades, decisions, snapshots, current system data, and bounded shadow-exit scenarios/events. Shadow data reports `UNAVAILABLE` independently if its read grant or tables are unavailable. |
+| `GET /api/v1/dashboard-data` | Portfolio, positions, recent trades, decisions, snapshots, current system data, and bounded shadow-exit scenarios/events retained for historical export. The dashboard does not display shadow-exit scenarios. Shadow data reports `UNAVAILABLE` independently if its read grant or tables are unavailable. |
 | `GET /api/v1/dashboard-data?view=analytics` | On-demand analytics data. |
 | `GET /api/v1/dashboard-data?view=trade-history` | Filtered and paginated trade history. |
 | `GET /api/v1/dashboard-data?view=analysis-export-manifest` | Fixed `asOf` boundary, source definitions, row/file limits, active markets, and paper-risk metadata for a full-history export. |

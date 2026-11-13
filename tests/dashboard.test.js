@@ -98,9 +98,6 @@ function createDashboardDocument() {
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"position-ai-status\"]",
-    "[data-shadow-exit-list]",
-    "[data-shadow-exit-status]",
-    "[data-shadow-exit-empty]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"position-ai-status\"]",
@@ -374,108 +371,6 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
-});
-
-test("dashboard displays prospective shadow rule outcomes separately from actual P&L", () => {
-  const { dashboardDocument, elements } = createDashboardDocument();
-  const data = dashboard.emptyDashboardData();
-  data.portfolio.totalPnl = 12.34;
-  data.shadowExitScenarios = {
-    status: "AVAILABLE",
-    positions: [
-      {
-        positionId: "open-position",
-        symbol: "BTC-EUR",
-        positionOpenedAt: "2026-03-20T10:00:00.000Z",
-        isOpen: true,
-        scenarios: [
-          {
-            rule_id: "fixed_tp_5",
-            rule_name: "Fixed take-profit · +5%",
-            rule_version: "1.0.0",
-            parameters: { targetGainPct: 5 },
-            status: "TRIGGERED",
-            tracking_started_at: "2026-03-20T10:01:00.000Z",
-            triggered_at: "2026-03-20T10:20:00.000Z",
-            trigger_mark: 95,
-            modeled_net_pnl: 4.25,
-            data_quality_status: "FRESH",
-            events: [{
-              event_type: "HYPOTHETICAL_TRIGGERED",
-              event_at: "2026-03-20T10:20:00.000Z",
-              observed_mark: 95,
-              data_quality_status: "FRESH",
-              error_code: null
-            }]
-          },
-          {
-            rule_id: "trailing_stop_5",
-            rule_name: "Trailing stop · arm +5%, retrace 5%",
-            rule_version: "1.0.0",
-            parameters: { armGainPct: 5, drawdownPct: 5 },
-            status: "TRACKING",
-            tracking_started_at: "2026-03-20T10:01:00.000Z",
-            last_mark: 94,
-            last_mark_captured_at: "2026-03-20T10:19:00.000Z",
-            data_quality_status: "STALE",
-            events: []
-          }
-        ]
-      },
-      {
-        positionId: "closed-position",
-        symbol: "ETH-EUR",
-        positionOpenedAt: "2026-03-19T10:00:00.000Z",
-        isOpen: false,
-        actualClosedAt: "2026-03-20T09:30:00.000Z",
-        actualClosePrice: 2100,
-        actualNetPnl: -8.5,
-        scenarios: [{
-          rule_id: "fixed_tp_5",
-          rule_name: "Fixed take-profit · +5%",
-          rule_version: "1.0.0",
-          parameters: { targetGainPct: 5 },
-          status: "CLOSED_WITHOUT_TRIGGER",
-          tracking_started_at: "2026-03-19T10:01:00.000Z",
-          modeled_net_pnl: null,
-          data_quality_status: "FRESH"
-        }]
-      }
-    ]
-  };
-
-  dashboard.renderDashboard(data, dashboardDocument, null);
-
-  const positionCards = elements.get("[data-shadow-exit-list]")[0].children;
-  assert.equal(positionCards.length, 2);
-  assert.match(positionCards[0].textContent, /Fixed take-profit · \+5%.*Triggered hypothetically · no trade placed.*\+€4\.25/);
-  assert.match(positionCards[0].textContent, /Hypothetical exit triggered.*Observed mark €95\.00/);
-  assert.match(positionCards[0].textContent, /last valid state retained.*€94\.00/);
-  assert.match(positionCards[1].textContent, /Actual close time.*Actual SELL execution price.*Actual net P&L.*-€8\.50/);
-  assert.equal(
-    positionCards[1].children[0].children[1].children[3].children[1].dataset.valueTone,
-    "negative"
-  );
-  assert.match(positionCards[1].textContent, /Closed without trigger/);
-  assert.equal(data.portfolio.totalPnl, 12.34);
-  assert.match(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, /12\.34/);
-});
-
-test("dashboard reports unavailable shadow data without hiding actual portfolio content", () => {
-  const { dashboardDocument, elements } = createDashboardDocument();
-  const data = dashboard.emptyDashboardData();
-  data.portfolio.portfolioValue = 10000;
-  data.shadowExitScenarios = { status: "UNAVAILABLE", positions: [] };
-
-  dashboard.renderDashboard(data, dashboardDocument, null);
-
-  assert.equal(elements.get("[data-shadow-exit-status]")[0].hidden, false);
-  assert.match(
-    elements.get("[data-shadow-exit-status]")[0].textContent,
-    /Actual trading and portfolio data are unaffected\./i
-  );
-  assert.equal(elements.get("[data-shadow-exit-list]")[0].hidden, true);
-  assert.match(elements.get("[data-dashboard-value=\"portfolioValue\"]")[0].textContent, /10,000/);
 });
 
 test("dashboard maps market-strength boundaries to the requested market views", () => {
@@ -848,15 +743,8 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   );
   assert.match(styles, /\.activity-strip dt\s*\{[^}]*color:\s*var\(--positive\);/s);
 
-  const shadowSection = html.match(
-    /<section class="dashboard-panel shadow-exit-panel"[^>]*>([\s\S]*?)<\/section>/
-  );
-  assert.ok(shadowSection);
-  assert.match(shadowSection[0], /aria-labelledby="shadow-exits-heading"/);
-  assert.match(shadowSection[0], /data-shadow-exit-list[^>]*aria-label=/);
-  assert.match(shadowSection[0], /data-shadow-exit-status role="status" aria-live="polite"/);
-  assert.match(shadowSection[0], /simulations only[\s\S]*never place trades[\s\S]*historical candles and intrabar highs or lows are not used/i);
-  assert.match(styles, /\.shadow-exit-rule-list\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,/s);
+  assert.doesNotMatch(html, /Experimental · Monitoring only|Shadow Exit Scenarios|data-shadow-exit-/);
+  assert.doesNotMatch(styles, /\.shadow-exit-/);
 });
 
 test("dashboard KPI information opens, toggles, dismisses outside, and closes with Escape", () => {
