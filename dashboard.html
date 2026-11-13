@@ -237,71 +237,67 @@
               <span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
           </div>
+          <details class="dashboard-panel archive-health-panel">
+            <summary class="panel-heading">
+              <h2 id="archive-health-heading">Infrastructure</h2>
+            </summary>
+            <dl class="archive-health-metrics">
+              <div>
+                <dt>Model</dt>
+                <dd data-archive-health="model">—</dd>
+              </div>
+              <div>
+                <dt>Server status</dt>
+                <dd><span class="status-pill" data-archive-health="server" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
+              </div>
+              <div>
+                <dt>PostgreSQL status</dt>
+                <dd><span class="status-pill" data-archive-health="postgresql" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
+              </div>
+              <div>
+                <dt>Database status</dt>
+                <dd><span class="status-pill" data-archive-health="database" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
+              </div>
+              <div>
+                <dt>Disk usage</dt>
+                <dd>
+                  <span data-archive-health="disk-usage">—</span>
+                  <meter data-archive-health-meter min="0" max="100" value="0" aria-label="Disk usage" hidden></meter>
+                </dd>
+              </div>
+              <div>
+                <dt>Temperature</dt>
+                <dd>
+                  <span data-archive-health="temperature">—</span>
+                  <meter data-archive-health-meter="temperature" data-state="unavailable" min="0" max="100" value="0" aria-label="Temperature" hidden></meter>
+                </dd>
+              </div>
+              <div>
+                <dt>CPU usage</dt>
+                <dd>
+                  <span data-archive-health="cpu-usage">—</span>
+                  <meter data-archive-health-meter="cpu-usage" data-state="unavailable" min="0" max="100" value="0" aria-label="CPU usage" hidden></meter>
+                </dd>
+              </div>
+              <div>
+                <dt>Memory usage</dt>
+                <dd>
+                  <span data-archive-health="memory-usage">—</span>
+                  <meter data-archive-health-meter="memory-usage" data-state="unavailable" min="0" max="100" value="0" aria-label="Memory usage" hidden></meter>
+                </dd>
+              </div>
+              <div>
+                <dt>Database size</dt>
+                <dd data-archive-health="database-size">—</dd>
+              </div>
+              <div>
+                <dt>Last health check</dt>
+                <dd data-archive-health="last-check">—</dd>
+              </div>
+            </dl>
+          </details>
         </article>
       </section>
-
-      <details class="dashboard-panel archive-health-panel">
-        <summary class="panel-heading">
-          <div>
-            <p class="eyebrow">Infrastructure</p>
-            <h2 id="archive-health-heading">Raspberry Pi</h2>
-          </div>
-        </summary>
-        <dl class="archive-health-metrics">
-          <div>
-            <dt>Raspberry Pi model</dt>
-            <dd data-archive-health="model">—</dd>
-          </div>
-          <div>
-            <dt>Server status</dt>
-            <dd><span class="status-pill" data-archive-health="server" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
-          </div>
-          <div>
-            <dt>PostgreSQL status</dt>
-            <dd><span class="status-pill" data-archive-health="postgresql" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
-          </div>
-          <div>
-            <dt>Database status</dt>
-            <dd><span class="status-pill" data-archive-health="database" data-state="unknown" role="status" aria-live="polite">Checking…</span></dd>
-          </div>
-          <div>
-            <dt>Disk usage</dt>
-            <dd>
-              <span data-archive-health="disk-usage">—</span>
-              <meter data-archive-health-meter min="0" max="100" value="0" aria-label="Raspberry Pi disk usage" hidden></meter>
-            </dd>
-          </div>
-          <div>
-            <dt>Temperature</dt>
-            <dd>
-              <span data-archive-health="temperature">—</span>
-              <meter data-archive-health-meter="temperature" data-state="unavailable" min="0" max="100" value="0" aria-label="Raspberry Pi temperature" hidden></meter>
-            </dd>
-          </div>
-          <div>
-            <dt>CPU usage</dt>
-            <dd>
-              <span data-archive-health="cpu-usage">—</span>
-              <meter data-archive-health-meter="cpu-usage" data-state="unavailable" min="0" max="100" value="0" aria-label="Raspberry Pi CPU usage" hidden></meter>
-            </dd>
-          </div>
-          <div>
-            <dt>Memory usage</dt>
-            <dd>
-              <span data-archive-health="memory-usage">—</span>
-              <meter data-archive-health-meter="memory-usage" data-state="unavailable" min="0" max="100" value="0" aria-label="Raspberry Pi memory usage" hidden></meter>
-            </dd>
-          </div>
-          <div>
-            <dt>Database size</dt>
-            <dd data-archive-health="database-size">—</dd>
-          </div>
-          <div>
-            <dt>Last health check</dt>
-            <dd data-archive-health="last-check">—</dd>
-          </div>
-        </dl>
-      </details>
 
       <section class="dashboard-panel chart-panel" aria-labelledby="portfolio-chart-heading">
         <div class="panel-heading">

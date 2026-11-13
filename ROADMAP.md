@@ -8,6 +8,7 @@
 - The Exports page now offers a complete, paginated JSONL history export for AI analysis using the existing Pi data route; local implementation and production verification are tracked in the [full-history export report](raspberry-pi/docs/reports/full-history-analysis-export.md).
 - Raspberry Pi infrastructure metrics now include the device model as the first metric on the dashboard and Exports page, read through the existing monitoring route.
 - The dashboard activity strip distinguishes AI analysis and paper-trading run statuses/scheduled cycle times from the latest market-data update and actual paper trade; on-demand analytics and market scans are omitted.
+- Infrastructure status and Raspberry Pi resource metrics are grouped in a collapsed card beneath the live backend signal.
 - Phase 11: not started.
 - Shadow-exit scenario records remain available for historical export, but the paper-trading cycle does not evaluate the experimental rule grid and the dashboard no longer displays its monitoring panel. Earlier Phase 8 migration notes describe a separate experimental activation and should not be read as current runtime behavior.
 - Dashboard sessions are persisted in the Pi systemd state directory; rollout of the updated unit is required to preserve logins across runtime restarts.

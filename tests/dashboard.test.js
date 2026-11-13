@@ -477,12 +477,29 @@ test("dashboard omits all scanner content and uses only its watched-market summa
   assert.match(html, /data-portfolio-chart/);
 });
 
-test("infrastructure monitoring uses the Raspberry Pi label", () => {
+test("infrastructure metrics are collapsed below the live backend signal", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
+  const statusPanel = html.match(
+    /<article class="dashboard-panel status-panel">([\s\S]*?)<\/article>/
+  );
+  assert.ok(statusPanel);
+  const backendSignal = statusPanel[1].indexOf("Live backend signal");
+  const infrastructureCard = statusPanel[1].indexOf(
+    '<details class="dashboard-panel archive-health-panel">'
+  );
 
-  assert.match(html, /<h2 id="archive-health-heading">Raspberry Pi<\/h2>/);
+  assert.ok(infrastructureCard > backendSignal);
+  assert.match(statusPanel[1], /<h2 id="archive-health-heading">Infrastructure<\/h2>/);
+  assert.doesNotMatch(
+    statusPanel[1].slice(infrastructureCard, statusPanel[1].indexOf("</details>", infrastructureCard)),
+    /Raspberry Pi/
+  );
+  assert.doesNotMatch(
+    statusPanel[1].slice(infrastructureCard, statusPanel[1].indexOf("</details>", infrastructureCard)),
+    /<details[^>]*\bopen(?:\s|>)/
+  );
   assert.ok(html.indexOf('data-archive-health="model"') < html.indexOf('data-archive-health="server"'));
-  assert.match(html, /aria-label="Raspberry Pi disk usage"/);
+  assert.match(html, /aria-label="Disk usage"/);
   assert.doesNotMatch(html, />Archive Server<\/h2>|aria-label="Archive server disk usage"/);
 });
 
