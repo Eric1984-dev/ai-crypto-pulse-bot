@@ -187,26 +187,29 @@
       <section class="dashboard-section dashboard-activity" aria-label="Recent system activity">
         <dl class="activity-strip">
           <div>
-            <dt>Bot run</dt>
-            <dd><time data-dashboard-activity="bot-run">—</time></dd>
+            <dt>AI analysis</dt>
+            <dd>
+              <span class="activity-status" data-dashboard-activity-status="ai-analysis">No run yet</span>
+              <time data-dashboard-activity="ai-analysis">—</time>
+            </dd>
           </div>
           <div>
-            <dt>Market data</dt>
+            <dt>Paper-trading run</dt>
+            <dd>
+              <span class="activity-status" data-dashboard-activity-status="paper-trading">No run yet</span>
+              <time data-dashboard-activity="paper-trading-run">—</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Market data updated</dt>
             <dd><time data-dashboard-activity="market-data">—</time></dd>
           </div>
           <div>
-            <dt>Paper trade</dt>
+            <dt>Last paper trade</dt>
             <dd><time data-dashboard-activity="paper-trade">—</time></dd>
           </div>
-          <div>
-            <dt>Analytics</dt>
-            <dd>On demand</dd>
-          </div>
-          <div>
-            <dt>Market scan</dt>
-            <dd>On demand</dd>
-          </div>
         </dl>
+        <p class="activity-note">Analysis and paper-trading times show the scheduled cycle time; individual stage timestamps are not recorded.</p>
       </section>
 
       <section class="dashboard-grid dashboard-grid-status" aria-label="Agent status">

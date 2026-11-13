@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replace the vague dashboard Bot Run timestamp with AI-analysis and paper-trading stage statuses and cycle times; remove on-demand Analytics and Market scan placeholders.
 - Remove the inactive Shadow Exit monitoring panel and its dashboard rendering; historical shadow records remain available to full-history exports.
 - Show the Raspberry Pi model as the first infrastructure metric on the dashboard and Exports page using the existing monitoring route.
 - Document guarded Raspberry Pi paper-history reset and €2,000 portfolio initialization scripts; the reset preserves watched markets and market data.

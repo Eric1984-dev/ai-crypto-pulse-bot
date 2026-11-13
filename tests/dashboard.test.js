@@ -82,7 +82,10 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"paperTrades\"]",
     "[data-dashboard-value=\"trackedMarkets\"]",
     "[data-dashboard-value=\"portfolioCount\"]",
-    "[data-dashboard-activity=\"bot-run\"]",
+    "[data-dashboard-activity=\"ai-analysis\"]",
+    "[data-dashboard-activity=\"paper-trading-run\"]",
+    "[data-dashboard-activity-status=\"ai-analysis\"]",
+    "[data-dashboard-activity-status=\"paper-trading\"]",
     "[data-dashboard-activity=\"market-data\"]",
     "[data-dashboard-activity=\"paper-trade\"]",
     "[data-dashboard-status=\"agent\"]",
@@ -148,10 +151,20 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
     diskUsage: 12.5,
     databaseSize: "<b>2.3 GB</b>",
     lastHealthCheck: "2026-11-06T12:00:00.000Z",
-    system: { model: "Raspberry Pi 5 Model B Rev 1.0" }
+    system: { model: "Raspberry Pi 5 Model B Rev 1.0" },
+    runtime: {
+      lastCycle: {
+        cycleAt: "2026-11-06T11:55:00.000Z",
+        stages: { aiAnalysis: "completed", paperTrading: "SKIPPED" }
+      }
+    }
   };
   dashboard.renderArchiveHealth(health, dashboardDocument);
 
+  assert.equal(elements.get("[data-dashboard-activity-status=\"ai-analysis\"]")[0].textContent, "Completed");
+  assert.equal(elements.get("[data-dashboard-activity-status=\"paper-trading\"]")[0].textContent, "Skipped");
+  assert.equal(elements.get("[data-dashboard-activity=\"ai-analysis\"]")[0].dateTime, "2026-11-06T11:55:00.000Z");
+  assert.equal(elements.get("[data-dashboard-activity=\"paper-trading-run\"]")[0].dateTime, "2026-11-06T11:55:00.000Z");
   assert.equal(elements.get("[data-archive-health=\"model\"]")[0].textContent, "Raspberry Pi 5 Model B Rev 1.0");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Online");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "online");
@@ -174,6 +187,10 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"model\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-activity-status=\"ai-analysis\"]")[0].textContent, "No run yet");
+  assert.equal(elements.get("[data-dashboard-activity-status=\"paper-trading\"]")[0].textContent, "No run yet");
+  assert.equal(elements.get("[data-dashboard-activity=\"ai-analysis\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-activity=\"paper-trading-run\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-archive-health-meter]")[0].hidden, true);
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "—");
@@ -313,7 +330,6 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "2");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
-  assert.equal(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, "20/03/2026, 12:55");
   assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "20/03/2026, 12:59");
   assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "20/03/2026, 13:00");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].children[0].children[0].textContent, "<img src=x> · 0.01 units");
@@ -544,7 +560,6 @@ test("dashboard renders safe empty states without inventing portfolio history", 
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "0");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "UNKNOWN");
-  assert.equal(elements.get("[data-dashboard-activity=\"bot-run\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, true);
@@ -733,10 +748,11 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
 
   const activityStrip = html.match(/<dl class="activity-strip">([\s\S]*?)<\/dl>/);
   assert.ok(activityStrip);
-  assert.match(activityStrip[1], /Bot run[\s\S]*data-dashboard-activity="bot-run"/);
-  assert.match(activityStrip[1], /Market data[\s\S]*data-dashboard-activity="market-data"/);
-  assert.match(activityStrip[1], /Paper trade[\s\S]*data-dashboard-activity="paper-trade"/);
-  assert.match(activityStrip[1], /Analytics[\s\S]*On demand[\s\S]*Market scan[\s\S]*On demand/);
+  assert.match(activityStrip[1], /AI analysis[\s\S]*data-dashboard-activity="ai-analysis"/);
+  assert.match(activityStrip[1], /Paper-trading run[\s\S]*data-dashboard-activity="paper-trading-run"/);
+  assert.match(activityStrip[1], /Market data updated[\s\S]*data-dashboard-activity="market-data"/);
+  assert.match(activityStrip[1], /Last paper trade[\s\S]*data-dashboard-activity="paper-trade"/);
+  assert.doesNotMatch(activityStrip[1], /Analytics|Market scan|On demand/);
   assert.match(
     styles,
     /\.activity-strip\s*\{[^}]*background:\s*linear-gradient\(105deg,\s*#193a31,\s*var\(--positive-dark\)\s+58%,\s*#193a31\);/s

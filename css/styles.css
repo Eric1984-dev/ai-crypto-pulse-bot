@@ -834,11 +834,35 @@ a:focus-visible {
 }
 
 .activity-strip dd {
+  display: grid;
+  gap: 3px;
   margin: 0;
   color: #dce5f2;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.activity-strip dd time {
   white-space: nowrap;
+}
+
+.activity-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.activity-status[data-state="completed"] {
+  color: var(--positive);
+}
+
+.activity-status[data-state="failed"] {
+  color: var(--negative);
+}
+
+.activity-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .dashboard-panel {

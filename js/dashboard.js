@@ -214,6 +214,7 @@
     const system = health && health.system && typeof health.system === "object"
       ? health.system
       : {};
+    renderRuntimeActivity(health, documentRef);
     const modelElement = documentRef.querySelector("[data-archive-health=\"model\"]");
     const model = typeof system.model === "string" ? system.model.trim() : "";
     const validModel = model.length > 0 && model.length <= 128
@@ -737,7 +738,6 @@
   function renderActivityTimestamps(documentRef, view, recentTrades) {
     const latestTrade = Array.isArray(recentTrades.items) ? recentTrades.items[0] : null;
     const values = {
-      "bot-run": view.agentStatus && view.agentStatus.last_run,
       "market-data": view.lastMarketDataAt,
       "paper-trade": latestTrade && latestTrade.created_at
     };
@@ -752,6 +752,51 @@
         : "";
       target.textContent = timestamp ? formatters.formatTimestamp(timestamp) : "—";
       target.dateTime = timestamp;
+    }
+  }
+
+  function renderRuntimeActivity(health, documentRef) {
+    const cycle = health && health.runtime && health.runtime.lastCycle;
+    const cycleAt = cycle && typeof cycle.cycleAt === "string"
+      && Number.isFinite(Date.parse(cycle.cycleAt))
+      ? cycle.cycleAt
+      : "";
+    const stages = cycle && cycle.stages && typeof cycle.stages === "object"
+      ? cycle.stages
+      : {};
+    const statusLabels = {
+      completed: ["Completed", "completed"],
+      COMPLETED: ["Completed", "completed"],
+      FAILED: ["Failed", "failed"],
+      SKIPPED: ["Skipped", "skipped"]
+    };
+
+    for (const [activity, stage, timeActivity] of [
+      ["ai-analysis", "aiAnalysis", "ai-analysis"],
+      ["paper-trading", "paperTrading", "paper-trading-run"]
+    ]) {
+      const statusElement = documentRef.querySelector(
+        `[data-dashboard-activity-status="${activity}"]`
+      );
+      const timeElement = documentRef.querySelector(
+        `[data-dashboard-activity="${timeActivity}"]`
+      );
+      const stageStatus = stages[stage];
+      const mappedStatus = typeof stageStatus === "string"
+        && Object.hasOwn(statusLabels, stageStatus)
+        ? statusLabels[stageStatus]
+        : null;
+      const [label, state] = mappedStatus
+        || [cycle ? "Not run" : "No run yet", "unknown"];
+
+      if (statusElement) {
+        statusElement.textContent = label;
+        statusElement.dataset.state = state;
+      }
+      if (timeElement) {
+        timeElement.textContent = cycleAt ? formatters.formatTimestamp(cycleAt) : "—";
+        timeElement.dateTime = cycleAt;
+      }
     }
   }
 
