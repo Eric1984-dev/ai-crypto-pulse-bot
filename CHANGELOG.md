@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Show live Raspberry Pi temperature, CPU, and RAM beside the historical export controls using the existing authenticated monitoring endpoint.
 - Add a complete, sequential JSONL history export for AI analysis with bounded Pi API pages, per-source file splitting, and cancellation status; remove overlapping CSV export cards while retaining API compatibility.
 - Fix complete-history exports rejecting valid candle-window pages that do not contain the ordinary `items` field.
 - Highlight the active historical export source and show progress feedback on the export button.

@@ -58,13 +58,61 @@
           </div>
         </div>
         <p class="card-description">Writes all available trades, positions, AI decisions, portfolio snapshots, shadow-exit scenarios and events, stored analytics runs, and bounded candle windows to JSONL files in a folder you choose. Candle windows are collected around every trade and AI-decision timestamp. Requests run one at a time; large sources are split into files no larger than 5 MiB. The manifest records the fixed as-of time and any limitations. Use a current desktop Chromium browser with folder access enabled; no AI upload occurs.</p>
-        <p class="export-record-count" data-analysis-export-progress role="status" aria-live="polite">
-          <strong class="export-source-indicator" data-analysis-export-source hidden></strong>
-          <span data-analysis-export-detail>Ready to export all available history.</span>
-        </p>
-        <button class="history-search-button" data-analysis-export-start type="button">Export Complete History</button>
-        <button class="history-search-button" data-analysis-export-cancel type="button" hidden>Cancel Export</button>
-        <p class="export-status" data-analysis-export-status role="status" aria-live="polite"></p>
+        <div class="export-action-layout">
+          <section class="pi-health-panel" data-pi-health data-state="unavailable" aria-label="Raspberry Pi resources">
+            <div class="pi-health-heading">
+              <div class="pi-health-title">
+                <span class="pi-health-indicator" aria-hidden="true"></span>
+                <div>
+                  <p class="pi-health-kicker">RASPBERRY PI</p>
+                  <p class="pi-health-state" data-pi-health-state role="status" aria-live="polite">Connecting to live metrics…</p>
+                </div>
+              </div>
+              <span class="pi-health-updated" data-pi-health-updated>Loading</span>
+            </div>
+            <div class="pi-health-metrics">
+              <div class="pi-health-metric" data-pi-metric="temperature" data-state="unavailable">
+                <div class="pi-health-metric-heading">
+                  <span>Temperature</span>
+                  <strong data-pi-health-value="temperature">—</strong>
+                </div>
+                <div class="pi-health-track" aria-hidden="true">
+                  <span data-pi-health-bar="temperature"></span>
+                </div>
+              </div>
+              <div class="pi-health-metric" data-pi-metric="cpu" data-state="unavailable">
+                <div class="pi-health-metric-heading">
+                  <span>CPU</span>
+                  <strong data-pi-health-value="cpu">—</strong>
+                </div>
+                <div class="pi-health-track" aria-hidden="true">
+                  <span data-pi-health-bar="cpu"></span>
+                </div>
+              </div>
+              <div class="pi-health-metric" data-pi-metric="memory" data-state="unavailable">
+                <div class="pi-health-metric-heading">
+                  <span>RAM</span>
+                  <strong data-pi-health-value="memory">—</strong>
+                </div>
+                <div class="pi-health-track" aria-hidden="true">
+                  <span data-pi-health-bar="memory"></span>
+                </div>
+              </div>
+            </div>
+            <p class="pi-health-note">Refreshes every 30 sec · Amber: 70°C / 75% CPU / 80% RAM · Red: 80°C / 90% RAM / sustained CPU.</p>
+          </section>
+          <div class="export-action-controls">
+            <p class="export-record-count" data-analysis-export-progress role="status" aria-live="polite">
+              <strong class="export-source-indicator" data-analysis-export-source hidden></strong>
+              <span data-analysis-export-detail>Ready to export all available history.</span>
+            </p>
+            <div class="export-action-buttons">
+              <button class="history-search-button" data-analysis-export-start type="button">Export Complete History</button>
+              <button class="history-search-button" data-analysis-export-cancel type="button" hidden>Cancel Export</button>
+            </div>
+            <p class="export-status" data-analysis-export-status role="status" aria-live="polite"></p>
+          </div>
+        </div>
       </section>
     </main>
     <footer class="site-footer">

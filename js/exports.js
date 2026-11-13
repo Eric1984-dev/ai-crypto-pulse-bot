@@ -539,8 +539,15 @@
     const analysisExportStatus = documentRef.querySelector(
       "[data-analysis-export-status]"
     );
+    const piHealthPanel = documentRef.querySelector("[data-pi-health]");
+    const piHealthState = documentRef.querySelector("[data-pi-health-state]");
+    const piHealthUpdated = documentRef.querySelector("[data-pi-health-updated]");
     let activeExportController = null;
     let analysisExportRunning = false;
+    let piHealthInterval = null;
+    let piHealthRequestRunning = false;
+    let hasPiHealthReading = false;
+    let cpuCriticalSamples = 0;
 
     function setAnalysisExportStatus(message, state = "") {
       if (analysisExportStatus) {
@@ -564,6 +571,144 @@
         analysisExportProgress.textContent = source
           ? `Exporting ${source}: ${message}`
           : message;
+      }
+    }
+
+    function renderPiMetric(name, value) {
+      const card = documentRef.querySelector(`[data-pi-metric="${name}"]`);
+      const valueElement = documentRef.querySelector(`[data-pi-health-value="${name}"]`);
+      const bar = documentRef.querySelector(`[data-pi-health-bar="${name}"]`);
+      const maxValue = name === "temperature" ? 200 : 100;
+      const available = Number.isFinite(value) && value >= 0 && value <= maxValue;
+      let state = "unavailable";
+
+      if (available) {
+        if (name === "temperature") {
+          state = value >= 80 ? "critical" : value >= 70 ? "warning" : "normal";
+        } else if (name === "memory") {
+          state = value >= 90 ? "critical" : value >= 80 ? "warning" : "normal";
+        } else {
+          state = value >= 90
+            ? (cpuCriticalSamples >= 2 ? "critical" : "warning")
+            : value >= 75 ? "warning" : "normal";
+        }
+      }
+
+      if (card) {
+        card.dataset.state = state;
+      }
+      if (valueElement) {
+        valueElement.textContent = available
+          ? name === "temperature" ? `${value.toFixed(1)}°C` : `${Math.round(value)}%`
+          : "—";
+      }
+      if (bar) {
+        bar.style.width = available ? `${Math.min(100, value)}%` : "0%";
+      }
+      return state;
+    }
+
+    function setPiHealthSummary(states, updatedText) {
+      if (!piHealthPanel) {
+        return;
+      }
+      const availableStates = states.filter((state) => state !== "unavailable");
+      const state = availableStates.includes("critical")
+        ? "critical"
+        : availableStates.includes("warning")
+          ? "warning"
+          : availableStates.length
+            ? "normal"
+            : "unavailable";
+      piHealthPanel.dataset.state = state;
+      if (piHealthState) {
+        piHealthState.textContent = state === "critical"
+          ? "High system load"
+          : state === "warning"
+            ? "Elevated system load"
+            : state === "normal"
+              ? "System running normally"
+              : "Metrics unavailable";
+      }
+      if (piHealthUpdated) {
+        piHealthUpdated.textContent = updatedText;
+      }
+    }
+
+    async function refreshPiHealth() {
+      if (!piHealthPanel || piHealthRequestRunning || documentRef.hidden) {
+        return;
+      }
+      piHealthRequestRunning = true;
+      try {
+        const response = await fetchImpl(runtimeApiUrl("/api/v1/monitoring"), {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+          headers: { Accept: "application/json" }
+        });
+        if (response.status === 401) {
+          const error = new Error("Authentication is required.");
+          error.status = 401;
+          throw error;
+        }
+        if (!response.ok) {
+          throw new Error("System metrics are temporarily unavailable.");
+        }
+
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error("System metrics response is invalid.");
+        }
+        const system = result?.data?.system;
+        if (!system || typeof system !== "object") {
+          throw new Error("System metrics response is invalid.");
+        }
+
+        cpuCriticalSamples = Number.isFinite(system.cpuUsagePercent)
+          && system.cpuUsagePercent >= 90
+          ? cpuCriticalSamples + 1
+          : 0;
+        const states = [
+          renderPiMetric("temperature", system.temperatureC),
+          renderPiMetric("cpu", system.cpuUsagePercent),
+          renderPiMetric("memory", system.memory?.usedPercent)
+        ];
+        hasPiHealthReading = states.some((state) => state !== "unavailable");
+        const updatedAt = new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date());
+        setPiHealthSummary(states, `Updated ${updatedAt}`);
+      } catch (error) {
+        cpuCriticalSamples = 0;
+        if (error.status === 401 && typeof windowRef.location?.assign === "function") {
+          windowRef.location.assign("/login.html?next=%2Fexports.html");
+          return;
+        }
+        if (piHealthPanel) {
+          piHealthPanel.dataset.state = hasPiHealthReading ? "stale" : "unavailable";
+        }
+        if (piHealthState) {
+          piHealthState.textContent = hasPiHealthReading
+            ? "Connection issue · showing last reading"
+            : "Metrics unavailable";
+        }
+        if (piHealthUpdated) {
+          piHealthUpdated.textContent = hasPiHealthReading
+            ? "Refresh failed"
+            : "Retrying in 30 sec";
+        }
+      } finally {
+        piHealthRequestRunning = false;
+      }
+    }
+
+    function onPiHealthVisibilityChange() {
+      if (!documentRef.hidden) {
+        refreshPiHealth();
       }
     }
 
@@ -666,11 +811,21 @@
       activeExportController?.abort();
       startAnalysisExportButton?.removeEventListener("click", startAnalysisExport);
       cancelAnalysisExportButton?.removeEventListener("click", cancelAnalysisExport);
+      documentRef.removeEventListener?.("visibilitychange", onPiHealthVisibilityChange);
+      if (piHealthInterval !== null) {
+        windowRef.clearInterval?.(piHealthInterval);
+        piHealthInterval = null;
+      }
       windowRef.removeEventListener?.("pagehide", onAnalysisExportPageHide);
     }
 
     startAnalysisExportButton?.addEventListener("click", startAnalysisExport);
     cancelAnalysisExportButton?.addEventListener("click", cancelAnalysisExport);
+    if (piHealthPanel) {
+      refreshPiHealth();
+      piHealthInterval = windowRef.setInterval?.(refreshPiHealth, 30_000) ?? null;
+      documentRef.addEventListener?.("visibilitychange", onPiHealthVisibilityChange);
+    }
     windowRef.addEventListener?.("pagehide", onAnalysisExportPageHide);
 
     return () => {
