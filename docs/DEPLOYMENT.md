@@ -36,8 +36,11 @@ Set these build-time environment values for the Vercel deployment:
 | `CRYPTOPULSE_ENVIRONMENT` | `development`, `validation`, or `production`; Vercel Production cannot be downgraded. |
 | `CRYPTOPULSE_ACCESS_ENABLED` | `true` only when Cloudflare Access is enabled for the deployment. |
 | `CRYPTOPULSE_ACCESS_AUDIENCE` | Required public audience value when Access is enabled. |
+| `ONESIGNAL_APP_ID` | Public OneSignal Web Push App ID used by the Settings subscription UI. |
 
 Quick Tunnel origins are for development/validation only; production builds reject them. Build configuration contains public routing values only, never secrets. The root `.env.example` contains placeholders for these settings and the paper-mode safeguard.
+
+For push alerts, set the same `ONESIGNAL_APP_ID` in the Raspberry Pi runtime and add `ONESIGNAL_REST_API_KEY` only to `raspberry-pi/.env`. The REST key must never be set in Vercel or exposed to the browser. See the [OneSignal setup guide](ONESIGNAL.md).
 
 The Vercel project uses the repository root for static assets. `vercel.json` runs `npm run build`, protects dashboard HTML routes, and defines no cron jobs. The project validator requires exactly the three active function files and keeps the total below the Hobby limit. `raspberry-pi/` is excluded from the Vercel deployment input.
 

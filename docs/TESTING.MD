@@ -44,6 +44,14 @@ node --test raspberry-pi/tests/position-exit-policy.test.mjs raspberry-pi/tests/
 
 The Phase 8.14, 8.15, and 8.16 migrations are exercised only inside isolated local PGlite fixtures; no test applies them to the live Pi database. Do not start the Pi runtime with this code until the operator has reviewed/applied the required migrations.
 
+OneSignal push regressions cover public App ID injection, private server-key isolation, permission prompting from Settings, executed-trade targeting, automatic SELL alerts, post-commit delivery, and provider-failure isolation:
+
+```powershell
+node --test tests/runtime-api-config-build.test.mjs tests/project-setup.test.js tests/settings-notifications.test.js raspberry-pi/tests/runtime-config.test.mjs raspberry-pi/tests/onesignal-trade-notifier.test.mjs raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/runtime-bootstrap.test.mjs
+```
+
+These tests mock the OneSignal SDK/API. They do not subscribe a real device or verify delivery through OneSignal.
+
 The full-history export regressions cover source keyset pagination including paper-execution attempts, deduplicated trade/decision candle anchors, fixed as-of filtering, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation manifests. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer.
 
 ## Dashboard and authentication

@@ -9,7 +9,8 @@ test("local builds default to an unconfigured API origin", () => {
   assert.deepEqual(createRuntimeApiConfig({}), {
     apiOrigin: "",
     accessEnabled: false,
-    accessAudience: ""
+    accessAudience: "",
+    oneSignalAppId: ""
   });
 });
 
@@ -32,7 +33,8 @@ test("Vercel builds require an origin and infer production or validation mode", 
   }), {
     apiOrigin: "https://api.example.com",
     accessEnabled: false,
-    accessAudience: ""
+    accessAudience: "",
+    oneSignalAppId: ""
   });
   assert.deepEqual(createRuntimeApiConfig({
     VERCEL: "1",
@@ -41,7 +43,8 @@ test("Vercel builds require an origin and infer production or validation mode", 
   }), {
     apiOrigin: "https://api-preview.trycloudflare.com",
     accessEnabled: false,
-    accessAudience: ""
+    accessAudience: "",
+    oneSignalAppId: ""
   });
   assert.deepEqual(createRuntimeApiConfig({
     VERCEL: "1",
@@ -50,7 +53,8 @@ test("Vercel builds require an origin and infer production or validation mode", 
   }), {
     apiOrigin: "https://api-validation.trycloudflare.com",
     accessEnabled: false,
-    accessAudience: ""
+    accessAudience: "",
+    oneSignalAppId: ""
   });
 });
 
@@ -169,4 +173,18 @@ test("Cloudflare Access settings are validated and emitted as public dashboard c
   assert.match(rendered, /"accessEnabled": true/);
   assert.match(rendered, /"accessAudience": "public-audience-tag"/);
   assert.doesNotMatch(rendered, /trycloudflare\.com/);
+});
+
+test("OneSignal App ID is validated and emitted without exposing server credentials", () => {
+  const appId = "123e4567-e89b-12d3-a456-426614174000";
+  assert.throws(
+    () => createRuntimeApiConfig({ ONESIGNAL_APP_ID: "not-an-app-id" }),
+    /ONESIGNAL_APP_ID must be a UUID/
+  );
+  const rendered = renderRuntimeApiConfig({
+    ONESIGNAL_APP_ID: appId,
+    ONESIGNAL_REST_API_KEY: "must-not-be-emitted"
+  });
+  assert.match(rendered, new RegExp(`"oneSignalAppId": "${appId}"`));
+  assert.doesNotMatch(rendered, /ONESIGNAL_REST_API_KEY|must-not-be-emitted/);
 });

@@ -136,6 +136,17 @@ test("all pages enable standalone home-screen app mode", () => {
   assert.equal(manifest.theme_color, "#0b100f");
   assert.equal(manifest.background_color, "#0b100f");
   assert.ok(manifest.icons.some(({ src }) => src === "/assets/icons/apple-touch-icon.png"));
+  for (const [size, filename] of [
+    [192, "cryptopulse-icon-192.png"],
+    [512, "cryptopulse-icon-512.png"]
+  ]) {
+    assert.ok(manifest.icons.some(({ src, sizes }) =>
+      src === `/assets/icons/${filename}` && sizes === `${size}x${size}`));
+    const icon = fs.readFileSync(path.join(rootDirectory, "assets", "icons", filename));
+    assert.equal(icon.toString("ascii", 1, 4), "PNG");
+    assert.equal(icon.readUInt32BE(16), size);
+    assert.equal(icon.readUInt32BE(20), size);
+  }
 
   for (const page of requiredPages) {
     const html = fs.readFileSync(path.join(rootDirectory, page), "utf8");

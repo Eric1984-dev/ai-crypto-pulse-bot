@@ -54,6 +54,11 @@ test("runtime config defaults to loopback API and disables live trading", () => 
     databaseUser: "",
     databasePassword: ""
   });
+  assert.deepEqual(config.pushNotifications, {
+    enabled: false,
+    oneSignalAppId: "",
+    oneSignalRestApiKey: ""
+  });
   assert.equal(config.database.poolMax, 4);
   assert.equal(createPoolOptions(config).options, "-c default_transaction_read_only=on");
 });
@@ -123,6 +128,32 @@ test("runtime config accepts isolated analytics writer credentials only as a pai
   assert.throws(() => readRuntimeConfig(validEnvironment({
     ANALYTICS_DATABASE_PASSWORD: "analytics-password"
   })), /ANALYTICS_DATABASE_USER and ANALYTICS_DATABASE_PASSWORD/);
+});
+
+test("runtime config requires valid OneSignal app ID and REST API key together", () => {
+  const config = readRuntimeConfig(validEnvironment({
+    ONESIGNAL_APP_ID: "123e4567-e89b-12d3-a456-426614174000",
+    ONESIGNAL_REST_API_KEY: "server-only-key"
+  }));
+  assert.deepEqual(config.pushNotifications, {
+    enabled: true,
+    oneSignalAppId: "123e4567-e89b-12d3-a456-426614174000",
+    oneSignalRestApiKey: "server-only-key"
+  });
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ONESIGNAL_APP_ID: "123e4567-e89b-12d3-a456-426614174000"
+  })), /must be set together/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ONESIGNAL_REST_API_KEY: "server-only-key"
+  })), /must be set together/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ONESIGNAL_APP_ID: "invalid",
+    ONESIGNAL_REST_API_KEY: "server-only-key"
+  })), /ONESIGNAL_APP_ID must be a UUID/);
+  assert.throws(() => readRuntimeConfig(validEnvironment({
+    ONESIGNAL_APP_ID: "123e4567-e89b-12d3-a456-426614174000",
+    ONESIGNAL_REST_API_KEY: "bad\r\nkey"
+  })), /ONESIGNAL_REST_API_KEY/);
 });
 
 test("runtime config requires explicit boolean opt-in for ingestion table ownership", () => {

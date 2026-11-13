@@ -97,12 +97,20 @@ function validateProject() {
     for (const variable of [
       "CRYPTOPULSE_RUNTIME_API_ORIGIN",
       "CRYPTOPULSE_ENVIRONMENT",
-      "CRYPTOPULSE_ACCESS_ENABLED"
+      "CRYPTOPULSE_ACCESS_ENABLED",
+      "ONESIGNAL_APP_ID"
     ]) {
       if (!new RegExp(`^${variable}=`, "m").test(envExample)) {
         errors.push(`The environment template must declare ${variable}.`);
       }
     }
+  }
+
+  const oneSignalWorkerPath = path.join(rootDirectory, "OneSignalSDKWorker.js");
+  if (!fs.existsSync(oneSignalWorkerPath)
+    || !fs.readFileSync(oneSignalWorkerPath, "utf8")
+      .includes('importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");')) {
+    errors.push("The OneSignal web push service worker is missing or invalid.");
   }
 
   for (const endpoint of [

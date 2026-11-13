@@ -120,9 +120,10 @@ function makeRepository(overrides = {}) {
   return repository;
 }
 
-function makeService(repository, logs = []) {
+function makeService(repository, logs = [], tradeNotifier = null) {
   return createPaperTradingService({
     repository,
+    tradeNotifier,
     now: () => NOW,
     logger: {
       error: (message) => logs.push(JSON.parse(message)),
@@ -177,6 +178,83 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
   assert.equal(repository.auditAttempts[0].tradeId, "00000000-0000-4000-8000-000000000010");
   assert.match(repository.auditAttempts[0].evaluationRunId, /^[0-9a-f-]{36}$/i);
   assert.deepEqual(repository.calls, ["buy"]);
+});
+
+test("executed BUY notifications are sent after the paper-trading transaction commits", async () => {
+  const events = [];
+  const repository = makeRepository({
+    withTransaction: async (operation) => {
+      const result = await operation({});
+      events.push("committed");
+      return result;
+    }
+  });
+  const service = makeService(repository, [], async (trade) => {
+    events.push({ type: "notification", trade });
+  });
+
+  const result = await service.run();
+
+  assert.equal(result.tradesExecuted, 1);
+  assert.deepEqual(events, [
+    "committed",
+    {
+      type: "notification",
+      trade: {
+        tradeId: "00000000-0000-4000-8000-000000000010",
+        side: "BUY",
+        symbol: SYMBOL,
+        executionPrice: "100.1",
+        quantity: "1",
+        executionReason: "AI_DECISION"
+      }
+    }
+  ]);
+});
+
+test("notification delivery failure does not roll back or fail an executed paper trade", async () => {
+  const logs = [];
+  let committed = false;
+  const repository = makeRepository({
+    withTransaction: async (operation) => {
+      const result = await operation({});
+      committed = true;
+      return result;
+    }
+  });
+  const service = makeService(repository, logs, async () => {
+    assert.equal(committed, true);
+    throw Object.assign(new Error("provider unavailable"), {
+      code: "ONESIGNAL_REQUEST_FAILED"
+    });
+  });
+
+  const result = await service.run();
+
+  assert.equal(result.status, "COMPLETED");
+  assert.equal(result.tradesExecuted, 1);
+  assert.ok(logs.some((entry) =>
+    entry.event === "paper_trade_notification_failed"
+      && entry.code === "ONESIGNAL_REQUEST_FAILED"));
+});
+
+test("skipped BUY decisions do not send trade notifications", async () => {
+  const repository = makeRepository({
+    listMarketData: async () => [{
+      symbol: SYMBOL,
+      price: "100",
+      captured_at: new Date(NOW.getTime() - 60 * 60 * 1000)
+    }]
+  });
+  let notifications = 0;
+  const service = makeService(repository, [], async () => {
+    notifications += 1;
+  });
+
+  const result = await service.run();
+
+  assert.equal(result.tradesExecuted, 0);
+  assert.equal(notifications, 0);
 });
 
 test("non-directional decisions do not create execution-audit records", async () => {
@@ -273,12 +351,16 @@ test("ATR ratchet closes one position after a pullback and records an automatic 
       return {
         availableBalance: "10100",
         portfolioValue: "10100",
-        openPositions: 0
+        openPositions: 0,
+        tradeId: "00000000-0000-4000-8000-000000000012"
       };
     }
   });
+  const notifications = [];
 
-  const result = await makeService(repository).run();
+  const result = await makeService(repository, [], async (trade) => {
+    notifications.push(trade);
+  }).run();
 
   assert.equal(result.automaticExits, 1);
   assert.equal(result.tradesExecuted, 1);
@@ -294,6 +376,14 @@ test("ATR ratchet closes one position after a pullback and records an automatic 
     createPositionExitIdempotencyKey(PORTFOLIO_ID, position.id)
   );
   assert.deepEqual(repository.calls, ["sell"]);
+  assert.deepEqual(notifications, [{
+    tradeId: "00000000-0000-4000-8000-000000000012",
+    side: "SELL",
+    symbol: SYMBOL,
+    executionPrice: "99.9",
+    quantity: "2",
+    executionReason: "ATR_TRAILING_EXIT"
+  }]);
 });
 
 test("missing ATR history does not create a new exit, but an existing stop remains active", async (t) => {

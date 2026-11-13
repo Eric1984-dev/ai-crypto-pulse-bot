@@ -7,6 +7,7 @@ import { AiDecisionsRepository } from "../repositories/ai-decisions-repository.m
 import { DashboardRepository } from "../repositories/dashboard-repository.mjs";
 import { MarketDataRepository } from "../repositories/market-data-repository.mjs";
 import { PaperTradingRepository } from "../repositories/paper-trading-repository.mjs";
+import { createOneSignalTradeNotifier } from "../services/onesignal-trade-notifier.mjs";
 import { RuntimeStatusRepository } from "../repositories/runtime-status-repository.mjs";
 import { WatchedMarketsRepository } from "../repositories/watched-markets-repository.mjs";
 import { createAiAnalysisDatabaseConfig } from "../analyze-ai.mjs";
@@ -109,8 +110,14 @@ export async function startRuntime(config, {
     paperPool = createPostgresPool(withPoolMax(paperConfig, 1), { Pool, logger });
     const paperValidation = await validatePaperContracts(paperPool, paperConfig, { logger });
     const paperRepository = new PaperTradingRepository(paperPool, { logger });
+    const tradeNotifier = createOneSignalTradeNotifier({
+      enabled: config.pushNotifications.enabled,
+      appId: config.pushNotifications.oneSignalAppId,
+      restApiKey: config.pushNotifications.oneSignalRestApiKey
+    }, { fetchImpl, logger });
     const paperTrading = createPaperTradingService({
       repository: paperRepository,
+      tradeNotifier,
       logger
     });
     const existingStatus = await paperTrading.readAgentStatus();

@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const projectDirectory = resolve(scriptDirectory, "..");
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 export function createRuntimeApiConfig(environment = process.env) {
   const rawApiOrigin = environment.CRYPTOPULSE_RUNTIME_API_ORIGIN?.trim() || "";
@@ -26,8 +27,12 @@ export function createRuntimeApiConfig(environment = process.env) {
   if (accessEnabled && !accessAudience) {
     throw new Error("CRYPTOPULSE_ACCESS_AUDIENCE is required when Access is enabled.");
   }
+  const oneSignalAppId = environment.ONESIGNAL_APP_ID?.trim() || "";
+  if (oneSignalAppId && !UUID_PATTERN.test(oneSignalAppId)) {
+    throw new Error("ONESIGNAL_APP_ID must be a UUID.");
+  }
 
-  return { apiOrigin, accessEnabled, accessAudience };
+  return { apiOrigin, accessEnabled, accessAudience, oneSignalAppId };
 }
 
 export function renderRuntimeApiConfig(environment = process.env) {

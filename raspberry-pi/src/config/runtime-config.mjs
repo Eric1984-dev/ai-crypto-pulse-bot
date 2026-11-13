@@ -16,6 +16,7 @@ const DEFAULTS = Object.freeze({
   rateLimitWindowMs: 60000,
   rateLimitMaxRequests: 60
 });
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function requiredString(env, name) {
   const value = env[name];
@@ -171,6 +172,17 @@ export function readRuntimeConfig(env = process.env, {
   const dashboardUsername = requiredString(env, "DASHBOARD_USERNAME");
   const dashboardPasswordHash = requiredString(env, "DASHBOARD_PASSWORD_HASH");
   const liveTradingEnabled = readBoolean(env, "ENABLE_LIVE_TRADING", false);
+  const oneSignalAppId = env.ONESIGNAL_APP_ID?.trim() || "";
+  const oneSignalRestApiKey = env.ONESIGNAL_REST_API_KEY?.trim() || "";
+  if (Boolean(oneSignalAppId) !== Boolean(oneSignalRestApiKey)) {
+    throw new Error("ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY must be set together.");
+  }
+  if (oneSignalAppId && !UUID_PATTERN.test(oneSignalAppId)) {
+    throw new Error("ONESIGNAL_APP_ID must be a UUID.");
+  }
+  if (oneSignalRestApiKey.length > 512 || /[\r\n]/.test(oneSignalRestApiKey)) {
+    throw new Error("Invalid runtime setting: ONESIGNAL_REST_API_KEY");
+  }
 
   if (dashboardUsername.length > 128 || /[\u0000-\u001f\u007f]/.test(dashboardUsername)) {
     throw new Error("Invalid runtime setting: DASHBOARD_USERNAME");
@@ -279,6 +291,11 @@ export function readRuntimeConfig(env = process.env, {
     analytics: Object.freeze({
       databaseUser: analyticsDatabaseUser,
       databasePassword: analyticsDatabasePassword
+    }),
+    pushNotifications: Object.freeze({
+      enabled: Boolean(oneSignalAppId),
+      oneSignalAppId,
+      oneSignalRestApiKey
     }),
     paperTrading: Object.freeze({
       databaseUser: paperDatabaseUser,

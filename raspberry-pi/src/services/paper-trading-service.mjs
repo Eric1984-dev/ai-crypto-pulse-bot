@@ -69,6 +69,7 @@ export function createPaperTradingDatabaseConfig(config, env = process.env) {
 
 export function createPaperTradingService({
   repository,
+  tradeNotifier = null,
   now = () => new Date(),
   logger = console
 } = {}) {
@@ -80,6 +81,7 @@ export function createPaperTradingService({
     || typeof repository.recordPaperExecutionAttempt !== "function"
     || typeof repository.listTrailingExitCandles !== "function"
     || typeof repository.updatePositionExitState !== "function"
+    || (tradeNotifier !== null && typeof tradeNotifier !== "function")
     || typeof now !== "function") {
     throw new TypeError("A paper-trading repository and clock are required.");
   }
@@ -88,6 +90,7 @@ export function createPaperTradingService({
     async run() {
       const currentTime = readTime(now());
       const evaluationRunId = randomUUID();
+      const executedTrades = [];
       try {
         const tradingResult = await repository.withTransaction(async (client) => {
           if (!await repository.tryAcquireRunLock(client)) {
@@ -254,6 +257,14 @@ export function createPaperTradingService({
                 positionId: position.id,
                 executionReason: "ATR_TRAILING_EXIT"
               });
+              executedTrades.push({
+                tradeId: tradeState.tradeId,
+                side: "SELL",
+                symbol: position.symbol,
+                executionPrice: quote.execution_price,
+                quantity: quote.amount,
+                executionReason: "ATR_TRAILING_EXIT"
+              });
               state = Object.freeze({ ...state, ...tradeState });
               openPositions = openPositions.filter(({ id }) => id !== position.id);
               cooldowns.set(position.symbol, currentTime);
@@ -374,6 +385,14 @@ export function createPaperTradingService({
                   marketPrice: market.price
                 });
                 const { tradeId, ...tradeState } = buyResult;
+                executedTrades.push({
+                  tradeId,
+                  side: "BUY",
+                  symbol: decision.symbol,
+                  executionPrice: quote.execution_price,
+                  quantity: quote.amount,
+                  executionReason: "AI_DECISION"
+                });
                 state = Object.freeze({ ...state, ...tradeState });
                 openPositions.push({
                   symbol: decision.symbol,
@@ -424,6 +443,14 @@ export function createPaperTradingService({
                   quote
                 });
                 const { tradeId, ...tradeState } = sellResult;
+                executedTrades.push({
+                  tradeId,
+                  side: "SELL",
+                  symbol: decision.symbol,
+                  executionPrice: quote.execution_price,
+                  quantity: quote.amount,
+                  executionReason: "AI_DECISION"
+                });
                 state = Object.freeze({ ...state, ...tradeState });
                 await recordExecutionAttempt(repository, client, {
                   evaluationRunId,
@@ -446,6 +473,21 @@ export function createPaperTradingService({
           }
           return Object.freeze(result);
         });
+        if (tradeNotifier) {
+          await Promise.all(executedTrades.map(async (trade) => {
+            try {
+              await tradeNotifier(trade);
+            } catch (error) {
+              logger.error(JSON.stringify({
+                event: "paper_trade_notification_failed",
+                code: safeErrorCode(error),
+                tradeId: trade.tradeId,
+                side: trade.side,
+                symbol: trade.symbol
+              }));
+            }
+          }));
+        }
         return tradingResult;
       } catch (error) {
         const wrapped = error instanceof PaperTradingServiceError
@@ -590,6 +632,12 @@ function groupCandlesBySymbol(candles) {
     grouped.set(candle.symbol, rows);
   }
   return grouped;
+}
+
+function safeErrorCode(error) {
+  return typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code)
+    ? error.code
+    : "NOTIFICATION_DELIVERY_FAILED";
 }
 
 function logPositionExitDataQuality(logger, position, reason) {
