@@ -28,13 +28,13 @@ node --test raspberry-pi/tests/ai-analysis.test.mjs raspberry-pi/tests/market-da
 
 The snapshot-order migration test runs against local PGlite only. It does not apply the migration to the Raspberry Pi database.
 
-Paper execution attribution regressions cover reason-coded directional outcomes, duplicate and repeated-cycle identity, executed-trade linkage, automatic-exit exclusion, the Phase 8.15 migration/schema/grant contract, and paginated export as-of handling:
+Paper execution attribution regressions cover reason-coded directional outcomes, duplicate and repeated-cycle identity, executed-trade linkage, automatic-exit exclusion, the Phase 8.15/8.16 migration/schema/grant contract, paper-writer `ON CONFLICT` insertion, runtime preflight of conflict-key column grants, and paginated export as-of handling:
 
 ```powershell
 node --test raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/paper-trading-repository.test.mjs raspberry-pi/tests/paper-trading-contract.test.mjs raspberry-pi/tests/dashboard-repository.test.mjs tests/exports-ui.test.js
 ```
 
-The Phase 8.15 migration test uses local PGlite and does not apply the migration to the live Pi database.
+The Phase 8.15/8.16 migration tests use local PGlite and do not apply migrations to the live Pi database.
 
 Position-exit regressions cover the single active 1.5 × 5-minute-ATR ratchet, the fee/slippage-adjusted €3 net floor, stale/incomplete/gapped candle rejection, persisted-stop behavior without ATR, idempotent trade attribution, and decision-analytics isolation:
 
@@ -42,7 +42,7 @@ Position-exit regressions cover the single active 1.5 × 5-minute-ATR ratchet, t
 node --test raspberry-pi/tests/position-exit-policy.test.mjs raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/paper-trading-repository.test.mjs raspberry-pi/tests/dashboard-analytics.test.mjs raspberry-pi/tests/dashboard-repository.test.mjs raspberry-pi/tests/runtime-cycle.test.mjs raspberry-pi/tests/operational-health.test.mjs tests/trade-history.test.js
 ```
 
-The Phase 8.14 and 8.15 migrations are not applied by these tests; the repository uses isolated local fixtures. Do not start the Pi runtime with this code until the operator has reviewed/applied the required migrations.
+The Phase 8.14, 8.15, and 8.16 migrations are exercised only inside isolated local PGlite fixtures; no test applies them to the live Pi database. Do not start the Pi runtime with this code until the operator has reviewed/applied the required migrations.
 
 The full-history export regressions cover source keyset pagination including paper-execution attempts, deduplicated trade/decision candle anchors, fixed as-of filtering, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation manifests. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer.
 

@@ -25,7 +25,8 @@ verwachte database en eigenaar gebruikt:
 ```bash
 ls -l migrations/phase-8.13-portfolio-snapshot-order.sql \
   migrations/phase-8.14-position-aware-trailing-exits.sql \
-  migrations/phase-8.15-paper-execution-audit.sql
+  migrations/phase-8.15-paper-execution-audit.sql \
+  migrations/phase-8.16-paper-execution-audit-conflict-key-select.sql
 sudo -u postgres psql --dbname=ai_crypto_bot_store \
   --command="SELECT current_database(), current_user;"
 ```
@@ -107,9 +108,9 @@ Een Git-push of Vercel-deployment werkt de Pi-runtime niet automatisch bij.
 
 Phase 8.15 is een aparte, additieve migratie voor per-evaluatie uitkomsten van
 directionele paper BUY/SELL-beslissingen. Pas deze alleen toe na backup en als
-database-schema-owner. De tabel biedt het runtime-paperaccount uitsluitend
-INSERT-toegang; de bestaande dashboard-lezer krijgt SELECT-toegang. Controleer
-dat `ai_crypto_bot_runtime_reader` bestaat en gebruik de exacte, beperkte
+database-schema-owner. De tabel biedt het runtime-paperaccount INSERT-toegang;
+de bestaande dashboard-lezer krijgt SELECT-toegang. Controleer dat
+`ai_crypto_bot_runtime_reader` bestaat en gebruik de exacte, beperkte
 `PAPER_DATABASE_USER`-rol uit de lokale Pi-configuratie:
 
 ```bash
@@ -146,8 +147,89 @@ ORDER BY grantee, privilege_type;"
 Verwacht auditkolommen voor evaluation-run/portfolio/decision IDs, symbol,
 action, confidence, decision/evaluation timestamps, outcome, reason code en
 nullable trade ID. De paper writer mag INSERT hebben maar geen UPDATE, DELETE
-of TRUNCATE; de dashboard reader moet SELECT hebben. Valideer runtime-contracts
-met de geïnstalleerde code voordat de runtime opnieuw wordt gestart.
+of TRUNCATE; de dashboard reader moet SELECT hebben. De paper writer heeft
+tevens SELECT nodig op alleen de drie idempotency-kolommen voor de
+`ON CONFLICT`-sleutel. Dit wordt toegepast in Phase 8.16 hieronder. Valideer
+runtime-contracts met de geïnstalleerde code voordat de runtime opnieuw wordt
+gestart.
+
+## Phase 8.16 conflict-key privileges toepassen
+
+Phase 8.16 formaliseert de beperkte kolomrechten die nodig zijn voor de
+paper-audit `INSERT ... ON CONFLICT`. Het geeft de paper writer geen SELECT op
+de volledige audit-tabel. Pas deze migratie toe als schema-owner nadat Phase
+8.15 is toegepast. De eerdere handmatige GRANT is inhoudelijk gelijkwaardig;
+de migratie kan daarna veilig worden toegepast om de procedure te formaliseren.
+
+```bash
+sudo -u postgres psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store <<'SQL'
+SELECT pg_catalog.set_config(
+  'cryptopulse.paper_database_user',
+  'ai_crypto_bot_paper_writer',
+  false
+);
+\i migrations/phase-8.16-paper-execution-audit-conflict-key-select.sql
+SQL
+```
+
+Vervang `ai_crypto_bot_paper_writer` alleen als dat niet de exacte
+`PAPER_DATABASE_USER` in de Pi-configuratie is. Controleer daarna dat INSERT en
+de drie kolomrechten aanwezig zijn, terwijl tabelbrede SELECT, UPDATE, DELETE
+en TRUNCATE niet zijn verleend:
+
+```bash
+sudo -u postgres psql --dbname=ai_crypto_bot_store --command="
+SELECT
+  pg_catalog.has_table_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'INSERT'
+  ) AS writer_can_insert,
+  pg_catalog.has_table_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'SELECT'
+  ) AS writer_can_select_table,
+  pg_catalog.has_column_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'evaluation_run_id',
+    'SELECT'
+  ) AS writer_can_select_run_id,
+  pg_catalog.has_column_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'portfolio_id',
+    'SELECT'
+  ) AS writer_can_select_portfolio_id,
+  pg_catalog.has_column_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'decision_id',
+    'SELECT'
+  ) AS writer_can_select_decision_id,
+  pg_catalog.has_table_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'UPDATE'
+  ) AS writer_can_update,
+  pg_catalog.has_table_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'DELETE'
+  ) AS writer_can_delete,
+  pg_catalog.has_table_privilege(
+    'ai_crypto_bot_paper_writer',
+    'public.\"AI_Crypto_Bot_Paper_Execution_Audit\"',
+    'TRUNCATE'
+  ) AS writer_can_truncate;"
+```
+
+Expected: `writer_can_insert` and all three `writer_can_select_*` values are
+true; `writer_can_select_table`, `writer_can_update`, `writer_can_delete` and
+`writer_can_truncate` are false. Restart the runtime only after the updated
+code is installed and its startup contract validation succeeds. Do not start a
+deployment or apply the migration automatically.
 
 ## Volgende migraties en fouten
 

@@ -1,7 +1,8 @@
 import {
   REQUIRED_TABLES,
   REQUIRED_FUNCTION_CONTRACTS,
-  OPTIONAL_FUNCTION_CONTRACTS
+  OPTIONAL_FUNCTION_CONTRACTS,
+  REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS
 } from "../services/database-contracts.mjs";
 import { withReadOnlyTransaction } from "../database/read-only-transaction.mjs";
 
@@ -98,6 +99,29 @@ const TABLE_PRIVILEGES_SQL = `
   ORDER BY relation.relname
 `;
 
+const COLUMN_PRIVILEGES_SQL = `
+  SELECT relation.relname::text AS table_name,
+         attribute.attname::text AS column_name,
+         pg_catalog.has_column_privilege(
+           current_user,
+           relation.oid,
+           attribute.attnum,
+           'SELECT'
+         ) AS can_select
+  FROM pg_catalog.pg_attribute AS attribute
+  JOIN pg_catalog.pg_class AS relation
+    ON relation.oid = attribute.attrelid
+  JOIN pg_catalog.pg_namespace AS namespace
+    ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname = $1
+    AND relation.relname = $2
+    AND relation.relkind IN ('r', 'p')
+    AND attribute.attname = ANY($3::text[])
+    AND attribute.attnum > 0
+    AND NOT attribute.attisdropped
+  ORDER BY attribute.attnum
+`;
+
 const SEQUENCE_PRIVILEGES_SQL = `
   SELECT sequence.relname AS relation_name,
          (sequence.relowner = current_role_oid.role_oid) AS is_owner,
@@ -141,6 +165,11 @@ export async function inspectDatabaseContract(pool, expectedRoleName, {
     const columns = await client.query(COLUMNS_SQL, [schemaName, TABLE_NAMES]);
     const constraints = await client.query(CONSTRAINTS_SQL, [schemaName, TABLE_NAMES]);
     const tablePrivileges = await client.query(TABLE_PRIVILEGES_SQL, [schemaName, "AI_Crypto_Bot_"]);
+    const columnPrivileges = await client.query(COLUMN_PRIVILEGES_SQL, [
+      schemaName,
+      "AI_Crypto_Bot_Paper_Execution_Audit",
+      REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS
+    ]);
     const sequencePrivileges = await client.query(SEQUENCE_PRIVILEGES_SQL, [schemaName, "AI_Crypto_Bot_"]);
     const functions = await client.query(FUNCTIONS_SQL, [schemaName, FUNCTION_NAMES]);
 
@@ -151,6 +180,7 @@ export async function inspectDatabaseContract(pool, expectedRoleName, {
       columns: columns.rows,
       constraints: constraints.rows,
       tablePrivileges: tablePrivileges.rows,
+      columnPrivileges: columnPrivileges.rows,
       sequencePrivileges: sequencePrivileges.rows,
       functions: functions.rows
     });

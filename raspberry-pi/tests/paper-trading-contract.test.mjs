@@ -5,6 +5,7 @@ import {
   PAPER_TRADING_READ_TABLES,
   PAPER_TRADING_UPDATE_TABLES,
   REQUIRED_COLUMN_CONTRACTS,
+  REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS,
   REQUIRED_PAPER_TRADING_COLUMNS,
   REQUIRED_TABLES,
   evaluatePaperTradingDatabaseContract
@@ -50,6 +51,13 @@ function createSnapshot(overrides = {}) {
       columns: ["evaluation_run_id", "portfolio_id", "decision_id"]
     }
   ];
+  const columnPrivileges = REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS.map(
+    (column_name) => ({
+      table_name: "AI_Crypto_Bot_Paper_Execution_Audit",
+      column_name,
+      can_select: true
+    })
+  );
   return {
     expectedRoleName: "paper_writer",
     connection: {
@@ -67,6 +75,7 @@ function createSnapshot(overrides = {}) {
     columns,
     constraints,
     tablePrivileges,
+    columnPrivileges,
     sequencePrivileges: [],
     functions: [],
     ...overrides
@@ -102,6 +111,22 @@ test("paper trading contract requires schema columns and exact write grants", ()
   ));
   assert.ok(result.errors.includes(
     "MISSING_PAPER_TRADING_INSERT_PRIVILEGE:AI_Crypto_Bot_Portfolios"
+  ));
+});
+
+test("paper trading contract requires SELECT on audit conflict-key columns", () => {
+  const snapshot = createSnapshot({
+    columnPrivileges: createSnapshot().columnPrivileges.map((privilege) =>
+      privilege.column_name === "portfolio_id"
+        ? { ...privilege, can_select: false }
+        : privilege)
+  });
+
+  const result = evaluatePaperTradingDatabaseContract(snapshot, "ai_crypto_bot_store");
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes(
+    "MISSING_PAPER_EXECUTION_AUDIT_SELECT_COLUMN_PRIVILEGE:portfolio_id"
   ));
 });
 

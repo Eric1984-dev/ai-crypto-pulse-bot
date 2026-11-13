@@ -6,6 +6,7 @@ import {
   PAPER_TRADING_READ_TABLES,
   REQUIRED_COLUMN_CONTRACTS,
   REQUIRED_FUNCTION_CONTRACTS,
+  REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS,
   REQUIRED_READ_TABLES,
   REQUIRED_TABLES
 } from "../src/services/database-contracts.mjs";
@@ -53,7 +54,8 @@ function createContractPool({
   extraOwnedTable,
   canCreatePublic = false,
   roleName = "runtime_reader",
-  noSelectTables = []
+  noSelectTables = [],
+  noPaperAuditSelectColumns = []
 } = {}) {
   const queries = [];
   const columns = Object.entries(REQUIRED_COLUMN_CONTRACTS).flatMap(([table_name, values]) =>
@@ -69,6 +71,13 @@ function createContractPool({
     function_kind: "f",
     security_definer: contract.securityDefiner
   }));
+  const columnPrivileges = REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS.map(
+    (column_name) => ({
+      table_name: "AI_Crypto_Bot_Paper_Execution_Audit",
+      column_name,
+      can_select: !noPaperAuditSelectColumns.includes(column_name)
+    })
+  );
   const constraints = omitLegacyConstraints ? [] : [
     { relation_name: "AI_Crypto_Bot_Watched_Markets", constraint_type: "p", columns: ["id"] },
     { relation_name: "AI_Crypto_Bot_Watched_Markets", constraint_type: "u", columns: ["symbol"] },
@@ -158,6 +167,9 @@ function createContractPool({
           rows
         };
       }
+      if (sql.includes("has_column_privilege")) {
+        return { rows: columnPrivileges };
+      }
       if (sql.includes("has_sequence_privilege")) {
         return { rows: [] };
       }
@@ -202,11 +214,23 @@ test("contract inspection reads catalog columns without requiring table SELECT",
       relation_name === "AI_Crypto_Bot_Candles").can_select,
     false
   );
+  assert.deepEqual(
+    snapshot.columnPrivileges.map(({ column_name, can_select }) => ({
+      column_name,
+      can_select
+    })),
+    REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS.map((column_name) => ({
+      column_name,
+      can_select: true
+    }))
+  );
   assert.deepEqual(candleColumns, Object.keys(REQUIRED_COLUMN_CONTRACTS.AI_Crypto_Bot_Candles));
   assert.ok(pool.queries.some((query) =>
     query.includes("pg_catalog.format_type(attribute.atttypid, NULL)")));
   assert.ok(pool.queries.some((query) =>
     query.includes("attribute.attname::text AS column_name")));
+  assert.ok(pool.queries.some((query) =>
+    query.includes("pg_catalog.has_column_privilege")));
   assert.ok(pool.queries.every((query) => !query.includes("information_schema.columns")));
 });
 

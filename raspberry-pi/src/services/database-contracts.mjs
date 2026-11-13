@@ -162,6 +162,12 @@ export const REQUIRED_PAPER_EXECUTION_AUDIT_CONSTRAINTS = Object.freeze([
   })
 ]);
 
+export const REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS = Object.freeze([
+  "evaluation_run_id",
+  "portfolio_id",
+  "decision_id"
+]);
+
 export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
   AI_Crypto_Bot_Profiles: Object.freeze({
     id: "uuid",
@@ -483,6 +489,19 @@ export function evaluatePaperTradingDatabaseContract(snapshot, expectedDatabaseN
   for (const tableName of PAPER_TRADING_INSERT_TABLES) {
     if (!privilegesByTable.get(tableName)?.can_insert) {
       errors.push(`MISSING_PAPER_TRADING_INSERT_PRIVILEGE:${tableName}`);
+    }
+  }
+  const auditSelectColumns = new Map(
+    (snapshot.columnPrivileges || [])
+      .filter(({ table_name }) =>
+        table_name === "AI_Crypto_Bot_Paper_Execution_Audit")
+      .map(({ column_name, can_select }) => [column_name, can_select])
+  );
+  for (const columnName of REQUIRED_PAPER_EXECUTION_AUDIT_SELECT_COLUMNS) {
+    if (!auditSelectColumns.get(columnName)) {
+      errors.push(
+        `MISSING_PAPER_EXECUTION_AUDIT_SELECT_COLUMN_PRIVILEGE:${columnName}`
+      );
     }
   }
   for (const tableName of PAPER_TRADING_UPDATE_TABLES) {

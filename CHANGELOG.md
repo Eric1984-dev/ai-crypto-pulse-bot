@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Persist per-evaluation, reason-coded outcomes for directional paper BUY/SELL decisions atomically with trade execution; add a paginated paper-execution-audit source to the existing full-history JSONL export (format v3) without adding a Vercel function.
+- Add Phase 8.16 column-scoped SELECT grants for audit idempotency keys and fail paper-runtime preflight when any required conflict-key privilege is missing.
 - Show Infrastructure as an expandable strip matching the live backend signal instead of a nested dashboard card.
 - Add a Raspberry Pi health summary with a colored status indicator at the top of the dashboard using the existing monitoring route.
 - Replace the vague dashboard Bot Run timestamp with AI-analysis and paper-trading stage statuses and cycle times; remove on-demand Analytics and Market scan placeholders.

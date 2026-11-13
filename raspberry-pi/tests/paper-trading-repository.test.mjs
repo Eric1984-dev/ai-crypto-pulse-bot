@@ -571,7 +571,7 @@ test("paper repository fails closed on malformed agent status", async () => {
   }), { code: "PAPER_TRADING_STATUS_INVALID" });
 });
 
-test("Phase 8.15 migration installs an idempotent audit table with scoped grants", async () => {
+test("Phase 8.15 and 8.16 migrations install the audit table with scoped writer grants", async () => {
   const database = new PGlite();
   try {
     await database.exec(`
@@ -588,6 +588,18 @@ test("Phase 8.15 migration installs an idempotent audit table with scoped grants
       "utf8"
     );
     await database.exec(migration);
+    await database.query(
+      "SELECT pg_catalog.set_config('cryptopulse.paper_database_user', $1, false)",
+      ["paper_writer"]
+    );
+    const conflictKeyMigration = await readFile(
+      new URL(
+        "../migrations/phase-8.16-paper-execution-audit-conflict-key-select.sql",
+        import.meta.url
+      ),
+      "utf8"
+    );
+    await database.exec(conflictKeyMigration);
 
     const grants = await database.query(`
       SELECT
@@ -606,6 +618,24 @@ test("Phase 8.15 migration installs an idempotent audit table with scoped grants
           'public."AI_Crypto_Bot_Paper_Execution_Audit"',
           'SELECT'
         ) AS writer_can_select,
+        pg_catalog.has_column_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'evaluation_run_id',
+          'SELECT'
+        ) AS writer_can_select_run_id,
+        pg_catalog.has_column_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'portfolio_id',
+          'SELECT'
+        ) AS writer_can_select_portfolio_id,
+        pg_catalog.has_column_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'decision_id',
+          'SELECT'
+        ) AS writer_can_select_decision_id,
         pg_catalog.has_table_privilege(
           'paper_writer',
           'public."AI_Crypto_Bot_Paper_Execution_Audit"',
@@ -616,8 +646,27 @@ test("Phase 8.15 migration installs an idempotent audit table with scoped grants
       reader_can_select: true,
       writer_can_insert: true,
       writer_can_select: false,
+      writer_can_select_run_id: true,
+      writer_can_select_portfolio_id: true,
+      writer_can_select_decision_id: true,
       writer_can_delete: false
     });
+
+    await database.exec(`
+      SET ROLE paper_writer;
+      BEGIN;
+      INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit"
+        (evaluation_run_id, portfolio_id, decision_id, symbol, action, confidence,
+         decision_at, evaluated_at, outcome, reason_code, trade_id)
+      VALUES
+        ('00000000-0000-4000-8000-000000000101',
+         '00000000-0000-4000-8000-000000000102',
+         '00000000-0000-4000-8000-000000000103',
+         'BTC-EUR', 'BUY', 70, now(), now(), 'SKIPPED', 'LOW_CONFIDENCE', NULL)
+      ON CONFLICT (evaluation_run_id, portfolio_id, decision_id) DO NOTHING;
+      ROLLBACK;
+      RESET ROLE;
+    `);
 
     const repository = new PaperTradingRepository({
       connect: async () => ({
