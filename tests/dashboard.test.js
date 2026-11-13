@@ -88,6 +88,7 @@ function createDashboardDocument() {
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
     "[data-archive-health=\"server\"]",
+    "[data-archive-health=\"model\"]",
     "[data-archive-health=\"postgresql\"]",
     "[data-archive-health=\"database\"]",
     "[data-archive-health=\"disk-usage\"]",
@@ -149,10 +150,12 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
     database: "online",
     diskUsage: 12.5,
     databaseSize: "<b>2.3 GB</b>",
-    lastHealthCheck: "2026-11-06T12:00:00.000Z"
+    lastHealthCheck: "2026-11-06T12:00:00.000Z",
+    system: { model: "Raspberry Pi 5 Model B Rev 1.0" }
   };
   dashboard.renderArchiveHealth(health, dashboardDocument);
 
+  assert.equal(elements.get("[data-archive-health=\"model\"]")[0].textContent, "Raspberry Pi 5 Model B Rev 1.0");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Online");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "online");
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Online");
@@ -173,6 +176,7 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "unknown");
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Unknown");
+  assert.equal(elements.get("[data-archive-health=\"model\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-archive-health-meter]")[0].hidden, true);
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "—");
@@ -566,6 +570,7 @@ test("infrastructure monitoring uses the Raspberry Pi label", () => {
   const html = fs.readFileSync(path.join(rootDirectory, "dashboard.html"), "utf8");
 
   assert.match(html, /<h2 id="archive-health-heading">Raspberry Pi<\/h2>/);
+  assert.ok(html.indexOf('data-archive-health="model"') < html.indexOf('data-archive-health="server"'));
   assert.match(html, /aria-label="Raspberry Pi disk usage"/);
   assert.doesNotMatch(html, />Archive Server<\/h2>|aria-label="Archive server disk usage"/);
 });

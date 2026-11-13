@@ -2276,6 +2276,16 @@ a:focus-visible {
   min-width: 0;
 }
 
+.pi-health-metric-model .pi-health-metric-heading {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pi-health-metric-model .pi-health-metric-heading strong {
+  overflow-wrap: anywhere;
+}
+
 .pi-health-metric-heading {
   align-items: baseline;
   color: #9ba8b8;

@@ -215,6 +215,13 @@
     const system = health && health.system && typeof health.system === "object"
       ? health.system
       : {};
+    const modelElement = documentRef.querySelector("[data-archive-health=\"model\"]");
+    const model = typeof system.model === "string" ? system.model.trim() : "";
+    const validModel = model.length > 0 && model.length <= 128
+      && !/[\u0000-\u001f\u007f]/.test(model);
+    if (modelElement) {
+      modelElement.textContent = validModel ? model : "—";
+    }
     const systemMetrics = [
       {
         name: "temperature",

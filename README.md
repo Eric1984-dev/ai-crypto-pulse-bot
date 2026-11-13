@@ -28,7 +28,7 @@ The operator reports that the Pi runtime, PostgreSQL, ingestion, AI analysis, sc
 - The dashboard uses a single administrator account configured on the Pi. Passwords are checked against a bcrypt hash, and the browser receives only the secure session cookie.
 - Dashboard sessions persist in the Pi's systemd-managed state directory, so runtime restarts and Vercel-only deployments do not require a new login before the session expires.
 - The Exports page puts complete historical AI-analysis export first. It pages through bounded Pi API responses, creates a `cryptopulse-analysis-ddMMyyyyHHmmss` subfolder in the selected local folder for split JSONL files and an as-of manifest, and does not upload data to an AI service. It writes each selected candle once and preserves all trade/decision window relationships in a separate JSONL file; it does not export the full candle table.
-- Monitoring reads the Pi runtime API, including scheduler, process, host, and database metrics. The former archive server is retired and is no longer used.
+- Monitoring reads the Pi runtime API, including the Raspberry Pi model, scheduler, process, host, and database metrics. The dashboard and Exports page show the Pi model first in their infrastructure metrics. The former archive server is retired and is no longer used.
 - `PostgreSQL/migrations/` and `config/markets.js` remain as historical schema/seed provenance and inputs to local PGlite validation. They do not configure a live Supabase runtime.
 
 See [deployment](docs/DEPLOYMENT.md), [API contracts](docs/API.md), [architecture](docs/ARCHITECTURE.md), [scheduling](docs/SCHEDULING.md), and the [Phase 10 cleanup report](docs/post-migration-cleanup-report.md).

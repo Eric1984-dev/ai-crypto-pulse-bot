@@ -6,6 +6,7 @@
 - Phase 10: conservative post-migration cleanup is being validated. See the [cleanup report](docs/post-migration-cleanup-report.md).
 - Local paper-trading hardening now excludes incomplete candles, reports stale/missing candle intervals, and uses an explicit snapshot sequence for equal timestamps. The snapshot migration remains unapplied and no live Pi validation or deployment is claimed.
 - The Exports page now offers a complete, paginated JSONL history export for AI analysis using the existing Pi data route; local implementation and production verification are tracked in the [full-history export report](raspberry-pi/docs/reports/full-history-analysis-export.md).
+- Raspberry Pi infrastructure metrics now include the device model as the first metric on the dashboard and Exports page, read through the existing monitoring route.
 - Phase 11: not started.
 - Shadow-exit runtime/dashboard support is implemented in the Pi code. A missing evaluator is installed by the operator-applied Phase 8.11 Pi migration; Phase 8.10 separately grants dashboard reads. Existing Phase 8.11 installations also require the Phase 8.12 lock-isolation migration to prevent collision with the runtime ownership advisory lock. Production activation and generated records still require operator migration/restart and live verification.
 - Dashboard sessions are persisted in the Pi systemd state directory; rollout of the updated unit is required to preserve logins across runtime restarts.

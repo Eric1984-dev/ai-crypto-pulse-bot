@@ -608,6 +608,20 @@
       return state;
     }
 
+    function renderPiModel(value) {
+      const card = documentRef.querySelector('[data-pi-metric="model"]');
+      const valueElement = documentRef.querySelector('[data-pi-health-value="model"]');
+      const model = typeof value === "string" ? value.trim() : "";
+      const validModel = model.length > 0 && model.length <= 128
+        && !/[\u0000-\u001f\u007f]/.test(model);
+      if (card) {
+        card.dataset.state = validModel ? "normal" : "unavailable";
+      }
+      if (valueElement) {
+        valueElement.textContent = validModel ? model : "—";
+      }
+    }
+
     function setPiHealthSummary(states, updatedText) {
       if (!piHealthPanel) {
         return;
@@ -671,6 +685,7 @@
           && system.cpuUsagePercent >= 90
           ? cpuCriticalSamples + 1
           : 0;
+        renderPiModel(system.model);
         const states = [
           renderPiMetric("temperature", system.temperatureC),
           renderPiMetric("cpu", system.cpuUsagePercent),

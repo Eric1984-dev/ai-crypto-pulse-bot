@@ -96,6 +96,53 @@ function createExportsDocument() {
   };
 }
 
+test("Exports page shows the Raspberry Pi model as its first resource metric", async () => {
+  const panel = createControl();
+  const state = createControl();
+  const updated = createControl();
+  const modelCard = createControl();
+  const modelValue = createControl();
+  const elements = new Map([
+    ["[data-exports-page]", createControl()],
+    ["[data-pi-health]", panel],
+    ["[data-pi-health-state]", state],
+    ["[data-pi-health-updated]", updated],
+    ['[data-pi-metric="model"]', modelCard],
+    ['[data-pi-health-value="model"]', modelValue]
+  ]);
+  const documentRef = {
+    hidden: false,
+    querySelector(selector) {
+      return elements.get(selector) || null;
+    },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const windowRef = {
+    addEventListener() {},
+    removeEventListener() {},
+    setInterval() {
+      return 1;
+    },
+    clearInterval() {}
+  };
+  const stop = exportsPage.startExports({
+    windowRef,
+    documentRef,
+    fetchImpl: async () => jsonResponse({
+      system: { model: "Raspberry Pi 5 Model B Rev 1.0" }
+    })
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(modelValue.textContent, "Raspberry Pi 5 Model B Rev 1.0");
+  assert.equal(modelCard.dataset.state, "normal");
+  stop();
+
+  const html = fs.readFileSync(path.join(rootDirectory, "exports.html"), "utf8");
+  assert.ok(html.indexOf('data-pi-metric="model"') < html.indexOf('data-pi-metric="temperature"'));
+});
+
 test("full-history export paginates sequentially, retries rate limits, and splits bounded JSONL files", async () => {
   const { directoryHandle, files, directories } = createMemoryDirectory();
   const asOf = "2026-11-12T20:00:00.000Z";

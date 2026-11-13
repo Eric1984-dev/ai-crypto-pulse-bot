@@ -8,16 +8,19 @@ export async function collectSystemMetrics({
   processRef = process,
   fsRef = fs,
   cwd = process.cwd(),
-  temperaturePath = "/sys/class/thermal/thermal_zone0/temp"
+  temperaturePath = "/sys/class/thermal/thermal_zone0/temp",
+  modelPath = "/proc/device-tree/model"
 } = {}) {
-  const [disk, temperatureC] = await Promise.all([
+  const [disk, temperatureC, model] = await Promise.all([
     readDiskMetrics(fsRef, cwd),
-    readTemperature(fsRef, temperaturePath)
+    readTemperature(fsRef, temperaturePath),
+    readHardwareModel(fsRef, modelPath)
   ]);
   const memoryTotalBytes = finiteNonNegative(osRef.totalmem());
   const memoryAvailableBytes = finiteNonNegative(osRef.freemem());
 
   return Object.freeze({
+    model,
     cpuUsagePercent: readCpuUsage(osRef.cpus()),
     loadAverage: Object.freeze(osRef.loadavg().map((value) => finiteNonNegative(value))),
     memory: Object.freeze({
@@ -28,6 +31,22 @@ export async function collectSystemMetrics({
     temperatureC,
     disk
   });
+}
+
+async function readHardwareModel(fsRef, modelPath) {
+  try {
+    const raw = await fsRef.readFile(modelPath, "utf8");
+    const model = raw.replace(/\0/g, "").trim();
+    if (!model || model.length > 128 || /[\u0000-\u001f\u007f]/.test(model)) {
+      throw new Error("System model reading is invalid.");
+    }
+    return model;
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function readDiskMetrics(fsRef, cwd) {

@@ -155,7 +155,7 @@ npm start
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
-- `GET /api/v1/monitoring` — runtime status, last-cycle stages including position-exit processing, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
+- `GET /api/v1/monitoring` — Raspberry Pi model, runtime status, last-cycle stages including position-exit processing, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts. The model comes from `/proc/device-tree/model` and may be `null` on unsupported systems.
 
 ## Phase 11 historical analytics
 
@@ -214,7 +214,7 @@ Keep `API_HOST=127.0.0.1`. Set `API_CORS_ORIGINS` to the exact dashboard origin(
 
 The runtime preflight checks read privileges for every table used by the dashboard API. Apply the [Phase 8.3 permission migration](migrations/phase-8.3-dashboard-permissions.sql) to the existing database before restarting with a role that lacks those dashboard-specific `SELECT` grants. See the [Phase 8.3 permission validation report](docs/phase-8.3-dashboard-permission-validation.md) for the read set and verification query.
 
-All JSON responses use a `{ "data": ... }` envelope; errors use `{ "error": { "code", "message", "requestId" } }`. Invalid query input is rejected, market candle results are limited to 500 rows, trade/AI history pages are limited to 100 rows, analytics and CSV reads are capped at 10,000 rows, and monitoring table counts are PostgreSQL estimates. CPU, disk, temperature or other host details may be unavailable on unsupported systems. The admin-only operational health route is not used by the dashboard.
+All JSON responses use a `{ "data": ... }` envelope; errors use `{ "error": { "code", "message", "requestId" } }`. Invalid query input is rejected, market candle results are limited to 500 rows, trade/AI history pages are limited to 100 rows, analytics and CSV reads are capped at 10,000 rows, and monitoring table counts are PostgreSQL estimates. The Raspberry Pi model, CPU, disk, temperature or other host details may be unavailable on unsupported systems. The admin-only operational health route is not used by the dashboard.
 
 The existing Vercel dashboard now reads its runtime data from these Pi APIs and uses aligned polling instead of Supabase Realtime. See the [Phase 8 dashboard cutover report](docs/phase-8-dashboard-cutover.md) for the dependency mapping, full route contracts, security assumptions, limitations and validation results.
 
