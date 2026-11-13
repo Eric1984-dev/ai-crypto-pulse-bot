@@ -485,7 +485,7 @@ test("infrastructure metrics are collapsed below the live backend signal", () =>
   assert.ok(statusPanel);
   const backendSignal = statusPanel[1].indexOf("Live backend signal");
   const infrastructureCard = statusPanel[1].indexOf(
-    '<details class="dashboard-panel archive-health-panel">'
+    '<details class="archive-health-panel">'
   );
 
   assert.ok(infrastructureCard > backendSignal);
