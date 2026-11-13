@@ -99,3 +99,33 @@ Earlier focused validation passed the export UI suite (4/4) and Raspberry Pi
 repository/API/authentication suites (36/36). After adding page-level candle
 aggregation, the export UI suite passed again (4/4) and the dashboard repository
 suite passed (11/11). JavaScript syntax checks and `git diff --check` passed.
+
+## Paper Execution Outcome Attribution (Format v3)
+
+The full-history export now includes a `paperExecutionAttempts` JSONL source,
+read through the same bounded, keyset-paginated dashboard-data API. It exports
+each system-portfolio BUY/SELL evaluation through the fixed `asOf` timestamp,
+including run/decision identity, confidence, outcome, reason code, timestamps,
+and a trade ID when available (including a duplicate linked to its existing
+trade). The browser's saved manifest records
+the source count and filenames. The format is now
+`cryptopulse-analysis-export-v3`; prior sources and candle file behavior are
+retained.
+
+The additive `phase-8.15-paper-execution-audit.sql` migration is a required
+operator-applied Pi schema change. It has not been applied to a live database,
+and this implementation did not deploy or validate a production export. Global
+cycle skips before per-decision evaluation have no per-decision row; HOLD/WAIT
+and automatic `ATR_TRAILING_EXIT` sells remain excluded.
+
+Execution attempts are written in the paper-trade transaction, with unique
+`(evaluation_run_id, portfolio_id, decision_id)` identity. A failed audit write
+rolls back the transaction and fails the cycle rather than silently losing an
+outcome. Later cycles receive a new run identity, preserving cooldown and other
+repeat-evaluation outcomes.
+
+Local follow-up validation: the focused paper-trading, schema-contract,
+dashboard-repository, API/authentication, runtime-bootstrap, and export UI
+tests passed (117/117); `npm.cmd run build`, changed-module `node --check`, and
+`git diff --check` passed. The PGlite migration test does not modify the Pi
+database, and no deployment or production export was performed.

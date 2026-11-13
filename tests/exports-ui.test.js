@@ -150,6 +150,7 @@ test("full-history export paginates sequentially, retries rate limits, and split
     "trades",
     "positions",
     "decisions",
+    "paperExecutionAttempts",
     "portfolioSnapshots",
     "shadowExitScenarios",
     "shadowExitEvents",
@@ -171,7 +172,7 @@ test("full-history export paginates sequentially, retries rate limits, and split
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
         return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v2",
+          formatVersion: "cryptopulse-analysis-export-v3",
           asOf,
           sources,
           limits: { maxFileBytes: 1024 }
@@ -217,6 +218,28 @@ test("full-history export paginates sequentially, retries rate limits, and split
           nextCursor: cursor ? null : "candle-page-2"
         });
       }
+      if (source === "paperExecutionAttempts") {
+        return jsonResponse({
+          source,
+          asOf,
+          items: [{
+            id: "00000000-0000-4000-8000-000000000001",
+            evaluation_run_id: "00000000-0000-4000-8000-000000000002",
+            portfolio_id: "00000000-0000-4000-8000-000000000003",
+            decision_id: "00000000-0000-4000-8000-000000000004",
+            symbol: "BTC-EUR",
+            action: "BUY",
+            confidence: 90,
+            decision_at: asOf,
+            evaluated_at: asOf,
+            outcome: "EXECUTED",
+            reason_code: "TRADE_EXECUTED",
+            trade_id: "00000000-0000-4000-8000-000000000005"
+          }],
+          hasMore: false,
+          nextCursor: null
+        });
+      }
       return jsonResponse({
         source,
         asOf,
@@ -245,11 +268,15 @@ test("full-history export paginates sequentially, retries rate limits, and split
   const runFiles = files;
   const manifest = JSON.parse(runFiles.get("manifest.json"));
   assert.equal(manifest.exportStatus, "complete");
-  assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v2");
+  assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v3");
   assert.equal(manifest.candleDataFormat.candleRowsAreUnique, true);
   const tradeFiles = [...runFiles.entries()].filter(([name]) => name.startsWith("trades-"));
   assert.equal(tradeFiles.length, 2);
   assert.ok(tradeFiles.every(([, contents]) => new TextEncoder().encode(contents).byteLength <= 1024));
+  assert.equal(result.manifest.sourceCounts.paperExecutionAttempts.records, 1);
+  const executionFile = [...runFiles.entries()].find(([name]) =>
+    name.startsWith("paperExecutionAttempts-"))[1];
+  assert.equal(JSON.parse(executionFile).reason_code, "TRADE_EXECUTED");
   const anchorFile = runFiles.get("candle-anchors-0001.jsonl");
   const candleFile = runFiles.get("candle-windows-0001.jsonl");
   const linkFile = runFiles.get("candle-window-links-0001.jsonl");
@@ -287,11 +314,12 @@ test("full-history export leaves a cancelled status in the manifest", async () =
     const params = new URL(url, "https://cryptopulse.local").searchParams;
     if (params.get("view") === "analysis-export-manifest") {
       return jsonResponse({
-        formatVersion: "cryptopulse-analysis-export-v2",
+        formatVersion: "cryptopulse-analysis-export-v3",
         asOf,
         sources: [
-          "trades", "positions", "decisions", "portfolioSnapshots",
-          "shadowExitScenarios", "shadowExitEvents", "analyticsRuns", "candleWindows"
+          "trades", "positions", "decisions", "paperExecutionAttempts",
+          "portfolioSnapshots", "shadowExitScenarios", "shadowExitEvents",
+          "analyticsRuns", "candleWindows"
         ],
         limits: { maxFileBytes: 1024 }
       });
@@ -324,6 +352,7 @@ test("Exports page wires folder selection and displays completed export status",
     "trades",
     "positions",
     "decisions",
+    "paperExecutionAttempts",
     "portfolioSnapshots",
     "shadowExitScenarios",
     "shadowExitEvents",
@@ -336,7 +365,7 @@ test("Exports page wires folder selection and displays completed export status",
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
         return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v2",
+          formatVersion: "cryptopulse-analysis-export-v3",
           asOf,
           sources,
           limits: { maxFileBytes: 1024 }
@@ -369,7 +398,7 @@ test("Exports page wires folder selection and displays completed export status",
   );
   assert.match(
     documentRef.analysisExportControls["[data-analysis-export-progress]"].textContent,
-    /8 sources exported/i
+    /9 sources exported/i
   );
   cleanup();
 });

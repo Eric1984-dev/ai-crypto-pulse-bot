@@ -76,6 +76,29 @@ test("paper repository reports missing profile and portfolio without writes", as
   assert.equal(queryCount, 3);
 });
 
+test("paper repository resolves idempotency keys to their existing trade IDs", async () => {
+  const key = "00000000-0000-4000-8000-000000000101";
+  const tradeId = "00000000-0000-4000-8000-000000000102";
+  let captured;
+  const repository = new PaperTradingRepository({
+    connect: async () => ({
+      query: async () => ({ rows: [] }),
+      release() {}
+    })
+  });
+
+  const existing = await repository.listExistingTradeKeys({
+    async query(sql, values) {
+      captured = { sql, values };
+      return { rows: [{ id: tradeId, idempotency_key: key }] };
+    }
+  }, [key]);
+
+  assert.deepEqual(existing, new Map([[key, tradeId]]));
+  assert.match(captured.sql, /SELECT trade\.id, trade\.idempotency_key/i);
+  assert.deepEqual(captured.values, [[key]]);
+});
+
 test("paper repository uses snapshot sequence for same-time daily baselines", async () => {
   const database = new PGlite();
   try {
@@ -546,4 +569,113 @@ test("paper repository fails closed on malformed agent status", async () => {
       rows: [{ status: "UNKNOWN", is_active: false, is_analyzing: false }]
     })
   }), { code: "PAPER_TRADING_STATUS_INVALID" });
+});
+
+test("Phase 8.15 migration installs an idempotent audit table with scoped grants", async () => {
+  const database = new PGlite();
+  try {
+    await database.exec(`
+      CREATE ROLE ai_crypto_bot_runtime_reader;
+      CREATE ROLE paper_writer;
+      CREATE TABLE public."AI_Crypto_Bot_Trades" (id uuid PRIMARY KEY);
+    `);
+    await database.query(
+      "SELECT pg_catalog.set_config('cryptopulse.paper_database_user', $1, false)",
+      ["paper_writer"]
+    );
+    const migration = await readFile(
+      new URL("../migrations/phase-8.15-paper-execution-audit.sql", import.meta.url),
+      "utf8"
+    );
+    await database.exec(migration);
+
+    const grants = await database.query(`
+      SELECT
+        pg_catalog.has_table_privilege(
+          'ai_crypto_bot_runtime_reader',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'SELECT'
+        ) AS reader_can_select,
+        pg_catalog.has_table_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'INSERT'
+        ) AS writer_can_insert,
+        pg_catalog.has_table_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'SELECT'
+        ) AS writer_can_select,
+        pg_catalog.has_table_privilege(
+          'paper_writer',
+          'public."AI_Crypto_Bot_Paper_Execution_Audit"',
+          'DELETE'
+        ) AS writer_can_delete
+    `);
+    assert.deepEqual(grants.rows[0], {
+      reader_can_select: true,
+      writer_can_insert: true,
+      writer_can_select: false,
+      writer_can_delete: false
+    });
+
+    const repository = new PaperTradingRepository({
+      connect: async () => ({
+        query: database.query.bind(database),
+        release() {}
+      })
+    });
+    const attempt = {
+      evaluationRunId: "00000000-0000-4000-8000-000000000101",
+      portfolioId: "00000000-0000-4000-8000-000000000102",
+      decisionId: "00000000-0000-4000-8000-000000000103",
+      symbol: "BTC-EUR",
+      action: "BUY",
+      confidence: "90",
+      decisionAt: new Date("2026-01-01T11:00:00.000Z"),
+      evaluatedAt: new Date("2026-01-01T12:00:00.000Z"),
+      outcome: "SKIPPED",
+      reasonCode: "LOW_CONFIDENCE",
+      tradeId: null
+    };
+    assert.equal(await repository.recordPaperExecutionAttempt(database, attempt), true);
+    assert.equal(await repository.recordPaperExecutionAttempt(database, attempt), false);
+    const duplicateTradeId = "00000000-0000-4000-8000-000000000104";
+    await database.query(
+      'INSERT INTO public."AI_Crypto_Bot_Trades" (id) VALUES ($1::uuid)',
+      [duplicateTradeId]
+    );
+    assert.equal(await repository.recordPaperExecutionAttempt(database, {
+      ...attempt,
+      evaluationRunId: "00000000-0000-4000-8000-000000000105",
+      outcome: "DUPLICATE",
+      reasonCode: "DUPLICATE_TRADE",
+      tradeId: duplicateTradeId
+    }), true);
+    const rows = await database.query(`
+      SELECT evaluation_run_id, decision_id, action, outcome, reason_code, trade_id
+      FROM public."AI_Crypto_Bot_Paper_Execution_Audit"
+      ORDER BY evaluation_run_id
+    `);
+    assert.deepEqual(rows.rows, [
+      {
+        evaluation_run_id: attempt.evaluationRunId,
+        decision_id: attempt.decisionId,
+        action: "BUY",
+        outcome: "SKIPPED",
+        reason_code: "LOW_CONFIDENCE",
+        trade_id: null
+      },
+      {
+        evaluation_run_id: "00000000-0000-4000-8000-000000000105",
+        decision_id: attempt.decisionId,
+        action: "BUY",
+        outcome: "DUPLICATE",
+        reason_code: "DUPLICATE_TRADE",
+        trade_id: duplicateTradeId
+      }
+    ]);
+  } finally {
+    await database.close();
+  }
 });

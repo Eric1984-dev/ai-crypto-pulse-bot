@@ -22,6 +22,7 @@ The historical objects live in the `public` schema. The `auth.users` references 
 | `AI_Crypto_Bot_Portfolios` | User-owned paper portfolio and balances. |
 | `AI_Crypto_Bot_Positions` | User-owned positions, scoped through their portfolio. |
 | `AI_Crypto_Bot_Trades` | User-owned paper trade history, scoped through its portfolio. |
+| `AI_Crypto_Bot_Paper_Execution_Audit` | Append-only per-evaluation outcomes for directional paper BUY/SELL decisions, including reason codes and optional trade linkage. |
 | `AI_Crypto_Bot_AI_Decisions` | Server-managed decision history; authenticated users may read it. |
 | `AI_Crypto_Bot_Status` | Server-managed singleton containing the current agent status. |
 | `AI_Crypto_Bot_Watched_Markets` | Global market universe; authenticated users may read it. |
@@ -43,6 +44,7 @@ The historical objects live in the `public` schema. The `auth.users` references 
 - `AI_Crypto_Bot_Portfolios`: UUID ID, `user_id`, starting/available balances, portfolio value, and timestamps. Balances use exact numeric types and cannot be negative.
 - `AI_Crypto_Bot_Positions`: portfolio and watched-market references, positive amount/prices, unrealized P&L, and `OPEN`/`CLOSED` status.
 - `AI_Crypto_Bot_Trades`: portfolio and watched-market references, optional AI decision reference for legacy compatibility, required unique idempotency key, `BUY`/`SELL` side, positive price/quantity, nonnegative fees/slippage, realized P&L, and creation time.
+- `AI_Crypto_Bot_Paper_Execution_Audit`: evaluation-run ID, portfolio and decision IDs, symbol/action/confidence, decision/evaluation timestamps, `EXECUTED`/`SKIPPED`/`DUPLICATE` outcome, reason code, and nullable trade ID. A unique `(evaluation_run_id, portfolio_id, decision_id)` key prevents duplicate attempts when the same transaction run is retried while retaining later evaluations as separate records. This is a new Pi-runtime table created by the additive Phase 8.15 migration; it is not included in the historical Supabase migration chain.
 - `AI_Crypto_Bot_Portfolio_Snapshots`: portfolio reference, portfolio value, available balance, nonnegative open-position count, and capture time.
 
 ### Agent, market, and strategy tables
@@ -144,6 +146,12 @@ The scheduled refresh upserts ticker snapshots in `AI_Crypto_Bot_Market_Data` an
 The Phase 03 seed migration creates the initial `IDLE` agent status and `NORMAL` emergency-state event. Phase 08 creates only simulated starting balances and snapshots; it never seeds positions or trades.
 
 ## Migrations and operations
+
+### Current Raspberry Pi audit migration
+
+`raspberry-pi/migrations/phase-8.15-paper-execution-audit.sql` creates `AI_Crypto_Bot_Paper_Execution_Audit`, its idempotency/history indexes and data constraints, grants dashboard-reader SELECT, and grants only INSERT to the role named by `cryptopulse.paper_database_user` (`PAPER_DATABASE_USER`). The Pi runtime contract requires the table, columns, key, and writer privilege before startup. The migration is additive and must be applied manually by an authorized schema owner after review and backup. It has not been applied to the live Pi database as part of this local implementation. See [the Pi migration procedure](../raspberry-pi/docs/database-migrations-on-pi.md).
+
+HOLD/WAIT decisions are not audited. The evaluator writes one row only for directional candidates it reaches after the paper-trading run lock and provisioned-portfolio checks; global skips before per-decision evaluation (for example `RUN_IN_PROGRESS`, `AI_ANALYSIS_IN_PROGRESS`, or a missing system portfolio) have no corresponding attempt rows. Automatic `ATR_TRAILING_EXIT` sells have no AI decision and are deliberately excluded; their trade rows remain linked by the existing execution-reason field.
 
 Historical migration files are stored in `PostgreSQL/migrations/` and run in timestamp order:
 

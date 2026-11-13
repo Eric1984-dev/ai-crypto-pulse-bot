@@ -14,6 +14,7 @@ const SYMBOL = "BTC-EUR";
 
 function makeRepository(overrides = {}) {
   const calls = [];
+  const auditAttempts = [];
   let state = {
     startingBalance: "10000",
     availableBalance: "10000",
@@ -25,6 +26,7 @@ function makeRepository(overrides = {}) {
   let positions = [];
   const repository = {
     calls,
+    auditAttempts,
     withTransaction: (operation) => operation({}),
     tryAcquireRunLock: async () => true,
     getAgentStatus: async () => ({ status: "ACTIVE" }),
@@ -44,6 +46,10 @@ function makeRepository(overrides = {}) {
       confidence: "90",
       created_at: NOW
     }],
+    recordPaperExecutionAttempt: async (_client, attempt) => {
+      auditAttempts.push(attempt);
+      return true;
+    },
     listOpenPositions: async () => positions,
     listTrailingExitCandles: async () => [],
     updatePositionExitState: async (_client, exitState) => ({
@@ -58,7 +64,7 @@ function makeRepository(overrides = {}) {
     getLatestEmergencyStatus: async () => "NORMAL",
     refreshOpenPositionPrices: async () => {},
     refreshPortfolioState: async () => Object.freeze({ ...state }),
-    listExistingTradeKeys: async () => new Set(),
+    listExistingTradeKeys: async () => new Map(),
     listCooldowns: async () => new Map(),
     quoteBuy: async () => ({
       amount: "1",
@@ -74,7 +80,10 @@ function makeRepository(overrides = {}) {
         openPositions: 1
       };
       state = { ...state, ...tradeState };
-      return Object.freeze(tradeState);
+      return Object.freeze({
+        ...tradeState,
+        tradeId: "00000000-0000-4000-8000-000000000010"
+      });
     },
     getOpenPositionTotals: async () => ({
       amount: "2",
@@ -94,7 +103,10 @@ function makeRepository(overrides = {}) {
         openPositions: 0
       };
       state = { ...state, ...tradeState };
-      return Object.freeze(tradeState);
+      return Object.freeze({
+        ...tradeState,
+        tradeId: "00000000-0000-4000-8000-000000000011"
+      });
     },
     setEmergencyStop: async () => calls.push("emergency-stop"),
     updateStatusInTransaction: async (_client, { status }) => {
@@ -159,7 +171,30 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
 
   assert.equal(result.status, "COMPLETED");
   assert.equal(result.tradesExecuted, 1);
+  assert.equal(repository.auditAttempts.length, 1);
+  assert.equal(repository.auditAttempts[0].outcome, "EXECUTED");
+  assert.equal(repository.auditAttempts[0].reasonCode, "TRADE_EXECUTED");
+  assert.equal(repository.auditAttempts[0].tradeId, "00000000-0000-4000-8000-000000000010");
+  assert.match(repository.auditAttempts[0].evaluationRunId, /^[0-9a-f-]{36}$/i);
   assert.deepEqual(repository.calls, ["buy"]);
+});
+
+test("non-directional decisions do not create execution-audit records", async () => {
+  for (const decision of ["HOLD", "WAIT"]) {
+    const repository = makeRepository({
+      listLatestDecisions: async () => [{
+        id: DECISION_ID,
+        symbol: SYMBOL,
+        decision,
+        confidence: "90",
+        created_at: NOW
+      }]
+    });
+
+    await makeService(repository).run();
+
+    assert.equal(repository.auditAttempts.length, 0, decision);
+  }
 });
 
 test("paper BUY confidence gate accepts 70 and rejects values below it", async () => {
@@ -181,6 +216,11 @@ test("paper BUY confidence gate accepts 70 and rejects values below it", async (
     const result = await makeService(repository).run();
 
     assert.equal(result.tradesExecuted, expectedTrades, `confidence ${confidence}`);
+    assert.equal(
+      repository.auditAttempts[0]?.reasonCode,
+      confidence === "69.99" ? "LOW_CONFIDENCE" : "TRADE_EXECUTED",
+      `confidence ${confidence} is attributed`
+    );
   }
 });
 
@@ -244,6 +284,10 @@ test("ATR ratchet closes one position after a pullback and records an automatic 
   assert.equal(result.tradesExecuted, 1);
   assert.equal(sellInput.decisionId, null);
   assert.equal(sellInput.executionReason, "ATR_TRAILING_EXIT");
+  assert.equal(repository.auditAttempts[0].action, "BUY");
+  assert.equal(repository.auditAttempts[0].outcome, "SKIPPED");
+  assert.equal(repository.auditAttempts[0].reasonCode, "COOLDOWN_ACTIVE");
+  assert.equal(repository.auditAttempts[0].tradeId, null);
   assert.equal(sellInput.positionId, position.id);
   assert.equal(
     sellInput.idempotencyKey,
@@ -357,6 +401,7 @@ test("paper trading skips safely when the system profile has not been provisione
     component: "paper-trading-service"
   }]);
   assert.deepEqual(repository.calls, []);
+  assert.equal(repository.auditAttempts.length, 0);
 });
 
 test("paper trading skips safely when the system portfolio is missing", async () => {
@@ -405,24 +450,93 @@ test("SELL decisions close an existing virtual position without opening a short"
 
   assert.equal(result.tradesExecuted, 1);
   assert.deepEqual(repository.calls, ["sell"]);
+  assert.equal(repository.auditAttempts[0].action, "SELL");
+  assert.equal(repository.auditAttempts[0].tradeId, "00000000-0000-4000-8000-000000000011");
+});
+
+test("SELL without an open position and BUY without funds retain directional outcomes", async (t) => {
+  await t.test("SELL has no matching position", async () => {
+    const repository = makeRepository({
+      listLatestDecisions: async () => [{
+        id: DECISION_ID,
+        symbol: SYMBOL,
+        decision: "SELL",
+        confidence: "80",
+        created_at: NOW
+      }]
+    });
+
+    await makeService(repository).run();
+
+    assert.equal(repository.auditAttempts[0].outcome, "SKIPPED");
+    assert.equal(repository.auditAttempts[0].reasonCode, "NO_OPEN_POSITION");
+  });
+
+  await t.test("BUY is not affordable", async () => {
+    const repository = makeRepository({
+      quoteBuy: async () => ({
+        amount: "0",
+        execution_price: "100.1",
+        cash_required: "0",
+        affordable: false
+      })
+    });
+
+    await makeService(repository).run();
+
+    assert.equal(repository.auditAttempts[0].outcome, "SKIPPED");
+    assert.equal(repository.auditAttempts[0].reasonCode, "INSUFFICIENT_FUNDS");
+  });
+});
+
+test("repeated decision evaluations retain separate run identities", async () => {
+  const repository = makeRepository({
+    listLatestDecisions: async () => [{
+      id: DECISION_ID,
+      symbol: SYMBOL,
+      decision: "BUY",
+      confidence: "69",
+      created_at: NOW
+    }]
+  });
+  const service = makeService(repository);
+
+  await service.run();
+  await service.run();
+
+  assert.equal(repository.auditAttempts.length, 2);
+  assert.notEqual(
+    repository.auditAttempts[0].evaluationRunId,
+    repository.auditAttempts[1].evaluationRunId
+  );
+  assert.deepEqual(repository.auditAttempts.map(({ reasonCode }) => reasonCode), [
+    "LOW_CONFIDENCE",
+    "LOW_CONFIDENCE"
+  ]);
 });
 
 test("stale and duplicate decisions are skipped without writing trades", async () => {
   const idempotencyKey = createTradeIdempotencyKey(PORTFOLIO_ID, DECISION_ID);
   const repository = makeRepository({
-    listExistingTradeKeys: async () => new Set([idempotencyKey])
+    listExistingTradeKeys: async () => new Map([[
+      idempotencyKey,
+      "00000000-0000-4000-8000-000000000012"
+    ]])
   });
 
   const result = await makeService(repository).run();
 
   assert.equal(result.duplicates, 1);
   assert.equal(result.tradesExecuted, 0);
+  assert.equal(repository.auditAttempts[0].outcome, "DUPLICATE");
+  assert.equal(repository.auditAttempts[0].reasonCode, "DUPLICATE_TRADE");
+  assert.equal(repository.auditAttempts[0].tradeId, "00000000-0000-4000-8000-000000000012");
   assert.deepEqual(repository.calls, []);
 });
 
 test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
   const cases = [
-    ["low confidence", {
+    ["low confidence", "LOW_CONFIDENCE", {
       listLatestDecisions: async () => [{
         id: DECISION_ID,
         symbol: SYMBOL,
@@ -431,7 +545,7 @@ test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
         created_at: NOW
       }]
     }],
-    ["stale decision", {
+    ["stale decision", "STALE_DECISION", {
       listLatestDecisions: async () => [{
         id: DECISION_ID,
         symbol: SYMBOL,
@@ -440,22 +554,41 @@ test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
         created_at: new Date(NOW.getTime() - 16 * 60 * 1000)
       }]
     }],
-    ["stale market data", {
+    ["stale market data", "STALE_MARKET_DATA", {
       listMarketData: async () => [{
         symbol: SYMBOL,
         price: "100",
         captured_at: new Date(NOW.getTime() - 16 * 60 * 1000)
       }]
     }],
-    ["cooldown", {
+    ["missing market data", "MISSING_MARKET_DATA", {
+      listMarketData: async () => []
+    }],
+    ["cooldown", "COOLDOWN_ACTIVE", {
       listCooldowns: async () => new Map([
         [SYMBOL, new Date(NOW.getTime() - 60 * 1000)]
       ])
     }],
-    ["emergency pause", {
+    ["emergency pause", "TRADING_PAUSED", {
       getLatestEmergencyStatus: async () => "PAUSED"
     }],
-    ["daily drawdown", {
+    ["agent stopped", "AGENT_STOPPED", {
+      getAgentStatus: async () => ({ status: "STOPPED" })
+    }],
+    ["already open", "POSITION_ALREADY_OPEN", {
+      listOpenPositions: async () => [{
+        id: "00000000-0000-4000-8000-000000000003",
+        symbol: SYMBOL,
+        amount: "1",
+        entry_price: "100",
+        entry_cost_basis: "100",
+        current_price: "100",
+        unrealized_pnl: "0",
+        high_water_price: "100",
+        trailing_stop_price: null
+      }]
+    }],
+    ["daily drawdown", "DAILY_DRAWDOWN_LIMIT", {
       refreshPortfolioState: async () => ({
         startingBalance: "10000",
         availableBalance: "9400",
@@ -465,24 +598,27 @@ test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
         openPositions: 0
       })
     }],
-    ["portfolio drawdown", {
+    ["portfolio drawdown", "MAX_PORTFOLIO_DRAWDOWN", {
       refreshPortfolioState: async () => ({
         startingBalance: "10000",
         availableBalance: "8400",
         portfolioValue: "8400",
         peakValue: "10000",
-        dailyStartValue: "10000",
+        dailyStartValue: "8400",
         openPositions: 0
       })
     }]
   ];
 
-  for (const [name, overrides] of cases) {
+  for (const [name, expectedReason, overrides] of cases) {
     await t.test(name, async () => {
       const repository = makeRepository(overrides);
       const result = await makeService(repository).run();
       assert.equal(result.tradesExecuted, 0);
       assert.deepEqual(repository.calls, []);
+      assert.equal(repository.auditAttempts.length, 1);
+      assert.equal(repository.auditAttempts[0].outcome, "SKIPPED");
+      assert.equal(repository.auditAttempts[0].reasonCode, expectedReason);
     });
   }
 });
@@ -519,6 +655,7 @@ test("maximum open positions prevents a tenth virtual position", async () => {
 
   assert.equal(result.tradesExecuted, 0);
   assert.deepEqual(repository.calls, []);
+  assert.equal(repository.auditAttempts[0].reasonCode, "MAX_OPEN_POSITIONS");
 });
 
 test("emergency drawdown persists the stop and prevents new BUY decisions", async () => {
@@ -538,6 +675,7 @@ test("emergency drawdown persists the stop and prevents new BUY decisions", asyn
   assert.equal(result.tradesExecuted, 0);
   assert.ok(repository.calls.includes("emergency-stop"));
   assert.ok(repository.calls.includes("status:STOPPED"));
+  assert.equal(repository.auditAttempts[0].reasonCode, "EMERGENCY_DRAWDOWN_STOP");
 });
 
 test("paper trading fails closed and reports a safe error when storage fails", async () => {
@@ -568,4 +706,25 @@ test("paper trading fails closed and reports a safe error when storage fails", a
   assert.equal(logs[0].sqlState, "42501");
   assert.equal(logs[0].requiredPrivilege, "INSERT");
   assert.equal("message" in logs[0], false);
+});
+
+test("paper trading surfaces audit-write failures instead of losing attribution", async () => {
+  const denied = Object.assign(new Error("audit table is not writable"), {
+    code: "42501",
+    paperTradingContext: {
+      table: "AI_Crypto_Bot_Paper_Execution_Audit",
+      operation: "INSERT",
+      requiredPrivilege: "INSERT"
+    }
+  });
+  const repository = makeRepository({
+    recordPaperExecutionAttempt: async () => {
+      throw denied;
+    }
+  });
+
+  await assert.rejects(makeService(repository).run(), {
+    code: "42501",
+    component: "paper-trading-service"
+  });
 });

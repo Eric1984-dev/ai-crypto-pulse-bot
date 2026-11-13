@@ -18,6 +18,7 @@ export const ANALYSIS_EXPORT_SOURCE_TYPES = Object.freeze([
   "trades",
   "positions",
   "decisions",
+  "paperExecutionAttempts",
   "portfolioSnapshots",
   "shadowExitScenarios",
   "shadowExitEvents",
@@ -619,6 +620,20 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
       )
     ORDER BY created_at ASC, id ASC
     LIMIT $4
+  `,
+  paperExecutionAttempts: `
+    SELECT id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
+           confidence, decision_at, evaluated_at, outcome, reason_code, trade_id
+    FROM public."AI_Crypto_Bot_Paper_Execution_Audit"
+    WHERE portfolio_id = $1::uuid
+      AND evaluated_at <= $2::timestamptz
+      AND (
+        $3::timestamptz IS NULL
+        OR evaluated_at > $3::timestamptz
+        OR (evaluated_at = $3::timestamptz AND id > $4::uuid)
+      )
+    ORDER BY evaluated_at ASC, id ASC
+    LIMIT $5
   `,
   portfolioSnapshots: `
     SELECT id, portfolio_id, portfolio_value, available_balance,
@@ -1446,7 +1461,7 @@ export class DashboardRepository {
     }
     const generatedAt = now.toISOString();
     return Object.freeze({
-      formatVersion: "cryptopulse-analysis-export-v2",
+      formatVersion: "cryptopulse-analysis-export-v3",
       generatedAt,
       asOf: generatedAt,
       fileFormat: "UTF-8 JSON Lines, one source record per line",
@@ -1455,6 +1470,7 @@ export class DashboardRepository {
         trades: "All system-portfolio trades created by asOf.",
         positions: "All system-portfolio position rows created by asOf, with their current stored state.",
         decisions: "All AI decisions created by asOf.",
+        paperExecutionAttempts: "Per-evaluation BUY/SELL outcomes for the system paper portfolio, recorded after this migration is applied; global cycle skips that do not reach decision evaluation have no per-decision row.",
         portfolioSnapshots: "All system-portfolio snapshots captured by asOf.",
         shadowExitScenarios: "All system-portfolio shadow-exit scenarios opened by asOf.",
         shadowExitEvents: "All events belonging to system-portfolio shadow-exit scenarios recorded by asOf.",
@@ -1489,6 +1505,7 @@ export class DashboardRepository {
     const portfolioId = [
       "trades",
       "positions",
+      "paperExecutionAttempts",
       "portfolioSnapshots",
       "shadowExitScenarios",
       "shadowExitEvents"
@@ -2335,6 +2352,9 @@ function normalizeAnalysisExportRow(source, row) {
   if (source === "decisions") {
     return normalizeBundleDecision(row);
   }
+  if (source === "paperExecutionAttempts") {
+    return normalizePaperExecutionAttempt(row);
+  }
   if (source === "portfolioSnapshots") {
     return Object.freeze(normalizeSnapshot(row));
   }
@@ -2351,6 +2371,37 @@ function normalizeAnalysisExportRow(source, row) {
     return normalizeAnalyticsRun(row);
   }
   throw new TypeError("Analysis export source is invalid.");
+}
+
+function normalizePaperExecutionAttempt(row) {
+  if (!row || !UUID_PATTERN.test(row.id || "")
+    || !UUID_PATTERN.test(row.evaluation_run_id || "")
+    || !UUID_PATTERN.test(row.portfolio_id || "")
+    || !UUID_PATTERN.test(row.decision_id || "")
+    || (row.trade_id !== null && !UUID_PATTERN.test(row.trade_id || ""))
+    || typeof row.symbol !== "string"
+    || !/^[A-Z0-9]+-EUR$/.test(row.symbol)
+    || !["BUY", "SELL"].includes(row.action)
+    || !["EXECUTED", "SKIPPED", "DUPLICATE"].includes(row.outcome)
+    || typeof row.reason_code !== "string" || row.reason_code.length === 0) {
+    throw new RepositoryDataError("invalid paper execution audit record");
+  }
+  return Object.freeze({
+    id: row.id,
+    evaluation_run_id: row.evaluation_run_id,
+    portfolio_id: row.portfolio_id,
+    decision_id: row.decision_id,
+    symbol: row.symbol,
+    action: row.action,
+    confidence: row.confidence === null
+      ? null
+      : readFiniteNumber(row.confidence, "paper execution decision confidence"),
+    decision_at: readTimestamp(row.decision_at, "paper execution decision time"),
+    evaluated_at: readTimestamp(row.evaluated_at, "paper execution evaluation time"),
+    outcome: row.outcome,
+    reason_code: row.reason_code,
+    trade_id: row.trade_id
+  });
 }
 
 function emptyAnalysisExportPage(source, asOf, extra = {}) {
@@ -2375,6 +2426,7 @@ function createAnalysisExportPageParameters(source, { portfolioId, asOfTimestamp
     ];
   }
   if (source === "trades" || source === "positions"
+    || source === "paperExecutionAttempts"
     || source === "shadowExitScenarios") {
     return [
       portfolioId,
@@ -2417,6 +2469,12 @@ function getAnalysisExportCursor(source, row) {
     return {
       timestamp: readTimestamp(row.captured_at, "analysis export cursor timestamp"),
       snapshotOrder: String(row.snapshot_order)
+    };
+  }
+  if (source === "paperExecutionAttempts") {
+    return {
+      timestamp: readTimestamp(row.evaluated_at, "analysis export cursor evaluation time"),
+      id: row.id
     };
   }
   return {

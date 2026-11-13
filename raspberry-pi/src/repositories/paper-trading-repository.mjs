@@ -10,6 +10,28 @@ const SYMBOL_PATTERN = /^[A-Z0-9]+-EUR$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUS_VALUES = new Set(["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"]);
 const EMERGENCY_VALUES = new Set(["NORMAL", "PAUSED", "EMERGENCY_STOP"]);
+const PAPER_EXECUTION_OUTCOMES = new Set(["EXECUTED", "SKIPPED", "DUPLICATE"]);
+const PAPER_EXECUTION_REASONS = new Set([
+  "TRADE_EXECUTED",
+  "DUPLICATE_TRADE",
+  "STALE_DECISION",
+  "MISSING_MARKET_DATA",
+  "STALE_MARKET_DATA",
+  "LOW_CONFIDENCE",
+  "TRADING_PAUSED",
+  "EMERGENCY_STOP_ACTIVE",
+  "EMERGENCY_DRAWDOWN_STOP",
+  "AGENT_STOPPED",
+  "STALE_OPEN_POSITION_DATA",
+  "POSITION_ALREADY_OPEN",
+  "MAX_OPEN_POSITIONS",
+  "COOLDOWN_ACTIVE",
+  "DAILY_DRAWDOWN_LIMIT",
+  "MAX_PORTFOLIO_DRAWDOWN",
+  "INSUFFICIENT_FUNDS",
+  "ZERO_POSITION_SIZE",
+  "NO_OPEN_POSITION"
+]);
 const SHADOW_EXIT_EVALUATION_SQL = `
   SELECT public."AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios"() AS evaluation
 `;
@@ -225,7 +247,7 @@ const INSERT_EMERGENCY_SQL = `
 `;
 
 const EXISTING_TRADE_KEYS_SQL = `
-  SELECT trade.idempotency_key
+  SELECT trade.id, trade.idempotency_key
   FROM public."AI_Crypto_Bot_Trades" AS trade
   WHERE trade.idempotency_key = ANY($1::uuid[])
 `;
@@ -295,6 +317,15 @@ const INSERT_TRADE_SQL = `
   VALUES ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::numeric,
           $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11::text)
   RETURNING id
+`;
+
+const INSERT_PAPER_EXECUTION_AUDIT_SQL = `
+  INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit"
+    (evaluation_run_id, portfolio_id, decision_id, symbol, action, confidence,
+     decision_at, evaluated_at, outcome, reason_code, trade_id)
+  VALUES ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::numeric,
+          $7::timestamptz, $8::timestamptz, $9::text, $10::text, $11::uuid)
+  ON CONFLICT (evaluation_run_id, portfolio_id, decision_id) DO NOTHING
 `;
 
 const INSERT_POSITION_SQL = `
@@ -541,6 +572,42 @@ export class PaperTradingRepository {
     return result.rows;
   }
 
+  async recordPaperExecutionAttempt(client, {
+    evaluationRunId,
+    portfolioId,
+    decisionId,
+    symbol,
+    action,
+    confidence,
+    decisionAt,
+    evaluatedAt,
+    outcome,
+    reasonCode,
+    tradeId = null
+  }) {
+    if (!PAPER_EXECUTION_OUTCOMES.has(outcome)
+      || !PAPER_EXECUTION_REASONS.has(reasonCode)
+      || !["BUY", "SELL"].includes(action)
+      || (outcome === "EXECUTED" && tradeId === null)
+      || (outcome === "SKIPPED" && tradeId !== null)) {
+      throw new TypeError("The paper execution audit record is invalid.");
+    }
+    const result = await client.query(INSERT_PAPER_EXECUTION_AUDIT_SQL, [
+      requireUuid(evaluationRunId, "evaluation run id"),
+      requireUuid(portfolioId, "portfolio id"),
+      requireUuid(decisionId, "decision id"),
+      requireSymbol(symbol),
+      action,
+      confidence === null ? null : requireNumeric(confidence, "decision confidence"),
+      requireTimestamp(decisionAt, "decision timestamp"),
+      requireTimestamp(evaluatedAt, "evaluation timestamp"),
+      outcome,
+      reasonCode,
+      tradeId === null ? null : requireUuid(tradeId, "paper trade id")
+    ]);
+    return result.rowCount === 1;
+  }
+
   async listOpenPositions(client, portfolioId) {
     requireUuid(portfolioId, "portfolio id");
     const result = await client.query(OPEN_POSITIONS_SQL, [
@@ -743,11 +810,13 @@ export class PaperTradingRepository {
   async listExistingTradeKeys(client, keys) {
     validateUuidList(keys);
     if (keys.length === 0) {
-      return new Set();
+      return new Map();
     }
     const result = await client.query(EXISTING_TRADE_KEYS_SQL, [keys]);
-    return new Set(result.rows.map(({ idempotency_key }) =>
-      requireUuid(idempotency_key, "trade idempotency key")));
+    return new Map(result.rows.map(({ id, idempotency_key }) => [
+      requireUuid(idempotency_key, "trade idempotency key"),
+      requireUuid(id, "paper trade id")
+    ]));
   }
 
   async listCooldowns(client, portfolioId, symbols) {
@@ -805,7 +874,7 @@ export class PaperTradingRepository {
     quote,
     marketPrice
   }) {
-    await this.insertTrade(client, {
+    const tradeId = await this.insertTrade(client, {
       portfolioId,
       decisionId,
       idempotencyKey,
@@ -837,7 +906,7 @@ export class PaperTradingRepository {
       `-${quote.cash_required}`
     );
     await this.insertSnapshot(client, portfolioId, state);
-    return state;
+    return Object.freeze({ ...state, tradeId });
   }
 
   async insertSell(client, {
@@ -867,7 +936,7 @@ export class PaperTradingRepository {
         "PAPER_TRADING_POSITION_CHANGED"
       );
     }
-    await this.insertTrade(client, {
+    const tradeId = await this.insertTrade(client, {
       portfolioId,
       decisionId,
       idempotencyKey,
@@ -886,7 +955,7 @@ export class PaperTradingRepository {
       quote.net_proceeds
     );
     await this.insertSnapshot(client, portfolioId, state);
-    return state;
+    return Object.freeze({ ...state, tradeId });
   }
 
   async insertTrade(client, {
@@ -926,6 +995,7 @@ export class PaperTradingRepository {
         "PAPER_TRADING_TRADE_WRITE_FAILED"
       );
     }
+    return requireUuid(result.rows[0]?.id, "paper trade id");
   }
 
   async updatePortfolioAfterTrade(client, portfolioId, cashDelta) {

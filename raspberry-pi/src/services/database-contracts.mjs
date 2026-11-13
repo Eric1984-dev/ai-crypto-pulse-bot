@@ -17,7 +17,8 @@ export const REQUIRED_TABLES = Object.freeze([
   "AI_Crypto_Bot_Emergency_State",
   "AI_Crypto_Bot_Shadow_Exit_Scenarios",
   "AI_Crypto_Bot_Shadow_Exit_Events",
-  "AI_Crypto_Bot_Analytics_Runs"
+  "AI_Crypto_Bot_Analytics_Runs",
+  "AI_Crypto_Bot_Paper_Execution_Audit"
 ]);
 
 export const REQUIRED_READ_TABLES = Object.freeze([
@@ -42,7 +43,8 @@ export const DASHBOARD_READ_TABLES = Object.freeze([
   "AI_Crypto_Bot_Emergency_State",
   "AI_Crypto_Bot_Shadow_Exit_Scenarios",
   "AI_Crypto_Bot_Shadow_Exit_Events",
-  "AI_Crypto_Bot_Analytics_Runs"
+  "AI_Crypto_Bot_Analytics_Runs",
+  "AI_Crypto_Bot_Paper_Execution_Audit"
 ]);
 
 export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
@@ -111,6 +113,20 @@ export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
     source_counts: "jsonb",
     analytics_summary: "jsonb",
     insights: "jsonb"
+  }),
+  AI_Crypto_Bot_Paper_Execution_Audit: Object.freeze({
+    id: "uuid",
+    evaluation_run_id: "uuid",
+    portfolio_id: "uuid",
+    decision_id: "uuid",
+    symbol: "text",
+    action: "text",
+    confidence: "numeric",
+    decision_at: "timestamp with time zone",
+    evaluated_at: "timestamp with time zone",
+    outcome: "text",
+    reason_code: "text",
+    trade_id: "uuid"
   })
 });
 
@@ -136,6 +152,14 @@ export const REQUIRED_CANDLE_CONSTRAINTS = Object.freeze([
 
 export const REQUIRED_DECISION_CONSTRAINTS = Object.freeze([
   Object.freeze({ type: "p", columns: Object.freeze(["id"]) })
+]);
+
+export const REQUIRED_PAPER_EXECUTION_AUDIT_CONSTRAINTS = Object.freeze([
+  Object.freeze({ type: "p", columns: Object.freeze(["id"]) }),
+  Object.freeze({
+    type: "u",
+    columns: Object.freeze(["evaluation_run_id", "portfolio_id", "decision_id"])
+  })
 ]);
 
 export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
@@ -193,6 +217,20 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
     status: "text",
     reason: "text",
     created_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Paper_Execution_Audit: Object.freeze({
+    id: "uuid",
+    evaluation_run_id: "uuid",
+    portfolio_id: "uuid",
+    decision_id: "uuid",
+    symbol: "text",
+    action: "text",
+    confidence: "numeric",
+    decision_at: "timestamp with time zone",
+    evaluated_at: "timestamp with time zone",
+    outcome: "text",
+    reason_code: "text",
+    trade_id: "uuid"
   })
 });
 
@@ -215,7 +253,8 @@ export const PAPER_TRADING_INSERT_TABLES = Object.freeze([
   "AI_Crypto_Bot_Positions",
   "AI_Crypto_Bot_Trades",
   "AI_Crypto_Bot_Portfolio_Snapshots",
-  "AI_Crypto_Bot_Emergency_State"
+  "AI_Crypto_Bot_Emergency_State",
+  "AI_Crypto_Bot_Paper_Execution_Audit"
 ]);
 
 export const PAPER_TRADING_UPDATE_TABLES = Object.freeze([
@@ -325,6 +364,17 @@ export function evaluateDatabaseContract(snapshot, expectedDatabaseName, {
   for (const expected of REQUIRED_DECISION_CONSTRAINTS) {
     if (!hasConstraint(snapshot.constraints, "AI_Crypto_Bot_AI_Decisions", expected)) {
       errors.push(`MISSING_DECISION_CONSTRAINT:${expected.columns.join(",")}`);
+    }
+  }
+  for (const expected of REQUIRED_PAPER_EXECUTION_AUDIT_CONSTRAINTS) {
+    if (!hasConstraint(
+      snapshot.constraints,
+      "AI_Crypto_Bot_Paper_Execution_Audit",
+      expected
+    )) {
+      errors.push(
+        `MISSING_PAPER_EXECUTION_AUDIT_CONSTRAINT:${expected.type}:${expected.columns.join(",")}`
+      );
     }
   }
 

@@ -24,7 +24,8 @@ verwachte database en eigenaar gebruikt:
 
 ```bash
 ls -l migrations/phase-8.13-portfolio-snapshot-order.sql \
-  migrations/phase-8.14-position-aware-trailing-exits.sql
+  migrations/phase-8.14-position-aware-trailing-exits.sql \
+  migrations/phase-8.15-paper-execution-audit.sql
 sudo -u postgres psql --dbname=ai_crypto_bot_store \
   --command="SELECT current_database(), current_user;"
 ```
@@ -101,6 +102,52 @@ Verwacht vier kolommen: `snapshot_order`, `high_water_price`,
 overeenkomt met de lokale configuratie. Start de runtime pas als de Pi-code die
 de nieuwe kolommen gebruikt is bijgewerkt en de post-migratiecontroles slagen.
 Een Git-push of Vercel-deployment werkt de Pi-runtime niet automatisch bij.
+
+## Phase 8.15 audit-tabel toepassen
+
+Phase 8.15 is een aparte, additieve migratie voor per-evaluatie uitkomsten van
+directionele paper BUY/SELL-beslissingen. Pas deze alleen toe na backup en als
+database-schema-owner. De tabel biedt het runtime-paperaccount uitsluitend
+INSERT-toegang; de bestaande dashboard-lezer krijgt SELECT-toegang. Controleer
+dat `ai_crypto_bot_runtime_reader` bestaat en gebruik de exacte, beperkte
+`PAPER_DATABASE_USER`-rol uit de lokale Pi-configuratie:
+
+```bash
+sudo -u postgres psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store <<'SQL'
+SELECT pg_catalog.set_config(
+  'cryptopulse.paper_database_user',
+  'ai_crypto_bot_paper_writer',
+  false
+);
+\i migrations/phase-8.15-paper-execution-audit.sql
+SQL
+```
+
+Vervang de voorbeeldrol door de geconfigureerde PostgreSQL-rolnaam, niet het
+wachtwoord. Voer dit blok alleen uit nadat de vorige migraties zijn beoordeeld;
+het is geen runtime-startactie en is niet automatisch toegepast.
+
+Controleer de tabel, kolommen en belangrijkste grants:
+
+```bash
+sudo -u postgres psql --dbname=ai_crypto_bot_store --command="
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'AI_Crypto_Bot_Paper_Execution_Audit'
+ORDER BY ordinal_position;
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+  AND table_name = 'AI_Crypto_Bot_Paper_Execution_Audit'
+ORDER BY grantee, privilege_type;"
+```
+
+Verwacht auditkolommen voor evaluation-run/portfolio/decision IDs, symbol,
+action, confidence, decision/evaluation timestamps, outcome, reason code en
+nullable trade ID. De paper writer mag INSERT hebben maar geen UPDATE, DELETE
+of TRUNCATE; de dashboard reader moet SELECT hebben. Valideer runtime-contracts
+met de geïnstalleerde code voordat de runtime opnieuw wordt gestart.
 
 ## Volgende migraties en fouten
 

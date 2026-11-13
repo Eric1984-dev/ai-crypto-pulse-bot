@@ -110,6 +110,20 @@ async function createDatabase() {
       strategy_version text,
       created_at timestamptz NOT NULL
     );
+    CREATE TABLE public."AI_Crypto_Bot_Paper_Execution_Audit" (
+      id uuid PRIMARY KEY,
+      evaluation_run_id uuid NOT NULL,
+      portfolio_id uuid NOT NULL,
+      decision_id uuid NOT NULL,
+      symbol text NOT NULL,
+      action text NOT NULL,
+      confidence numeric,
+      decision_at timestamptz NOT NULL,
+      evaluated_at timestamptz NOT NULL,
+      outcome text NOT NULL,
+      reason_code text NOT NULL,
+      trade_id uuid
+    );
     CREATE TABLE public."AI_Crypto_Bot_Analytics_Runs" (
       id uuid PRIMARY KEY,
       calculation_version text NOT NULL,
@@ -157,6 +171,18 @@ async function createDatabase() {
       (id, symbol, decision, confidence, reason, indicators, created_at)
     VALUES ('00000000-0000-4000-8000-000000000700',
       'BTC-EUR', 'HOLD', 82, 'Consolidating.', '{"marketStrength": 12.5}', NOW());
+    INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit" (
+      id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
+      confidence, decision_at, evaluated_at, outcome, reason_code, trade_id
+    )
+    VALUES (
+      '00000000-0000-4000-8000-000000000900',
+      '00000000-0000-4000-8000-000000000901',
+      '00000000-0000-4000-8000-000000000200',
+      '00000000-0000-4000-8000-000000000700',
+      'BTC-EUR', 'SELL', 82, NOW(), NOW(), 'EXECUTED', 'TRADE_EXECUTED',
+      '00000000-0000-4000-8000-000000000400'
+    );
   `);
   return database;
 }
@@ -722,6 +748,7 @@ test("full-history export paginates every source and deduplicates candle anchors
     const asOf = new Date("2099-01-01T00:00:00.000Z");
     const manifest = repository.getAnalysisExportManifest({ now: asOf });
     assert.equal(manifest.asOf, asOf.toISOString());
+    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v3");
     assert.equal(manifest.limits.rowsPerRequest, 250);
     assert.equal(manifest.limits.candleAnchorsPerRequest, 10);
     assert.ok(manifest.sources.includes("analyticsRuns"));
@@ -730,6 +757,7 @@ test("full-history export paginates every source and deduplicates candle anchors
       ["trades", 1],
       ["positions", 1],
       ["decisions", 11],
+      ["paperExecutionAttempts", 1],
       ["portfolioSnapshots", 1],
       ["shadowExitScenarios", 1],
       ["shadowExitEvents", 1],
@@ -817,6 +845,63 @@ test("full-history export decision pages use stable keyset cursors without gaps"
     assert.equal(secondPage.hasMore, false);
     assert.equal(new Set([...firstPage.items, ...secondPage.items].map(({ id }) => id)).size, 251);
     assert.equal(beforeHistory.items.length, 0);
+  } finally {
+    await database.close();
+  }
+});
+
+test("full-history paper execution attempts are as-of bounded and keyset paginated", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      DELETE FROM public."AI_Crypto_Bot_Paper_Execution_Audit";
+      INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit" (
+        id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
+        confidence, decision_at, evaluated_at, outcome, reason_code, trade_id
+      )
+      SELECT
+        ('00000000-0000-4000-8000-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+        ('00000000-0000-4000-8001-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+        '00000000-0000-4000-8000-000000000200',
+        ('00000000-0000-4000-8002-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+        'BTC-EUR', 'BUY', 70, '2026-03-20T00:00:00.000Z',
+        '2026-03-20T00:00:00.000Z', 'SKIPPED', 'COOLDOWN_ACTIVE', NULL
+      FROM generate_series(1, 251) AS values(sequence_number)
+    `);
+    const repository = new DashboardRepository({
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    }, { logger: { error() {} } });
+    const asOf = new Date("2099-01-01T00:00:00.000Z");
+    const firstPage = await repository.getAnalysisExportPage({
+      source: "paperExecutionAttempts",
+      asOf
+    });
+    const secondPage = await repository.getAnalysisExportPage({
+      source: "paperExecutionAttempts",
+      asOf,
+      cursor: firstPage.nextCursor
+    });
+    const beforeHistory = await repository.getAnalysisExportPage({
+      source: "paperExecutionAttempts",
+      asOf: new Date("2026-03-19T00:00:00.000Z")
+    });
+
+    assert.equal(firstPage.items.length, 250);
+    assert.equal(firstPage.hasMore, true);
+    assert.equal(secondPage.items.length, 1);
+    assert.equal(secondPage.hasMore, false);
+    assert.equal(beforeHistory.items.length, 0);
+    assert.equal(
+      new Set([...firstPage.items, ...secondPage.items].map(({ id }) => id)).size,
+      251
+    );
+    assert.equal(firstPage.items[0].reason_code, "COOLDOWN_ACTIVE");
+    assert.equal(firstPage.items[0].trade_id, null);
   } finally {
     await database.close();
   }

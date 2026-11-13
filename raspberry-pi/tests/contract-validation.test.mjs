@@ -77,7 +77,17 @@ function createContractPool({
       constraint_type: "u",
       columns: ["symbol", "interval", "timestamp"]
     },
-    { relation_name: "AI_Crypto_Bot_AI_Decisions", constraint_type: "p", columns: ["id"] }
+    { relation_name: "AI_Crypto_Bot_AI_Decisions", constraint_type: "p", columns: ["id"] },
+    {
+      relation_name: "AI_Crypto_Bot_Paper_Execution_Audit",
+      constraint_type: "p",
+      columns: ["id"]
+    },
+    {
+      relation_name: "AI_Crypto_Bot_Paper_Execution_Audit",
+      constraint_type: "u",
+      columns: ["evaluation_run_id", "portfolio_id", "decision_id"]
+    }
   ];
 
   const client = {

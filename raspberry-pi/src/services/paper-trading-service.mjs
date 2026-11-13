@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { MAX_PAPER_TRADING_MARKETS } from "../repositories/paper-trading-repository.mjs";
 import { createPaperTradingFailureDiagnostic } from "./paper-trading-diagnostics.mjs";
 import {
@@ -77,6 +77,7 @@ export function createPaperTradingService({
     || typeof repository.tryAcquireRunLock !== "function"
     || typeof repository.getSystemPortfolio !== "function"
     || typeof repository.listLatestDecisions !== "function"
+    || typeof repository.recordPaperExecutionAttempt !== "function"
     || typeof repository.listTrailingExitCandles !== "function"
     || typeof repository.updatePositionExitState !== "function"
     || typeof now !== "function") {
@@ -86,6 +87,7 @@ export function createPaperTradingService({
   return Object.freeze({
     async run() {
       const currentTime = readTime(now());
+      const evaluationRunId = randomUUID();
       try {
         const tradingResult = await repository.withTransaction(async (client) => {
           if (!await repository.tryAcquireRunLock(client)) {
@@ -137,6 +139,9 @@ export function createPaperTradingService({
           const marketRows = await repository.listMarketData(client, [...symbols].sort());
           const marketData = indexMarketData(marketRows);
           let emergencyStatus = await repository.getLatestEmergencyStatus(client);
+          let emergencyReasonCode = emergencyStatus === "PAUSED"
+            ? "TRADING_PAUSED"
+            : emergencyStatus === "EMERGENCY_STOP" ? "EMERGENCY_STOP_ACTIVE" : null;
           let effectiveAgentStatus = agentStatus.status;
           const result = {
             status: "COMPLETED",
@@ -172,6 +177,7 @@ export function createPaperTradingService({
                 );
                 emergencyStatus = "EMERGENCY_STOP";
               }
+              emergencyReasonCode = "EMERGENCY_DRAWDOWN_STOP";
               effectiveAgentStatus = await repository.updateStatusInTransaction(client, {
                 status: "STOPPED",
                 errorMessage: "Paper portfolio emergency drawdown threshold reached.",
@@ -262,6 +268,17 @@ export function createPaperTradingService({
               const idempotencyKey = createTradeIdempotencyKey(portfolio.id, decision.id);
               if (existingKeys.has(idempotencyKey)) {
                 result.duplicates += 1;
+                if (TRADE_DECISIONS.has(decision.decision)) {
+                  await recordExecutionAttempt(repository, client, {
+                    evaluationRunId,
+                    portfolioId: portfolio.id,
+                    decision,
+                    evaluatedAt: currentTime,
+                    outcome: "DUPLICATE",
+                    reasonCode: "DUPLICATE_TRADE",
+                    tradeId: existingKeys.get(idempotencyKey)
+                  });
+                }
                 continue;
               }
               if (!TRADE_DECISIONS.has(decision.decision)) {
@@ -270,36 +287,64 @@ export function createPaperTradingService({
               }
               if (isStale(decision.created_at, currentTime)) {
                 result.skipped += 1;
+                await recordExecutionAttempt(repository, client, {
+                  evaluationRunId,
+                  portfolioId: portfolio.id,
+                  decision,
+                  evaluatedAt: currentTime,
+                  outcome: "SKIPPED",
+                  reasonCode: "STALE_DECISION"
+                });
                 continue;
               }
               const market = marketData.get(decision.symbol);
-              if (!market || !isFresh(market.captured_at, currentTime)) {
+              if (!market) {
                 result.skipped += 1;
+                await recordExecutionAttempt(repository, client, {
+                  evaluationRunId,
+                  portfolioId: portfolio.id,
+                  decision,
+                  evaluatedAt: currentTime,
+                  outcome: "SKIPPED",
+                  reasonCode: "MISSING_MARKET_DATA"
+                });
+                continue;
+              }
+              if (!isFresh(market.captured_at, currentTime)) {
+                result.skipped += 1;
+                await recordExecutionAttempt(repository, client, {
+                  evaluationRunId,
+                  portfolioId: portfolio.id,
+                  decision,
+                  evaluatedAt: currentTime,
+                  outcome: "SKIPPED",
+                  reasonCode: "STALE_MARKET_DATA"
+                });
                 continue;
               }
 
               if (decision.decision === "BUY") {
-                if (Number(decision.confidence) < PAPER_TRADING_RULES.minimumConfidence
-                  || emergencyStatus !== "NORMAL"
-                  || effectiveAgentStatus === "STOPPED"
-                  || openPositions.some((position) => {
-                    const positionMarket = marketData.get(position.symbol);
-                    return !positionMarket || !isFresh(positionMarket.captured_at, currentTime);
-                  })
-                  || openPositions.some(({ symbol }) => symbol === decision.symbol)
-                  || openPositions.length >= PAPER_TRADING_RULES.maxOpenPositions
-                  || isInCooldown(cooldowns.get(decision.symbol), currentTime)
-                  || isAtOrBelowFraction(
-                    state.portfolioValue,
-                    state.dailyStartValue,
-                    1 - PAPER_TRADING_RULES.dailyDrawdownFraction
-                  )
-                  || isAtOrBelowFraction(
-                    state.portfolioValue,
-                    state.peakValue,
-                    1 - PAPER_TRADING_RULES.maxPortfolioDrawdownFraction
-                  )) {
+                const skipReason = getBuySkipReason({
+                  decision,
+                  emergencyStatus,
+                  emergencyReasonCode,
+                  agentStatus: effectiveAgentStatus,
+                  openPositions,
+                  marketData,
+                  currentTime,
+                  cooldownAt: cooldowns.get(decision.symbol),
+                  state
+                });
+                if (skipReason) {
                   result.skipped += 1;
+                  await recordExecutionAttempt(repository, client, {
+                    evaluationRunId,
+                    portfolioId: portfolio.id,
+                    decision,
+                    evaluatedAt: currentTime,
+                    outcome: "SKIPPED",
+                    reasonCode: skipReason
+                  });
                   continue;
                 }
 
@@ -310,9 +355,17 @@ export function createPaperTradingService({
                 });
                 if (decimalCompare(quote.amount, "0") <= 0 || !quote.affordable) {
                   result.skipped += 1;
+                  await recordExecutionAttempt(repository, client, {
+                    evaluationRunId,
+                    portfolioId: portfolio.id,
+                    decision,
+                    evaluatedAt: currentTime,
+                    outcome: "SKIPPED",
+                    reasonCode: quote.affordable ? "ZERO_POSITION_SIZE" : "INSUFFICIENT_FUNDS"
+                  });
                   continue;
                 }
-                const tradeState = await repository.insertBuy(client, {
+                const buyResult = await repository.insertBuy(client, {
                   portfolioId: portfolio.id,
                   decisionId: decision.id,
                   idempotencyKey,
@@ -320,17 +373,36 @@ export function createPaperTradingService({
                   quote,
                   marketPrice: market.price
                 });
+                const { tradeId, ...tradeState } = buyResult;
                 state = Object.freeze({ ...state, ...tradeState });
                 openPositions.push({
                   symbol: decision.symbol,
                   amount: quote.amount
                 });
+                await recordExecutionAttempt(repository, client, {
+                  evaluationRunId,
+                  portfolioId: portfolio.id,
+                  decision,
+                  evaluatedAt: currentTime,
+                  outcome: "EXECUTED",
+                  reasonCode: "TRADE_EXECUTED",
+                  tradeId
+                });
+                existingKeys.set(idempotencyKey, tradeId);
               } else {
                 const matchingPositions = openPositions.filter(
                   ({ symbol }) => symbol === decision.symbol
                 );
                 if (matchingPositions.length === 0) {
                   result.skipped += 1;
+                  await recordExecutionAttempt(repository, client, {
+                    evaluationRunId,
+                    portfolioId: portfolio.id,
+                    decision,
+                    evaluatedAt: currentTime,
+                    outcome: "SKIPPED",
+                    reasonCode: "NO_OPEN_POSITION"
+                  });
                   continue;
                 }
                 const positionTotals = await repository.getOpenPositionTotals(
@@ -343,7 +415,7 @@ export function createPaperTradingService({
                   amount: positionTotals.amount,
                   entryCostBasis: positionTotals.entryCostBasis
                 });
-                const tradeState = await repository.insertSell(client, {
+                const sellResult = await repository.insertSell(client, {
                   portfolioId: portfolio.id,
                   decisionId: decision.id,
                   idempotencyKey,
@@ -351,12 +423,22 @@ export function createPaperTradingService({
                   marketPrice: market.price,
                   quote
                 });
+                const { tradeId, ...tradeState } = sellResult;
                 state = Object.freeze({ ...state, ...tradeState });
+                await recordExecutionAttempt(repository, client, {
+                  evaluationRunId,
+                  portfolioId: portfolio.id,
+                  decision,
+                  evaluatedAt: currentTime,
+                  outcome: "EXECUTED",
+                  reasonCode: "TRADE_EXECUTED",
+                  tradeId
+                });
+                existingKeys.set(idempotencyKey, tradeId);
                 openPositions = openPositions.filter(
                   ({ symbol }) => symbol !== decision.symbol
                 );
               }
-              existingKeys.add(idempotencyKey);
               cooldowns.set(decision.symbol, currentTime);
               state = updatePeak(state);
               result.tradesExecuted += 1;
@@ -389,6 +471,83 @@ export function createPaperTradingService({
       });
     }
   });
+}
+
+async function recordExecutionAttempt(repository, client, {
+  evaluationRunId,
+  portfolioId,
+  decision,
+  evaluatedAt,
+  outcome,
+  reasonCode,
+  tradeId = null
+}) {
+  await repository.recordPaperExecutionAttempt(client, {
+    evaluationRunId,
+    portfolioId,
+    decisionId: decision.id,
+    symbol: decision.symbol,
+    action: decision.decision,
+    confidence: decision.confidence ?? null,
+    decisionAt: decision.created_at,
+    evaluatedAt,
+    outcome,
+    reasonCode,
+    tradeId
+  });
+}
+
+function getBuySkipReason({
+  decision,
+  emergencyStatus,
+  emergencyReasonCode,
+  agentStatus,
+  openPositions,
+  marketData,
+  currentTime,
+  cooldownAt,
+  state
+}) {
+  if (Number(decision.confidence) < PAPER_TRADING_RULES.minimumConfidence) {
+    return "LOW_CONFIDENCE";
+  }
+  if (emergencyStatus !== "NORMAL") {
+    return emergencyReasonCode
+      || (emergencyStatus === "PAUSED" ? "TRADING_PAUSED" : "EMERGENCY_STOP_ACTIVE");
+  }
+  if (agentStatus === "STOPPED") {
+    return "AGENT_STOPPED";
+  }
+  if (openPositions.some((position) => {
+    const positionMarket = marketData.get(position.symbol);
+    return !positionMarket || !isFresh(positionMarket.captured_at, currentTime);
+  })) {
+    return "STALE_OPEN_POSITION_DATA";
+  }
+  if (openPositions.some(({ symbol }) => symbol === decision.symbol)) {
+    return "POSITION_ALREADY_OPEN";
+  }
+  if (openPositions.length >= PAPER_TRADING_RULES.maxOpenPositions) {
+    return "MAX_OPEN_POSITIONS";
+  }
+  if (isInCooldown(cooldownAt, currentTime)) {
+    return "COOLDOWN_ACTIVE";
+  }
+  if (isAtOrBelowFraction(
+    state.portfolioValue,
+    state.dailyStartValue,
+    1 - PAPER_TRADING_RULES.dailyDrawdownFraction
+  )) {
+    return "DAILY_DRAWDOWN_LIMIT";
+  }
+  if (isAtOrBelowFraction(
+    state.portfolioValue,
+    state.peakValue,
+    1 - PAPER_TRADING_RULES.maxPortfolioDrawdownFraction
+  )) {
+    return "MAX_PORTFOLIO_DRAWDOWN";
+  }
+  return null;
 }
 
 export function createTradeIdempotencyKey(portfolioId, decisionId) {

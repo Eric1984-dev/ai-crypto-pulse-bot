@@ -12,6 +12,7 @@
     "trades",
     "positions",
     "decisions",
+    "paperExecutionAttempts",
     "portfolioSnapshots",
     "shadowExitScenarios",
     "shadowExitEvents",
@@ -22,6 +23,7 @@
     trades: "TRADES",
     positions: "POSITIONS",
     decisions: "AI DECISIONS",
+    paperExecutionAttempts: "PAPER EXECUTION OUTCOMES",
     portfolioSnapshots: "PORTFOLIO SNAPSHOTS",
     shadowExitScenarios: "SHADOW-EXIT SCENARIOS",
     shadowExitEvents: "SHADOW-EXIT EVENTS",
@@ -147,7 +149,7 @@
       buildAnalysisExportUrl("analysis-export-manifest"),
       signal
     );
-    if (manifest.formatVersion !== "cryptopulse-analysis-export-v2"
+    if (manifest.formatVersion !== "cryptopulse-analysis-export-v3"
       || typeof manifest.asOf !== "string" || !Number.isFinite(Date.parse(manifest.asOf))
       || !Array.isArray(manifest.sources)
       || manifest.sources.length !== analysisExportSources.length

@@ -34,7 +34,7 @@ const dataRepositories = {
     async getExportRecords() { return []; },
     getAnalysisExportManifest({ now }) {
       return {
-        formatVersion: "cryptopulse-analysis-export-v2",
+        formatVersion: "cryptopulse-analysis-export-v3",
         generatedAt: now.toISOString(),
         asOf: now.toISOString(),
         sources: []
