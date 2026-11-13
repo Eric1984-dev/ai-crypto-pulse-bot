@@ -20,6 +20,22 @@ npm.cmd run validate --prefix raspberry-pi
 
 The Pi tests cover the active API, authentication, PostgreSQL repositories, scheduler, market ingestion, AI engine, paper trading, monitoring, and runtime lifecycle. Tests use controlled local fixtures and do not claim that a live Pi/database was reached.
 
+Paper-trading hardening regressions can be run with:
+
+```powershell
+node --test raspberry-pi/tests/ai-analysis.test.mjs raspberry-pi/tests/market-data-ingestion.test.mjs raspberry-pi/tests/portfolio-snapshot-order.test.mjs raspberry-pi/tests/dashboard-analytics.test.mjs raspberry-pi/tests/dashboard-repository.test.mjs raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/paper-trading-repository.test.mjs
+```
+
+The snapshot-order migration test runs against local PGlite only. It does not apply the migration to the Raspberry Pi database.
+
+Position-exit regressions cover the single active 1.5 × 5-minute-ATR ratchet, the fee/slippage-adjusted €3 net floor, stale/incomplete/gapped candle rejection, persisted-stop behavior without ATR, idempotent trade attribution, and decision-analytics isolation:
+
+```powershell
+node --test raspberry-pi/tests/position-exit-policy.test.mjs raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/paper-trading-repository.test.mjs raspberry-pi/tests/dashboard-analytics.test.mjs raspberry-pi/tests/dashboard-repository.test.mjs raspberry-pi/tests/runtime-cycle.test.mjs raspberry-pi/tests/operational-health.test.mjs tests/trade-history.test.js
+```
+
+The Phase 8.14 migration is not applied by these tests; the repository uses isolated local fixtures. Do not start the Pi runtime with this code until the operator has reviewed/applied the migration.
+
 The full-history export regressions cover source keyset pagination, deduplicated trade/decision candle anchors, fixed as-of filtering, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation manifests. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer.
 
 ## Dashboard and authentication

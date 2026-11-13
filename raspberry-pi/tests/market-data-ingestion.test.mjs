@@ -42,7 +42,8 @@ function ticker(market) {
   };
 }
 
-function rawCandle(interval, timestamp = Math.floor(nowMs / INTERVAL_MS[interval]) * INTERVAL_MS[interval]) {
+function rawCandle(interval, timestamp =
+  Math.floor(nowMs / INTERVAL_MS[interval]) * INTERVAL_MS[interval] - INTERVAL_MS[interval]) {
   return [timestamp, "100", "110", "90", "105", "4"];
 }
 
@@ -287,23 +288,46 @@ test("unsupported intervals fail before market or provider access", async () => 
 
 test("ticker and candle parsers reject invalid values and collapse identical duplicate candles", () => {
   assert.equal(parseTickerSnapshot({ ...ticker("BTC-EUR"), open: "0" }, now.toISOString()), null);
-  const timestamp = Math.floor(nowMs / INTERVAL_MS["1m"]) * INTERVAL_MS["1m"];
+  const timestamp = Math.floor(nowMs / INTERVAL_MS["1m"]) * INTERVAL_MS["1m"]
+    - INTERVAL_MS["1m"];
+  const openTimestamp = timestamp + INTERVAL_MS["1m"];
   const parsed = parseCandleRows([
     rawCandle("1m", timestamp),
     rawCandle("1m", timestamp),
-    [timestamp + 1, "100", "110", "90", "105", "4"]
+    [timestamp + 1, "100", "110", "90", "105", "4"],
+    rawCandle("1m", openTimestamp)
   ], {
     symbol: "BTC-EUR",
     interval: "1m",
-    limit: 3,
+    limit: 4,
     nowMs
   });
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0].timestamp, new Date(timestamp).toISOString());
 });
 
+test("daily candle ingestion excludes the active UTC-day candle until its close", () => {
+  const dayStart = Date.parse("2026-11-13T00:00:00.000Z");
+  const activeCandle = rawCandle("1d", dayStart);
+  assert.deepEqual(parseCandleRows([activeCandle], {
+    symbol: "BTC-EUR",
+    interval: "1d",
+    limit: 1,
+    nowMs: dayStart + 2 * 60 * 1000
+  }), []);
+  const closed = parseCandleRows([activeCandle], {
+    symbol: "BTC-EUR",
+    interval: "1d",
+    limit: 1,
+    nowMs: dayStart + INTERVAL_MS["1d"]
+  });
+  assert.equal(closed.length, 1);
+  assert.equal(closed[0].timestamp, new Date(dayStart).toISOString());
+});
+
 test("conflicting duplicate provider candles fail the affected market", () => {
-  const timestamp = Math.floor(nowMs / INTERVAL_MS["1m"]) * INTERVAL_MS["1m"];
+  const timestamp = Math.floor(nowMs / INTERVAL_MS["1m"]) * INTERVAL_MS["1m"]
+    - INTERVAL_MS["1m"];
   assert.throws(() => parseCandleRows([
     rawCandle("1m", timestamp),
     [timestamp, "100", "110", "90", "106", "4"]

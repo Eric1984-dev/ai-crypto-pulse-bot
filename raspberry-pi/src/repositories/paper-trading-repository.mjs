@@ -80,8 +80,11 @@ const OPEN_POSITIONS_SQL = `
          position.symbol,
          position.amount,
          position.entry_price,
+         pg_catalog.round(position.entry_price * position.amount, 12) AS entry_cost_basis,
          position.current_price,
          position.unrealized_pnl,
+         position.high_water_price,
+         position.trailing_stop_price,
          position.created_at
   FROM public."AI_Crypto_Bot_Positions" AS position
   WHERE position.portfolio_id = $1
@@ -89,6 +92,41 @@ const OPEN_POSITIONS_SQL = `
   ORDER BY position.created_at ASC, position.id ASC
   LIMIT $2
   FOR UPDATE
+`;
+
+const TRAILING_EXIT_CANDLES_SQL = `
+  WITH ranked_candles AS (
+    SELECT candle.symbol,
+           candle.high,
+           candle.low,
+           candle.close,
+           candle."timestamp",
+           ROW_NUMBER() OVER (
+             PARTITION BY candle.symbol
+             ORDER BY candle."timestamp" DESC
+           ) AS row_number
+    FROM public."AI_Crypto_Bot_Candles" AS candle
+    WHERE candle.interval = '5m'
+      AND candle.symbol = ANY($1::text[])
+      AND candle."timestamp" <= $2::timestamptz - INTERVAL '5 minutes'
+  )
+  SELECT symbol, high, low, close, "timestamp"
+  FROM ranked_candles
+  WHERE row_number <= 15
+  ORDER BY symbol ASC, "timestamp" ASC
+`;
+
+const UPDATE_POSITION_EXIT_STATE_SQL = `
+  UPDATE public."AI_Crypto_Bot_Positions"
+  SET high_water_price = GREATEST(high_water_price, $2::numeric),
+      trailing_stop_price = CASE
+        WHEN $3::numeric IS NULL THEN trailing_stop_price
+        WHEN trailing_stop_price IS NULL THEN $3::numeric
+        ELSE GREATEST(trailing_stop_price, $3::numeric)
+      END
+  WHERE id = $1::uuid
+    AND status = 'OPEN'
+  RETURNING high_water_price, trailing_stop_price
 `;
 
 const OPEN_POSITION_TOTALS_SQL = `
@@ -166,7 +204,7 @@ const DRAWDOWN_SNAPSHOT_SQL = `
            FROM public."AI_Crypto_Bot_Portfolio_Snapshots" AS previous
            WHERE previous.portfolio_id = $1
              AND previous.captured_at < $3::timestamptz
-           ORDER BY previous.captured_at DESC, previous.id DESC
+           ORDER BY previous.captured_at DESC, previous.snapshot_order DESC
            LIMIT 1
          ), $2::numeric) AS daily_start_value
   FROM public."AI_Crypto_Bot_Portfolio_Snapshots" AS snapshot
@@ -253,16 +291,18 @@ const BUY_QUOTE_SQL = `
 const INSERT_TRADE_SQL = `
   INSERT INTO public."AI_Crypto_Bot_Trades"
     (portfolio_id, ai_decision_id, idempotency_key, symbol, side, price,
-     quantity, fees, slippage, realized_pnl)
+     quantity, fees, slippage, realized_pnl, execution_reason)
   VALUES ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::numeric,
-          $7::numeric, $8::numeric, $9::numeric, $10::numeric)
+          $7::numeric, $8::numeric, $9::numeric, $10::numeric, $11::text)
   RETURNING id
 `;
 
 const INSERT_POSITION_SQL = `
   INSERT INTO public."AI_Crypto_Bot_Positions"
-    (portfolio_id, symbol, amount, entry_price, current_price, unrealized_pnl)
-  VALUES ($1::uuid, $2::text, $3::numeric, $4::numeric, $5::numeric, $6::numeric)
+    (portfolio_id, symbol, amount, entry_price, current_price, unrealized_pnl,
+     high_water_price)
+  VALUES ($1::uuid, $2::text, $3::numeric, $4::numeric, $5::numeric, $6::numeric,
+          $5::numeric)
   RETURNING id
 `;
 
@@ -328,6 +368,17 @@ const CLOSE_POSITIONS_SQL = `
       unrealized_pnl = 0
   WHERE portfolio_id = $1::uuid
     AND symbol = $2::text
+    AND status = 'OPEN'
+  RETURNING id
+`;
+
+const CLOSE_POSITION_BY_ID_SQL = `
+  UPDATE public."AI_Crypto_Bot_Positions"
+  SET status = 'CLOSED',
+      current_price = $3::numeric,
+      unrealized_pnl = 0
+  WHERE portfolio_id = $1::uuid
+    AND id = $2::uuid
     AND status = 'OPEN'
   RETURNING id
 `;
@@ -507,10 +558,74 @@ export class PaperTradingRepository {
       requireSymbol(position.symbol);
       requireNumeric(position.amount, "position amount");
       requireNumeric(position.entry_price, "position entry price");
+      requireNumeric(position.entry_cost_basis, "position cost basis");
       requireNumeric(position.current_price, "position current price");
       requireNumeric(position.unrealized_pnl, "position unrealized P&L");
+      requireNumeric(position.high_water_price, "position high-water price");
+      if (position.trailing_stop_price !== null) {
+        requireNumeric(position.trailing_stop_price, "position trailing stop price");
+      }
     }
     return result.rows;
+  }
+
+  async listTrailingExitCandles(client, symbols, now) {
+    validateSymbols(symbols);
+    requireTimestamp(now, "position-exit evaluation timestamp");
+    if (symbols.length === 0) {
+      return [];
+    }
+    const result = await client.query(TRAILING_EXIT_CANDLES_SQL, [symbols, now]);
+    if (result.rows.length > symbols.length * 15) {
+      throw new PaperTradingRepositoryError(
+        "The trailing-exit candle query exceeded its bounded result.",
+        "PAPER_TRADING_EXIT_CANDLES_INVALID"
+      );
+    }
+    for (const candle of result.rows) {
+      requireSymbol(candle.symbol);
+      requireNumeric(candle.high, "exit candle high");
+      requireNumeric(candle.low, "exit candle low");
+      requireNumeric(candle.close, "exit candle close");
+      requireTimestamp(candle.timestamp, "exit candle timestamp");
+      if (Number(candle.low) <= 0
+        || Number(candle.high) < Number(candle.low)
+        || Number(candle.close) < Number(candle.low)
+        || Number(candle.close) > Number(candle.high)) {
+        throw new PaperTradingRepositoryError(
+          "The trailing-exit candle query returned invalid OHLC values.",
+          "PAPER_TRADING_EXIT_CANDLES_INVALID"
+        );
+      }
+    }
+    return result.rows;
+  }
+
+  async updatePositionExitState(client, {
+    positionId,
+    highWaterPrice,
+    trailingStopPrice
+  }) {
+    const result = await client.query(UPDATE_POSITION_EXIT_STATE_SQL, [
+      requireUuid(positionId, "position id"),
+      requirePositiveNumeric(highWaterPrice, "position high-water price"),
+      trailingStopPrice === null
+        ? null
+        : requirePositiveNumeric(trailingStopPrice, "position trailing stop price")
+    ]);
+    const row = result.rows[0];
+    if (!row) {
+      throw new PaperTradingRepositoryError(
+        "The open paper position changed before its exit state could be updated.",
+        "PAPER_TRADING_POSITION_CHANGED"
+      );
+    }
+    return Object.freeze({
+      highWaterPrice: requireNumeric(row.high_water_price, "position high-water price"),
+      trailingStopPrice: row.trailing_stop_price === null
+        ? null
+        : requireNumeric(row.trailing_stop_price, "position trailing stop price")
+    });
   }
 
   async getOpenPositionTotals(client, portfolioId, symbol) {
@@ -731,13 +846,21 @@ export class PaperTradingRepository {
     idempotencyKey,
     symbol,
     marketPrice,
-    quote
+    quote,
+    positionId = null,
+    executionReason = "AI_DECISION"
   }) {
-    const closed = await client.query(CLOSE_POSITIONS_SQL, [
-      portfolioId,
-      symbol,
-      marketPrice
-    ]);
+    const closed = positionId
+      ? await client.query(CLOSE_POSITION_BY_ID_SQL, [
+        portfolioId,
+        requireUuid(positionId, "position id"),
+        marketPrice
+      ])
+      : await client.query(CLOSE_POSITIONS_SQL, [
+        portfolioId,
+        symbol,
+        marketPrice
+      ]);
     if (closed.rowCount === 0) {
       throw new PaperTradingRepositoryError(
         "The open paper position changed before its exit could be recorded.",
@@ -754,7 +877,8 @@ export class PaperTradingRepository {
       quantity: quote.amount,
       fees: quote.fee,
       slippage: quote.slippage,
-      realizedPnl: quote.realized_pnl
+      realizedPnl: quote.realized_pnl,
+      executionReason
     });
     const state = await this.updatePortfolioAfterTrade(
       client,
@@ -775,11 +899,17 @@ export class PaperTradingRepository {
     quantity,
     fees,
     slippage,
-    realizedPnl
+    realizedPnl,
+    executionReason = "AI_DECISION"
   }) {
+    if (!["AI_DECISION", "ATR_TRAILING_EXIT"].includes(executionReason)
+      || (executionReason === "ATR_TRAILING_EXIT" && (side !== "SELL" || decisionId !== null))
+      || (executionReason === "AI_DECISION" && decisionId === null)) {
+      throw new TypeError("The paper trade source and decision reference are inconsistent.");
+    }
     const result = await client.query(INSERT_TRADE_SQL, [
       requireUuid(portfolioId, "portfolio id"),
-      requireUuid(decisionId, "decision id"),
+      decisionId === null ? null : requireUuid(decisionId, "decision id"),
       requireUuid(idempotencyKey, "trade idempotency key"),
       requireSymbol(symbol),
       side,
@@ -787,7 +917,8 @@ export class PaperTradingRepository {
       quantity,
       fees,
       slippage,
-      realizedPnl
+      realizedPnl,
+      executionReason
     ]);
     if (result.rowCount !== 1) {
       throw new PaperTradingRepositoryError(
@@ -1037,6 +1168,17 @@ function requireNumeric(value, label) {
     || !Number.isFinite(Number(numeric))) {
     throw new PaperTradingRepositoryError(
       `The ${label} is invalid.`,
+      "PAPER_TRADING_DATABASE_DATA_INVALID"
+    );
+  }
+  return numeric;
+}
+
+function requirePositiveNumeric(value, label) {
+  const numeric = requireNumeric(value, label);
+  if (Number(numeric) <= 0) {
+    throw new PaperTradingRepositoryError(
+      `The ${label} must be positive.`,
       "PAPER_TRADING_DATABASE_DATA_INVALID"
     );
   }

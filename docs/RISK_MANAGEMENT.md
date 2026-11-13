@@ -24,9 +24,9 @@ Maximum Open Positions:
 
 ## Confidence Threshold
 
-Minimum entry confidence: 67 during the approved Paper Trading experiment. The Phase 08 baseline was 70; migration `20261102140000_paper_trading_confidence_experiment.sql` changes only the BUY-entry gate. A valid SELL may reduce exposure without the entry threshold.
+Minimum entry confidence in the Raspberry Pi paper executor: 70. Values below 70 are rejected; 70 is accepted. A valid SELL may reduce exposure without the entry threshold.
 
-The experiment changes neither AI decision generation nor confidence calculations, Analytics, or any other risk control. Review results at 25 closed trades and, if the experiment continues, make a final evaluation at 50 closed trades using trade count, win rate, profit factor, drawdown, and portfolio growth.
+The 67-confidence experiment migration applies to the historical SQL paper executor, not the current Raspberry Pi service. It does not change the active Pi threshold or its AI decision generation, Analytics, or other risk controls.
 
 ---
 
@@ -73,12 +73,26 @@ Existing positions remain visible and can still be closed by a fresh, stored SEL
 
 - Only the newest stored decision for an enabled market is considered.
 - Decisions and market snapshots older than 15 minutes, more than one minute in the future, missing, or invalid are rejected; no position is opened.
+- Candle timestamps represent interval start times. Ingestion stores only aligned, fully closed candles; AI analysis also excludes any incomplete legacy candle and records stale, missing, and incomplete interval diagnostics.
 - BUY and SELL execution use the database value from `AI_Crypto_Bot_Market_Data`; the executor never fetches exchange prices itself.
 - A portfolio cannot exceed nine open positions or hold multiple open positions for the same market through the executor.
 - Buys are rejected when any open position lacks a fresh market snapshot, when the available balance cannot cover notional plus fees, or when an emergency/pause is active.
 - Trades are linked to the source AI decision and use a unique deterministic idempotency key. A retried decision cannot create another trade.
 - HOLD and WAIT decisions never create trades. SELL closes existing positions only; it cannot open a short position.
 - Risk checks, balance updates, position changes, trade insertion, and snapshot writes run under database transaction and row-lock protection.
+- Portfolio snapshot chronology uses `snapshot_order` to order snapshots that share a timestamp. The additive migration proposal [`phase-8.13-portfolio-snapshot-order.sql`](../raspberry-pi/migrations/phase-8.13-portfolio-snapshot-order.sql) must be reviewed and applied by the operator before deploying code that requires this column. The original execution order of historical same-timestamp rows cannot be recovered.
+
+## Position Exits
+
+The paper executor retains fresh AI-SELL exits and also runs one active position-aware profit-protection rule:
+
+- The rule arms once the observed high-water mark could realize at least €3 net after the fee-inclusive entry cost basis, 0.10% exit slippage, and 0.25% exit fee.
+- The stop is the greater of that +€3 net floor and the high-water mark minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. The stop only ratchets upward.
+- A fresh stored market mark at or below the persisted stop closes that position as a paper SELL. The trade has `execution_reason = ATR_TRAILING_EXIT` and no AI-decision link, so it remains visible as a real trade without being counted as an AI SELL decision.
+- High-water is the highest fresh market mark observed during paper cycles, not a tick-level or intrabar candle high. Missing, stale, incomplete, misaligned, gapped, or zero-range candles cannot create a new stop. A previously persisted stop remains enforceable with a fresh market mark, and its high-water mark continues to update.
+- There is no initial fixed stop-loss and no fixed take-profit. Before the +€3 net floor arms, a position can continue to lose value; the portfolio drawdown controls are not per-position stops. Mark-price gaps can also produce less than €3 net on the eventual simulated fill.
+
+The 1.5 × ATR multiplier and €3 net floor are the single active PAPER starting configuration, not statistically validated optimal values. The previous shadow rule grid is no longer evaluated during paper-trading cycles; its stored records remain historical/read-only. Before starting a runtime that uses this policy, the operator must review and apply the additive [Phase 8.14 migration](../raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql). Existing open positions are seeded from their stored entry/current prices; prior unrecorded peaks cannot be reconstructed. This workspace has not applied the migration to the Pi database.
 
 ---
 

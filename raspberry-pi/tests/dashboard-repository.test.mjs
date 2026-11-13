@@ -41,6 +41,7 @@ async function createDatabase() {
       fees numeric NOT NULL,
       slippage numeric NOT NULL DEFAULT 0,
       realized_pnl numeric NOT NULL,
+      execution_reason text NOT NULL DEFAULT 'AI_DECISION',
       created_at timestamptz NOT NULL
     );
     CREATE TABLE public."AI_Crypto_Bot_Portfolio_Snapshots" (
@@ -49,7 +50,8 @@ async function createDatabase() {
       portfolio_value numeric NOT NULL,
       available_balance numeric NOT NULL,
       open_positions integer NOT NULL,
-      captured_at timestamptz NOT NULL
+      captured_at timestamptz NOT NULL,
+      snapshot_order bigint GENERATED ALWAYS AS IDENTITY
     );
     CREATE TABLE public."AI_Crypto_Bot_Emergency_State" (
       id uuid PRIMARY KEY,
@@ -207,6 +209,7 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(result.openPositionAiStatus.items[0].latestAiDecision.decision, "HOLD");
     assert.equal(result.recentTrades.items[0].side, "SELL");
     assert.equal(result.portfolioSnapshots.length, 1);
+    assert.equal(result.portfolioSnapshots[0].snapshot_order, "1");
     assert.equal(result.emergencyState.status, "NORMAL");
     assert.equal(history.totalCount, 1);
     assert.equal(history.stats.winningTrades, 1);

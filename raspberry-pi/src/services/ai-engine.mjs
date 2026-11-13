@@ -1,3 +1,9 @@
+import {
+  CANDLE_INTERVAL_MS,
+  isCandleClosed,
+  isCandleTimestampAligned
+} from "./candle-intervals.mjs";
+
 export const AI_ANALYSIS_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export const AI_ANALYZER_NAME = "Deterministic Technical Analysis V2";
 export const AI_ANALYZER_VERSION = "2.0.0";
@@ -27,15 +33,29 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
   const timeframeResults = {};
   const validTimeframes = [];
   const staleCandleIntervals = [];
+  const incompleteCandleIntervals = [];
+  const missingCandleIntervals = [];
+  let incompleteCandlesIgnored = 0;
   let staleCandlesIgnored = 0;
   let totalInvalidCandles = 0;
 
   for (const interval of AI_ANALYSIS_INTERVALS) {
     const normalized = groupedCandles.get(interval) || { candles: [], invalidCount: 0 };
     totalInvalidCandles += normalized.invalidCount;
-    const timeframeFresh = isTimeframeFresh(normalized.candles, interval, analysisTime);
-    const candlesForAnalysis = timeframeFresh ? normalized.candles : [];
-    const staleCandleCount = normalized.candles.length - candlesForAnalysis.length;
+    const closedCandles = normalized.candles.filter(({ timestamp }) =>
+      isCandleClosed(Date.parse(timestamp), interval, analysisTime.getTime())
+    );
+    const incompleteCandleCount = normalized.candles.length - closedCandles.length;
+    if (incompleteCandleCount) {
+      incompleteCandleIntervals.push(interval);
+      incompleteCandlesIgnored += incompleteCandleCount;
+    }
+    if (!normalized.candles.length) {
+      missingCandleIntervals.push(interval);
+    }
+    const timeframeFresh = isTimeframeFresh(closedCandles, interval, analysisTime);
+    const candlesForAnalysis = timeframeFresh ? closedCandles : [];
+    const staleCandleCount = closedCandles.length - candlesForAnalysis.length;
     if (staleCandleCount) {
       staleCandleIntervals.push(interval);
       staleCandlesIgnored += staleCandleCount;
@@ -43,6 +63,8 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
     const result = analyzeTimeframe(candlesForAnalysis);
     timeframeResults[interval] = {
       candleCount: normalized.candles.length,
+      closedCandleCount: closedCandles.length,
+      incompleteCandleCount,
       analyzedCandleCount: candlesForAnalysis.length,
       staleCandleCount,
       stale: staleCandleCount > 0,
@@ -99,6 +121,9 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
     snapshot,
     validTimeframes,
     staleCandleIntervals,
+    incompleteCandleIntervals,
+    incompleteCandlesIgnored,
+    missingCandleIntervals,
     totalInvalidCandles,
     score,
     v2InputsAvailable: v2Signal.available
@@ -125,6 +150,9 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
       invalidCandlesIgnored: totalInvalidCandles,
       staleCandleIntervals,
       staleCandlesIgnored,
+      incompleteCandleIntervals,
+      incompleteCandlesIgnored,
+      missingCandleIntervals,
       marketSnapshotAvailable: snapshot.available,
       sufficientForDirectionalSignal: sufficientData && v2Signal.available && validTimeframes.length >= 4
         && confidence >= MIN_CONFIDENCE_FOR_SIGNAL
@@ -313,8 +341,8 @@ function isTimeframeFresh(candles, interval, now) {
   if (!candles.length) {
     return false;
   }
-  const latestTimestamp = Date.parse(candles.at(-1).timestamp);
-  const ageMs = now.getTime() - latestTimestamp;
+  const latestCloseTime = Date.parse(candles.at(-1).timestamp) + CANDLE_INTERVAL_MS[interval];
+  const ageMs = now.getTime() - latestCloseTime;
   return Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= CANDLE_MAX_AGE_MS[interval];
 }
 
@@ -334,6 +362,7 @@ function normalizeCandle(row, symbol) {
       : null;
   if (open === null || high === null || low === null || close === null || volume === null
     || !timestamp || open <= 0 || close <= 0 || volume < 0
+    || !isCandleTimestampAligned(Date.parse(timestamp), row.interval)
     || high < Math.max(open, close, low) || low > Math.min(open, close)) {
     return null;
   }
@@ -499,6 +528,9 @@ function buildDecisionReason({
   snapshot,
   validTimeframes,
   staleCandleIntervals,
+  incompleteCandleIntervals,
+  incompleteCandlesIgnored,
+  missingCandleIntervals,
   totalInvalidCandles,
   score,
   v2InputsAvailable
@@ -519,8 +551,21 @@ function buildDecisionReason({
   if (decision === "HOLD") {
     return `HOLD: market strength ${score} is neutral or confidence is reduced by incomplete data; ${timeframeText}.`;
   }
-  const invalidText = totalInvalidCandles ? ` ${totalInvalidCandles} invalid candle records were ignored.` : "";
-  return `${decision}: daily EMA trend, hourly volume confirmation, daily RSI, and volatility produced a ${score} V2 market-strength score.${invalidText}`;
+  const qualityDetails = [];
+  if (incompleteCandlesIgnored) {
+    qualityDetails.push(`${incompleteCandlesIgnored} in-progress candles were ignored`);
+  }
+  if (staleCandleIntervals.length) {
+    qualityDetails.push(`stale intervals ignored: ${staleCandleIntervals.join(", ")}`);
+  }
+  if (missingCandleIntervals.length) {
+    qualityDetails.push(`missing intervals: ${missingCandleIntervals.join(", ")}`);
+  }
+  if (totalInvalidCandles) {
+    qualityDetails.push(`${totalInvalidCandles} invalid candles ignored`);
+  }
+  const qualityText = qualityDetails.length ? ` Data quality: ${qualityDetails.join("; ")}.` : "";
+  return `${decision}: daily EMA trend, hourly volume confirmation, daily RSI, and volatility produced a ${score} V2 market-strength score.${qualityText}`;
 }
 
 function finiteNumber(value) {

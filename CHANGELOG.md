@@ -12,3 +12,10 @@
 - Name analysis export folders `cryptopulse-analysis-ddMMyyyyHHmmss`.
 - Deduplicate exported candle rows while preserving anchor-to-window links in JSONL.
 - Fix Raspberry Pi shadow-exit evaluations being skipped because the evaluator shared the scheduler's PostgreSQL advisory-lock key; existing installations must apply Phase 8.12.
+# Unreleased
+
+- Exclude in-progress or misaligned candle intervals from ingestion and AI indicators, with explicit stale/missing/incomplete data-quality reporting and regressions around UTC daily candle closure.
+- Order equal-timestamp portfolio snapshots with an insertion sequence in analytics and exports. The additive Pi migration is a proposal only and has not been applied.
+- Clarify that the current Pi paper BUY confidence gate remains 70; the historical SQL executor's 67 experiment is not the active Pi setting.
+- Add one active PAPER-only position exit: a fee/slippage-adjusted +€3 net floor ratcheted by 1.5 × fresh closed 5-minute ATR, with persisted high-water/stop state and auditable automatic SELLs. The shadow candidate grid is no longer evaluated during paper-trading cycles.
+- Add the local Phase 8.14 position-exit schema migration proposal; no migration, database reset, deployment, or live verification was performed.

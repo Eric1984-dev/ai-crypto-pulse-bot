@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   createPaperTradingDatabaseConfig,
   createPaperTradingService,
-  createTradeIdempotencyKey
+  createTradeIdempotencyKey,
+  createPositionExitIdempotencyKey
 } from "../src/services/paper-trading-service.mjs";
 
 const NOW = new Date("2026-01-01T12:00:00.000Z");
@@ -44,6 +45,11 @@ function makeRepository(overrides = {}) {
       created_at: NOW
     }],
     listOpenPositions: async () => positions,
+    listTrailingExitCandles: async () => [],
+    updatePositionExitState: async (_client, exitState) => ({
+      highWaterPrice: exitState.highWaterPrice,
+      trailingStopPrice: exitState.trailingStopPrice
+    }),
     listMarketData: async () => [{
       symbol: SYMBOL,
       price: "100",
@@ -113,6 +119,17 @@ function makeService(repository, logs = []) {
   });
 }
 
+function makeExitCandles() {
+  const firstTimestamp = NOW.getTime() - 75 * 60 * 1000;
+  return Array.from({ length: 15 }, (_, index) => ({
+    symbol: SYMBOL,
+    high: "101",
+    low: "99",
+    close: "100",
+    timestamp: new Date(firstTimestamp + index * 5 * 60 * 1000)
+  }));
+}
+
 test("paper trading config requires a distinct writer identity", () => {
   const config = {
     database: { user: "api_reader", password: "api-password" },
@@ -145,16 +162,33 @@ test("BUY decisions pass through confidence, freshness, portfolio, and duplicate
   assert.deepEqual(repository.calls, ["buy"]);
 });
 
-test("shadow exits run before the paper cycle and after executed trades", async () => {
+test("paper BUY confidence gate accepts 70 and rejects values below it", async () => {
+  for (const [confidence, expectedTrades] of [
+    ["69.99", 0],
+    ["70", 1],
+    ["70.01", 1]
+  ]) {
+    const repository = makeRepository({
+      listLatestDecisions: async () => [{
+        id: DECISION_ID,
+        symbol: SYMBOL,
+        decision: "BUY",
+        confidence,
+        created_at: NOW
+      }]
+    });
+
+    const result = await makeService(repository).run();
+
+    assert.equal(result.tradesExecuted, expectedTrades, `confidence ${confidence}`);
+  }
+});
+
+test("paper trading does not evaluate shadow-exit variants alongside its active policy", async () => {
   const repository = makeRepository();
-  const events = [];
-  const insertBuy = repository.insertBuy;
-  repository.insertBuy = async (...args) => {
-    events.push("buy");
-    return insertBuy(...args);
-  };
+  let shadowEvaluations = 0;
   repository.evaluateShadowExitScenarios = async () => {
-    events.push("shadow");
+    shadowEvaluations += 1;
     return {
       status: "COMPLETED",
       positionsEvaluated: 0,
@@ -169,27 +203,106 @@ test("shadow exits run before the paper cycle and after executed trades", async 
   const result = await makeService(repository).run();
 
   assert.equal(result.tradesExecuted, 1);
-  assert.deepEqual(events, ["shadow", "buy", "shadow"]);
-  assert.equal(result.shadowExitEvaluation.status, "COMPLETED");
+  assert.equal(shadowEvaluations, 0);
 });
 
-test("shadow-exit failures are logged and do not block paper trading", async () => {
-  const logs = [];
+test("ATR ratchet closes one position after a pullback and records an automatic SELL", async () => {
+  const position = {
+    id: "00000000-0000-4000-8000-000000000003",
+    symbol: SYMBOL,
+    amount: "1",
+    entry_price: "100.35025",
+    entry_cost_basis: "100.35025",
+    current_price: "110",
+    unrealized_pnl: "9.64975",
+    high_water_price: "110",
+    trailing_stop_price: null
+  };
+  let sellInput;
   const repository = makeRepository({
-    evaluateShadowExitScenarios: async () => {
-      throw Object.assign(new Error("permission denied"), { code: "42501" });
+    listOpenPositions: async () => [position],
+    listMarketData: async () => [{
+      symbol: SYMBOL,
+      price: "106",
+      captured_at: NOW
+    }],
+    listTrailingExitCandles: async () => makeExitCandles(),
+    insertSell: async (_client, input) => {
+      sellInput = input;
+      repository.calls.push("sell");
+      return {
+        availableBalance: "10100",
+        portfolioValue: "10100",
+        openPositions: 0
+      };
     }
   });
 
-  const result = await makeService(repository, logs).run();
+  const result = await makeService(repository).run();
 
-  assert.equal(result.status, "COMPLETED");
+  assert.equal(result.automaticExits, 1);
   assert.equal(result.tradesExecuted, 1);
-  assert.deepEqual(result.shadowExitEvaluation, {
-    status: "FAILED",
-    errorCode: "42501"
+  assert.equal(sellInput.decisionId, null);
+  assert.equal(sellInput.executionReason, "ATR_TRAILING_EXIT");
+  assert.equal(sellInput.positionId, position.id);
+  assert.equal(
+    sellInput.idempotencyKey,
+    createPositionExitIdempotencyKey(PORTFOLIO_ID, position.id)
+  );
+  assert.deepEqual(repository.calls, ["sell"]);
+});
+
+test("missing ATR history does not create a new exit, but an existing stop remains active", async (t) => {
+  const basePosition = {
+    id: "00000000-0000-4000-8000-000000000003",
+    symbol: SYMBOL,
+    amount: "1",
+    entry_price: "100",
+    entry_cost_basis: "100",
+    current_price: "110",
+    unrealized_pnl: "10",
+    high_water_price: "110",
+    trailing_stop_price: null
+  };
+
+  await t.test("missing candles preserve the open position", async () => {
+    const logs = [];
+    const repository = makeRepository({
+      listOpenPositions: async () => [basePosition],
+      listMarketData: async () => [{
+        symbol: SYMBOL,
+        price: "106",
+        captured_at: NOW
+      }]
+    });
+
+    const result = await makeService(repository, logs).run();
+
+    assert.equal(result.automaticExits, 0);
+    assert.equal(repository.calls.includes("sell"), false);
+    assert.ok(logs.some(({ event, reason }) =>
+      event === "paper_position_exit_waiting_for_valid_atr"
+        && reason === "INSUFFICIENT_CANDLES"));
   });
-  assert.equal(logs.filter(({ event }) => event === "shadow_exit_evaluation_failed").length, 2);
+
+  await t.test("a previously persisted stop triggers without fresh ATR", async () => {
+    const repository = makeRepository({
+      listOpenPositions: async () => [{
+        ...basePosition,
+        trailing_stop_price: "107"
+      }],
+      listMarketData: async () => [{
+        symbol: SYMBOL,
+        price: "106",
+        captured_at: NOW
+      }]
+    });
+
+    const result = await makeService(repository).run();
+
+    assert.equal(result.automaticExits, 1);
+    assert.deepEqual(repository.calls, ["sell"]);
+  });
 });
 
 test("multiple decisions retain drawdown baselines after partial trade-state updates", async () => {
@@ -271,8 +384,11 @@ test("SELL decisions close an existing virtual position without opening a short"
     symbol: SYMBOL,
     amount: "2",
     entry_price: "100",
+    entry_cost_basis: "200",
     current_price: "100",
-    unrealized_pnl: "0"
+    unrealized_pnl: "0",
+    high_water_price: "100",
+    trailing_stop_price: null
   };
   const repository = makeRepository({
     listLatestDecisions: async () => [{
@@ -389,8 +505,11 @@ test("maximum open positions prevents a tenth virtual position", async () => {
       symbol,
       amount: "1",
       entry_price: "10",
+      entry_cost_basis: "10",
       current_price: "10",
-      unrealized_pnl: "0"
+      unrealized_pnl: "0",
+      high_water_price: "10",
+      trailing_stop_price: null
     })),
     listMarketData: async (_client, marketSymbols) =>
       marketSymbols.map((symbol) => ({ symbol, price: "10", captured_at: NOW }))

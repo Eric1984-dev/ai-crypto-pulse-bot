@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { MAX_PAPER_TRADING_MARKETS } from "../repositories/paper-trading-repository.mjs";
 import { createPaperTradingFailureDiagnostic } from "./paper-trading-diagnostics.mjs";
+import {
+  assessPositionExit,
+  POSITION_EXIT_POLICY
+} from "./position-exit-policy.mjs";
 
 export const PAPER_TRADING_RULES = Object.freeze({
   maxPositionSizeFraction: 0.10,
@@ -73,6 +77,8 @@ export function createPaperTradingService({
     || typeof repository.tryAcquireRunLock !== "function"
     || typeof repository.getSystemPortfolio !== "function"
     || typeof repository.listLatestDecisions !== "function"
+    || typeof repository.listTrailingExitCandles !== "function"
+    || typeof repository.updatePositionExitState !== "function"
     || typeof now !== "function") {
     throw new TypeError("A paper-trading repository and clock are required.");
   }
@@ -81,7 +87,6 @@ export function createPaperTradingService({
     async run() {
       const currentTime = readTime(now());
       try {
-        const shadowExitBefore = await evaluateShadowExits(repository, logger);
         const tradingResult = await repository.withTransaction(async (client) => {
           if (!await repository.tryAcquireRunLock(client)) {
             return skipped("RUN_IN_PROGRESS");
@@ -138,6 +143,7 @@ export function createPaperTradingService({
             portfoliosProcessed: 0,
             decisionsProcessed: 0,
             tradesExecuted: 0,
+            automaticExits: 0,
             duplicates: 0,
             skipped: 0
           };
@@ -186,6 +192,70 @@ export function createPaperTradingService({
               portfolio.id,
               [...new Set(decisions.map(({ symbol }) => symbol))].sort()
             );
+
+            const exitCandles = openPositions.length > 0
+              ? await repository.listTrailingExitCandles(
+                client,
+                [...new Set(openPositions.map(({ symbol }) => symbol))].sort(),
+                currentTime
+              )
+              : [];
+            const candlesBySymbol = groupCandlesBySymbol(exitCandles);
+            for (const position of [...openPositions]) {
+              const market = marketData.get(position.symbol);
+              if (!market || !isFresh(market.captured_at, currentTime)) {
+                logPositionExitDataQuality(
+                  logger,
+                  position,
+                  market ? "STALE_MARKET_DATA" : "MISSING_MARKET_DATA"
+                );
+                continue;
+              }
+              const assessment = assessPositionExit(
+                position,
+                market.price,
+                candlesBySymbol.get(position.symbol) || [],
+                currentTime
+              );
+              const savedExitState = await repository.updatePositionExitState(client, {
+                positionId: position.id,
+                highWaterPrice: assessment.highWaterPrice,
+                trailingStopPrice: assessment.trailingStopPrice
+              });
+              if (assessment.dataQuality !== "VALID") {
+                logPositionExitDataQuality(logger, position, assessment.dataQuality);
+              }
+              if (savedExitState.trailingStopPrice === null
+                || decimalCompare(market.price, savedExitState.trailingStopPrice) > 0) {
+                continue;
+              }
+
+              const quote = await repository.quoteSell(client, {
+                marketPrice: market.price,
+                amount: position.amount,
+                entryCostBasis: position.entry_cost_basis
+              });
+              const tradeState = await repository.insertSell(client, {
+                portfolioId: portfolio.id,
+                decisionId: null,
+                idempotencyKey: createPositionExitIdempotencyKey(
+                  portfolio.id,
+                  position.id
+                ),
+                symbol: position.symbol,
+                marketPrice: market.price,
+                quote,
+                positionId: position.id,
+                executionReason: "ATR_TRAILING_EXIT"
+              });
+              state = Object.freeze({ ...state, ...tradeState });
+              openPositions = openPositions.filter(({ id }) => id !== position.id);
+              cooldowns.set(position.symbol, currentTime);
+              state = updatePeak(state);
+              result.tradesExecuted += 1;
+              result.automaticExits += 1;
+              logPositionExitExecuted(logger, position, market.price, savedExitState, quote);
+            }
 
             for (const decision of decisions) {
               result.decisionsProcessed += 1;
@@ -294,14 +364,7 @@ export function createPaperTradingService({
           }
           return Object.freeze(result);
         });
-        const shadowExitAfter = Number.isSafeInteger(tradingResult?.tradesExecuted)
-          && tradingResult.tradesExecuted > 0
-          ? await evaluateShadowExits(repository, logger)
-          : null;
-        const shadowExitEvaluation = shadowExitAfter || shadowExitBefore;
-        return shadowExitEvaluation
-          ? Object.freeze({ ...tradingResult, shadowExitEvaluation })
-          : tradingResult;
+        return tradingResult;
       } catch (error) {
         const wrapped = error instanceof PaperTradingServiceError
           ? error
@@ -328,37 +391,6 @@ export function createPaperTradingService({
   });
 }
 
-async function evaluateShadowExits(repository, logger) {
-  if (typeof repository.evaluateShadowExitScenarios !== "function") {
-    return null;
-  }
-  try {
-    const result = await repository.evaluateShadowExitScenarios();
-    if (result?.status === "FAILED") {
-      logger.error(JSON.stringify({
-        event: "shadow_exit_evaluation_failed",
-        component: "shadow-exit-evaluator",
-        code: safeShadowExitCode(result.errorCode)
-      }));
-    }
-    return result;
-  } catch (error) {
-    const errorCode = safeShadowExitCode(error?.code);
-    logger.error(JSON.stringify({
-      event: "shadow_exit_evaluation_failed",
-      component: "shadow-exit-evaluator",
-      code: errorCode
-    }));
-    return Object.freeze({ status: "FAILED", errorCode });
-  }
-}
-
-function safeShadowExitCode(value) {
-  return typeof value === "string" && /^[A-Z0-9_]{1,64}$/.test(value)
-    ? value
-    : "SHADOW_EXIT_EVALUATION_FAILED";
-}
-
 export function createTradeIdempotencyKey(portfolioId, decisionId) {
   if (typeof portfolioId !== "string" || typeof decisionId !== "string") {
     throw new TypeError("Portfolio and decision UUIDs are required.");
@@ -366,6 +398,69 @@ export function createTradeIdempotencyKey(portfolioId, decisionId) {
   const hash = createHash("md5").update(`${portfolioId}:${decisionId}`).digest("hex");
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-`
     + `${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+}
+
+export function createPositionExitIdempotencyKey(portfolioId, positionId) {
+  if (typeof portfolioId !== "string" || typeof positionId !== "string") {
+    throw new TypeError("Portfolio and position UUIDs are required.");
+  }
+  const hash = createHash("md5")
+    .update(`${portfolioId}:${positionId}:${POSITION_EXIT_POLICY.version}`)
+    .digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-`
+    + `${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+}
+
+function groupCandlesBySymbol(candles) {
+  if (!Array.isArray(candles)) {
+    throw new PaperTradingServiceError(
+      "PAPER_TRADING_EXIT_CANDLES_INVALID",
+      "The trailing-exit repository returned invalid candle data."
+    );
+  }
+  const grouped = new Map();
+  for (const candle of candles) {
+    if (!candle || typeof candle.symbol !== "string" || !SYMBOL_PATTERN.test(candle.symbol)) {
+      throw new PaperTradingServiceError(
+        "PAPER_TRADING_EXIT_CANDLES_INVALID",
+        "The trailing-exit repository returned a candle with an invalid market."
+      );
+    }
+    const rows = grouped.get(candle.symbol) || [];
+    rows.push(candle);
+    grouped.set(candle.symbol, rows);
+  }
+  return grouped;
+}
+
+function logPositionExitDataQuality(logger, position, reason) {
+  const log = typeof logger.warn === "function" ? logger.warn : logger.error;
+  log.call(logger, JSON.stringify({
+    event: "paper_position_exit_waiting_for_valid_atr",
+    component: "paper-trading-service",
+    policy: POSITION_EXIT_POLICY.version,
+    positionId: position.id,
+    symbol: position.symbol,
+    reason
+  }));
+}
+
+function logPositionExitExecuted(logger, position, marketPrice, exitState, quote) {
+  const log = typeof logger.info === "function" ? logger.info : logger.log;
+  if (typeof log !== "function") {
+    return;
+  }
+  log.call(logger, JSON.stringify({
+    event: "paper_position_closed_by_trailing_exit",
+    component: "paper-trading-service",
+    policy: POSITION_EXIT_POLICY.version,
+    positionId: position.id,
+    symbol: position.symbol,
+    marketPrice,
+    highWaterPrice: exitState.highWaterPrice,
+    trailingStopPrice: exitState.trailingStopPrice,
+    realizedPnl: quote.realized_pnl
+  }));
 }
 
 function skipped(reason) {

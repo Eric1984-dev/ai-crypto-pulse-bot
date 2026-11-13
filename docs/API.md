@@ -33,7 +33,7 @@ The Pi runtime is the sole application API and validates the session, request, a
 | `GET /api/v1/dashboard-data?view=analysis-export-page&source=trades&asOf=<UTC timestamp>&cursor=<opaque>` | Authenticated bounded keyset page for one allowlisted export source; pages are read sequentially by the browser. `candleWindows` pages return up to ten anchors and at most 1,200 unique candle rows, each with its page-local anchor timestamps. The browser deduplicates across pages and writes separate anchor-to-candle links. |
 | `GET /api/v1/markets`, `/api/v1/market`, `/api/v1/market-summary` | Watched markets, market detail, and scanner rankings. |
 | `GET /api/v1/agent-status` | Current agent status. |
-| `GET /api/v1/monitoring` | Pi runtime, scheduler, process, host, and database monitoring. |
+| `GET /api/v1/monitoring` | Pi runtime, scheduler, process, host, database, and position-exit stage monitoring. |
 
 Data endpoints require the single-admin session and return no-store responses. Dashboard reads make one bounded retry after HTTP 429 using the server's `Retry-After` header. The dashboard monitoring view and Exports page resource panel use `/api/v1/monitoring`; both display Raspberry Pi temperature, CPU, and memory from its `system` metrics. Neither calls the retired Vercel archive-health handler. Current contracts and bounds are maintained in the [Pi API implementation](../raspberry-pi/src/api/).
 

@@ -3,6 +3,10 @@
 ## Current post-migration verification boundaries
 
 - The operator reports the Pi runtime, PostgreSQL, scheduler, AI, paper trading, dashboard, authentication, Cloudflare Tunnel, and custom domain are operational; this workspace has not independently checked those live services.
+- The new 1.5 × 5-minute-ATR trailing profit rule and €3 net activation floor are an initial PAPER configuration, not a validated strategy. There is intentionally no initial fixed stop-loss or fixed take-profit; positions remain exposed to losses until the profit floor arms, and mark-price gaps can breach that floor.
+- The [position-exit migration](../raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql) is local only and has not been applied to the Pi database. Do not start the updated runtime until the operator reviews/applies it. The runtime has not been deployed or verified against the Pi.
+- The [snapshot-order migration proposal](../raspberry-pi/migrations/phase-8.13-portfolio-snapshot-order.sql) is local only. The Pi database has not been changed or verified, so the updated runtime must not be deployed until the operator reviews and applies it. Existing equal-timestamp snapshot execution order cannot be reconstructed.
+- Candle ingestion and AI analysis now define closed candles from aligned interval-start timestamps. Local regression coverage does not verify Bitvavo or the Pi's stored candle history in production.
 - External scheduler-provider configuration and Vercel project settings were not inspected. The repository has no Vercel Cron configuration, and the Pi runtime is the documented scheduler owner.
 - The optional archive-copy CLI still has a restricted Supabase source connection. It is not a trading/runtime dependency and was retained because its retirement was not confirmed.
 - Historical sections below describe issues from the former Supabase/Vercel runtime and are not statements about the current Pi deployment.

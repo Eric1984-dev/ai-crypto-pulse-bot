@@ -95,6 +95,22 @@ test("paper trading contract requires schema columns and exact write grants", ()
   ));
 });
 
+test("paper trading contract requires read-only candle access for exit ATR", () => {
+  const snapshot = createSnapshot({
+    tablePrivileges: createSnapshot().tablePrivileges.map((table) =>
+      table.relation_name === "AI_Crypto_Bot_Candles"
+        ? { ...table, can_select: false }
+        : table)
+  });
+
+  const result = evaluatePaperTradingDatabaseContract(snapshot, "ai_crypto_bot_store");
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes(
+    "MISSING_PAPER_TRADING_SELECT_PRIVILEGE:AI_Crypto_Bot_Candles"
+  ));
+});
+
 test("paper trading contract rejects ownership, destructive grants, and unrelated writes", () => {
   const snapshot = createSnapshot();
   snapshot.tablePrivileges = snapshot.tablePrivileges.map((table) => {

@@ -63,10 +63,10 @@ test("analytics attributes outcomes to BUY and SELL decisions, not HOLD or WAIT"
     trades,
     decisions,
     snapshots: [
-      { captured_at: "2026-02-28T00:00:00.000Z", portfolio_value: 1000 },
-      { captured_at: "2026-03-01T00:00:00.000Z", portfolio_value: 900 },
-      { captured_at: "2026-03-02T00:00:00.000Z", portfolio_value: 1100 },
-      { captured_at: "2026-03-03T00:00:00.000Z", portfolio_value: 1050 }
+      { snapshot_order: "1", captured_at: "2026-02-28T00:00:00.000Z", portfolio_value: 1000 },
+      { snapshot_order: "2", captured_at: "2026-03-01T00:00:00.000Z", portfolio_value: 900 },
+      { snapshot_order: "3", captured_at: "2026-03-02T00:00:00.000Z", portfolio_value: 1100 },
+      { snapshot_order: "4", captured_at: "2026-03-03T00:00:00.000Z", portfolio_value: 1050 }
     ]
   });
 
@@ -114,10 +114,63 @@ test("analytics attributes outcomes to BUY and SELL decisions, not HOLD or WAIT"
     averageValueForBreakeven: null,
     interpretation: "descriptive association; not evidence of causation"
   });
+
+  test("automatic trailing SELLs count as trade outcomes, not unmatched AI decisions", () => {
+    const analytics = buildDashboardAnalytics({
+      period: "30d",
+      now,
+      portfolio: { starting_balance: 10000, portfolio_value: 10005 },
+      positions: [],
+      trades: [
+        trade("buy-trade", "BUY", "buy", 1, 0, "2026-03-05T00:00:00.000Z"),
+        {
+          ...trade("exit-trade", "SELL", null, 1, 5, "2026-03-05T01:00:00.000Z"),
+          execution_reason: "ATR_TRAILING_EXIT"
+        }
+      ],
+      decisions: [decision("buy", 90, "BUY")],
+      snapshots: []
+    });
+
+    assert.equal(analytics.tradePerformance.closedTrades, 1);
+    assert.equal(analytics.tradePerformance.realizedPnl, 5);
+    assert.equal(analytics.aiPerformance.unmatchedDecisionTrades, 0);
+    assert.equal(analytics.aiPerformance.actions.BUY.scoredCount, 1);
+    assert.equal(analytics.aiPerformance.actions.SELL.scoredCount, 0);
+  });
   assert.equal(analytics.portfolio.periodPnl, 50);
   assert.equal(analytics.portfolio.maxDrawdown, 10);
   assert.equal(analytics.portfolio.maxDrawdownStatus, "CALCULATED_WITH_PERIOD_BASELINE");
   assert.equal(analytics.strategyVersionPerformance.versions[0].comparisonEligible, false);
+});
+
+test("equal-timestamp snapshots use insertion sequence for equity and drawdown order", () => {
+  const analytics = buildDashboardAnalytics({
+    period: "30d",
+    now,
+    portfolio: { starting_balance: 1000, portfolio_value: 800 },
+    positions: [],
+    trades: [],
+    decisions: [],
+    snapshots: [
+      {
+        snapshot_order: "2",
+        captured_at: "2026-03-10T12:00:00.000Z",
+        portfolio_value: 800
+      },
+      {
+        snapshot_order: "1",
+        captured_at: "2026-03-10T12:00:00.000Z",
+        portfolio_value: 1000
+      }
+    ]
+  });
+
+  assert.deepEqual(analytics.portfolio.equityCurve.map(({ portfolioValue }) =>
+    portfolioValue), [1000, 800]);
+  assert.deepEqual(analytics.portfolio.drawdownHistory.map(({ drawdownPercent }) =>
+    drawdownPercent), [0, 20]);
+  assert.equal(analytics.portfolio.maxDrawdown, 20);
 });
 
 test("confidence bands include exact boundaries once and exclude values below 50", () => {

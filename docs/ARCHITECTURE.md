@@ -380,17 +380,21 @@ Database advisory lock and per-portfolio row lock
 ↓
 Freshness, confidence, position, cooldown, balance, drawdown, and emergency checks
 ↓
-Simulated BUY/SELL with stored fees, slippage, and source decision ID
+Simulated BUY, AI SELL, or position-aware trailing SELL with stored fees/slippage
 ↓
 Position, trade, portfolio balance/value, and snapshot writes in one transaction
 
-BUY opens long positions only; SELL closes existing positions; HOLD and WAIT do not trade. The executor does not contact Bitvavo or any exchange and cannot place a real order. The service role is used only server-side. The database migration grants the scheduler RPC to `service_role` and revokes execution of its internal helpers from browser roles.
+BUY opens long positions only; AI SELL closes existing positions; HOLD and WAIT do not trade. A separate active PAPER policy closes an individual position after its net-profit floor arms and its ratcheting ATR stop is reached. Automatic SELL trades use `execution_reason = ATR_TRAILING_EXIT` and have no AI-decision link, so actual trade outcomes are retained without being misattributed as AI SELL decisions. The executor does not contact Bitvavo or any exchange and cannot place a real order.
 
 Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than nine open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
 
+## Active Position Exit Policy
+
+The Raspberry Pi paper executor persists a high-water price and a monotonic stop price per position. It arms after the high-water mark could realize at least €3 net after entry basis, exit fee, and slippage, then uses the higher of that net-profit floor or high-water price minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. Only a fresh stored market mark triggers the paper SELL. Missing, stale, incomplete, misaligned, or gapped candles cannot create a stop; any previously persisted stop is still checked. There is no initial fixed stop-loss or fixed take-profit. The additive Phase 8.14 migration must be reviewed/applied by the operator before deploying the code; this repository task does not apply it to the Pi database.
+
 ## Shadow Exit Scenarios
 
-The existing paper-trading service separately evaluates open positions against the fixed, versioned experimental rule grid before execution and, when trades execute, afterward. The evaluator persists state and meaningful events through its own service-role-only RPC and tables. It consumes fresh stored market marks only; stale/invalid input preserves the last valid state and is surfaced as waiting/skipped. It has no call path to the decision executor and does not write decisions, trades, positions, portfolio values, balances, or snapshots. Evaluation errors are isolated and logged separately so the actual paper-trading run can continue.
+Historical shadow scenarios remain readable in the dashboard, but the normal paper-trading cycle no longer evaluates the experimental rule grid alongside the active exit policy. These records are simulation-only and do not write decisions, trades, positions, portfolio values, balances, or snapshots.
 
 The existing authenticated `/api/dashboard-data` route reads and serializes the scenarios for the dashboard. Actual P&L and portfolio metrics remain sourced from actual trades, positions, and snapshots; hypothetical outcomes are displayed in a distinct simulation-only section.
 

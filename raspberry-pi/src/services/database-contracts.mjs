@@ -37,6 +37,7 @@ export const DASHBOARD_READ_TABLES = Object.freeze([
   "AI_Crypto_Bot_Status",
   "AI_Crypto_Bot_Watched_Markets",
   "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Candles",
   "AI_Crypto_Bot_Portfolio_Snapshots",
   "AI_Crypto_Bot_Emergency_State",
   "AI_Crypto_Bot_Shadow_Exit_Scenarios",
@@ -90,6 +91,15 @@ export const REQUIRED_COLUMN_CONTRACTS = Object.freeze({
     status: "text",
     last_run: "timestamp with time zone",
     updated_at: "timestamp with time zone"
+  }),
+  AI_Crypto_Bot_Portfolio_Snapshots: Object.freeze({
+    id: "uuid",
+    portfolio_id: "uuid",
+    portfolio_value: "numeric",
+    available_balance: "numeric",
+    open_positions: "integer",
+    captured_at: "timestamp with time zone",
+    snapshot_order: "bigint"
   }),
   AI_Crypto_Bot_Analytics_Runs: Object.freeze({
     id: "uuid",
@@ -149,6 +159,8 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
     entry_price: "numeric",
     current_price: "numeric",
     unrealized_pnl: "numeric",
+    high_water_price: "numeric",
+    trailing_stop_price: "numeric",
     status: "text",
     created_at: "timestamp with time zone"
   }),
@@ -164,6 +176,7 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
     fees: "numeric",
     slippage: "numeric",
     realized_pnl: "numeric",
+    execution_reason: "text",
     created_at: "timestamp with time zone"
   }),
   AI_Crypto_Bot_Portfolio_Snapshots: Object.freeze({
@@ -172,7 +185,8 @@ export const REQUIRED_PAPER_TRADING_COLUMNS = Object.freeze({
     portfolio_value: "numeric",
     available_balance: "numeric",
     open_positions: "integer",
-    captured_at: "timestamp with time zone"
+    captured_at: "timestamp with time zone",
+    snapshot_order: "bigint"
   }),
   AI_Crypto_Bot_Emergency_State: Object.freeze({
     id: "uuid",
@@ -191,6 +205,7 @@ export const PAPER_TRADING_READ_TABLES = Object.freeze([
   "AI_Crypto_Bot_Status",
   "AI_Crypto_Bot_Watched_Markets",
   "AI_Crypto_Bot_Market_Data",
+  "AI_Crypto_Bot_Candles",
   "AI_Crypto_Bot_Portfolio_Snapshots",
   "AI_Crypto_Bot_Emergency_State"
 ]);

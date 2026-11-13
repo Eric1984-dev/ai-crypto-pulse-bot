@@ -149,6 +149,9 @@
         ? [
           `Entry Price: ${formatters.formatPrice(closedTradeMetrics ? closedTradeMetrics.entryPrice : null)}`,
           `Exit Price: ${formatters.formatPrice(trade.price)}`,
+          ...(trade.execution_reason === "ATR_TRAILING_EXIT"
+            ? ["Exit Rule: 1.5 × 5m ATR trail, activated at +€3 net"]
+            : []),
           `Realized P&L: ${formatPnlSummary(trade.realized_pnl, closedTradeMetrics ? closedTradeMetrics.realizedPnlPercent : null)}`
         ]
         : [];
@@ -169,7 +172,9 @@
       trade.side === "BUY" && trade.openPosition
         ? "OPEN"
         : trade.side === "SELL"
-          ? "CLOSED · Paper Trade"
+          ? trade.execution_reason === "ATR_TRAILING_EXIT"
+            ? "CLOSED · ATR Trailing Exit · Paper Trade"
+            : "CLOSED · Paper Trade"
           : "Executed · Paper Trade"
     ];
     for (const [index, value] of values.entries()) {

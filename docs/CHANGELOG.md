@@ -6,6 +6,13 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+### Paper position exit policy
+
+- Add one active 1.5 × closed 5-minute-ATR trailing exit with a fee/slippage-adjusted +€3 net floor; no fixed take-profit or initial stop-loss
+- Persist high-water and stop state and identify automatic SELLs without attributing them to AI decisions
+- Stop automatic evaluation of the experimental shadow-exit grid during paper-trading cycles
+- Add the local, unapplied Phase 8.14 PostgreSQL migration proposal
+
 ### Persistent dashboard sessions
 
 - Persist dashboard session token hashes outside the application checkout so Pi runtime restarts and deployments no longer force a new login

@@ -8,6 +8,7 @@ import {
   calculateMacd,
   calculateRsi
 } from "../src/services/ai-engine.mjs";
+import { CANDLE_INTERVAL_MS } from "../src/services/candle-intervals.mjs";
 import { createAiAnalysisService } from "../src/services/ai-analysis-service.mjs";
 import { createDeterministicDecisionId } from "../src/services/ai-decision-identity.mjs";
 import { readRuntimeConfig } from "../src/config/runtime-config.mjs";
@@ -20,6 +21,8 @@ const fixedNow = new Date("2026-03-20T12:00:00.000Z");
 const symbols = ["BTC-EUR", "ETH-EUR", "SOL-EUR", "ADA-EUR", "XRP-EUR"];
 
 function createCandles(symbol, interval, count = 60, direction = "up", now = fixedNow) {
+  const intervalMs = CANDLE_INTERVAL_MS[interval];
+  const latestClosedStart = Math.floor(now.getTime() / intervalMs) * intervalMs - intervalMs;
   return Array.from({ length: count }, (_, index) => {
     const close = direction === "up"
       ? 100 + index * 0.5
@@ -35,7 +38,7 @@ function createCandles(symbol, interval, count = 60, direction = "up", now = fix
       low: Math.min(open, close) - 0.3,
       close,
       volume: 100 + index,
-      timestamp: new Date(now.getTime() - (count - index) * 60_000).toISOString()
+      timestamp: new Date(latestClosedStart - (count - index - 1) * intervalMs).toISOString()
     };
   });
 }
@@ -88,6 +91,7 @@ function createServiceFixture({
   }
   const calls = [];
   const persisted = [];
+  const logs = [];
   let persistCalls = 0;
   const watchedMarketsRepository = {
     async listEnabled() {
@@ -117,10 +121,16 @@ function createServiceFixture({
     service: createAiAnalysisService({
       watchedMarketsRepository,
       aiAnalysisRepository,
+      logger: {
+        warn(message) {
+          logs.push(JSON.parse(message));
+        }
+      },
       now: () => fixedNow
     }),
     calls,
     persisted,
+    logs,
     get persistCalls() {
       return persistCalls;
     }
@@ -155,6 +165,82 @@ test("Pi V2 analysis returns the expected directional and safe outcomes", () => 
     assert.equal(actual.timestamp, fixedNow.toISOString());
     assert.equal(actual.indicators.interval, AI_DECISION_INTERVAL);
   }
+});
+
+test("AI excludes in-progress candles and accepts them only at the interval close", () => {
+  const now = new Date("2026-03-20T00:02:00.000Z");
+  const dailyCandles = createCandles("BTC-EUR", "1d", 60, "up", now);
+  const lastClosedDaily = dailyCandles.at(-1);
+  const inProgressDaily = {
+    ...lastClosedDaily,
+    volume: 875.01,
+    timestamp: "2026-03-20T00:00:00.000Z"
+  };
+  const candles = [
+    ...["1m", "5m", "15m", "1h", "4h"].flatMap((interval) =>
+      createCandles("BTC-EUR", interval, 60, "up", now)),
+    ...dailyCandles,
+    inProgressDaily
+  ];
+
+  const beforeDailyClose = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot("BTC-EUR", now),
+    candles,
+    now
+  });
+  assert.equal(beforeDailyClose.indicators.timeframes["1d"].incompleteCandleCount, 1);
+  assert.equal(beforeDailyClose.indicators.timeframes["1d"].analyzedCandleCount, 60);
+  assert.equal(beforeDailyClose.indicators.timeframes["1d"].volume.latest, lastClosedDaily.volume);
+  assert.notEqual(beforeDailyClose.indicators.timeframes["1d"].volume.latest, 875.01);
+  assert.deepEqual(beforeDailyClose.indicators.dataQuality.incompleteCandleIntervals, ["1d"]);
+
+  const atDailyClose = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot("BTC-EUR", new Date("2026-03-21T00:00:00.000Z")),
+    candles: [inProgressDaily],
+    now: new Date("2026-03-21T00:00:00.000Z")
+  });
+  assert.equal(atDailyClose.indicators.timeframes["1d"].incompleteCandleCount, 0);
+  assert.equal(atDailyClose.indicators.timeframes["1d"].closedCandleCount, 1);
+});
+
+test("stale intervals are excluded, insufficient directional data cannot BUY, and fresh data recovers", () => {
+  const staleOneMinute = createCandles("BTC-EUR", "1m", 150).map((candle) => ({
+    ...candle,
+    timestamp: new Date(Date.parse(candle.timestamp) - 60 * 60 * 1000).toISOString()
+  }));
+  const otherIntervals = ["5m", "15m", "1h"];
+  const candles = [
+    ...staleOneMinute,
+    ...otherIntervals.flatMap((interval) => createCandles("BTC-EUR", interval))
+  ];
+  const stale = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles,
+    now: fixedNow
+  });
+
+  assert.ok(stale.indicators.dataQuality.staleCandleIntervals.includes("1m"));
+  assert.equal(stale.indicators.timeframes["1m"].analyzedCandleCount, 0);
+  assert.equal(stale.indicators.timeframes["1m"].staleCandleCount, 150);
+  assert.equal(stale.indicators.dataQuality.sufficientForDirectionalSignal, false);
+  assert.notEqual(stale.decision, "BUY");
+
+  const recovered = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: [
+      ...candles.filter(({ interval }) => interval !== "1m"),
+      ...createCandles("BTC-EUR", "1d"),
+      ...createCandles("BTC-EUR", "1m")
+    ],
+    now: fixedNow
+  });
+  assert.equal(recovered.indicators.timeframes["1m"].analyzedCandleCount, 60);
+  assert.equal(recovered.indicators.dataQuality.staleCandleIntervals.includes("1m"), false);
+  assert.equal(recovered.indicators.dataQuality.sufficientForDirectionalSignal, true);
 });
 
 test("EMA, RSI, and MACD validate history and use deterministic values", () => {
@@ -205,6 +291,9 @@ test("missing and invalid candle inputs generate safe WAIT decisions", async () 
   const missingResult = await missing.service.run();
   assert.equal(missingResult.waitCount, 1);
   assert.equal(missing.persisted[0][0].decision, "WAIT");
+  assert.equal(missing.logs[0].event, "ai_analysis_candle_data_quality");
+  assert.equal(missing.logs[0].affectedMarketCount, 1);
+  assert.equal(missing.logs[0].affectedMarkets[0].missingIntervals.length, 6);
 
   const invalid = createServiceFixture({ invalidCandleFor: ["BTC-EUR"] });
   await invalid.service.run();

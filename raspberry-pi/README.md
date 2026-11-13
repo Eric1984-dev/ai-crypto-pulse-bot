@@ -45,15 +45,21 @@ The AI command is a manual one-shot operation. It does not backfill or refresh c
 
 The paper engine preserves the existing rules: 10% maximum position size, nine open positions, minimum BUY confidence 70, 15-minute cooldown, 0.25% fee, 0.10% slippage, 5% daily drawdown, 15% portfolio drawdown, and a 20% emergency stop. It uses existing tables only; it does not create schema objects or market rows. A failed ingestion or AI stage prevents downstream execution. Partial per-market ingestion can continue to AI so existing freshness safeguards can reject stale inputs.
 
+The paper executor also runs one active position-aware exit policy alongside fresh AI SELL decisions. Once the observed high-water mark could realize at least €3 net after entry cost, exit fee, and slippage, it ratchets a stop to the greater of that net-profit floor and the high-water mark minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. High-water is the highest fresh market mark observed during paper cycles, not a tick-level or intrabar high. Only a fresh stored market mark can trigger a SELL. Missing, stale, incomplete, misaligned, gapped, or zero-range candles cannot create a stop; any previously persisted stop remains enforceable. The policy has no initial fixed stop-loss or fixed take-profit, so it does not cap losses before the net-profit floor arms.
+
+The additive [Phase 8.14 migration](migrations/phase-8.14-position-aware-trailing-exits.sql) stores position high-water/stop state and an auditable trade execution reason. Review and apply it as the database schema owner before starting this runtime version. Runtime startup never applies migrations. Automated exits create SELL trades with no AI-decision link and `execution_reason = ATR_TRAILING_EXIT`; dashboard trade history and analytics distinguish those from AI SELL decisions.
+
+The 1.5 × ATR and €3 net settings are the single initial PAPER configuration, not validated optimal values. The previous shadow candidate grid is not evaluated during paper-trading cycles.
+
 Paper trading uses only the standalone system profile and has no Supabase Auth or `auth.users` dependency. Apply the [Phase 7.6 schema migration](migrations/phase-7.6-standalone-system-profile.sql), then the [Phase 7.7 bootstrap migration](migrations/phase-7.7-system-profile-bootstrap.sql) to the existing `ai_crypto_bot_store` database as its schema owner. Phase 7.7 creates a missing system profile, portfolio, and first snapshot transactionally; a repeated run preserves existing balances and history. Runtime startup still does not provision or repair database records, and paper trading skips safely if the account is absent or invalid. See the [Phase 7.7 operational validation report](docs/phase-7.7-operational-validation.md).
 
 The scheduler is process-local, UTC-aligned, non-overlapping, and guarded by a session advisory lock. Lost lock ownership terminates the runtime with a failure so systemd can restart it. The service uses `Restart=always`; deliberate `systemctl stop` remains stopped. `systemd` starts/restarts the one runtime service but does not schedule cycles. The retention service only emits a policy plan; it never deletes data. Starter candle cadences are 1m every five minutes, 5m every fifteen minutes, 15m every thirty minutes, 1h hourly, 4h every four hours, and 1d daily. The external production cadences for 1h/4h/1d were not independently verified; confirm them before cutover.
 
 The runtime requires a dedicated, non-owner `PAPER_DATABASE_USER` and `PAPER_DATABASE_PASSWORD`, distinct from the API, ingestion, and AI roles. `npm start` validates all four role contracts at startup. See the [Phase 7 implementation report](docs/phase-7-implementation-report.md) for exact existing-table grants, scheduler assumptions, systemd deployment steps, and validation status. The sample systemd unit is [deploy/cryptopulse-runtime.service](deploy/cryptopulse-runtime.service).
 
-## Shadow-exit simulation
+## Shadow-exit history (not evaluated by the runtime)
 
-The paper-trading runtime invokes the existing `AI_Crypto_Bot_Evaluate_Shadow_Exit_Scenarios()` database function before paper processing and again after a cycle that executes trades. Each invocation uses its own transaction and the function's advisory lock. Shadow exits only record hypothetical outcomes; they do not execute trades, modify real paper positions, or affect risk decisions. Evaluator failures are logged and surfaced as `lastCycle.stages.shadowExits` by `/api/v1/monitoring`, but do not roll back or block paper trading.
+Existing shadow-exit scenarios and their dashboard reads are retained for historical inspection, but the normal paper-trading runtime no longer evaluates the experimental rule grid. New paper cycles do not advance those scenario records, and they are not execution rules or evidence that the active ATR exit is profitable.
 
 Phase 8.10 only grants the dashboard API read access; it does not install the evaluator. If the evaluator is missing (for example, PostgreSQL returns SQLSTATE `42883`), apply the [Phase 8.11 evaluator installation migration](migrations/phase-8.11-shadow-exit-evaluator-installation.sql) as the database schema owner. It installs only the Pi-compatible function and grants execution to the exact `PAPER_DATABASE_USER` role configured in the Pi's local `.env`:
 
@@ -69,9 +75,9 @@ SELECT pg_catalog.set_config(
 SQL
 ```
 
-The migration requires the existing positions, trades, market-data, and shadow-exit tables; it does not create or alter tables. It fails if the evaluator already exists, the migration owner cannot securely access its required tables, or the configured paper role is privileged. The function is installed as `SECURITY DEFINER` with a pinned empty `search_path`; the paper role receives schema usage and function execution only, not direct shadow-table access. Do not apply the legacy Supabase migration wholesale to the Pi. If the evaluator already exists, use the [Phase 8.9 permission migration](migrations/phase-8.9-shadow-exit-runtime-permissions.sql) instead. After applying the appropriate migration, restart the Pi runtime and check `GET /api/v1/monitoring`; the latest cycle should report `shadowExits: "COMPLETED"` or `"SKIPPED"`. No rows are expected until there are open positions and fresh market data. See the [shadow-exit reactivation report](docs/reports/shadow-exit-reactivation.md) for implementation and local validation evidence.
+These evaluator installation/permission migrations are retained for installations that intentionally need to inspect or manually run the legacy simulation. They are not required by the active position-exit policy, and applying them does not make the scheduler evaluate shadow exits. Do not apply the legacy Supabase migration wholesale to the Pi.
 
-The evaluator must also use an advisory-lock key distinct from the runtime ownership lock. Apply the [Phase 8.12 lock-isolation migration](migrations/phase-8.12-shadow-exit-lock-isolation.sql) as the evaluator owner on databases where Phase 8.11 was already applied. It changes only the evaluator's transaction-level lock key; the runtime ownership lock remains unchanged. This prevents the runtime's own scheduler lock from making every shadow evaluation return `SKIPPED`. The database change takes effect immediately; no runtime code deployment or restart is required, and the next five-minute cycle should report `COMPLETED`.
+If the legacy evaluator is manually invoked, it must use an advisory-lock key distinct from the runtime ownership lock. The [Phase 8.12 migration](migrations/phase-8.12-shadow-exit-lock-isolation.sql) addresses that legacy evaluator only; the active paper-trading cycle does not depend on it.
 
 The authenticated dashboard reads these records through the API's read-only `DATABASE_USER`. Apply the [Phase 8.10 dashboard-read permission migration](migrations/phase-8.10-shadow-exit-dashboard-read.sql) as the database schema owner, setting `cryptopulse.dashboard_database_user` to the exact `DATABASE_USER` configured on the Pi:
 
@@ -133,7 +139,7 @@ npm start
 
 - `GET /api/v1/health/live` — process liveness only.
 - `GET /api/v1/health/ready` — coarse read-only database readiness; it does not expose database, schema, or market details.
-- `GET /api/v1/health/operational` — bounded runtime/resource counters and last-cycle ingestion, AI, paper-trading, and shadow-exit stage outcomes, protected by the `admin` role and denied by default.
+- `GET /api/v1/health/operational` — bounded runtime/resource counters and last-cycle ingestion, AI, paper-trading, and position-exit stage outcomes, protected by the `admin` role and denied by default.
 - `POST /api/v1/auth/login`, `GET /api/v1/auth/session`, and `DELETE /api/v1/auth/session` — single-admin login, session lookup, and CSRF-protected session revocation.
 - `GET /api/v1/markets` — enabled watched-market rows, ordered by priority then symbol.
 - `GET /api/v1/market?symbol=BTC-EUR&interval=1m&limit=200` — one enabled market's stored snapshot and bounded newest-first candle history.
@@ -147,7 +153,7 @@ npm start
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
-- `GET /api/v1/monitoring` — runtime status, last-cycle stages including shadow-exit evaluation, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
+- `GET /api/v1/monitoring` — runtime status, last-cycle stages including position-exit processing, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts.
 
 ## Phase 11 historical analytics
 

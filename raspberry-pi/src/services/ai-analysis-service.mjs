@@ -24,6 +24,7 @@ export class AIAnalysisServiceError extends Error {
 export function createAiAnalysisService({
   watchedMarketsRepository,
   aiAnalysisRepository,
+  logger = console,
   now = () => new Date()
 }) {
   if (!watchedMarketsRepository || typeof watchedMarketsRepository.listEnabled !== "function"
@@ -92,6 +93,14 @@ export function createAiAnalysisService({
       }
 
       const persistence = await aiAnalysisRepository.insertDecisions(decisions);
+      const dataQuality = summarizeDataQuality(decisions);
+      if (dataQuality.affectedMarkets.length) {
+        logger?.warn?.(JSON.stringify({
+          event: "ai_analysis_candle_data_quality",
+          component: "ai-analysis-service",
+          ...dataQuality
+        }));
+      }
       return Object.freeze({
         status: "completed",
         analyzedMarkets: decisions.length,
@@ -100,9 +109,38 @@ export function createAiAnalysisService({
         buyCount: decisions.filter(({ decision }) => decision === "BUY").length,
         sellCount: decisions.filter(({ decision }) => decision === "SELL").length,
         holdCount: decisions.filter(({ decision }) => decision === "HOLD").length,
-        waitCount: decisions.filter(({ decision }) => decision === "WAIT").length
+        waitCount: decisions.filter(({ decision }) => decision === "WAIT").length,
+        dataQuality
       });
     }
+  });
+}
+
+function summarizeDataQuality(decisions) {
+  const affectedMarkets = decisions.flatMap(({ symbol, indicators }) => {
+    const dataQuality = indicators.dataQuality;
+    const incompleteIntervals = dataQuality.incompleteCandleIntervals;
+    const staleIntervals = dataQuality.staleCandleIntervals;
+    const missingIntervals = dataQuality.missingCandleIntervals;
+    const invalidCandleCount = dataQuality.invalidCandlesIgnored;
+    return incompleteIntervals.length || staleIntervals.length || missingIntervals.length
+      || invalidCandleCount
+      ? [{
+        symbol,
+        incompleteIntervals,
+        staleIntervals,
+        missingIntervals,
+        invalidCandleCount,
+        sufficientForDirectionalSignal: dataQuality.sufficientForDirectionalSignal
+      }]
+      : [];
+  });
+  return Object.freeze({
+    affectedMarketCount: affectedMarkets.length,
+    marketsWithoutDirectionalData: decisions.filter(({ indicators }) =>
+      !indicators.dataQuality.sufficientForDirectionalSignal
+    ).length,
+    affectedMarkets: Object.freeze(affectedMarkets)
   });
 }
 

@@ -4,6 +4,10 @@
 
 Implementation and local validation are complete. Production migration and deployment have not been performed or verified.
 
+## Applicability
+
+This report documents the historical SQL paper executor and its 67-confidence experiment. It does not describe the active Raspberry Pi executor, which continues to enforce a minimum BUY confidence of 70; the historical SQL migration is not part of the Pi runtime.
+
 ## Reason
 
 The supplied decision analysis showed:

@@ -44,7 +44,7 @@ test("runtime cycle allows per-market partial ingestion and preserves stage orde
     ingestion: "partial",
     aiAnalysis: "completed",
     paperTrading: "COMPLETED",
-    shadowExits: null
+    positionExits: "COMPLETED"
   });
   assert.deepEqual(calls, ["ingestion", "analysis", "paper"]);
   assert.deepEqual(statusUpdates.map(({ status }) => status), [
@@ -55,18 +55,18 @@ test("runtime cycle allows per-market partial ingestion and preserves stage orde
   ]);
 });
 
-test("shadow-exit failure remains visible without failing the runtime cycle", async () => {
+test("position exits complete within the paper-trading stage", async () => {
   const { cycle } = makeCycle({
     runPaperTrading: async () => ({
       status: "COMPLETED",
-      shadowExitEvaluation: { status: "FAILED", errorCode: "42501" }
+      automaticExits: 1
     })
   });
 
   const result = await cycle.run({ slot: new Date("2026-01-01T12:00:00.000Z") });
 
   assert.equal(result.status, "COMPLETED");
-  assert.equal(result.stages.shadowExits, "FAILED");
+  assert.equal(result.stages.positionExits, "COMPLETED");
 });
 
 test("critical ingestion failures mark ERROR and skip downstream stages", async () => {

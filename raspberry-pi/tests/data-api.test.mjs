@@ -618,6 +618,7 @@ test("analytics endpoint returns the page's chart and metric contract", async ()
     snapshots: [{
       id: "snapshot-1",
       portfolio_id: "portfolio-1",
+      snapshot_order: "1",
       portfolio_value: 10100,
       available_balance: 8000,
       open_positions: 1,
@@ -678,6 +679,7 @@ test("analytics and recommendations endpoints handle recommendation generator in
   const snapshots = Array.from({ length: 10 }, (_, index) => ({
     id: `snapshot-${index}`,
     portfolio_id: "portfolio-1",
+    snapshot_order: String(index + 1),
     portfolio_value: index < 9 ? 1000 : 900,
     available_balance: index < 9 ? 1000 : 900,
     open_positions: 0,

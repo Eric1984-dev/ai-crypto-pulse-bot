@@ -321,6 +321,9 @@ function createAiPerformance(decisions, trades, decisionSummary = null) {
   const buyOutcomes = matchBuyDecisionOutcomes(trades, decisionById);
   const sellTrades = trades.filter(({ side }) => side === "SELL");
   for (const trade of sellTrades) {
+    if (trade.execution_reason === "ATR_TRAILING_EXIT" && !trade.ai_decision_id) {
+      continue;
+    }
     const decision = trade.ai_decision_id
       ? decisionById.get(String(trade.ai_decision_id))
       : null;
@@ -748,6 +751,7 @@ function finalizeDecisionGroup(group) {
 function createPortfolioAnalytics(portfolio, snapshots, periodStart) {
   const ordered = snapshots.slice().sort((left, right) =>
     Date.parse(left.captured_at) - Date.parse(right.captured_at)
+      || compareSnapshotOrder(left.snapshot_order, right.snapshot_order)
   );
   const periodStartMs = Date.parse(periodStart);
   const baseline = ordered.filter(({ captured_at }) =>
@@ -760,6 +764,7 @@ function createPortfolioAnalytics(portfolio, snapshots, periodStart) {
   let peak = 0;
   const equityCurve = periodSnapshots.map((snapshot) => ({
     period: snapshot.captured_at,
+    snapshotOrder: snapshot.snapshot_order,
     portfolioValue: snapshot.portfolio_value,
     growthPercent: portfolio?.starting_balance
       ? (snapshot.portfolio_value - portfolio.starting_balance) / portfolio.starting_balance * 100
@@ -769,6 +774,7 @@ function createPortfolioAnalytics(portfolio, snapshots, periodStart) {
     peak = Math.max(peak, snapshot.portfolio_value);
     return {
       period: snapshot.captured_at,
+      snapshotOrder: snapshot.snapshot_order,
       drawdownPercent: peak > 0 ? (peak - snapshot.portfolio_value) / peak * 100 : 0
     };
   });
@@ -812,6 +818,12 @@ function createPortfolioAnalytics(portfolio, snapshots, periodStart) {
     weeklyPerformance,
     monthlyPerformance
   };
+}
+
+function compareSnapshotOrder(left, right) {
+  const leftOrder = BigInt(left);
+  const rightOrder = BigInt(right);
+  return leftOrder < rightOrder ? -1 : leftOrder > rightOrder ? 1 : 0;
 }
 
 function summarizeSnapshotPeriods(snapshots, unit, portfolio, baselineValue) {

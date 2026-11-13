@@ -4,7 +4,7 @@
 
 The package is an isolated Node.js runtime for the existing Raspberry Pi PostgreSQL database. The Phase 4 API remains read-only. Phase 5's one-shot Bitvavo ingestion and Phase 6's one-shot AI command remain available for explicit operation; Phase 7 also wires them into the long-running Node.js runtime with paper-only trade processing.
 
-The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and existing PostgreSQL tables. The paper worker invokes only the existing, simulation-only shadow-exit evaluator; it does not invoke database AI or trade-execution functions. The API, ingestion, AI, and paper-trading roles are separately validated; the latter three use bounded worker connections. No schema creation, migration, seed, live trade, or private exchange API is performed by the runtime.
+The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and existing PostgreSQL tables. The paper worker applies stored AI decisions and one position-aware ATR trailing exit; it does not invoke the experimental shadow-exit evaluator, database AI, or exchange order functions. The paper role reads 5-minute candles for the exit ATR and updates persisted high-water/stop state. The API, ingestion, AI, and paper-trading roles are separately validated; the latter three use bounded worker connections. No schema creation, migration, seed, live trade, or private exchange API is performed by the runtime.
 
 ## Lifecycle and database access
 
@@ -13,7 +13,7 @@ The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and 
 3. Validate ingestion and AI identities/contracts with one short-lived connection each. Open a one-connection paper writer pool and validate its exact existing-table grants.
 4. Require the singleton status row. A leftover `ANALYZING` state is changed to `ERROR`; `STOPPED` is never cleared automatically.
 5. Start the API and an in-process scheduler. UTC cycles run every five minutes and do not replay missed slots. The API pool is capped at two connections including its reserved owner-lock connection, the paper pool at one, and the sequential worker pool at one; total concurrent PostgreSQL connections remain at most four.
-6. Each cycle runs market ingestion, AI analysis, paper trading (including isolated shadow-exit evaluation), then a non-destructive retention plan. A failed ingestion or AI stage skips dependent downstream stages; safely partial per-market ingestion can continue to AI.
+6. Each cycle runs market ingestion, AI analysis, paper trading (including the active position-exit policy), then a non-destructive retention plan. A failed ingestion or AI stage skips dependent downstream stages; safely partial per-market ingestion can continue to AI.
 7. On `SIGINT` or `SIGTERM`, stop scheduling, wait up to 120 seconds for the active cycle, preserve `STOPPED`, set status to `IDLE` only when safe, release the lock, and close pools.
 
 The `npm run ingest:market-data -- --intervals=...` command separately validates the existing ingestion contract, reads enabled watched markets, and runs one snapshot/candle pass. It uses no Vercel function, HTTP trigger, external scheduler, or `systemd` timer. Each write uses an explicit `BEGIN READ WRITE` transaction; API repositories continue to use `BEGIN READ ONLY`. No write targets the watched-market table. Database/provider failures are logged with safe codes; credentials and raw error details are never logged.

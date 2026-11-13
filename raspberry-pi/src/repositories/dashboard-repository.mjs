@@ -86,10 +86,10 @@ const RECENT_TRADES_SQL = `
 
 const PORTFOLIO_SNAPSHOTS_SQL = `
   SELECT id, portfolio_id, portfolio_value, available_balance,
-         open_positions, captured_at
+         open_positions, captured_at, snapshot_order
   FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
   WHERE portfolio_id = $1::uuid
-  ORDER BY captured_at DESC, id DESC
+  ORDER BY captured_at DESC, snapshot_order DESC
   LIMIT $2
 `;
 
@@ -180,7 +180,7 @@ const ANALYTICS_POSITIONS_SQL = `
 `;
 const ANALYTICS_TRADES_SQL = `
   SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
-         realized_pnl, created_at
+         realized_pnl, execution_reason, created_at
   FROM public."AI_Crypto_Bot_Trades"
   WHERE portfolio_id = $1::uuid
     AND created_at >= $2::timestamptz
@@ -293,26 +293,28 @@ const ANALYTICS_LINKED_DECISIONS_SQL = `
 `;
 const ANALYTICS_SNAPSHOTS_SQL = `
   WITH period_snapshots AS (
-    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
+    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions,
+           captured_at, snapshot_order
     FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
     WHERE portfolio_id = $1::uuid
       AND captured_at >= $2::timestamptz
       AND captured_at <= $3::timestamptz
-    ORDER BY captured_at ASC, id ASC
+    ORDER BY captured_at ASC, snapshot_order ASC
     LIMIT $4
   ),
   baseline_snapshot AS (
-    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
+    SELECT id, portfolio_id, portfolio_value, available_balance, open_positions,
+           captured_at, snapshot_order
     FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
     WHERE portfolio_id = $1::uuid
       AND captured_at < $2::timestamptz
-    ORDER BY captured_at DESC, id DESC
+    ORDER BY captured_at DESC, snapshot_order DESC
     LIMIT 1
   )
   SELECT * FROM baseline_snapshot
   UNION ALL
   SELECT * FROM period_snapshots
-  ORDER BY captured_at ASC, id ASC
+  ORDER BY captured_at ASC, snapshot_order ASC
   LIMIT $5
 `;
 const ANALYTICS_SOURCE_COUNTS_SQL = `
@@ -407,7 +409,7 @@ const LATEST_ANALYTICS_RUN_SQL = `
 `;
 const BUNDLE_TRADES_SQL = `
   SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
-         realized_pnl, created_at
+         realized_pnl, execution_reason, created_at
   FROM public."AI_Crypto_Bot_Trades"
   WHERE portfolio_id = $1::uuid
     AND created_at >= $2::timestamptz
@@ -461,12 +463,13 @@ const BUNDLE_LINKED_DECISIONS_SQL = `
   LIMIT $2
 `;
 const BUNDLE_SNAPSHOTS_SQL = `
-  SELECT id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at
+  SELECT id, portfolio_id, portfolio_value, available_balance, open_positions,
+         captured_at, snapshot_order
   FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
   WHERE portfolio_id = $1::uuid
     AND captured_at >= $2::timestamptz
     AND captured_at <= $3::timestamptz
-  ORDER BY captured_at ASC, id ASC
+  ORDER BY captured_at ASC, snapshot_order ASC
   LIMIT $4
 `;
 const BUNDLE_SHADOW_SCENARIOS_SQL = `
@@ -578,7 +581,7 @@ const BUNDLE_SOURCE_COUNTS_SQL = `
 const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   trades: `
     SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
-           realized_pnl, created_at
+           realized_pnl, execution_reason, created_at
     FROM public."AI_Crypto_Bot_Trades"
     WHERE portfolio_id = $1::uuid
       AND created_at <= $2::timestamptz
@@ -619,16 +622,16 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   portfolioSnapshots: `
     SELECT id, portfolio_id, portfolio_value, available_balance,
-           open_positions, captured_at
+           open_positions, captured_at, snapshot_order
     FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
     WHERE portfolio_id = $1::uuid
       AND captured_at <= $2::timestamptz
       AND (
         $3::timestamptz IS NULL
         OR captured_at > $3::timestamptz
-        OR (captured_at = $3::timestamptz AND id > $4::uuid)
+        OR (captured_at = $3::timestamptz AND snapshot_order > $4::bigint)
       )
-    ORDER BY captured_at ASC, id ASC
+    ORDER BY captured_at ASC, snapshot_order ASC
     LIMIT $5
   `,
   shadowExitScenarios: `
@@ -777,8 +780,8 @@ const EXPORTS = Object.freeze({
   portfolio: Object.freeze({
     table: 'public."AI_Crypto_Bot_Portfolio_Snapshots"',
     timestamp: "captured_at",
-    select: "id,portfolio_id,portfolio_value,available_balance,open_positions,captured_at",
-    order: "captured_at ASC, id ASC",
+    select: "id,portfolio_id,portfolio_value,available_balance,open_positions,captured_at,snapshot_order",
+    order: "captured_at ASC, snapshot_order ASC",
     portfolioScoped: true
   }),
   decisions: Object.freeze({
@@ -2170,6 +2173,14 @@ function normalizeSnapshot(row) {
   if (!Number.isSafeInteger(row.open_positions) || row.open_positions < 0) {
     throw new RepositoryDataError("invalid snapshot open-position count");
   }
+  if (typeof row.snapshot_order !== "string" && typeof row.snapshot_order !== "bigint"
+    && !(typeof row.snapshot_order === "number" && Number.isSafeInteger(row.snapshot_order))) {
+    throw new RepositoryDataError("invalid snapshot order");
+  }
+  row.snapshot_order = String(row.snapshot_order);
+  if (!/^[1-9]\d*$/.test(row.snapshot_order)) {
+    throw new RepositoryDataError("invalid snapshot order");
+  }
   row.captured_at = readTimestamp(row.captured_at, "snapshot timestamp");
   return row;
 }
@@ -2354,8 +2365,17 @@ function emptyAnalysisExportPage(source, asOf, extra = {}) {
 }
 
 function createAnalysisExportPageParameters(source, { portfolioId, asOfTimestamp, cursor }) {
+  if (source === "portfolioSnapshots") {
+    return [
+      portfolioId,
+      asOfTimestamp,
+      cursor?.timestamp ?? null,
+      cursor?.snapshotOrder ?? null,
+      ANALYSIS_EXPORT_PAGE_SIZE + 1
+    ];
+  }
   if (source === "trades" || source === "positions"
-    || source === "portfolioSnapshots" || source === "shadowExitScenarios") {
+    || source === "shadowExitScenarios") {
     return [
       portfolioId,
       asOfTimestamp,
@@ -2391,6 +2411,12 @@ function getAnalysisExportCursor(source, row) {
       scenarioId: row.scenario_id,
       eventAt: readTimestamp(row.event_at, "analysis export cursor event time"),
       id: row.id
+    };
+  }
+  if (source === "portfolioSnapshots") {
+    return {
+      timestamp: readTimestamp(row.captured_at, "analysis export cursor timestamp"),
+      snapshotOrder: String(row.snapshot_order)
     };
   }
   return {
@@ -2435,6 +2461,14 @@ function decodeAnalysisExportCursor(value, source) {
       || typeof cursor.symbol !== "string" || !/^[A-Z0-9]+-EUR$/.test(cursor.symbol)
       || ![0, 1].includes(cursor.sourceRank)
       || !UUID_PATTERN.test(cursor.id || "")) {
+      throw new TypeError("Analysis export cursor is invalid.");
+    }
+    return cursor;
+  }
+  if (source === "portfolioSnapshots") {
+    if (!Number.isFinite(Date.parse(cursor.timestamp || ""))
+      || typeof cursor.snapshotOrder !== "string"
+      || !/^[1-9]\d*$/.test(cursor.snapshotOrder)) {
       throw new TypeError("Analysis export cursor is invalid.");
     }
     return cursor;

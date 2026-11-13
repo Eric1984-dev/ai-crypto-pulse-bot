@@ -119,7 +119,8 @@ test("trade history renders all required fields as text and treats buys as unrea
         price: "1124",
         quantity: "1",
         fees: "2.81",
-        realized_pnl: "118.69"
+        realized_pnl: "118.69",
+        execution_reason: "ATR_TRAILING_EXIT"
       }),
       createTradeRow({ id: "trade-3", price: "0.98123456" }),
       createTradeRow({ id: "trade-4", price: "12.3456" }),
@@ -183,13 +184,17 @@ test("trade history renders all required fields as text and treats buys as unrea
       "Unrealized P&L: +€100.00 (+10.00%)"
     ]
   );
-  assert.equal(rows.children[1].children[9].textContent, "CLOSED · Paper Trade");
+  assert.equal(
+    rows.children[1].children[9].textContent,
+    "CLOSED · ATR Trailing Exit · Paper Trade"
+  );
   assert.equal(rows.children[1].children[7].textContent, "+€118.69 (+11.84%)");
   assert.deepEqual(
     rows.children[1].children[8].children[0].children.map((line) => line.textContent),
     [
       "Entry Price: €1,002.50",
       "Exit Price: €1,124.00",
+      "Exit Rule: 1.5 × 5m ATR trail, activated at +€3 net",
       "Realized P&L: +€118.69 (+11.84%)"
     ]
   );

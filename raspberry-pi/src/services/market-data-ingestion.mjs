@@ -3,19 +3,16 @@ import {
   MAX_CANDLES_PER_MARKET,
   MAX_INGESTION_MARKETS_PER_BATCH
 } from "../repositories/market-ingestion-repository.mjs";
+import {
+  CANDLE_INTERVAL_MS,
+  isCandleClosed,
+  isCandleTimestampAligned
+} from "./candle-intervals.mjs";
 import { BitvavoProviderError } from "./bitvavo-public-client.mjs";
 import { createIngestionFailureDiagnostic } from "./ingestion-diagnostics.mjs";
 
 export const SUPPORTED_INGESTION_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export const MAX_INGESTION_WORKERS = 4;
-const CANDLE_INTERVAL_MS = Object.freeze({
-  "1m": 60_000,
-  "5m": 5 * 60_000,
-  "15m": 15 * 60_000,
-  "1h": 60 * 60_000,
-  "4h": 4 * 60 * 60_000,
-  "1d": 24 * 60 * 60_000
-});
 const MARKET_SYMBOL_PATTERN = /^[A-Z0-9]+-[A-Z0-9]+$/;
 const GLOBAL_PROVIDER_FAILURES = new Set([
   "PROVIDER_EMPTY",
@@ -518,10 +515,13 @@ export function parseCandleRows(rows, { symbol, interval, limit, nowMs }) {
     const close = finiteNumber(values[4]);
     const volume = finiteNumber(values[5]);
     if (!Number.isSafeInteger(timestamp) || timestamp <= 0 || timestamp > nowMs + 1000
-      || timestamp % intervalDuration !== 0
+      || !isCandleTimestampAligned(timestamp, interval)
       || open === null || open <= 0 || high === null || low === null || close === null
       || volume === null || volume < 0
       || high < low || high < open || high < close || low > open || low > close) {
+      continue;
+    }
+    if (!isCandleClosed(timestamp, interval, nowMs)) {
       continue;
     }
 

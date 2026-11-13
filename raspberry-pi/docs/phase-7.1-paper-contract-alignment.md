@@ -8,9 +8,11 @@ No live Raspberry Pi database was queried or modified. No trading cycle, exchang
 
 ## Root cause
 
-The shared contract inspector read columns from `information_schema.columns`. PostgreSQL filters that view according to the current role's effective access to each table or column. The paper writer is intentionally not granted `SELECT` on candles because paper trading does not read candle data, but the shared schema contract still checks the candle columns. As a result, valid columns can be reported missing when the paper role cannot see them through `information_schema`.
+The shared contract inspector read columns from `information_schema.columns`. PostgreSQL filters that view according to the current role's effective access to each table or column. At the time of this Phase 7.1 fix, the paper writer was not granted `SELECT` on candles because paper trading did not read candle data, but the shared schema contract still checked the candle columns. As a result, valid columns can be reported missing when the paper role cannot see them through `information_schema`.
 
 A local PGlite reproduction confirmed the visibility difference: under a role with schema usage but no table privileges, the `information_schema.columns` query returned no rows while a `pg_catalog.pg_attribute` query returned the table's column names and types. The node-postgres type parser was not the cause: `information_schema` returns the relevant name and data-type values as strings. The Phase 6.3 `name[]` constraint parsing defect was separate and its cast remains in place.
+
+The historical statement below that the paper writer has no candle `SELECT` grant describes the Phase 7.1 behavior only. The current position-exit policy reads candles; the Phase 8.14 migration now grants the restricted paper role `SELECT` on `AI_Crypto_Bot_Candles` while rejecting table ownership and candle write privileges.
 
 ## Affected validators
 
