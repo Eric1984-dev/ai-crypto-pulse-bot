@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document guarded Raspberry Pi paper-history reset and €2,000 portfolio initialization scripts; the reset preserves watched markets and market data.
+- Document a repeatable, operator-run procedure for applying PostgreSQL migrations on the Raspberry Pi.
 - Make dashboard data, agent status, and monitoring reads wait for `Retry-After` and retry once on rate limiting.
 - Show dashboard Pi services as Unknown, rather than Offline, when a monitoring request fails and preserve the last successful metrics.
 - Color dashboard temperature, CPU, and memory meters to match the Exports status thresholds.

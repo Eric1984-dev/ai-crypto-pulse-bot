@@ -6,6 +6,8 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+- Add a Pi-specific migration runbook and separate guarded scripts for clearing selected paper history and initializing a €2,000 system portfolio.
+
 ### Paper position exit policy
 
 - Add one active 1.5 × closed 5-minute-ATR trailing exit with a fee/slippage-adjusted +€3 net floor; no fixed take-profit or initial stop-loss
