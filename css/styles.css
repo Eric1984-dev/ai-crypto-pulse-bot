@@ -964,6 +964,22 @@ a:focus-visible {
 
 .archive-health-panel {
   margin-top: 14px;
+  padding: 0;
+  border-color: var(--accent-border);
+  background: linear-gradient(90deg, rgb(20 24 30 / 96%), rgb(28 33 41 / 80%));
+}
+
+.archive-health-panel > .agent-status-monitor {
+  margin-top: 0;
+  border-radius: 13px;
+}
+
+.archive-health-panel[open] > .agent-status-monitor {
+  border-radius: 13px 13px 0 0;
+}
+
+.archive-health-panel > .archive-health-metrics {
+  margin: 0 18px 18px;
 }
 
 .archive-health-metrics {

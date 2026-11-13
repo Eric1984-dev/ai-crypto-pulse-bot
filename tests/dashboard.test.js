@@ -489,7 +489,10 @@ test("infrastructure metrics are collapsed below the live backend signal", () =>
   );
 
   assert.ok(infrastructureCard > backendSignal);
-  assert.match(statusPanel[1], /<h2 id="archive-health-heading">Infrastructure<\/h2>/);
+  assert.match(
+    statusPanel[1],
+    /<summary class="panel-heading agent-status-monitor">[\s\S]*<p id="archive-health-heading" class="agent-status-title">Infrastructure<\/p>/
+  );
   assert.doesNotMatch(
     statusPanel[1].slice(infrastructureCard, statusPanel[1].indexOf("</details>", infrastructureCard)),
     /Raspberry Pi/
