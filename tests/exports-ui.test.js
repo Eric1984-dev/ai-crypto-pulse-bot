@@ -124,7 +124,7 @@ test("full-history export paginates sequentially, retries rate limits, and split
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
         return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v1",
+          formatVersion: "cryptopulse-analysis-export-v2",
           asOf,
           sources,
           limits: { maxFileBytes: 1024 }
@@ -155,16 +155,17 @@ test("full-history export paginates sequentially, retries rate limits, and split
           source,
           asOf,
           anchors: pageAnchors,
-          candleWindows: pageAnchors.map((anchor) => ({
-            ...anchor,
+          candleWindows: [{
+            symbol: "BTC-EUR",
             interval: "1m",
-            timestamp: anchor.anchorAt,
+            timestamp: "2026-11-12T10:00:00.000Z",
+            anchorTimes: pageAnchors.map(({ anchorAt }) => anchorAt),
             open: 1,
             high: 2,
             low: 0.5,
             close: 1.5,
             volume: 5
-          })),
+          }],
           hasMore: !cursor,
           nextCursor: cursor ? null : "candle-page-2"
         });
@@ -187,20 +188,44 @@ test("full-history export paginates sequentially, retries rate limits, and split
   });
   assert.equal(result.manifest.exportStatus, "complete");
   assert.equal(result.manifest.sourceCounts.trades.records, 2);
-  assert.equal(result.manifest.sourceCounts.candleWindows.records, 6);
+  assert.equal(result.manifest.sourceCounts.candleWindows.records, 7);
+  assert.equal(result.manifest.sourceCounts.candleWindows.anchors, 3);
+  assert.equal(result.manifest.sourceCounts.candleWindows.uniqueCandles, 1);
+  assert.equal(result.manifest.sourceCounts.candleWindows.windowLinks, 3);
   assert.equal(maximumActiveRequests, 1);
   assert.match([...directories.keys()][0], /^cryptopulse-analysis-\d{14}$/);
   assert.ok(requests.some((url) => url.includes("view=analysis-export-page")));
   const runFiles = files;
   const manifest = JSON.parse(runFiles.get("manifest.json"));
   assert.equal(manifest.exportStatus, "complete");
+  assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v2");
+  assert.equal(manifest.candleDataFormat.candleRowsAreUnique, true);
   const tradeFiles = [...runFiles.entries()].filter(([name]) => name.startsWith("trades-"));
   assert.equal(tradeFiles.length, 2);
   assert.ok(tradeFiles.every(([, contents]) => new TextEncoder().encode(contents).byteLength <= 1024));
   const anchorFile = runFiles.get("candle-anchors-0001.jsonl");
   const candleFile = runFiles.get("candle-windows-0001.jsonl");
+  const linkFile = runFiles.get("candle-window-links-0001.jsonl");
   assert.equal(anchorFile.trim().split("\n").length, 3);
-  assert.equal(candleFile.trim().split("\n").length, 3);
+  assert.equal(candleFile.trim().split("\n").length, 1);
+  assert.equal(linkFile.trim().split("\n").length, 3);
+  assert.deepEqual(
+    JSON.parse(candleFile.trim()),
+    {
+      symbol: "BTC-EUR",
+      interval: "1m",
+      timestamp: "2026-11-12T10:00:00.000Z",
+      open: 1,
+      high: 2,
+      low: 0.5,
+      close: 1.5,
+      volume: 5
+    }
+  );
+  assert.deepEqual(
+    linkFile.trim().split("\n").map((line) => JSON.parse(line).anchorAt),
+    anchors.map(({ anchorAt }) => anchorAt)
+  );
 });
 
 test("full-history export leaves a cancelled status in the manifest", async () => {
@@ -215,7 +240,7 @@ test("full-history export leaves a cancelled status in the manifest", async () =
     const params = new URL(url, "https://cryptopulse.local").searchParams;
     if (params.get("view") === "analysis-export-manifest") {
       return jsonResponse({
-        formatVersion: "cryptopulse-analysis-export-v1",
+        formatVersion: "cryptopulse-analysis-export-v2",
         asOf,
         sources: [
           "trades", "positions", "decisions", "portfolioSnapshots",
@@ -264,7 +289,7 @@ test("Exports page wires folder selection and displays completed export status",
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
         return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v1",
+          formatVersion: "cryptopulse-analysis-export-v2",
           asOf,
           sources,
           limits: { maxFileBytes: 1024 }

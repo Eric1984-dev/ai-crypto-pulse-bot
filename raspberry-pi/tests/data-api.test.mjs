@@ -259,7 +259,7 @@ function createRepositories(pool, logger = { error() {} }, dashboardOverrides = 
       },
       getAnalysisExportManifest({ now }) {
         return {
-          formatVersion: "cryptopulse-analysis-export-v1",
+          formatVersion: "cryptopulse-analysis-export-v2",
           generatedAt: now.toISOString(),
           asOf: now.toISOString(),
           sources: ["trades", "candleWindows"]
@@ -754,7 +754,7 @@ test("full-history export routes return a fixed manifest and bounded source page
     );
     assert.equal(manifestResponse.status, 200);
     const manifest = (await manifestResponse.json()).data;
-    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v1");
+    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v2");
     assert.equal(manifest.asOf, asOf);
     assert.deepEqual(manifest.activeMarkets, ["BTC-EUR", "ETH-EUR"]);
     assert.equal(manifest.tradingMode, "PAPER");

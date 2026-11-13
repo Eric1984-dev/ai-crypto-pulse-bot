@@ -147,7 +147,7 @@
       buildAnalysisExportUrl("analysis-export-manifest"),
       signal
     );
-    if (manifest.formatVersion !== "cryptopulse-analysis-export-v1"
+    if (manifest.formatVersion !== "cryptopulse-analysis-export-v2"
       || typeof manifest.asOf !== "string" || !Number.isFinite(Date.parse(manifest.asOf))
       || !Array.isArray(manifest.sources)
       || manifest.sources.length !== analysisExportSources.length
@@ -171,6 +171,10 @@
       signal
     );
     const isCandlePage = source === "candleWindows";
+    const pageAnchorKeys = new Set((Array.isArray(page.anchors) ? page.anchors : [])
+      .filter((anchor) => anchor && typeof anchor.symbol === "string"
+        && typeof anchor.anchorAt === "string")
+      .map((anchor) => `${anchor.symbol}\u0000${anchor.anchorAt}`));
     if (page.source !== source || page.asOf !== asOf
       || (!isCandlePage && !Array.isArray(page.items))
       || typeof page.hasMore !== "boolean"
@@ -188,8 +192,14 @@
           || !Number.isFinite(Date.parse(anchor.anchorAt || "")))
         || page.candleWindows.some((candle) => !candle
           || typeof candle.symbol !== "string"
-          || !Number.isFinite(Date.parse(candle.anchorAt || ""))
-          || !Number.isFinite(Date.parse(candle.timestamp || "")))
+          || typeof candle.timestamp !== "string"
+          || !Number.isFinite(Date.parse(candle.timestamp))
+          || !Array.isArray(candle.anchorTimes)
+          || candle.anchorTimes.length === 0
+          || candle.anchorTimes.some((anchorAt) =>
+            typeof anchorAt !== "string"
+            || !Number.isFinite(Date.parse(anchorAt))
+            || !pageAnchorKeys.has(`${candle.symbol}\u0000${anchorAt}`)))
       ))) {
       throw new Error(`The historical export page for ${source} is invalid.`);
     }
@@ -308,6 +318,17 @@
       exportStatus: "in_progress",
       files: [],
       sourceCounts: {},
+      candleDataFormat: {
+        anchorIdentity: ["symbol", "anchorAt"],
+        candleIdentity: ["symbol", "interval", "timestamp"],
+        candleLinkIdentity: ["symbol", "interval", "anchorAt", "candleTimestamp"],
+        candleRowsAreUnique: true,
+        files: {
+          anchors: "candle-anchors-*.jsonl",
+          candles: "candle-windows-*.jsonl",
+          anchorCandleLinks: "candle-window-links-*.jsonl"
+        }
+      },
       completedSources: []
     };
     const writers = [];
@@ -320,10 +341,13 @@
         let recordCount = 0;
         let anchorCount = 0;
         let candleCount = 0;
+        let windowLinkCount = 0;
         const sourceFiles = [];
         let sourceWriter;
         let anchorWriter;
+        let windowLinkWriter;
         let lastAnchorKey = null;
+        let seenCandleKeys;
         if (source === "candleWindows") {
           anchorWriter = createJsonlWriter(
             outputDirectory,
@@ -337,7 +361,15 @@
             manifest.limits.maxFileBytes,
             outputManifest.files
           );
+          windowLinkWriter = createJsonlWriter(
+            outputDirectory,
+            "candle-window-links",
+            manifest.limits.maxFileBytes,
+            outputManifest.files
+          );
+          seenCandleKeys = new Set();
           writers.push(anchorWriter, sourceWriter);
+          writers.push(windowLinkWriter);
         } else {
           sourceWriter = createJsonlWriter(
             outputDirectory,
@@ -371,18 +403,43 @@
               anchorRecords.push(anchor);
             }
             const candleRecords = [];
+            const linkRecords = [];
             for (const candle of page.candleWindows) {
-              const anchorKey = `${candle.symbol}\u0000${candle.anchorAt}`;
-              if (allowedAnchorKeys.has(anchorKey)) {
-                candleRecords.push(candle);
+              const matchedAnchorTimes = candle.anchorTimes.filter((anchorAt) =>
+                allowedAnchorKeys.has(`${candle.symbol}\u0000${anchorAt}`));
+              if (matchedAnchorTimes.length === 0) {
+                continue;
+              }
+              for (const anchorAt of matchedAnchorTimes) {
+                linkRecords.push({
+                  symbol: candle.symbol,
+                  interval: candle.interval,
+                  anchorAt,
+                  candleTimestamp: candle.timestamp
+                });
+              }
+              const candleKey = `${candle.symbol}\u0000${candle.interval}\u0000${candle.timestamp}`;
+              if (!seenCandleKeys.has(candleKey)) {
+                seenCandleKeys.add(candleKey);
+                candleRecords.push({
+                  symbol: candle.symbol,
+                  interval: candle.interval,
+                  timestamp: candle.timestamp,
+                  open: candle.open,
+                  high: candle.high,
+                  low: candle.low,
+                  close: candle.close,
+                  volume: candle.volume
+                });
               }
             }
             await anchorWriter.appendMany(anchorRecords);
             anchorCount += anchorRecords.length;
-            recordCount += anchorRecords.length;
             await sourceWriter.appendMany(candleRecords);
             candleCount += candleRecords.length;
-            recordCount += candleRecords.length;
+            await windowLinkWriter.appendMany(linkRecords);
+            windowLinkCount += linkRecords.length;
+            recordCount += anchorRecords.length + candleRecords.length + linkRecords.length;
           } else {
             await sourceWriter.appendMany(page.items);
             recordCount += page.items.length;
@@ -390,7 +447,9 @@
           cursor = page.nextCursor;
           outputManifest.sourceCounts[source] = {
             records: recordCount,
-            ...(source === "candleWindows" ? { anchors: anchorCount, candles: candleCount } : {}),
+            ...(source === "candleWindows"
+              ? { anchors: anchorCount, uniqueCandles: candleCount, windowLinks: windowLinkCount }
+              : {}),
             pages: pageCount,
             files: outputManifest.files.filter((fileName) =>
               fileName.startsWith(source === "candleWindows" ? "candle-" : `${source}-`))
@@ -399,16 +458,22 @@
             source,
             pages: pageCount,
             records: recordCount,
+            anchors: anchorCount,
+            uniqueCandles: candleCount,
+            windowLinks: windowLinkCount,
             completedSources: outputManifest.completedSources.length
           });
         } while (cursor);
         await sourceWriter.close();
         await anchorWriter?.close();
+        await windowLinkWriter?.close();
         sourceFiles.push(...outputManifest.files.filter((fileName) =>
           fileName.startsWith(source === "candleWindows" ? "candle-" : `${source}-`)));
         outputManifest.sourceCounts[source] = {
           records: recordCount,
-          ...(source === "candleWindows" ? { anchors: anchorCount, candles: candleCount } : {}),
+          ...(source === "candleWindows"
+            ? { anchors: anchorCount, uniqueCandles: candleCount, windowLinks: windowLinkCount }
+            : {}),
           pages: pageCount,
           files: sourceFiles
         };
@@ -535,11 +600,25 @@
           fetchImpl,
           directoryHandle,
           signal: activeExportController.signal,
-          onProgress({ source, pages, records, completedSources }) {
+          onProgress({
+            source,
+            pages,
+            records,
+            anchors,
+            uniqueCandles,
+            windowLinks,
+            completedSources
+          }) {
             const label = analysisExportSourceLabels[source] || source.toUpperCase();
+            const detail = source === "candleWindows"
+              ? `${countFormat.format(anchors)} anchors, `
+                + `${countFormat.format(uniqueCandles)} unique candles, `
+                + `${countFormat.format(windowLinks)} window links; ${pages} page(s); `
+                + `${completedSources} of ${analysisExportSources.length} sources complete.`
+              : `${countFormat.format(records)} records in ${pages} page(s); `
+                + `${completedSources} of ${analysisExportSources.length} sources complete.`;
             setAnalysisExportProgress(
-              `${countFormat.format(records)} records in ${pages} page(s); `
-                + `${completedSources} of ${analysisExportSources.length} sources complete.`,
+              detail,
               "active",
               label
             );

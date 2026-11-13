@@ -30,7 +30,7 @@ The Pi runtime is the sole application API and validates the session, request, a
 | `GET /api/v1/dashboard-data?view=analytics` | On-demand analytics data. |
 | `GET /api/v1/dashboard-data?view=trade-history` | Filtered and paginated trade history. |
 | `GET /api/v1/dashboard-data?view=analysis-export-manifest` | Fixed `asOf` boundary, source definitions, row/file limits, active markets, and paper-risk metadata for a full-history export. |
-| `GET /api/v1/dashboard-data?view=analysis-export-page&source=trades&asOf=<UTC timestamp>&cursor=<opaque>` | Authenticated bounded keyset page for one allowlisted export source; pages are read sequentially by the browser. `candleWindows` pages return up to ten unique anchors and at most 1,200 candles. |
+| `GET /api/v1/dashboard-data?view=analysis-export-page&source=trades&asOf=<UTC timestamp>&cursor=<opaque>` | Authenticated bounded keyset page for one allowlisted export source; pages are read sequentially by the browser. `candleWindows` pages return up to ten anchors and at most 1,200 unique candle rows, each with its page-local anchor timestamps. The browser deduplicates across pages and writes separate anchor-to-candle links. |
 | `GET /api/v1/markets`, `/api/v1/market`, `/api/v1/market-summary` | Watched markets, market detail, and scanner rankings. |
 | `GET /api/v1/agent-status` | Current agent status. |
 | `GET /api/v1/monitoring` | Pi runtime, scheduler, process, host, and database monitoring. |

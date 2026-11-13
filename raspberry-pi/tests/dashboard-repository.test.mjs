@@ -748,6 +748,17 @@ test("full-history export paginates every source and deduplicates candle anchors
       anchorPages.push(page);
       cursor = page.nextCursor;
       assert.ok(page.candleWindows.length <= 1200);
+      assert.equal(
+        new Set(page.candleWindows.map(({ symbol, interval, timestamp }) =>
+          `${symbol}\u0000${interval}\u0000${timestamp}`)).size,
+        page.candleWindows.length,
+        "each API page returns unique candle rows"
+      );
+      const pageAnchorKeys = new Set(page.anchors.map(({ symbol, anchorAt }) =>
+        `${symbol}\u0000${anchorAt}`));
+      assert.ok(page.candleWindows.every(({ symbol, anchorTimes }) =>
+        anchorTimes.length > 0 && anchorTimes.every((anchorAt) =>
+          pageAnchorKeys.has(`${symbol}\u0000${anchorAt}`))));
     } while (cursor);
     const uniqueAnchors = new Set(anchorPages.flatMap(({ anchors }) =>
       anchors.map(({ symbol, anchorAt }) => `${symbol}\u0000${anchorAt}`)));

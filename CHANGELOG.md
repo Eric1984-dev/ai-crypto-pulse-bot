@@ -6,4 +6,5 @@
 - Fix complete-history exports rejecting valid candle-window pages that do not contain the ordinary `items` field.
 - Highlight the active historical export source and show progress feedback on the export button.
 - Name analysis export folders `cryptopulse-analysis-ddMMyyyyHHmmss`.
+- Deduplicate exported candle rows while preserving anchor-to-window links in JSONL.
 - Fix Raspberry Pi shadow-exit evaluations being skipped because the evaluator shared the scheduler's PostgreSQL advisory-lock key; existing installations must apply Phase 8.12.

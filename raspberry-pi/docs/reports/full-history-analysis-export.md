@@ -16,11 +16,14 @@ candles before and ten after each unique symbol/timestamp for each of the six
 supported intervals.
 
 The folder contains a manifest and separate JSONL files per source; candle
-anchors and candle rows have separate files. Files are split at 5 MiB. Requests
-are sequential and limited to 250 ordinary rows or ten candle anchors (at most
-1,200 candle rows) per page. The client honors `Retry-After`, supports
-cancellation, records completed-source counts, and writes a partial/failed
-status to the manifest when it can finalize the run.
+anchors, unique candle rows, and anchor-to-candle links have separate files.
+Candles are deduplicated by `(symbol, interval, timestamp)`, while link rows
+retain the exact `(symbol, anchorAt, interval, candleTimestamp)` relationship
+for AI analysis. Files are split at 5 MiB. Requests are sequential and limited
+to 250 ordinary rows or ten candle anchors (at most 1,200 candle-window rows)
+per page. The client honors `Retry-After`, supports cancellation,
+records completed-source counts, and writes a partial/failed status to the
+manifest when it can finalize the run.
 
 All overlapping CSV and recommendation-history cards and their explanatory
 copy were removed from the Exports page because the full-history JSONL bundle
@@ -79,3 +82,20 @@ contract.
 Validation after the fix: the export UI tests passed (4/4), the Pi API and
 dashboard repository tests passed (31/31), `node --check js/exports.js` passed,
 and `git diff --check` passed.
+
+## Unique Candle Output
+
+The export format is now v2. Candle OHLCV rows are written once per
+`(symbol, interval, timestamp)` key, while `candle-window-links-*.jsonl` keeps
+the exact relationship between each trade/decision anchor and its selected
+candle timestamps. The manifest separates anchor, unique-candle, and
+window-link counts; the progress display reports those counts separately.
+The Pi API groups overlapping windows within each bounded page and returns
+each candle once with its page-local anchor timestamps; the browser deduplicates
+across pages. The query still evaluates the bounded per-anchor windows to find
+their relationships, but it does not load or transmit the full candle table.
+
+Earlier focused validation passed the export UI suite (4/4) and Raspberry Pi
+repository/API/authentication suites (36/36). After adding page-level candle
+aggregation, the export UI suite passed again (4/4) and the dashboard repository
+suite passed (11/11). JavaScript syntax checks and `git diff --check` passed.
