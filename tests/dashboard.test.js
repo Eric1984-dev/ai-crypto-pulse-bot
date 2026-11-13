@@ -1009,6 +1009,24 @@ test("dashboard requests Raspberry Pi API data and validates error responses", a
   );
 });
 
+test("dashboard retries one rate-limited request after Retry-After", async () => {
+  let requests = 0;
+  const data = await dashboard.requestDashboardData(async () => {
+    requests += 1;
+    if (requests === 1) {
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: () => "0" }
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ data: { portfolioValue: 12 } }) };
+  });
+
+  assert.deepEqual(data, { portfolioValue: 12 });
+  assert.equal(requests, 2);
+});
+
 test("dashboard waits for authentication and offers retry after a load error", async () => {
   const { dashboardDocument, elements } = createDashboardDocument();
   let resolveAuth;

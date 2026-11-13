@@ -30,6 +30,30 @@
     return globalThis.CryptoPulseRuntimeApi.url(path);
   };
 
+  function getRateLimitRetryDelay(response) {
+    const retryAfter = response.headers?.get?.("Retry-After");
+    if (retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter)) {
+      return Math.min(3600000, Math.max(0, Number(retryAfter) * 1000));
+    }
+    const retryAt = retryAfter ? Date.parse(retryAfter) : NaN;
+    return Number.isFinite(retryAt)
+      ? Math.min(3600000, Math.max(0, retryAt - Date.now()))
+      : 1000;
+  }
+
+  function waitForRateLimitRetry(delayMs) {
+    return new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  async function fetchDashboardResponse(fetchImpl, url, options) {
+    let response = await fetchImpl(url, options);
+    if (response.status === 429) {
+      await waitForRateLimitRetry(getRateLimitRetryDelay(response));
+      response = await fetchImpl(url, options);
+    }
+    return response;
+  }
+
   function emptyDashboardData() {
     return {
       agentStatus: null,
@@ -55,7 +79,7 @@
   }
 
   async function requestDashboardData(fetchImpl) {
-    const response = await fetchImpl(runtimeApiUrl("/api/v1/dashboard-data"), {
+    const response = await fetchDashboardResponse(fetchImpl, runtimeApiUrl("/api/v1/dashboard-data"), {
       method: "GET",
       cache: "no-store",
       credentials: "include",
@@ -65,6 +89,9 @@
       const error = new Error("Authentication is required.");
       error.status = 401;
       throw error;
+    }
+    if (response.status === 429) {
+      throw new Error("Dashboard data is rate limited. Please try again shortly.");
     }
     if (!response.ok) {
       throw new Error("Dashboard data is unavailable.");
@@ -83,7 +110,7 @@
   }
 
   async function requestAgentStatus(fetchImpl) {
-    const response = await fetchImpl(runtimeApiUrl("/api/v1/agent-status"), {
+    const response = await fetchDashboardResponse(fetchImpl, runtimeApiUrl("/api/v1/agent-status"), {
       method: "GET",
       cache: "no-store",
       credentials: "include",
@@ -93,6 +120,9 @@
       const error = new Error("Authentication is required.");
       error.status = 401;
       throw error;
+    }
+    if (response.status === 429) {
+      throw new Error("Agent status is rate limited.");
     }
     if (!response.ok) {
       throw new Error("Agent status is unavailable.");
@@ -111,7 +141,7 @@
   }
 
   async function requestArchiveHealth(fetchImpl) {
-    const response = await fetchImpl(runtimeApiUrl("/api/v1/monitoring"), {
+    const response = await fetchDashboardResponse(fetchImpl, runtimeApiUrl("/api/v1/monitoring"), {
       method: "GET",
       cache: "no-store",
       credentials: "include",
@@ -121,6 +151,9 @@
       const error = new Error("Authentication is required.");
       error.status = 401;
       throw error;
+    }
+    if (response.status === 429) {
+      throw new Error("System monitoring is rate limited.");
     }
     if (!response.ok) {
       throw new Error("Archive server health is unavailable.");
