@@ -985,6 +985,22 @@ a:focus-visible {
   accent-color: var(--accent);
 }
 
+.archive-health-metrics meter[data-state="normal"] {
+  accent-color: #5ad7ac;
+}
+
+.archive-health-metrics meter[data-state="warning"] {
+  accent-color: #f6bd5b;
+}
+
+.archive-health-metrics meter[data-state="critical"] {
+  accent-color: #ff737a;
+}
+
+.archive-health-metrics meter[data-state="unavailable"] {
+  accent-color: #8491a2;
+}
+
 .agent-brain {
   position: relative;
   margin-top: 16px;

@@ -138,7 +138,11 @@
     return result.data;
   }
 
-  function renderArchiveHealth(health, documentRef, { unavailable = false } = {}) {
+  function renderArchiveHealth(
+    health,
+    documentRef,
+    { unavailable = false, cpuCriticalSamples = 0 } = {}
+  ) {
     const statusFields = ["server", "postgresql", "database"];
     for (const field of statusFields) {
       const element = documentRef.querySelector(`[data-archive-health="${field}"]`);
@@ -214,6 +218,18 @@
         && metric.value <= metric.maximum
         ? metric.value
         : null;
+      let state = "unavailable";
+      if (value !== null) {
+        if (metric.name === "temperature") {
+          state = value >= 80 ? "critical" : value >= 70 ? "warning" : "normal";
+        } else if (metric.name === "memory-usage") {
+          state = value >= 90 ? "critical" : value >= 80 ? "warning" : "normal";
+        } else {
+          state = value >= 90
+            ? cpuCriticalSamples >= 2 ? "critical" : "warning"
+            : value >= 75 ? "warning" : "normal";
+        }
+      }
       if (valueElement) {
         valueElement.textContent = value === null
           ? "—"
@@ -222,6 +238,9 @@
           }).format(value)}${metric.unit}`;
       }
       if (meter) {
+        if (!unavailable) {
+          meter.dataset.state = state;
+        }
         meter.hidden = value === null;
         if (value !== null) {
           meter.value = Math.min(value, 100);
@@ -1113,6 +1132,7 @@
     let statusRequestInProgress = false;
     let archiveRequestInProgress = false;
     let archiveForegroundRefreshPending = false;
+    let archiveCpuCriticalSamples = 0;
     let lastArchiveHealth = null;
     let foregroundRefreshPending = false;
     let loginRedirected = false;
@@ -1342,7 +1362,16 @@
         const health = await requestArchiveHealth(fetchImpl);
         if (!disposed && documentRef.visibilityState !== "hidden") {
           lastArchiveHealth = health;
-          renderArchiveHealth(health, documentRef);
+          const cpuUsage = health.system?.cpuUsagePercent;
+          archiveCpuCriticalSamples = typeof cpuUsage === "number"
+            && Number.isFinite(cpuUsage)
+            && cpuUsage >= 90
+            && cpuUsage <= 100
+            ? archiveCpuCriticalSamples + 1
+            : 0;
+          renderArchiveHealth(health, documentRef, {
+            cpuCriticalSamples: archiveCpuCriticalSamples
+          });
         }
       } catch (error) {
         if (disposed) {
@@ -1352,7 +1381,11 @@
           redirectToLogin();
           return;
         }
-        renderArchiveHealth(lastArchiveHealth, documentRef, { unavailable: true });
+        archiveCpuCriticalSamples = 0;
+        renderArchiveHealth(lastArchiveHealth, documentRef, {
+          unavailable: true,
+          cpuCriticalSamples: archiveCpuCriticalSamples
+        });
       } finally {
         archiveRequestInProgress = false;
         if (archiveForegroundRefreshPending && !disposed
