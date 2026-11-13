@@ -176,17 +176,19 @@
     { unavailable = false, cpuCriticalSamples = 0 } = {}
   ) {
     const statusFields = ["server", "postgresql", "database"];
+    const serviceStates = [];
     for (const field of statusFields) {
       const element = documentRef.querySelector(`[data-archive-health="${field}"]`);
-      if (!element) {
-        continue;
-      }
       const value = health && typeof health[field] === "string"
         ? health[field].trim().toLowerCase()
         : "";
       const state = unavailable
         ? "unknown"
         : value === "online" || value === "offline" ? value : "unknown";
+      serviceStates.push(state);
+      if (!element) {
+        continue;
+      }
       element.textContent = state === "online"
         ? "Online"
         : state === "offline" ? "Offline" : "Unknown";
@@ -245,6 +247,7 @@
         fractionDigits: 0
       }
     ];
+    const systemMetricStates = [];
     for (const metric of systemMetrics) {
       const valueElement = documentRef.querySelector(
         `[data-archive-health="${metric.name}"]`
@@ -270,6 +273,7 @@
             : value >= 75 ? "warning" : "normal";
         }
       }
+      systemMetricStates.push(state);
       if (valueElement) {
         valueElement.textContent = value === null
           ? "—"
@@ -287,6 +291,11 @@
         }
       }
     }
+    renderDashboardPiHealthSummary({
+      serviceStates,
+      systemMetricStates,
+      unavailable
+    }, documentRef);
 
     const databaseSizeElement = documentRef.querySelector("[data-archive-health=\"database-size\"]");
     const databaseSize = health && typeof health.databaseSize === "string"
@@ -312,6 +321,39 @@
           : "Unavailable"
         : formattedLastCheck || "—";
     }
+  }
+
+  function renderDashboardPiHealthSummary(
+    { serviceStates, systemMetricStates, unavailable },
+    documentRef
+  ) {
+    const summary = documentRef.querySelector("[data-dashboard-pi-health]");
+    const status = documentRef.querySelector("[data-dashboard-pi-health-state]");
+    if (!summary || !status) {
+      return;
+    }
+
+    let state = "error";
+    let label = "System status unavailable";
+    if (!unavailable) {
+      if (serviceStates.includes("offline")) {
+        label = "System service offline";
+      } else if (serviceStates.includes("unknown")) {
+        label = "System status unavailable";
+      } else if (systemMetricStates.includes("critical")) {
+        label = "High system load";
+      } else if (systemMetricStates.includes("warning")) {
+        label = "Elevated system load";
+      } else if (systemMetricStates.some((metricState) => metricState !== "unavailable")) {
+        state = "normal";
+        label = "System running normally";
+      } else {
+        label = "Metrics unavailable";
+      }
+    }
+
+    summary.dataset.state = state;
+    status.textContent = label;
   }
 
   function renderDashboard(data, documentRef, ChartConstructor, previousChart = null) {

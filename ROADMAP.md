@@ -7,6 +7,7 @@
 - Local paper-trading hardening now excludes incomplete candles, reports stale/missing candle intervals, and uses an explicit snapshot sequence for equal timestamps. The snapshot migration remains unapplied and no live Pi validation or deployment is claimed.
 - The Exports page now offers a complete, paginated JSONL history export for AI analysis using the existing Pi data route; local implementation and production verification are tracked in the [full-history export report](raspberry-pi/docs/reports/full-history-analysis-export.md).
 - Raspberry Pi infrastructure metrics now include the device model as the first metric on the dashboard and Exports page, read through the existing monitoring route.
+- The dashboard shows the Raspberry Pi system-health summary at the top, with a green indicator when healthy and red for unhealthy or unavailable status.
 - The dashboard activity strip distinguishes AI analysis and paper-trading run statuses/scheduled cycle times from the latest market-data update and actual paper trade; on-demand analytics and market scans are omitted.
 - Infrastructure status and Raspberry Pi resource metrics are grouped in a collapsed strip beneath the live backend signal, without an extra nested card.
 - Phase 11: not started.

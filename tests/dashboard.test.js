@@ -90,6 +90,8 @@ function createDashboardDocument() {
     "[data-dashboard-activity=\"paper-trade\"]",
     "[data-dashboard-status=\"agent\"]",
     "[data-dashboard-status=\"emergency\"]",
+    "[data-dashboard-pi-health]",
+    "[data-dashboard-pi-health-state]",
     "[data-archive-health=\"server\"]",
     "[data-archive-health=\"model\"]",
     "[data-archive-health=\"postgresql\"]",
@@ -151,7 +153,12 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
     diskUsage: 12.5,
     databaseSize: "<b>2.3 GB</b>",
     lastHealthCheck: "2026-11-06T12:00:00.000Z",
-    system: { model: "Raspberry Pi 5 Model B Rev 1.0" },
+    system: {
+      model: "Raspberry Pi 5 Model B Rev 1.0",
+      temperatureC: 40,
+      cpuUsagePercent: 20,
+      memory: { usedPercent: 50 }
+    },
     runtime: {
       lastCycle: {
         cycleAt: "2026-11-06T11:55:00.000Z",
@@ -170,18 +177,24 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "online");
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Online");
   assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Online");
+  assert.equal(elements.get("[data-dashboard-pi-health]")[0].dataset.state, "normal");
+  assert.equal(elements.get("[data-dashboard-pi-health-state]")[0].textContent, "System running normally");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "12.5%");
   assert.equal(elements.get("[data-archive-health-meter]")[0].value, 12.5);
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "<b>2.3 GB</b>");
   assert.match(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, /2026/);
 
   dashboard.renderArchiveHealth(health, dashboardDocument, { unavailable: true });
+  assert.equal(elements.get("[data-dashboard-pi-health]")[0].dataset.state, "error");
+  assert.equal(elements.get("[data-dashboard-pi-health-state]")[0].textContent, "System status unavailable");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "unknown");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "12.5%");
   assert.match(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, /Unavailable · last success/);
 
   dashboard.renderArchiveHealth(null, dashboardDocument);
+  assert.equal(elements.get("[data-dashboard-pi-health]")[0].dataset.state, "error");
+  assert.equal(elements.get("[data-dashboard-pi-health-state]")[0].textContent, "System status unavailable");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "unknown");
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Unknown");

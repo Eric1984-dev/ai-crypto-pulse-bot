@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Show Infrastructure as an expandable strip matching the live backend signal instead of a nested dashboard card.
+- Add a Raspberry Pi health summary with a colored status indicator at the top of the dashboard using the existing monitoring route.
 - Replace the vague dashboard Bot Run timestamp with AI-analysis and paper-trading stage statuses and cycle times; remove on-demand Analytics and Market scan placeholders.
 - Remove the inactive Shadow Exit monitoring panel and its dashboard rendering; historical shadow records remain available to full-history exports.
 - Show the Raspberry Pi model as the first infrastructure metric on the dashboard and Exports page using the existing monitoring route.

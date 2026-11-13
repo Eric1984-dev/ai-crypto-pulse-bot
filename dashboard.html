@@ -51,6 +51,11 @@
     </header>
     <main class="page-shell dashboard-shell">
       <h1 class="visually-hidden">Dashboard</h1>
+      <div class="dashboard-pi-health" data-dashboard-pi-health data-state="error" role="status" aria-live="polite" aria-label="Raspberry Pi system status">
+        <span class="pi-health-indicator" aria-hidden="true"></span>
+        <span class="pi-health-kicker">RASPBERRY PI</span>
+        <span class="dashboard-pi-health-state" data-dashboard-pi-health-state>Checking system status…</span>
+      </div>
       <p data-auth-message role="status" aria-live="polite"></p>
       <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>
       <span class="dashboard-updated" data-dashboard-loading role="status" aria-live="polite" hidden>Loading dashboard data…</span>
