@@ -35,7 +35,7 @@ The Pi runtime is the sole application API and validates the session, request, a
 | `GET /api/v1/agent-status` | Current agent status. |
 | `GET /api/v1/monitoring` | Pi runtime, scheduler, process, host, and database monitoring. |
 
-Data endpoints require the single-admin session and return no-store responses. The dashboard monitoring view and Exports page resource panel use `/api/v1/monitoring`; the latter displays Raspberry Pi temperature, CPU, and memory from its `system` metrics. Neither calls the retired Vercel archive-health handler. Current contracts and bounds are maintained in the [Pi API implementation](../raspberry-pi/src/api/).
+Data endpoints require the single-admin session and return no-store responses. The dashboard monitoring view and Exports page resource panel use `/api/v1/monitoring`; both display Raspberry Pi temperature, CPU, and memory from its `system` metrics. Neither calls the retired Vercel archive-health handler. Current contracts and bounds are maintained in the [Pi API implementation](../raspberry-pi/src/api/).
 
 The full-history export uses the existing `/api/v1/dashboard-data` route and the existing Vercel proxy function; it adds no serverless function or write endpoint. The browser saves bounded JSONL parts and a manifest locally, honors `Retry-After` on rate limiting, and does not upload data to an AI service. The fixed `asOf` boundary does not create a transactionally consistent database snapshot.
 

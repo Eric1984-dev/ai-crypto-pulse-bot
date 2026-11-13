@@ -171,6 +171,60 @@
       }
     }
 
+    const system = health && health.system && typeof health.system === "object"
+      ? health.system
+      : {};
+    const systemMetrics = [
+      {
+        name: "temperature",
+        value: system.temperatureC,
+        unit: "°C",
+        maximum: 200,
+        fractionDigits: 1
+      },
+      {
+        name: "cpu-usage",
+        value: system.cpuUsagePercent,
+        unit: "%",
+        maximum: 100,
+        fractionDigits: 0
+      },
+      {
+        name: "memory-usage",
+        value: system.memory && system.memory.usedPercent,
+        unit: "%",
+        maximum: 100,
+        fractionDigits: 0
+      }
+    ];
+    for (const metric of systemMetrics) {
+      const valueElement = documentRef.querySelector(
+        `[data-archive-health="${metric.name}"]`
+      );
+      const meter = documentRef.querySelector(
+        `[data-archive-health-meter="${metric.name}"]`
+      );
+      const value = typeof metric.value === "number"
+        && Number.isFinite(metric.value)
+        && metric.value >= 0
+        && metric.value <= metric.maximum
+        ? metric.value
+        : null;
+      if (valueElement) {
+        valueElement.textContent = value === null
+          ? "—"
+          : `${new Intl.NumberFormat("en-GB", {
+            maximumFractionDigits: metric.fractionDigits
+          }).format(value)}${metric.unit}`;
+      }
+      if (meter) {
+        meter.hidden = value === null;
+        if (value !== null) {
+          meter.value = Math.min(value, 100);
+        }
+      }
+    }
+
     const databaseSizeElement = documentRef.querySelector("[data-archive-health=\"database-size\"]");
     const databaseSize = health && typeof health.databaseSize === "string"
       ? health.databaseSize.trim()
