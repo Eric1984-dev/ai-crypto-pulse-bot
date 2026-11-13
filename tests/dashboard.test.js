@@ -141,16 +141,17 @@ function createDashboardDocument() {
   return { dashboardDocument, elements };
 }
 
-test("dashboard renders archive health safely and shows Offline for unavailable fields", () => {
+test("dashboard distinguishes offline services from unavailable monitoring data", () => {
   const { dashboardDocument, elements } = createDashboardDocument();
-  dashboard.renderArchiveHealth({
+  const health = {
     server: "online",
     postgresql: "online",
     database: "online",
     diskUsage: 12.5,
     databaseSize: "<b>2.3 GB</b>",
     lastHealthCheck: "2026-11-06T12:00:00.000Z"
-  }, dashboardDocument);
+  };
+  dashboard.renderArchiveHealth(health, dashboardDocument);
 
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Online");
   assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "online");
@@ -161,11 +162,17 @@ test("dashboard renders archive health safely and shows Offline for unavailable 
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "<b>2.3 GB</b>");
   assert.match(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, /2026/);
 
+  dashboard.renderArchiveHealth(health, dashboardDocument, { unavailable: true });
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Unknown");
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "unknown");
+  assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "12.5%");
+  assert.match(elements.get("[data-archive-health=\"last-check\"]")[0].textContent, /Unavailable · last success/);
+
   dashboard.renderArchiveHealth(null, dashboardDocument);
-  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Offline");
-  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "offline");
-  assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Offline");
-  assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Offline");
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].textContent, "Unknown");
+  assert.equal(elements.get("[data-archive-health=\"server\"]")[0].dataset.state, "unknown");
+  assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Unknown");
+  assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "—");
   assert.equal(elements.get("[data-archive-health-meter]")[0].hidden, true);
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "—");

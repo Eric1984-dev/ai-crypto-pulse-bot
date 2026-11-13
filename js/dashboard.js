@@ -138,7 +138,7 @@
     return result.data;
   }
 
-  function renderArchiveHealth(health, documentRef) {
+  function renderArchiveHealth(health, documentRef, { unavailable = false } = {}) {
     const statusFields = ["server", "postgresql", "database"];
     for (const field of statusFields) {
       const element = documentRef.querySelector(`[data-archive-health="${field}"]`);
@@ -147,10 +147,14 @@
       }
       const value = health && typeof health[field] === "string"
         ? health[field].trim().toLowerCase()
-        : "offline";
-      const isOnline = value === "online";
-      element.textContent = isOnline ? "Online" : "Offline";
-      element.dataset.state = isOnline ? "online" : "offline";
+        : "";
+      const state = unavailable
+        ? "unknown"
+        : value === "online" || value === "offline" ? value : "unknown";
+      element.textContent = state === "online"
+        ? "Online"
+        : state === "offline" ? "Offline" : "Unknown";
+      element.dataset.state = state;
     }
 
     const diskUsageElement = documentRef.querySelector("[data-archive-health=\"disk-usage\"]");
@@ -239,10 +243,15 @@
     const lastCheck = health && typeof health.lastHealthCheck === "string"
       ? new Date(health.lastHealthCheck)
       : null;
+    const formattedLastCheck = lastCheck && Number.isFinite(lastCheck.getTime())
+      ? formatters.formatTimestamp(lastCheck)
+      : null;
     if (lastCheckElement) {
-      lastCheckElement.textContent = lastCheck && Number.isFinite(lastCheck.getTime())
-        ? formatters.formatTimestamp(lastCheck)
-        : "—";
+      lastCheckElement.textContent = unavailable
+        ? formattedLastCheck
+          ? `Unavailable · last success ${formattedLastCheck}`
+          : "Unavailable"
+        : formattedLastCheck || "—";
     }
   }
 
@@ -1104,6 +1113,7 @@
     let statusRequestInProgress = false;
     let archiveRequestInProgress = false;
     let archiveForegroundRefreshPending = false;
+    let lastArchiveHealth = null;
     let foregroundRefreshPending = false;
     let loginRedirected = false;
     let dashboardDataLoaded = false;
@@ -1331,6 +1341,7 @@
       try {
         const health = await requestArchiveHealth(fetchImpl);
         if (!disposed && documentRef.visibilityState !== "hidden") {
+          lastArchiveHealth = health;
           renderArchiveHealth(health, documentRef);
         }
       } catch (error) {
@@ -1341,7 +1352,7 @@
           redirectToLogin();
           return;
         }
-        renderArchiveHealth(null, documentRef);
+        renderArchiveHealth(lastArchiveHealth, documentRef, { unavailable: true });
       } finally {
         archiveRequestInProgress = false;
         if (archiveForegroundRefreshPending && !disposed
