@@ -549,7 +549,12 @@ const BUNDLE_CANDLES_SQL = `${CANDLE_WINDOWS_CTE}
 `;
 const ANALYSIS_EXPORT_CANDLES_SQL = `${CANDLE_WINDOWS_CTE}
   SELECT symbol, interval, timestamp, open, high, low, close, volume,
-         jsonb_agg(DISTINCT anchor_at ORDER BY anchor_at) AS anchor_timestamps
+         jsonb_agg(
+           DISTINCT pg_catalog.to_char(anchor_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+           ORDER BY pg_catalog.to_char(anchor_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+         ) AS anchor_timestamps
   FROM candle_windows
   GROUP BY symbol, interval, timestamp, open, high, low, close, volume
   ORDER BY symbol ASC, interval ASC, timestamp ASC
@@ -582,7 +587,11 @@ const BUNDLE_SOURCE_COUNTS_SQL = `
 const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   trades: `
     SELECT id, ai_decision_id, symbol, side, price, quantity, fees, slippage,
-           realized_pnl, execution_reason, created_at
+           realized_pnl, execution_reason,
+           pg_catalog.to_char(created_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+           pg_catalog.to_char(created_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Trades"
     WHERE portfolio_id = $1::uuid
       AND created_at <= $2::timestamptz
@@ -596,7 +605,9 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   positions: `
     SELECT id, symbol, amount, entry_price, current_price, unrealized_pnl,
-           status, created_at
+           status, created_at,
+           pg_catalog.to_char(created_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Positions"
     WHERE portfolio_id = $1::uuid
       AND created_at <= $2::timestamptz
@@ -610,7 +621,11 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   decisions: `
     SELECT id, symbol, decision, confidence, indicators, reason,
-           strategy_name, strategy_version, created_at
+           strategy_name, strategy_version,
+           pg_catalog.to_char(created_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+           pg_catalog.to_char(created_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_AI_Decisions"
     WHERE created_at <= $1::timestamptz
       AND (
@@ -623,7 +638,9 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   paperExecutionAttempts: `
     SELECT id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
-           confidence, decision_at, evaluated_at, outcome, reason_code, trade_id
+           confidence, decision_at, evaluated_at, outcome, reason_code, trade_id,
+           pg_catalog.to_char(evaluated_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Paper_Execution_Audit"
     WHERE portfolio_id = $1::uuid
       AND evaluated_at <= $2::timestamptz
@@ -637,7 +654,9 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   portfolioSnapshots: `
     SELECT id, portfolio_id, portfolio_value, available_balance,
-           open_positions, captured_at, snapshot_order
+           open_positions, captured_at, snapshot_order,
+           pg_catalog.to_char(captured_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
     WHERE portfolio_id = $1::uuid
       AND captured_at <= $2::timestamptz
@@ -654,6 +673,8 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
            parameters, status, data_quality_status, position_opened_at,
            tracking_started_at, last_evaluated_at, triggered_at,
            modeled_exit_price, modeled_net_pnl, actual_closed_at,
+           pg_catalog.to_char(position_opened_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,
            actual_close_price, actual_net_pnl
     FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
     WHERE portfolio_id = $1::uuid
@@ -668,7 +689,9 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   shadowExitEvents: `
     SELECT event.id, event.scenario_id, event.event_type, event.event_at,
-           event.observed_mark, event.data_quality_status, event.error_code
+           event.observed_mark, event.data_quality_status, event.error_code,
+           pg_catalog.to_char(event.event_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Shadow_Exit_Events" AS event
     JOIN public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
       ON scenario.id = event.scenario_id
@@ -686,7 +709,9 @@ const ANALYSIS_EXPORT_PAGE_SQL = Object.freeze({
   `,
   analyticsRuns: `
     SELECT id, calculation_version, period, period_start, period_end,
-           generated_at, source_counts, analytics_summary, insights
+           generated_at, source_counts, analytics_summary, insights,
+           pg_catalog.to_char(generated_at AT TIME ZONE 'UTC',
+             'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
     FROM public."AI_Crypto_Bot_Analytics_Runs"
     WHERE generated_at <= $1::timestamptz
       AND (
@@ -709,42 +734,90 @@ const ANALYSIS_EXPORT_CANDLE_ANCHORS_SQL = `
         AND (
           $3::timestamptz IS NULL
           OR trade.created_at > $3::timestamptz
-          OR (trade.created_at = $3::timestamptz AND (
-            trade.symbol > $4::text
-            OR (trade.symbol = $4::text AND (
-              0::smallint > $5::smallint
-              OR (0::smallint = $5::smallint AND trade.id > $6::uuid)
-            ))
-          ))
+          OR (trade.created_at = $3::timestamptz AND trade.symbol > $4::text)
         )
-      ORDER BY trade.created_at ASC, trade.symbol ASC, trade.id ASC
-      LIMIT $7
     )
     UNION ALL
     (
-      SELECT 1::smallint AS source_rank, decision.id, decision.symbol,
+      SELECT DISTINCT 1::smallint AS source_rank, decision.id, decision.symbol,
              decision.created_at AS anchor_at
-      FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
-      WHERE decision.created_at <= $2::timestamptz
+      FROM public."AI_Crypto_Bot_Trades" AS trade
+      JOIN public."AI_Crypto_Bot_AI_Decisions" AS decision
+        ON decision.id = trade.ai_decision_id
+      WHERE trade.portfolio_id = $1::uuid
+        AND trade.created_at <= $2::timestamptz
+        AND decision.created_at <= $2::timestamptz
         AND (
           $3::timestamptz IS NULL
           OR decision.created_at > $3::timestamptz
-          OR (decision.created_at = $3::timestamptz AND (
-            decision.symbol > $4::text
-            OR (decision.symbol = $4::text AND (
-              1::smallint > $5::smallint
-              OR (1::smallint = $5::smallint AND decision.id > $6::uuid)
-            ))
-          ))
+          OR (decision.created_at = $3::timestamptz AND decision.symbol > $4::text)
         )
-      ORDER BY decision.created_at ASC, decision.symbol ASC, decision.id ASC
-      LIMIT $7
     )
   )
-  SELECT source_rank, id, symbol, anchor_at
+  SELECT symbol, anchor_at,
+         COUNT(*) FILTER (WHERE source_rank = 0)::integer AS trade_anchor_count,
+         COUNT(*) FILTER (WHERE source_rank = 1)::integer AS decision_anchor_count,
+         pg_catalog.to_char(anchor_at AT TIME ZONE 'UTC',
+           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS anchor_at_exact,
+         pg_catalog.to_char(anchor_at AT TIME ZONE 'UTC',
+           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp
   FROM candidates
-  ORDER BY anchor_at ASC, symbol ASC, source_rank ASC, id ASC
-  LIMIT $8
+  GROUP BY symbol, anchor_at
+  ORDER BY anchor_at ASC, symbol ASC
+  LIMIT $5
+`;
+const ANALYSIS_EXPORT_EXPECTED_COUNTS_SQL = `
+  WITH trade_anchors AS (
+    SELECT trade.id, trade.ai_decision_id, trade.symbol, trade.created_at AS anchor_at
+    FROM public."AI_Crypto_Bot_Trades" AS trade
+    WHERE trade.portfolio_id = $1::uuid AND trade.created_at <= $2::timestamptz
+  ),
+  linked_decision_anchors AS (
+    SELECT DISTINCT decision.id, decision.symbol, decision.created_at AS anchor_at
+    FROM trade_anchors AS trade
+    JOIN public."AI_Crypto_Bot_AI_Decisions" AS decision
+      ON decision.id = trade.ai_decision_id
+    WHERE decision.created_at <= $2::timestamptz
+  ),
+  candle_anchor_candidates AS (
+    SELECT 0::smallint AS source_rank, id, symbol, anchor_at FROM trade_anchors
+    UNION ALL
+    SELECT 1::smallint AS source_rank, id, symbol, anchor_at FROM linked_decision_anchors
+  ),
+  candle_anchor_counts AS (
+    SELECT
+      COUNT(*) FILTER (WHERE source_rank = 0)::text AS trade_anchors,
+      COUNT(*) FILTER (WHERE source_rank = 1)::text AS decision_anchors,
+      COUNT(DISTINCT (symbol, anchor_at))::text AS unique_anchors
+    FROM candle_anchor_candidates
+  )
+  SELECT
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Trades"
+      WHERE portfolio_id = $1::uuid AND created_at <= $2::timestamptz)::text AS trades,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Positions"
+      WHERE portfolio_id = $1::uuid AND created_at <= $2::timestamptz)::text AS positions,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_AI_Decisions"
+      WHERE created_at <= $2::timestamptz)::text AS decisions,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Paper_Execution_Audit"
+      WHERE portfolio_id = $1::uuid AND evaluated_at <= $2::timestamptz)::text
+      AS paper_execution_attempts,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Portfolio_Snapshots"
+      WHERE portfolio_id = $1::uuid AND captured_at <= $2::timestamptz)::text
+      AS portfolio_snapshots,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+      WHERE portfolio_id = $1::uuid AND position_opened_at <= $2::timestamptz)::text
+      AS shadow_exit_scenarios,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Shadow_Exit_Events" AS event
+      JOIN public."AI_Crypto_Bot_Shadow_Exit_Scenarios" AS scenario
+        ON scenario.id = event.scenario_id
+      WHERE scenario.portfolio_id = $1::uuid AND event.event_at <= $2::timestamptz)::text
+      AS shadow_exit_events,
+    (SELECT COUNT(*) FROM public."AI_Crypto_Bot_Analytics_Runs"
+      WHERE generated_at <= $2::timestamptz)::text AS analytics_runs,
+    candle_anchor_counts.trade_anchors,
+    candle_anchor_counts.decision_anchors,
+    candle_anchor_counts.unique_anchors
+  FROM candle_anchor_counts
 `;
 const MONITORING_SQL = `
   SELECT
@@ -1456,17 +1529,47 @@ export class DashboardRepository {
     });
   }
 
-  getAnalysisExportManifest({ now = new Date() } = {}) {
+  async getAnalysisExportManifest({ now = new Date() } = {}) {
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
       throw new TypeError("Analysis export generation time is invalid.");
     }
     const generatedAt = now.toISOString();
+    const portfolioId = await this.#systemPortfolioId();
+    const countResult = await queryReadOnly(
+      this.pool,
+      ANALYSIS_EXPORT_EXPECTED_COUNTS_SQL,
+      [portfolioId, generatedAt],
+      { logger: this.logger }
+    );
+    const countRow = countResult.rows[0];
+    if (!countRow) {
+      throw new RepositoryDataError("analysis export source counts are unavailable");
+    }
     return Object.freeze({
-      formatVersion: "cryptopulse-analysis-export-v3",
+      formatVersion: "cryptopulse-analysis-export-v4",
       generatedAt,
       asOf: generatedAt,
       fileFormat: "UTF-8 JSON Lines, one source record per line",
       sources: ANALYSIS_EXPORT_SOURCE_TYPES,
+      expectedSourceCounts: Object.freeze({
+        trades: readExportCount(countRow.trades, "trade count"),
+        positions: readExportCount(countRow.positions, "position count"),
+        decisions: readExportCount(countRow.decisions, "decision count"),
+        paperExecutionAttempts: readExportCount(
+          countRow.paper_execution_attempts, "paper execution attempt count"
+        ),
+        portfolioSnapshots: readExportCount(countRow.portfolio_snapshots, "snapshot count"),
+        shadowExitScenarios: readExportCount(
+          countRow.shadow_exit_scenarios, "shadow-exit scenario count"
+        ),
+        shadowExitEvents: readExportCount(countRow.shadow_exit_events, "shadow-exit event count"),
+        analyticsRuns: readExportCount(countRow.analytics_runs, "analytics run count")
+      }),
+      expectedCandleAnchorCounts: Object.freeze({
+        tradeAnchors: readExportCount(countRow.trade_anchors, "trade anchor count"),
+        decisionAnchors: readExportCount(countRow.decision_anchors, "decision anchor count"),
+        uniqueAnchors: readExportCount(countRow.unique_anchors, "unique candle anchor count")
+      }),
       sourceDescriptions: Object.freeze({
         trades: "All system-portfolio trades created by asOf.",
         positions: "All system-portfolio position rows created by asOf, with their current stored state.",
@@ -1476,7 +1579,7 @@ export class DashboardRepository {
         shadowExitScenarios: "All system-portfolio shadow-exit scenarios opened by asOf.",
         shadowExitEvents: "All events belonging to system-portfolio shadow-exit scenarios recorded by asOf.",
         analyticsRuns: "All persisted analytics runs generated by asOf.",
-        candleWindows: "Unique candle rows selected around trade and decision anchors; exact anchor-to-candle membership is in candle-window-links files."
+        candleWindows: "Unique candle rows selected around system-portfolio trades and their linked AI decisions; exact anchor-to-candle membership is in candle-window-links files."
       }),
       limits: Object.freeze({
         rowsPerRequest: ANALYSIS_EXPORT_PAGE_SIZE,
@@ -1486,7 +1589,8 @@ export class DashboardRepository {
         maxFileBytes: 5 * 1024 * 1024
       }),
       dataScope: "All available source history through asOf; this export is not limited to 30/90/365-day analytics periods.",
-      candleSelection: "Deduplicated symbol/timestamp anchors from every historical trade and AI decision; up to ten candles before and ten after each anchor per supported interval. Exported candle rows are unique by symbol, interval, and timestamp; candle-window-links files preserve each anchor relationship.",
+      candleSelectionMode: "trades-and-linked-decisions",
+      candleSelection: "Deduplicated symbol/timestamp anchors from every system-portfolio trade and its linked AI decision; up to ten candles before and ten after each unique anchor per supported interval. Non-trade-linked decision candle windows are excluded; the decisions JSONL still contains every decision. Exported candle rows are unique by symbol, interval, and timestamp; candle-window-links files preserve each selected anchor relationship.",
       snapshotConsistency: "Pages use a fixed as-of time, but the export is not a single PostgreSQL transaction; mutable position and scenario rows may change while pages are read."
     });
   }
@@ -1529,7 +1633,11 @@ export class DashboardRepository {
     );
     const rows = result.rows.slice(0, ANALYSIS_EXPORT_PAGE_SIZE);
     const hasMore = result.rows.length > ANALYSIS_EXPORT_PAGE_SIZE;
-    const items = rows.map((row) => normalizeAnalysisExportRow(source, row));
+    const items = rows.map((row) => {
+      const exportRow = { ...row };
+      delete exportRow.cursor_timestamp;
+      return normalizeAnalysisExportRow(source, exportRow);
+    });
     const lastRow = rows.at(-1);
     return Object.freeze({
       source,
@@ -1559,24 +1667,36 @@ export class DashboardRepository {
         asOf.toISOString(),
         decodedCursor?.timestamp ?? null,
         decodedCursor?.symbol ?? null,
-        decodedCursor?.sourceRank ?? null,
-        decodedCursor?.id ?? null,
-        ANALYSIS_EXPORT_CANDLE_ANCHOR_PAGE_SIZE + 1,
         ANALYSIS_EXPORT_CANDLE_ANCHOR_PAGE_SIZE + 1
       ],
       { logger: this.logger }
     );
     const anchorRows = anchorResult.rows.slice(0, ANALYSIS_EXPORT_CANDLE_ANCHOR_PAGE_SIZE);
     const hasMore = anchorResult.rows.length > ANALYSIS_EXPORT_CANDLE_ANCHOR_PAGE_SIZE;
-    const anchors = [...new Map(anchorRows.map(({ symbol, anchor_at }) => [
-      `${symbol}\u0000${readTimestamp(anchor_at, "analysis export candle anchor")}`,
-      { symbol, anchor_at: readTimestamp(anchor_at, "analysis export candle anchor") }
-    ])).values()];
+    const anchors = anchorRows.map((row) => {
+      if (typeof row.symbol !== "string" || !/^[A-Z0-9]+-EUR$/.test(row.symbol)) {
+        throw new RepositoryDataError("invalid analysis export candle anchor symbol");
+      }
+      return {
+        symbol: row.symbol,
+        anchor_at: readExportTimestamp(row.anchor_at_exact, "analysis export candle anchor"),
+        cursor_timestamp: readExportCursorTimestamp(
+          row.cursor_timestamp, "analysis export cursor timestamp"
+        ),
+        trade_anchor_count: readExportCount(row.trade_anchor_count, "trade anchor count"),
+        decision_anchor_count: readExportCount(
+          row.decision_anchor_count, "decision anchor count"
+        )
+      };
+    });
     const candlesResult = anchors.length
       ? await queryReadOnly(
         this.pool,
         ANALYSIS_EXPORT_CANDLES_SQL,
-        [JSON.stringify(anchors), 20, 6001, asOf.toISOString()],
+        [JSON.stringify(anchors.map(({ symbol, anchor_at }) => ({
+          symbol,
+          anchor_at
+        }))), 20, 6001, asOf.toISOString()],
         { logger: this.logger }
       )
       : { rows: [] };
@@ -1587,18 +1707,23 @@ export class DashboardRepository {
     return Object.freeze({
       source: "candleWindows",
       asOf: asOf.toISOString(),
-      anchors: Object.freeze(anchors.map(({ symbol, anchor_at }) => Object.freeze({
+      anchors: Object.freeze(anchors.map(({
         symbol,
-        anchorAt: anchor_at
+        anchor_at,
+        trade_anchor_count,
+        decision_anchor_count
+      }) => Object.freeze({
+        symbol,
+        anchorAt: anchor_at,
+        tradeAnchorCount: trade_anchor_count,
+        decisionAnchorCount: decision_anchor_count
       }))),
       candleWindows: Object.freeze(candlesResult.rows.map(normalizeAnalysisExportCandle)),
       hasMore,
       nextCursor: hasMore
         ? encodeAnalysisExportCursor("candleWindows", {
-          timestamp: readTimestamp(lastRow.anchor_at, "analysis export cursor timestamp"),
-          symbol: lastRow.symbol,
-          sourceRank: lastRow.source_rank,
-          id: lastRow.id
+          timestamp: lastRow.cursor_timestamp,
+          symbol: lastRow.symbol
         })
         : null
     });
@@ -1942,6 +2067,32 @@ function readNullableTimestamp(value, field) {
   return value === null || value === undefined ? null : readTimestamp(value, field);
 }
 
+function readExportTimestamp(value, field) {
+  if (typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(value)
+    && Number.isFinite(Date.parse(value))) {
+    return value;
+  }
+  return readTimestamp(value, field);
+}
+
+function readExportCursorTimestamp(value, field) {
+  if (typeof value !== "string"
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(value)
+    || !Number.isFinite(Date.parse(value))) {
+    throw new RepositoryDataError(`invalid ${field}`);
+  }
+  return value;
+}
+
+function readExportCount(value, field) {
+  const count = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new RepositoryDataError(`invalid ${field}`);
+  }
+  return count;
+}
+
 function normalizeTrade(row) {
   for (const field of ["price", "quantity", "fees", "realized_pnl"]) {
     row[field] = readFiniteNumber(row[field], `trade ${field}`);
@@ -1952,7 +2103,7 @@ function normalizeTrade(row) {
   if (typeof row.symbol !== "string" || !["BUY", "SELL"].includes(row.side)) {
     throw new RepositoryDataError("invalid trade row");
   }
-  row.created_at = readTimestamp(row.created_at, "trade timestamp");
+  row.created_at = readExportTimestamp(row.created_at, "trade timestamp");
   return row;
 }
 
@@ -1968,7 +2119,7 @@ function normalizeAnalyticsDecision(row) {
     ...row,
     confidence,
     indicators: normalizeJsonObject(row.indicators, "analytics decision indicators"),
-    created_at: readTimestamp(row.created_at, "decision timestamp")
+    created_at: readExportTimestamp(row.created_at, "decision timestamp")
   };
 }
 
@@ -2315,7 +2466,7 @@ function normalizeBundleCandle(row) {
   const candle = {
     symbol: row.symbol,
     interval: row.interval,
-    anchorAt: readTimestamp(row.anchor_at, "bundle candle anchor time"),
+    anchorAt: readExportTimestamp(row.anchor_at, "bundle candle anchor time"),
     timestamp: readTimestamp(row.timestamp, "bundle candle timestamp")
   };
   for (const field of ["open", "high", "low", "close", "volume"]) {
@@ -2341,7 +2492,7 @@ function normalizeAnalysisExportCandle(row) {
     interval: row.interval,
     timestamp: readTimestamp(row.timestamp, "analysis export candle timestamp"),
     anchorTimes: Object.freeze(anchorTimes.map((anchorAt) =>
-      readTimestamp(anchorAt, "analysis export candle anchor time")))
+      readExportTimestamp(anchorAt, "analysis export candle anchor time")))
   };
   for (const field of ["open", "high", "low", "close", "volume"]) {
     candle[field] = readFiniteNumber(row[field], `analysis export candle ${field}`);
@@ -2361,7 +2512,7 @@ function normalizeAnalysisExportRow(source, row) {
       || typeof row.symbol !== "string" || !["OPEN", "CLOSED"].includes(row.status)) {
       throw new RepositoryDataError("invalid analysis export position");
     }
-    row.created_at = readTimestamp(row.created_at, "analysis export position timestamp");
+    row.created_at = readExportTimestamp(row.created_at, "analysis export position timestamp");
     return Object.freeze(row);
   }
   if (source === "decisions") {
@@ -2411,8 +2562,8 @@ function normalizePaperExecutionAttempt(row) {
     confidence: row.confidence === null
       ? null
       : readFiniteNumber(row.confidence, "paper execution decision confidence"),
-    decision_at: readTimestamp(row.decision_at, "paper execution decision time"),
-    evaluated_at: readTimestamp(row.evaluated_at, "paper execution evaluation time"),
+    decision_at: readExportTimestamp(row.decision_at, "paper execution decision time"),
+    evaluated_at: readExportTimestamp(row.evaluated_at, "paper execution evaluation time"),
     outcome: row.outcome,
     reason_code: row.reason_code,
     trade_id: row.trade_id
@@ -2476,30 +2627,30 @@ function getAnalysisExportCursor(source, row) {
   if (source === "shadowExitEvents") {
     return {
       scenarioId: row.scenario_id,
-      eventAt: readTimestamp(row.event_at, "analysis export cursor event time"),
+      eventAt: readExportCursorTimestamp(
+        row.cursor_timestamp, "analysis export cursor event time"
+      ),
       id: row.id
     };
   }
   if (source === "portfolioSnapshots") {
     return {
-      timestamp: readTimestamp(row.captured_at, "analysis export cursor timestamp"),
+      timestamp: readExportCursorTimestamp(
+        row.cursor_timestamp, "analysis export cursor timestamp"
+      ),
       snapshotOrder: String(row.snapshot_order)
     };
   }
   if (source === "paperExecutionAttempts") {
     return {
-      timestamp: readTimestamp(row.evaluated_at, "analysis export cursor evaluation time"),
+      timestamp: readExportCursorTimestamp(
+        row.cursor_timestamp, "analysis export cursor evaluation time"
+      ),
       id: row.id
     };
   }
   return {
-    timestamp: readTimestamp(
-      source === "portfolioSnapshots" ? row.captured_at
-        : source === "shadowExitScenarios" ? row.position_opened_at
-          : source === "analyticsRuns" ? row.generated_at
-            : row.created_at,
-      "analysis export cursor timestamp"
-    ),
+    timestamp: readExportCursorTimestamp(row.cursor_timestamp, "analysis export cursor timestamp"),
     id: row.id
   };
 }
@@ -2531,26 +2682,33 @@ function decodeAnalysisExportCursor(value, source) {
   }
   if (source === "candleWindows") {
     if (!Number.isFinite(Date.parse(cursor.timestamp || ""))
-      || typeof cursor.symbol !== "string" || !/^[A-Z0-9]+-EUR$/.test(cursor.symbol)
-      || ![0, 1].includes(cursor.sourceRank)
-      || !UUID_PATTERN.test(cursor.id || "")) {
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(cursor.timestamp)
+      || typeof cursor.symbol !== "string" || !/^[A-Z0-9]+-EUR$/.test(cursor.symbol)) {
       throw new TypeError("Analysis export cursor is invalid.");
     }
     return cursor;
   }
   if (source === "portfolioSnapshots") {
-    if (!Number.isFinite(Date.parse(cursor.timestamp || ""))
+    if (!isValidExportCursorTimestamp(cursor.timestamp)
       || typeof cursor.snapshotOrder !== "string"
       || !/^[1-9]\d*$/.test(cursor.snapshotOrder)) {
       throw new TypeError("Analysis export cursor is invalid.");
     }
     return cursor;
   }
-  if (!Number.isFinite(Date.parse(cursor.timestamp || ""))
+  if (!isValidExportCursorTimestamp(
+    source === "shadowExitEvents" ? cursor.eventAt : cursor.timestamp
+  )
     || !UUID_PATTERN.test(cursor.id || "")) {
     throw new TypeError("Analysis export cursor is invalid.");
   }
   return cursor;
+}
+
+function isValidExportCursorTimestamp(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(value)
+    && Number.isFinite(Date.parse(value));
 }
 
 function normalizeJsonValue(value, field) {

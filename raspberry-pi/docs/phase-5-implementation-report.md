@@ -19,9 +19,9 @@ No application code outside `raspberry-pi/` was changed. No database was contact
 
 - The only market universe source is `public."AI_Crypto_Bot_Watched_Markets"`; no market catalog, seed list, `config/markets.js`, fallback list, or market mutation is used.
 - Supported intervals are `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`.
-- Processing is bounded to five markets per storage batch, at most four concurrent candle workers, 500 candles per market/interval request, and 100 candles per write chunk.
-- Candle checkpoints are derived from the latest stored timestamp for each requested symbol and interval. A first request is bounded to the latest 500 candles; subsequent requests resume from the stored checkpoint. No unbounded backfill is performed.
-- At approximately 102 enabled markets, a pass has 21 market batches per interval. `--intervals=all` can make up to 612 candle requests plus one ticker request and store up to 306,000 candles on an initially empty candle table. Begin with selected intervals and monitor Raspberry Pi resource use.
+- Processing is bounded to five markets per storage batch, at most four concurrent candle workers, 100 candles per write chunk, and 500 candles per market/interval request. The current initial-history bootstrap is separately limited to 150 candles per market/interval to match the AI read limit; existing-history catch-up retains the 500-candle request cap.
+- Candle checkpoints are derived from the latest stored timestamp for each requested symbol and interval. A new market/interval receives at most the latest 150 candles; existing history resumes from its stored checkpoint and catches up in bounded requests. No unbounded backfill is performed.
+- At approximately 102 enabled markets, a pass has 21 market batches per interval. `--intervals=all` can make up to 612 candle requests plus one ticker request and store up to 91,800 initial candles. Begin with selected intervals and monitor Raspberry Pi resource use.
 - Provider failures or invalid data are reported without discarding successfully collected markets. Best-effort scanner events are recorded for bounded missing/invalid/storage-failure cases.
 
 ## Database identity and credentials

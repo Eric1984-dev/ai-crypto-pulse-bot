@@ -7,7 +7,7 @@ import {
 import { createIngestionFailureDiagnostic } from "../services/ingestion-diagnostics.mjs";
 
 export const MAX_INGESTION_MARKETS_PER_BATCH = 5;
-export const MAX_CANDLES_PER_MARKET = 500;
+export const MAX_CANDLES_PER_MARKET_REQUEST = 500;
 export const CANDLE_WRITE_BATCH_SIZE = 100;
 const MARKET_SYMBOL_PATTERN = /^[A-Z0-9]+-[A-Z0-9]+$/;
 const CANDLE_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
@@ -353,7 +353,7 @@ function validateSnapshotRows(rows) {
 }
 
 function validateCandleRows(rows) {
-  if (!Array.isArray(rows) || rows.length > MAX_CANDLES_PER_MARKET) {
+  if (!Array.isArray(rows) || rows.length > MAX_CANDLES_PER_MARKET_REQUEST) {
     throw new RangeError("Candle writes must be bounded to one market's response.");
   }
   const keys = new Set();

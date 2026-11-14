@@ -33,6 +33,51 @@
   const analysisExportFilePrefix = "cryptopulse-analysis";
   const utf8Encoder = new TextEncoder();
   const countFormat = new Intl.NumberFormat("en-GB");
+  const expectedAnalysisExportCountSources = analysisExportSources.filter(
+    (source) => source !== "candleWindows"
+  );
+  const exportFailureMessages = Object.freeze({
+    EXPORT_CANCELLED: "Export cancelled by the user.",
+    EXPORT_CURSOR_CYCLE: "Export pagination repeated a cursor; the source is incomplete.",
+    EXPORT_DUPLICATE_ANCHOR: "Candle-anchor pagination returned a duplicate anchor.",
+    EXPORT_DUPLICATE_LINK: "Candle-window pagination returned a duplicate link.",
+    EXPORT_DUPLICATE_ROW: "A source page repeated a record.",
+    EXPORT_EXPECTED_COUNT_MISMATCH: "Exported source counts did not match the as-of manifest.",
+    EXPORT_FILE_FINALIZE_FAILED: "A local export file could not be finalized.",
+    EXPORT_FILE_WRITE_FAILED: "A local export file could not be written.",
+    EXPORT_INVALID_MANIFEST: "The historical export manifest is invalid.",
+    EXPORT_INVALID_PAGE: "A historical export page is invalid.",
+    EXPORT_NETWORK_ERROR: "The runtime API could not be reached.",
+    EXPORT_FAILED: "The export failed before all sources were verified complete."
+  });
+
+  function createExportError(code, message, { requestId } = {}) {
+    const error = new Error(message);
+    error.code = code;
+    if (requestId) {
+      error.requestId = requestId;
+    }
+    return error;
+  }
+
+  function safeExportFailure(error) {
+    if (error?.name === "AbortError") {
+      return { code: "EXPORT_CANCELLED", message: exportFailureMessages.EXPORT_CANCELLED };
+    }
+    const code = typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code)
+      ? error.code
+      : "EXPORT_FAILED";
+    const message = exportFailureMessages[code]
+      || (code.startsWith("ANALYSIS_EXPORT_")
+        ? error.message
+        : exportFailureMessages.EXPORT_FAILED);
+    return {
+      code,
+      message,
+      ...(typeof error?.requestId === "string" ? { requestId: error.requestId } : {})
+    };
+  }
+
   const runtimeApiUrl = (path) => {
     if (!globalThis.CryptoPulseRuntimeApi) {
       throw new Error("Raspberry Pi runtime API is not configured.");
@@ -107,13 +152,24 @@
       if (signal?.aborted) {
         throw createAbortError();
       }
-      const response = await fetchImpl(url, {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        signal
-      });
+      let response;
+      try {
+        response = await fetchImpl(url, {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          signal
+        });
+      } catch (error) {
+        if (error.name === "AbortError") {
+          throw error;
+        }
+        throw createExportError(
+          "EXPORT_NETWORK_ERROR",
+          exportFailureMessages.EXPORT_NETWORK_ERROR
+        );
+      }
       if (response.status === 429) {
         if (rateLimitRetries >= 5) {
           throw new Error("The runtime API rate limit is still active. Resume the export later.");
@@ -123,12 +179,28 @@
         continue;
       }
       if (response.status === 401) {
-        const error = new Error("Authentication is required.");
+        const error = createExportError("AUTHENTICATION_REQUIRED", "Authentication is required.");
         error.status = 401;
         throw error;
       }
       if (!response.ok) {
-        throw new Error("The historical export request failed.");
+        let errorPayload = null;
+        try {
+          errorPayload = await response.json();
+        } catch {
+          errorPayload = null;
+        }
+        const apiError = errorPayload?.error;
+        const code = typeof apiError?.code === "string"
+          && /^[A-Z0-9_]{1,64}$/.test(apiError.code)
+          ? apiError.code
+          : "EXPORT_HTTP_ERROR";
+        const message = typeof apiError?.message === "string" && apiError.message.length <= 240
+          ? apiError.message
+          : "The runtime API returned an unsuccessful export response.";
+        throw createExportError(code, message, {
+          requestId: typeof apiError?.requestId === "string" ? apiError.requestId : undefined
+        });
       }
       let result;
       try {
@@ -149,14 +221,23 @@
       buildAnalysisExportUrl("analysis-export-manifest"),
       signal
     );
-    if (manifest.formatVersion !== "cryptopulse-analysis-export-v3"
+    if (manifest.formatVersion !== "cryptopulse-analysis-export-v4"
       || typeof manifest.asOf !== "string" || !Number.isFinite(Date.parse(manifest.asOf))
       || !Array.isArray(manifest.sources)
       || manifest.sources.length !== analysisExportSources.length
       || analysisExportSources.some((source, index) => manifest.sources[index] !== source)
+      || manifest.candleSelectionMode !== "trades-and-linked-decisions"
+      || !manifest.expectedSourceCounts
+      || expectedAnalysisExportCountSources.some((source) =>
+        !Number.isSafeInteger(manifest.expectedSourceCounts[source])
+        || manifest.expectedSourceCounts[source] < 0)
+      || !manifest.expectedCandleAnchorCounts
+      || ["tradeAnchors", "decisionAnchors", "uniqueAnchors"].some((key) =>
+        !Number.isSafeInteger(manifest.expectedCandleAnchorCounts[key])
+        || manifest.expectedCandleAnchorCounts[key] < 0)
       || !Number.isSafeInteger(manifest.limits?.maxFileBytes)
       || manifest.limits.maxFileBytes < 1024) {
-      throw new Error("The historical export manifest is invalid.");
+      throw createExportError("EXPORT_INVALID_MANIFEST", exportFailureMessages.EXPORT_INVALID_MANIFEST);
     }
     return manifest;
   }
@@ -191,7 +272,12 @@
         !Array.isArray(page.anchors) || !Array.isArray(page.candleWindows)
         || page.anchors.some((anchor) => !anchor
           || typeof anchor.symbol !== "string"
-          || !Number.isFinite(Date.parse(anchor.anchorAt || "")))
+          || !Number.isFinite(Date.parse(anchor.anchorAt || ""))
+          || !Number.isSafeInteger(anchor.tradeAnchorCount)
+          || anchor.tradeAnchorCount < 0
+          || !Number.isSafeInteger(anchor.decisionAnchorCount)
+          || anchor.decisionAnchorCount < 0
+          || anchor.tradeAnchorCount + anchor.decisionAnchorCount === 0)
         || page.candleWindows.some((candle) => !candle
           || typeof candle.symbol !== "string"
           || typeof candle.timestamp !== "string"
@@ -201,9 +287,10 @@
           || candle.anchorTimes.some((anchorAt) =>
             typeof anchorAt !== "string"
             || !Number.isFinite(Date.parse(anchorAt))
-            || !pageAnchorKeys.has(`${candle.symbol}\u0000${anchorAt}`)))
+            || !pageAnchorKeys.has(`${candle.symbol}\u0000${anchorAt}`))
+          || candle.anchorTimes.length !== new Set(candle.anchorTimes).size)
       ))) {
-      throw new Error(`The historical export page for ${source} is invalid.`);
+      throw createExportError("EXPORT_INVALID_PAGE", exportFailureMessages.EXPORT_INVALID_PAGE);
     }
     return page;
   }
@@ -318,6 +405,10 @@
     const outputManifest = {
       ...manifest,
       exportStatus: "in_progress",
+      exportMode: {
+        candleWindows: "trades-and-linked-decisions",
+        includesAllDecisionCandleWindows: false
+      },
       files: [],
       sourceCounts: {},
       candleDataFormat: {
@@ -339,8 +430,11 @@
       await writeManifest(outputDirectory, outputManifest);
       for (const source of manifest.sources) {
         let cursor = null;
+        const seenCursors = new Set();
         let pageCount = 0;
         let recordCount = 0;
+        let tradeAnchorCount = 0;
+        let decisionAnchorCount = 0;
         let anchorCount = 0;
         let candleCount = 0;
         let windowLinkCount = 0;
@@ -348,8 +442,11 @@
         let sourceWriter;
         let anchorWriter;
         let windowLinkWriter;
-        let lastAnchorKey = null;
         let seenCandleKeys;
+        let seenAnchorKeys;
+        let seenLinkKeys;
+        let seenRecordIds;
+        let lastAnchor = null;
         if (source === "candleWindows") {
           anchorWriter = createJsonlWriter(
             outputDirectory,
@@ -370,6 +467,8 @@
             outputManifest.files
           );
           seenCandleKeys = new Set();
+          seenAnchorKeys = new Set();
+          seenLinkKeys = new Set();
           writers.push(anchorWriter, sourceWriter);
           writers.push(windowLinkWriter);
         } else {
@@ -379,11 +478,18 @@
             manifest.limits.maxFileBytes,
             outputManifest.files
           );
+          seenRecordIds = new Set();
           writers.push(sourceWriter);
         }
         do {
           if (signal?.aborted) {
             throw createAbortError();
+          }
+          if (cursor) {
+            if (seenCursors.has(cursor)) {
+              throw createExportError("EXPORT_CURSOR_CYCLE", exportFailureMessages.EXPORT_CURSOR_CYCLE);
+            }
+            seenCursors.add(cursor);
           }
           const page = await requestAnalysisExportPage(fetchImpl, {
             source,
@@ -391,18 +497,32 @@
             cursor,
             signal
           });
+          if (page.nextCursor && seenCursors.has(page.nextCursor)) {
+            throw createExportError("EXPORT_CURSOR_CYCLE", exportFailureMessages.EXPORT_CURSOR_CYCLE);
+          }
           pageCount += 1;
           if (source === "candleWindows") {
             const allowedAnchorKeys = new Set();
             const anchorRecords = [];
             for (const anchor of page.anchors) {
               const anchorKey = `${anchor.symbol}\u0000${anchor.anchorAt}`;
-              if (anchorKey === lastAnchorKey) {
-                continue;
+              if (seenAnchorKeys.has(anchorKey)) {
+                throw createExportError(
+                  "EXPORT_DUPLICATE_ANCHOR",
+                  exportFailureMessages.EXPORT_DUPLICATE_ANCHOR
+                );
               }
-              lastAnchorKey = anchorKey;
+              if (lastAnchor && (anchor.anchorAt < lastAnchor.anchorAt
+                || (anchor.anchorAt === lastAnchor.anchorAt
+                  && anchor.symbol <= lastAnchor.symbol))) {
+                throw createExportError("EXPORT_INVALID_PAGE", exportFailureMessages.EXPORT_INVALID_PAGE);
+              }
+              seenAnchorKeys.add(anchorKey);
+              lastAnchor = anchor;
               allowedAnchorKeys.add(anchorKey);
               anchorRecords.push(anchor);
+              tradeAnchorCount += anchor.tradeAnchorCount;
+              decisionAnchorCount += anchor.decisionAnchorCount;
             }
             const candleRecords = [];
             const linkRecords = [];
@@ -413,6 +533,15 @@
                 continue;
               }
               for (const anchorAt of matchedAnchorTimes) {
+                const linkKey = `${candle.symbol}\u0000${candle.interval}\u0000${anchorAt}`
+                  + `\u0000${candle.timestamp}`;
+                if (seenLinkKeys.has(linkKey)) {
+                  throw createExportError(
+                    "EXPORT_DUPLICATE_LINK",
+                    exportFailureMessages.EXPORT_DUPLICATE_LINK
+                  );
+                }
+                seenLinkKeys.add(linkKey);
                 linkRecords.push({
                   symbol: candle.symbol,
                   interval: candle.interval,
@@ -443,6 +572,15 @@
             windowLinkCount += linkRecords.length;
             recordCount += anchorRecords.length + candleRecords.length + linkRecords.length;
           } else {
+            for (const item of page.items) {
+              if (typeof item.id !== "string" || seenRecordIds.has(item.id)) {
+                throw createExportError(
+                  "EXPORT_DUPLICATE_ROW",
+                  exportFailureMessages.EXPORT_DUPLICATE_ROW
+                );
+              }
+              seenRecordIds.add(item.id);
+            }
             await sourceWriter.appendMany(page.items);
             recordCount += page.items.length;
           }
@@ -450,7 +588,13 @@
           outputManifest.sourceCounts[source] = {
             records: recordCount,
             ...(source === "candleWindows"
-              ? { anchors: anchorCount, uniqueCandles: candleCount, windowLinks: windowLinkCount }
+              ? {
+                tradeAnchors: tradeAnchorCount,
+                decisionAnchors: decisionAnchorCount,
+                anchors: anchorCount,
+                uniqueCandles: candleCount,
+                windowLinks: windowLinkCount
+              }
               : {}),
             pages: pageCount,
             files: outputManifest.files.filter((fileName) =>
@@ -460,12 +604,33 @@
             source,
             pages: pageCount,
             records: recordCount,
+            tradeAnchors: tradeAnchorCount,
+            decisionAnchors: decisionAnchorCount,
             anchors: anchorCount,
             uniqueCandles: candleCount,
             windowLinks: windowLinkCount,
             completedSources: outputManifest.completedSources.length
           });
         } while (cursor);
+        if (source === "candleWindows") {
+          const expected = manifest.expectedCandleAnchorCounts;
+          if (tradeAnchorCount !== expected.tradeAnchors
+            || decisionAnchorCount !== expected.decisionAnchors
+            || anchorCount !== expected.uniqueAnchors
+            || anchorCount !== seenAnchorKeys.size
+            || candleCount !== seenCandleKeys.size
+            || windowLinkCount !== seenLinkKeys.size) {
+            throw createExportError(
+              "EXPORT_EXPECTED_COUNT_MISMATCH",
+              exportFailureMessages.EXPORT_EXPECTED_COUNT_MISMATCH
+            );
+          }
+        } else if (recordCount !== manifest.expectedSourceCounts[source]) {
+          throw createExportError(
+            "EXPORT_EXPECTED_COUNT_MISMATCH",
+            exportFailureMessages.EXPORT_EXPECTED_COUNT_MISMATCH
+          );
+        }
         await sourceWriter.close();
         await anchorWriter?.close();
         await windowLinkWriter?.close();
@@ -474,7 +639,13 @@
         outputManifest.sourceCounts[source] = {
           records: recordCount,
           ...(source === "candleWindows"
-            ? { anchors: anchorCount, uniqueCandles: candleCount, windowLinks: windowLinkCount }
+            ? {
+              tradeAnchors: tradeAnchorCount,
+              decisionAnchors: decisionAnchorCount,
+              anchors: anchorCount,
+              uniqueCandles: candleCount,
+              windowLinks: windowLinkCount
+            }
             : {}),
           pages: pageCount,
           files: sourceFiles
@@ -485,18 +656,21 @@
       outputManifest.exportStatus = "complete";
     } catch (error) {
       failure = error;
-      outputManifest.exportStatus = error.name === "AbortError" ? "cancelled" : "failed";
-      outputManifest.failure = error.name === "AbortError"
-        ? "Cancelled by the user."
-        : "A source could not be exported completely.";
+      outputManifest.failure = safeExportFailure(error);
+      outputManifest.exportStatus = outputManifest.failure.code === "EXPORT_CANCELLED"
+        ? "cancelled"
+        : "failed";
     } finally {
       for (const writer of writers) {
         try {
           await writer.close();
         } catch (error) {
-          failure ||= error;
+          failure ||= createExportError(
+            "EXPORT_FILE_FINALIZE_FAILED",
+            exportFailureMessages.EXPORT_FILE_FINALIZE_FAILED
+          );
           outputManifest.exportStatus = "failed";
-          outputManifest.failure = "An export file could not be finalized.";
+          outputManifest.failure = safeExportFailure(failure);
         }
       }
       try {

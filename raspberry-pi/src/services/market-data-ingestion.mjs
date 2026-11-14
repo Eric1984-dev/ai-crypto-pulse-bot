@@ -1,6 +1,6 @@
 import { validateEnabledWatchedMarkets } from "./watched-markets.mjs";
 import {
-  MAX_CANDLES_PER_MARKET,
+  MAX_CANDLES_PER_MARKET_REQUEST,
   MAX_INGESTION_MARKETS_PER_BATCH
 } from "../repositories/market-ingestion-repository.mjs";
 import {
@@ -13,6 +13,8 @@ import { createIngestionFailureDiagnostic } from "./ingestion-diagnostics.mjs";
 
 export const SUPPORTED_INGESTION_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export const MAX_INGESTION_WORKERS = 4;
+export const INITIAL_CANDLE_BOOTSTRAP_LIMIT = 150;
+const MAX_CANDLE_CATCH_UP_LIMIT = MAX_CANDLES_PER_MARKET_REQUEST;
 const MARKET_SYMBOL_PATTERN = /^[A-Z0-9]+-[A-Z0-9]+$/;
 const GLOBAL_PROVIDER_FAILURES = new Set([
   "PROVIDER_EMPTY",
@@ -317,9 +319,9 @@ export function createMarketDataIngestionService({
         }
 
         const limit = latestTimestamp === undefined
-          ? MAX_CANDLES_PER_MARKET
+          ? INITIAL_CANDLE_BOOTSTRAP_LIMIT
           : Math.min(
-            MAX_CANDLES_PER_MARKET,
+            MAX_CANDLE_CATCH_UP_LIMIT,
             Math.max(2, Math.floor((referenceTime - latestTimestamp) / intervalDuration) + 1)
           );
         try {
@@ -560,7 +562,7 @@ function validateIntervals(intervals) {
 function validateCandleRequest(symbol, interval, limit, nowMs) {
   if (typeof symbol !== "string" || !MARKET_SYMBOL_PATTERN.test(symbol)
     || !SUPPORTED_INGESTION_INTERVALS.includes(interval)
-    || !Number.isSafeInteger(limit) || limit < 1 || limit > MAX_CANDLES_PER_MARKET
+    || !Number.isSafeInteger(limit) || limit < 1 || limit > MAX_CANDLE_CATCH_UP_LIMIT
     || !Number.isFinite(nowMs)) {
     throw new TypeError("A valid bounded candle request is required.");
   }

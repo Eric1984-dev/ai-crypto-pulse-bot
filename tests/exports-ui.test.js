@@ -96,6 +96,40 @@ function createExportsDocument() {
   };
 }
 
+function createExportManifest(asOf, {
+  expectedSourceCounts = {},
+  expectedCandleAnchorCounts = {}
+} = {}) {
+  const sources = [
+    "trades",
+    "positions",
+    "decisions",
+    "paperExecutionAttempts",
+    "portfolioSnapshots",
+    "shadowExitScenarios",
+    "shadowExitEvents",
+    "analyticsRuns",
+    "candleWindows"
+  ];
+  return {
+    formatVersion: "cryptopulse-analysis-export-v4",
+    asOf,
+    sources,
+    candleSelectionMode: "trades-and-linked-decisions",
+    expectedSourceCounts: Object.fromEntries(
+      sources.filter((source) => source !== "candleWindows")
+        .map((source) => [source, expectedSourceCounts[source] || 0])
+    ),
+    expectedCandleAnchorCounts: {
+      tradeAnchors: 0,
+      decisionAnchors: 0,
+      uniqueAnchors: 0,
+      ...expectedCandleAnchorCounts
+    },
+    limits: { maxFileBytes: 1024 }
+  };
+}
+
 test("Exports page shows the Raspberry Pi model as its first resource metric", async () => {
   const panel = createControl();
   const state = createControl();
@@ -146,23 +180,15 @@ test("Exports page shows the Raspberry Pi model as its first resource metric", a
 test("full-history export paginates sequentially, retries rate limits, and splits bounded JSONL files", async () => {
   const { directoryHandle, files, directories } = createMemoryDirectory();
   const asOf = "2026-11-12T20:00:00.000Z";
-  const sources = [
-    "trades",
-    "positions",
-    "decisions",
-    "paperExecutionAttempts",
-    "portfolioSnapshots",
-    "shadowExitScenarios",
-    "shadowExitEvents",
-    "analyticsRuns",
-    "candleWindows"
-  ];
   const requests = [];
   let activeRequests = 0;
   let maximumActiveRequests = 0;
   let rateLimitSent = false;
-  const anchors = ["2026-11-12T10:00:00.000Z", "2026-11-12T11:00:00.000Z",
-    "2026-11-12T12:00:00.000Z"].map((anchorAt) => ({ symbol: "BTC-EUR", anchorAt }));
+  const anchors = [
+    { symbol: "BTC-EUR", anchorAt: "2026-11-12T10:00:00.000Z", tradeAnchorCount: 1, decisionAnchorCount: 0 },
+    { symbol: "BTC-EUR", anchorAt: "2026-11-12T11:00:00.000Z", tradeAnchorCount: 0, decisionAnchorCount: 1 },
+    { symbol: "BTC-EUR", anchorAt: "2026-11-12T12:00:00.000Z", tradeAnchorCount: 1, decisionAnchorCount: 1 }
+  ];
   const fetchImpl = async (url) => {
     activeRequests += 1;
     maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
@@ -171,12 +197,14 @@ test("full-history export paginates sequentially, retries rate limits, and split
       await new Promise((resolve) => setImmediate(resolve));
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
-        return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v3",
-          asOf,
-          sources,
-          limits: { maxFileBytes: 1024 }
-        });
+        return jsonResponse(createExportManifest(asOf, {
+          expectedSourceCounts: { trades: 2, decisions: 251, paperExecutionAttempts: 1 },
+          expectedCandleAnchorCounts: {
+            tradeAnchors: 2,
+            decisionAnchors: 2,
+            uniqueAnchors: 3
+          }
+        }));
       }
       const source = params.get("source");
       const cursor = params.get("cursor");
@@ -197,8 +225,21 @@ test("full-history export paginates sequentially, retries rate limits, and split
           nextCursor: cursor ? null : "page-2"
         });
       }
+      if (source === "decisions") {
+        const pageNumber = cursor ? 2 : 1;
+        const items = pageNumber === 1
+          ? Array.from({ length: 250 }, (_, index) => ({ id: `decision-${index + 1}` }))
+          : [{ id: "decision-251" }];
+        return jsonResponse({
+          source,
+          asOf,
+          items,
+          hasMore: pageNumber === 1,
+          nextCursor: pageNumber === 1 ? "decisions-page-2" : null
+        });
+      }
       if (source === "candleWindows") {
-        const pageAnchors = cursor ? anchors.slice(1) : anchors.slice(0, 2);
+        const pageAnchors = cursor ? anchors.slice(2) : anchors.slice(0, 2);
         return jsonResponse({
           source,
           asOf,
@@ -258,6 +299,7 @@ test("full-history export paginates sequentially, retries rate limits, and split
   });
   assert.equal(result.manifest.exportStatus, "complete");
   assert.equal(result.manifest.sourceCounts.trades.records, 2);
+  assert.equal(result.manifest.sourceCounts.decisions.records, 251);
   assert.equal(result.manifest.sourceCounts.candleWindows.records, 7);
   assert.equal(result.manifest.sourceCounts.candleWindows.anchors, 3);
   assert.equal(result.manifest.sourceCounts.candleWindows.uniqueCandles, 1);
@@ -268,12 +310,17 @@ test("full-history export paginates sequentially, retries rate limits, and split
   const runFiles = files;
   const manifest = JSON.parse(runFiles.get("manifest.json"));
   assert.equal(manifest.exportStatus, "complete");
-  assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v3");
+  assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v4");
   assert.equal(manifest.candleDataFormat.candleRowsAreUnique, true);
   const tradeFiles = [...runFiles.entries()].filter(([name]) => name.startsWith("trades-"));
   assert.equal(tradeFiles.length, 2);
   assert.ok(tradeFiles.every(([, contents]) => new TextEncoder().encode(contents).byteLength <= 1024));
   assert.equal(result.manifest.sourceCounts.paperExecutionAttempts.records, 1);
+  const decisionFiles = [...runFiles.entries()].filter(([name]) => name.startsWith("decisions-"));
+  const decisionRows = decisionFiles.flatMap(([, contents]) =>
+    contents.trim().split("\n").map((line) => JSON.parse(line)));
+  assert.equal(decisionRows.length, 251);
+  assert.equal(new Set(decisionRows.map(({ id }) => id)).size, 251);
   const executionFile = [...runFiles.entries()].find(([name]) =>
     name.startsWith("paperExecutionAttempts-"))[1];
   assert.equal(JSON.parse(executionFile).reason_code, "TRADE_EXECUTED");
@@ -300,6 +347,9 @@ test("full-history export paginates sequentially, retries rate limits, and split
     linkFile.trim().split("\n").map((line) => JSON.parse(line).anchorAt),
     anchors.map(({ anchorAt }) => anchorAt)
   );
+  assert.equal(result.manifest.sourceCounts.candleWindows.tradeAnchors, 2);
+  assert.equal(result.manifest.sourceCounts.candleWindows.decisionAnchors, 2);
+  assert.equal(result.manifest.sourceCounts.candleWindows.anchors, 3);
 });
 
 test("full-history export leaves a cancelled status in the manifest", async () => {
@@ -313,16 +363,7 @@ test("full-history export leaves a cancelled status in the manifest", async () =
   const fetchImpl = async (url, options) => {
     const params = new URL(url, "https://cryptopulse.local").searchParams;
     if (params.get("view") === "analysis-export-manifest") {
-      return jsonResponse({
-        formatVersion: "cryptopulse-analysis-export-v3",
-        asOf,
-        sources: [
-          "trades", "positions", "decisions", "paperExecutionAttempts",
-          "portfolioSnapshots", "shadowExitScenarios", "shadowExitEvents",
-          "analyticsRuns", "candleWindows"
-        ],
-        limits: { maxFileBytes: 1024 }
-      });
+      return jsonResponse(createExportManifest(asOf));
     }
     started();
     return new Promise((resolve, reject) => {
@@ -344,32 +385,99 @@ test("full-history export leaves a cancelled status in the manifest", async () =
   assert.equal(JSON.parse(files.get("manifest.json")).exportStatus, "cancelled");
 });
 
+test("full-history export records a safe API failure code and request ID", async () => {
+  const { directoryHandle, files } = createMemoryDirectory();
+  const asOf = "2026-11-12T20:00:00.000Z";
+  const fetchImpl = async (url) => {
+    const params = new URL(url, "https://cryptopulse.local").searchParams;
+    if (params.get("view") === "analysis-export-manifest") {
+      return jsonResponse(createExportManifest(asOf, {
+        expectedSourceCounts: { trades: 1 }
+      }));
+    }
+    return {
+      status: 503,
+      ok: false,
+      headers: { get: () => null },
+      async json() {
+        return {
+          error: {
+            code: "ANALYSIS_EXPORT_UNAVAILABLE",
+            message: "A historical analysis export page is temporarily unavailable.",
+            requestId: "request-123"
+          }
+        };
+      }
+    };
+  };
+
+  await assert.rejects(
+    exportsPage.exportFullHistory({ fetchImpl, directoryHandle }),
+    { code: "ANALYSIS_EXPORT_UNAVAILABLE" }
+  );
+  const manifest = JSON.parse(files.get("manifest.json"));
+  assert.equal(manifest.exportStatus, "failed");
+  assert.deepEqual(manifest.failure, {
+    code: "ANALYSIS_EXPORT_UNAVAILABLE",
+    message: "A historical analysis export page is temporarily unavailable.",
+    requestId: "request-123"
+  });
+});
+
+test("full-history export fails closed on a repeated multi-page cursor", async () => {
+  const { directoryHandle, files } = createMemoryDirectory();
+  const asOf = "2026-11-12T20:00:00.000Z";
+  let tradePage = 0;
+  const fetchImpl = async (url) => {
+    const params = new URL(url, "https://cryptopulse.local").searchParams;
+    if (params.get("view") === "analysis-export-manifest") {
+      return jsonResponse(createExportManifest(asOf, {
+        expectedSourceCounts: { trades: 3 }
+      }));
+    }
+    if (params.get("source") === "trades") {
+      tradePage += 1;
+      const nextCursor = ["cursor-a", "cursor-b", "cursor-a"][tradePage - 1];
+      return jsonResponse({
+        source: "trades",
+        asOf,
+        items: [{ id: `trade-${tradePage}` }],
+        hasMore: true,
+        nextCursor
+      });
+    }
+    return jsonResponse({
+      source: params.get("source"),
+      asOf,
+      ...(params.get("source") === "candleWindows"
+        ? { anchors: [], candleWindows: [] }
+        : { items: [] }),
+      hasMore: false,
+      nextCursor: null
+    });
+  };
+
+  await assert.rejects(
+    exportsPage.exportFullHistory({ fetchImpl, directoryHandle }),
+    { code: "EXPORT_CURSOR_CYCLE" }
+  );
+  const manifest = JSON.parse(files.get("manifest.json"));
+  assert.equal(tradePage, 3);
+  assert.equal(manifest.exportStatus, "failed");
+  assert.equal(manifest.failure.code, "EXPORT_CURSOR_CYCLE");
+  assert.equal(manifest.completedSources.includes("trades"), false);
+});
+
 test("Exports page wires folder selection and displays completed export status", async () => {
   const documentRef = createExportsDocument();
   const { directoryHandle } = createMemoryDirectory();
   const asOf = "2026-11-12T20:00:00.000Z";
-  const sources = [
-    "trades",
-    "positions",
-    "decisions",
-    "paperExecutionAttempts",
-    "portfolioSnapshots",
-    "shadowExitScenarios",
-    "shadowExitEvents",
-    "analyticsRuns",
-    "candleWindows"
-  ];
   let pickerCalls = 0;
   const windowRef = {
     fetch: async (url) => {
       const params = new URL(url, "https://cryptopulse.local").searchParams;
       if (params.get("view") === "analysis-export-manifest") {
-        return jsonResponse({
-          formatVersion: "cryptopulse-analysis-export-v3",
-          asOf,
-          sources,
-          limits: { maxFileBytes: 1024 }
-        });
+        return jsonResponse(createExportManifest(asOf));
       }
       return jsonResponse({
         source: params.get("source"),

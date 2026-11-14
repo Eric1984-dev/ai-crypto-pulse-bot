@@ -259,9 +259,25 @@ function createRepositories(pool, logger = { error() {} }, dashboardOverrides = 
       },
       getAnalysisExportManifest({ now }) {
         return {
-          formatVersion: "cryptopulse-analysis-export-v3",
+          formatVersion: "cryptopulse-analysis-export-v4",
           generatedAt: now.toISOString(),
           asOf: now.toISOString(),
+          candleSelectionMode: "trades-and-linked-decisions",
+          expectedSourceCounts: {
+            trades: 0,
+            positions: 0,
+            decisions: 0,
+            paperExecutionAttempts: 0,
+            portfolioSnapshots: 0,
+            shadowExitScenarios: 0,
+            shadowExitEvents: 0,
+            analyticsRuns: 0
+          },
+          expectedCandleAnchorCounts: {
+            tradeAnchors: 0,
+            decisionAnchors: 0,
+            uniqueAnchors: 0
+          },
           sources: [
             "trades", "positions", "decisions", "paperExecutionAttempts",
             "portfolioSnapshots", "shadowExitScenarios", "shadowExitEvents",
@@ -760,7 +776,8 @@ test("full-history export routes return a fixed manifest and bounded source page
     );
     assert.equal(manifestResponse.status, 200);
     const manifest = (await manifestResponse.json()).data;
-    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v3");
+    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v4");
+    assert.equal(manifest.candleSelectionMode, "trades-and-linked-decisions");
     assert.equal(manifest.asOf, asOf);
     assert.deepEqual(manifest.activeMarkets, ["BTC-EUR", "ETH-EUR"]);
     assert.equal(manifest.tradingMode, "PAPER");

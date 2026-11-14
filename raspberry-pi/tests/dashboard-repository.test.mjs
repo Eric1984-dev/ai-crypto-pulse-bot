@@ -754,11 +754,16 @@ test("full-history export paginates every source and deduplicates candle anchors
     };
     const repository = new DashboardRepository(pool, { logger: { error() {} } });
     const asOf = new Date("2099-01-01T00:00:00.000Z");
-    const manifest = repository.getAnalysisExportManifest({ now: asOf });
+    const manifest = await repository.getAnalysisExportManifest({ now: asOf });
     assert.equal(manifest.asOf, asOf.toISOString());
-    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v3");
+    assert.equal(manifest.formatVersion, "cryptopulse-analysis-export-v4");
     assert.equal(manifest.limits.rowsPerRequest, 250);
     assert.equal(manifest.limits.candleAnchorsPerRequest, 10);
+    assert.equal(manifest.expectedSourceCounts.decisions, 11);
+    assert.equal(manifest.expectedCandleAnchorCounts.tradeAnchors, 1);
+    assert.equal(manifest.expectedCandleAnchorCounts.decisionAnchors, 1);
+    assert.equal(manifest.expectedCandleAnchorCounts.uniqueAnchors, 1);
+    assert.equal(manifest.candleSelectionMode, "trades-and-linked-decisions");
     assert.ok(manifest.sources.includes("analyticsRuns"));
 
     for (const [source, expected] of [
@@ -801,9 +806,111 @@ test("full-history export paginates every source and deduplicates candle anchors
     } while (cursor);
     const uniqueAnchors = new Set(anchorPages.flatMap(({ anchors }) =>
       anchors.map(({ symbol, anchorAt }) => `${symbol}\u0000${anchorAt}`)));
-    assert.equal(uniqueAnchors.size, 11);
-    assert.ok(anchorPages.length > 1);
+    assert.equal(uniqueAnchors.size, 1);
+    assert.equal(anchorPages.length, 1);
+    assert.equal(anchorPages[0].anchors[0].tradeAnchorCount, 1);
+    assert.equal(anchorPages[0].anchors[0].decisionAnchorCount, 1);
     assert.ok(anchorPages.every(({ hasMore }) => typeof hasMore === "boolean"));
+  } finally {
+    await database.close();
+  }
+});
+
+test("full-history candle anchors paginate linked trades and decisions at microsecond precision", async () => {
+  const database = await createDatabase();
+  try {
+    await database.exec(`
+      DELETE FROM public."AI_Crypto_Bot_Trades";
+      DELETE FROM public."AI_Crypto_Bot_AI_Decisions";
+    `);
+    for (let index = 0; index < 12; index += 1) {
+      const suffix = String(1000 + index).padStart(12, "0");
+      const tradeSuffix = String(2000 + index).padStart(12, "0");
+      const symbol = `MKT${String(index).padStart(3, "0")}-EUR`;
+      const timestamp = "2026-03-20T00:00:00.000123Z";
+      const decisionId = `00000000-0000-4000-8000-${suffix}`;
+      await database.query(`
+        INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+          (id, symbol, decision, confidence, reason, indicators, created_at)
+        VALUES ($1::uuid, $2, 'BUY', 80, 'Linked decision.', '{}', $3)
+      `, [decisionId, symbol, timestamp]);
+      await database.query(`
+        INSERT INTO public."AI_Crypto_Bot_Trades"
+          (id, portfolio_id, ai_decision_id, symbol, side, price, quantity, fees,
+           realized_pnl, created_at)
+        VALUES ($1::uuid, '00000000-0000-4000-8000-000000000200',
+                $2::uuid, $3, 'BUY', 10, 1, 0, 0, $4)
+      `, [`00000000-0000-4000-8000-${tradeSuffix}`, decisionId, symbol, timestamp]);
+    }
+
+    const finalDecisionId = "00000000-0000-4000-8000-000000001012";
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      VALUES ($1::uuid, 'MKT000-EUR', 'SELL', 80, 'Linked microsecond decision.', '{}',
+              '2026-03-20T00:00:00.000124Z')
+    `, [finalDecisionId]);
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, portfolio_id, ai_decision_id, symbol, side, price, quantity, fees,
+         realized_pnl, created_at)
+      VALUES ('00000000-0000-4000-8000-000000002012',
+              '00000000-0000-4000-8000-000000000200', $1::uuid,
+              'MKT000-EUR', 'SELL', 10, 1, 0, 0,
+              '2026-03-20T00:00:00.000124Z')
+    `, [finalDecisionId]);
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      VALUES ('00000000-0000-4000-8000-000000004000',
+              'UNLINKED-EUR', 'HOLD', 70, 'Not selected for candle windows.', '{}',
+              '2026-03-20T00:00:00.000123Z')
+    `);
+
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+    const asOf = new Date("2099-01-01T00:00:00.000Z");
+    const manifest = await repository.getAnalysisExportManifest({ now: asOf });
+    assert.deepEqual(manifest.expectedCandleAnchorCounts, {
+      tradeAnchors: 13,
+      decisionAnchors: 13,
+      uniqueAnchors: 13
+    });
+
+    const pages = [];
+    let cursor = null;
+    do {
+      const page = await repository.getAnalysisExportPage({
+        source: "candleWindows",
+        asOf,
+        cursor
+      });
+      pages.push(page);
+      cursor = page.nextCursor;
+    } while (cursor);
+    const anchors = pages.flatMap(({ anchors: pageAnchors }) => pageAnchors);
+    assert.equal(pages.length, 2);
+    assert.deepEqual(
+      anchors.map(({ symbol, anchorAt }) => `${symbol}\u0000${anchorAt}`),
+      [
+        ...Array.from({ length: 12 }, (_, index) =>
+          `MKT${String(index).padStart(3, "0")}-EUR\u00002026-03-20T00:00:00.000123Z`),
+        "MKT000-EUR\u00002026-03-20T00:00:00.000124Z"
+      ]
+    );
+    assert.ok(anchors.every(({ tradeAnchorCount, decisionAnchorCount }) =>
+      tradeAnchorCount === 1 && decisionAnchorCount === 1));
+    const decisions = await repository.getAnalysisExportPage({ source: "decisions", asOf });
+    assert.equal(decisions.items.length, 14);
+    assert.equal(decisions.items.find(({ id }) => id === finalDecisionId).created_at,
+      "2026-03-20T00:00:00.000124Z");
   } finally {
     await database.close();
   }
@@ -819,7 +926,7 @@ test("full-history export decision pages use stable keyset cursors without gaps"
         (id, symbol, decision, confidence, reason, indicators, created_at)
       SELECT ('00000000-0000-4000-8000-' || lpad(sequence_number::text, 12, '0'))::uuid,
              'BTC-EUR', 'HOLD', 70, 'Keyset pagination fixture.', '{}',
-             '2026-03-20T00:00:00.000Z'::timestamptz
+             '2026-03-20T00:00:00.000123Z'::timestamptz
       FROM generate_series(1, 251) AS values(sequence_number)
     `);
     const pool = {
@@ -853,6 +960,133 @@ test("full-history export decision pages use stable keyset cursors without gaps"
     assert.equal(secondPage.hasMore, false);
     assert.equal(new Set([...firstPage.items, ...secondPage.items].map(({ id }) => id)).size, 251);
     assert.equal(beforeHistory.items.length, 0);
+  } finally {
+    await database.close();
+  }
+});
+
+test("full-history keyset pages preserve microseconds and complete every source without duplicates", async () => {
+  const database = await createDatabase();
+  try {
+    const asOfTimestamp = "2026-03-20T00:00:00.000123Z";
+    await database.exec(`
+      DELETE FROM public."AI_Crypto_Bot_Shadow_Exit_Events";
+      DELETE FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios";
+      DELETE FROM public."AI_Crypto_Bot_Paper_Execution_Audit";
+      DELETE FROM public."AI_Crypto_Bot_Portfolio_Snapshots";
+      DELETE FROM public."AI_Crypto_Bot_Trades";
+      DELETE FROM public."AI_Crypto_Bot_Positions";
+      DELETE FROM public."AI_Crypto_Bot_AI_Decisions";
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, portfolio_id, ai_decision_id, symbol, side, price, quantity, fees,
+         realized_pnl, created_at)
+      SELECT ('00000000-0000-4000-8000-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8000-000000000200', NULL, 'BTC-EUR', 'BUY',
+             10, 1, 0, 0, '${asOfTimestamp}'::timestamptz
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Positions"
+        (id, portfolio_id, symbol, amount, entry_price, current_price,
+         unrealized_pnl, status, created_at)
+      SELECT ('00000000-0000-4000-8001-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8000-000000000200', 'BTC-EUR',
+             1, 10, 10, 0, 'OPEN', '${asOfTimestamp}'::timestamptz
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, reason, indicators, created_at)
+      SELECT ('00000000-0000-4000-8002-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             'BTC-EUR', 'HOLD', 70, 'Microsecond cursor fixture.', '{}',
+             '${asOfTimestamp}'::timestamptz
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit"
+        (id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
+         confidence, decision_at, evaluated_at, outcome, reason_code, trade_id)
+      SELECT ('00000000-0000-4000-8003-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             ('00000000-0000-4000-8004-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8000-000000000200',
+             ('00000000-0000-4000-8002-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             'BTC-EUR', 'BUY', 70, '${asOfTimestamp}'::timestamptz,
+             '${asOfTimestamp}'::timestamptz, 'SKIPPED', 'COOLDOWN_ACTIVE', NULL
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Portfolio_Snapshots"
+        (id, portfolio_id, portfolio_value, available_balance, open_positions, captured_at)
+      SELECT ('00000000-0000-4000-8005-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8000-000000000200', 10000, 10000, 0,
+             '${asOfTimestamp}'::timestamptz
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Scenarios"
+        (id, position_id, portfolio_id, symbol, position_opened_at, rule_id,
+         rule_version, parameters, status, data_quality_status, last_evaluated_at,
+         trailing_armed)
+      SELECT ('00000000-0000-4000-8006-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             ('00000000-0000-4000-8007-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8000-000000000200', 'BTC-EUR',
+             '${asOfTimestamp}'::timestamptz, 'test-rule', '1', '{}',
+             'TRACKING', 'FRESH', '${asOfTimestamp}'::timestamptz, false
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Shadow_Exit_Events"
+        (id, scenario_id, event_type, event_at, observed_mark, data_quality_status, error_code)
+      SELECT ('00000000-0000-4000-8008-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             '00000000-0000-4000-8006-000000000001', 'TRACKING_STARTED',
+             '${asOfTimestamp}'::timestamptz, 10, 'FRESH', NULL
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+      INSERT INTO public."AI_Crypto_Bot_Analytics_Runs"
+        (id, calculation_version, period, period_start, period_end, generated_at,
+         source_counts, analytics_summary, insights)
+      SELECT ('00000000-0000-4000-8009-' || pg_catalog.lpad(sequence_number::text, 12, '0'))::uuid,
+             'phase-11.1', '30d', '${asOfTimestamp}'::timestamptz,
+             '${asOfTimestamp}'::timestamptz, '${asOfTimestamp}'::timestamptz,
+             '{}', '{}', '[]'
+      FROM pg_catalog.generate_series(1, 251) AS values(sequence_number);
+    `);
+
+    const pool = {
+      async connect() {
+        return {
+          query: database.query.bind(database),
+          release() {}
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+    const asOf = new Date("2099-01-01T00:00:00.000Z");
+    const manifest = await repository.getAnalysisExportManifest({ now: asOf });
+    const sources = [
+      "trades",
+      "positions",
+      "decisions",
+      "paperExecutionAttempts",
+      "portfolioSnapshots",
+      "shadowExitScenarios",
+      "shadowExitEvents",
+      "analyticsRuns"
+    ];
+
+    for (const source of sources) {
+      const ids = new Set();
+      const seenCursors = new Set();
+      let cursor = null;
+      let pages = 0;
+      do {
+        const page = await repository.getAnalysisExportPage({ source, asOf, cursor });
+        pages += 1;
+        for (const item of page.items) {
+          assert.equal(ids.has(item.id), false, `${source} contains no repeated record`);
+          ids.add(item.id);
+        }
+        if (page.nextCursor) {
+          assert.equal(seenCursors.has(page.nextCursor), false, `${source} cursor advances`);
+          seenCursors.add(page.nextCursor);
+        }
+        cursor = page.nextCursor;
+      } while (cursor);
+      assert.equal(ids.size, manifest.expectedSourceCounts[source], `${source} is complete`);
+      assert.equal(ids.size, 251, `${source} includes every microsecond-timestamped row`);
+      assert.equal(pages, 2, `${source} crosses exactly one cursor boundary`);
+    }
+
+    const decisionPage = await repository.getAnalysisExportPage({ source: "decisions", asOf });
+    assert.ok(decisionPage.items.every(({ created_at }) =>
+      created_at === asOfTimestamp));
   } finally {
     await database.close();
   }

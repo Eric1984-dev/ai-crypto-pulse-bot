@@ -85,7 +85,21 @@ function createHarness({
       return rows.length;
     },
     async upsertCandles(rows) {
-      calls.candles.push(...rows);
+      for (const row of rows) {
+        const key = `${row.symbol}\u0000${row.interval}\u0000${row.timestamp}`;
+        const existingIndex = calls.candles.findIndex((candle) =>
+          `${candle.symbol}\u0000${candle.interval}\u0000${candle.timestamp}` === key);
+        if (existingIndex === -1) {
+          calls.candles.push(row);
+        } else {
+          calls.candles[existingIndex] = row;
+        }
+        const checkpointKey = `${row.symbol}:${row.interval}`;
+        const timestamp = Date.parse(row.timestamp);
+        if (timestamp > (checkpoints.get(checkpointKey) ?? -1)) {
+          checkpoints.set(checkpointKey, timestamp);
+        }
+      }
       return rows.length;
     },
     async insertScannerEvents(events) {
@@ -158,8 +172,29 @@ test("full 102-market ingestion completes every snapshot and interval batch with
   assert.deepEqual(result.candles.map(({ interval, batchCount, refreshed }) =>
     ({ interval, batchCount, refreshed })), SUPPORTED_INGESTION_INTERVALS.map((interval) =>
     ({ interval, batchCount: 21, refreshed: 102 })));
-  assert.ok(harness.calls.candleRequests.every(({ limit, start }) => limit === 500 && start === null));
+  assert.ok(harness.calls.candleRequests.every(({ limit, start }) => limit === 150 && start === null));
   assert.equal(harness.calls.events.length, 0);
+});
+
+test("a new market bootstraps at most 150 closed candles for its interval", async () => {
+  const markets = watchedMarkets(1);
+  const targetTimestamp = Math.floor(nowMs / INTERVAL_MS["1m"]) * INTERVAL_MS["1m"]
+    - INTERVAL_MS["1m"];
+  const harness = createHarness({
+    markets,
+    fetchCandles: async (_symbol, _interval, { limit }) =>
+      Array.from({ length: limit }, (_, index) =>
+        rawCandle("1m", targetTimestamp - (limit - index - 1) * INTERVAL_MS["1m"]))
+  });
+
+  const result = await harness.service.run({ intervals: ["1m"] });
+
+  assert.equal(result.status, "completed");
+  assert.equal(harness.calls.candleRequests.length, 1);
+  assert.equal(harness.calls.candleRequests[0].limit, 150);
+  assert.equal(harness.calls.candles.length, 150);
+  assert.equal(new Set(harness.calls.candles.map(({ timestamp }) => timestamp)).size, 150);
+  assert.equal(harness.calls.candles.at(-1).timestamp, new Date(targetTimestamp).toISOString());
 });
 
 test("checkpointed intervals resume from the latest stored timestamp and skip not-yet-due candles", async () => {
@@ -190,6 +225,38 @@ test("checkpointed intervals resume from the latest stored timestamp and skip no
     { start: latest, limit: 4 }
   );
   assert.equal(harness.calls.candles.length, 3);
+});
+
+test("existing markets catch up in bounded pages without missing or duplicating candles", async () => {
+  const markets = watchedMarkets(1);
+  const interval = "1m";
+  const duration = INTERVAL_MS[interval];
+  const targetTimestamp = Math.floor(nowMs / duration) * duration - duration;
+  const firstTimestamp = targetTimestamp - 1000 * duration;
+  const checkpoints = new Map([[`${markets[0].symbol}:${interval}`, firstTimestamp]]);
+  const harness = createHarness({
+    markets,
+    checkpoints,
+    fetchCandles: async (_symbol, requestedInterval, { limit, start }) =>
+      Array.from({ length: limit }, (_, index) =>
+        rawCandle(requestedInterval, start + index * duration))
+  });
+
+  for (let attempt = 0; attempt < 5
+    && checkpoints.get(`${markets[0].symbol}:${interval}`) < targetTimestamp; attempt += 1) {
+    const result = await harness.service.run({ intervals: [interval] });
+    assert.equal(result.status, "completed");
+  }
+
+  const requested = harness.calls.candleRequests;
+  assert.ok(requested.length > 1);
+  assert.ok(requested.every(({ limit }) => limit <= 500));
+  assert.equal(requested[0].limit, 500);
+  assert.equal(requested[0].start, firstTimestamp);
+  assert.equal(checkpoints.get(`${markets[0].symbol}:${interval}`), targetTimestamp);
+  const timestamps = harness.calls.candles.map(({ timestamp }) => Date.parse(timestamp)).sort((a, b) => a - b);
+  const expected = Array.from({ length: 1001 }, (_, index) => firstTimestamp + index * duration);
+  assert.deepEqual(timestamps, expected);
 });
 
 test("invalid candle checkpoints log a complete diagnostic instead of UNKNOWN", async () => {

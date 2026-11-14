@@ -52,7 +52,7 @@ node --test tests/runtime-api-config-build.test.mjs tests/project-setup.test.js 
 
 These tests mock the OneSignal SDK/API. They do not subscribe a real device or verify delivery through OneSignal.
 
-The full-history export regressions cover source keyset pagination including paper-execution attempts, deduplicated trade/decision candle anchors, fixed as-of filtering, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation manifests. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer.
+The full-history export regressions cover source keyset pagination at PostgreSQL microsecond boundaries (including all decisions across multiple pages), deduplicated trade/linked-decision candle anchors, fixed as-of filtering, source-count and anchor/candle/link invariants, cursor-cycle and API-failure manifests, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer. Candle-ingestion tests separately verify the 150-candle first bootstrap and retained 500-candle catch-up bound.
 
 ## Dashboard and authentication
 

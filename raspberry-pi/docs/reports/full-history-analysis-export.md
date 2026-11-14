@@ -10,20 +10,25 @@ AI upload was added.
 
 The export contains all available system-portfolio trades, position rows,
 recorded AI decisions, portfolio snapshots, shadow-exit scenarios and events,
-and persisted analytics runs through one fixed `asOf` time. Candle data is
-restricted to windows around every trade and decision timestamp: up to ten
-candles before and ten after each unique symbol/timestamp for each of the six
-supported intervals.
+and persisted analytics runs through one fixed `asOf` time. The decisions
+JSONL includes every recorded decision. To control export size, candle data is
+restricted to windows around executed-trade timestamps and the AI decisions
+linked to those trades, not every non-executed decision: up to ten candles
+before and ten after each selected symbol/timestamp for each supported interval.
 
 The folder contains a manifest and separate JSONL files per source; candle
 anchors, unique candle rows, and anchor-to-candle links have separate files.
 Candles are deduplicated by `(symbol, interval, timestamp)`, while link rows
 retain the exact `(symbol, anchorAt, interval, candleTimestamp)` relationship
-for AI analysis. Files are split at 5 MiB. Requests are sequential and limited
-to 250 ordinary rows or ten candle anchors (at most 1,200 candle-window rows)
-per page. The client honors `Retry-After`, supports cancellation,
-records completed-source counts, and writes a partial/failed status to the
-manifest when it can finalize the run.
+for selected anchors. Files are split at 5 MiB. Requests are sequential and
+limited to 250 ordinary rows or ten candle anchors (at most 1,200
+candle-window rows) per page. Keyset cursors preserve PostgreSQL microsecond
+timestamps, avoiding repeated or skipped rows where timestamps differ below
+JavaScript date precision. The manifest includes expected and processed source
+counts plus decision-anchor, trade-anchor, unique-anchor, unique-candle, and
+link counts. The client honors `Retry-After`, supports cancellation, and
+reports a source complete only after its expected count and pagination
+invariants pass.
 
 All overlapping CSV and recommendation-history cards and their explanatory
 copy were removed from the Exports page because the full-history JSONL bundle
@@ -34,7 +39,7 @@ removed.
 ## Limitations
 
 - Candle history is not exported as a full table; only the documented
-  trade/decision windows are included.
+  trade/linked-decision windows are included.
 - Position rows reflect their stored current state, not a complete position
   state-change log.
 - A fixed `asOf` boundary is not a transactionally consistent database
@@ -108,9 +113,9 @@ each system-portfolio BUY/SELL evaluation through the fixed `asOf` timestamp,
 including run/decision identity, confidence, outcome, reason code, timestamps,
 and a trade ID when available (including a duplicate linked to its existing
 trade). The browser's saved manifest records
-the source count and filenames. The format is now
-`cryptopulse-analysis-export-v3`; prior sources and candle file behavior are
-retained.
+the source count and filenames. The format was
+`cryptopulse-analysis-export-v3`; its historical source additions are
+superseded by the current v4 export described below.
 
 The additive `phase-8.15-paper-execution-audit.sql` migration is a required
 operator-applied Pi schema change. It has not been applied to a live database,
@@ -129,3 +134,38 @@ dashboard-repository, API/authentication, runtime-bootstrap, and export UI
 tests passed (117/117); `npm.cmd run build`, changed-module `node --check`, and
 `git diff --check` passed. The PGlite migration test does not modify the Pi
 database, and no deployment or production export was performed.
+
+## Complete pagination and bounded candle anchors (Format v4)
+
+The export was incomplete when keyset cursors crossed PostgreSQL timestamps
+with microseconds: conversion through JavaScript `Date` retained milliseconds
+only, so the next-page comparison could replay records instead of advancing.
+Export timestamp cursors now remain exact UTC strings with six fractional
+digits. Anchor pagination uses `(anchor_at, symbol)` so different symbols at
+the same timestamp and multiple anchors within a symbol remain ordered.
+
+The manifest now supplies expected counts for every selected source and
+expected trade, decision, and unique anchors. The browser checks processed
+counts, record identities, cursor progression, and aggregate candle/link
+counts before writing `exportStatus=complete`; failures keep a safe API error
+code/message/request ID or an explicit pagination/invariant failure in the
+manifest. Candle windows are selected for executed trades and their linked AI
+decisions by default, while the complete decisions JSONL remains unchanged.
+Unique candles are deduplicated on `(symbol, interval, timestamp)`, and link
+rows are kept only for selected anchors. No full-decision-window opt-in was
+added.
+
+Local regression coverage includes 251 decisions sharing one PostgreSQL
+microsecond timestamp across page boundaries, all eight ordinary paginated
+sources, anchor pages with timestamp ties across symbols, duplicate trade and
+decision anchors, safe API failure reporting, and repeated-cursor failure.
+The corresponding ingestion tests verify a maximum 150-candle bootstrap and
+preserved 500-candle catch-up without duplicate writes or checkpoint loss.
+Production export and deployment were not performed; the Pi database and its
+existing candle rows were not accessed or changed.
+
+Validation in this working tree: the targeted ingestion, repository, API,
+authentication, and browser-export suites passed (59/59); `npm.cmd run build`
+passed; `node --check` passed for all changed JavaScript modules; and
+`git diff --check` passed. No deployment, production execution, database write,
+or data deletion was performed.
