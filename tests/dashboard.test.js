@@ -92,6 +92,7 @@ function createDashboardDocument() {
     "[data-dashboard-status=\"emergency\"]",
     "[data-dashboard-pi-health]",
     "[data-dashboard-pi-health-state]",
+    "[data-dashboard-pi-boot-time]",
     "[data-archive-health=\"server\"]",
     "[data-archive-health=\"model\"]",
     "[data-archive-health=\"postgresql\"]",
@@ -155,6 +156,7 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
     lastHealthCheck: "2026-11-06T12:00:00.000Z",
     system: {
       model: "Raspberry Pi 5 Model B Rev 1.0",
+      bootTime: "2026-11-06T08:00:00.000Z",
       temperatureC: 40,
       cpuUsagePercent: 20,
       memory: { usedPercent: 50 }
@@ -179,6 +181,8 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
   assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Online");
   assert.equal(elements.get("[data-dashboard-pi-health]")[0].dataset.state, "normal");
   assert.equal(elements.get("[data-dashboard-pi-health-state]")[0].textContent, "System running normally");
+  assert.match(elements.get("[data-dashboard-pi-boot-time]")[0].textContent, /^Last boot: /);
+  assert.equal(elements.get("[data-dashboard-pi-boot-time]")[0].dateTime, "2026-11-06T08:00:00.000Z");
   assert.equal(elements.get("[data-archive-health=\"disk-usage\"]")[0].textContent, "12.5%");
   assert.equal(elements.get("[data-archive-health-meter]")[0].value, 12.5);
   assert.equal(elements.get("[data-archive-health=\"database-size\"]")[0].textContent, "<b>2.3 GB</b>");
@@ -200,6 +204,8 @@ test("dashboard distinguishes offline services from unavailable monitoring data"
   assert.equal(elements.get("[data-archive-health=\"postgresql\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"database\"]")[0].textContent, "Unknown");
   assert.equal(elements.get("[data-archive-health=\"model\"]")[0].textContent, "—");
+  assert.equal(elements.get("[data-dashboard-pi-boot-time]")[0].textContent, "Last boot: —");
+  assert.equal(elements.get("[data-dashboard-pi-boot-time]")[0].dateTime, "");
   assert.equal(elements.get("[data-dashboard-activity-status=\"ai-analysis\"]")[0].textContent, "No run yet");
   assert.equal(elements.get("[data-dashboard-activity-status=\"paper-trading\"]")[0].textContent, "No run yet");
   assert.equal(elements.get("[data-dashboard-activity=\"ai-analysis\"]")[0].textContent, "—");

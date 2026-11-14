@@ -161,7 +161,7 @@ npm start
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
 - `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
-- `GET /api/v1/monitoring` — Raspberry Pi model, runtime status, last-cycle stages including position-exit processing, uptime, Node/process and host metrics, PostgreSQL size and estimated table row counts. The model comes from `/proc/device-tree/model` and may be `null` on unsupported systems.
+- `GET /api/v1/monitoring` — Raspberry Pi model, host boot time derived from operating-system uptime, runtime status, last-cycle stages including position-exit processing, Node/process and host metrics, PostgreSQL size and estimated table row counts. The model comes from `/proc/device-tree/model` and may be `null` on unsupported systems.
 
 ## Phase 11 historical analytics
 

@@ -224,6 +224,15 @@
     if (modelElement) {
       modelElement.textContent = validModel ? model : "—";
     }
+    const bootTimeElement = documentRef.querySelector("[data-dashboard-pi-boot-time]");
+    const bootTime = typeof system.bootTime === "string" ? new Date(system.bootTime) : null;
+    const validBootTime = bootTime && Number.isFinite(bootTime.getTime());
+    if (bootTimeElement) {
+      bootTimeElement.textContent = validBootTime
+        ? `Last boot: ${formatters.formatTimestamp(bootTime)}`
+        : "Last boot: —";
+      bootTimeElement.dateTime = validBootTime ? bootTime.toISOString() : "";
+    }
     const systemMetrics = [
       {
         name: "temperature",

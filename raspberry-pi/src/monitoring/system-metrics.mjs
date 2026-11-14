@@ -9,7 +9,8 @@ export async function collectSystemMetrics({
   fsRef = fs,
   cwd = process.cwd(),
   temperaturePath = "/sys/class/thermal/thermal_zone0/temp",
-  modelPath = "/proc/device-tree/model"
+  modelPath = "/proc/device-tree/model",
+  now = Date.now
 } = {}) {
   const [disk, temperatureC, model] = await Promise.all([
     readDiskMetrics(fsRef, cwd),
@@ -18,9 +19,11 @@ export async function collectSystemMetrics({
   ]);
   const memoryTotalBytes = finiteNonNegative(osRef.totalmem());
   const memoryAvailableBytes = finiteNonNegative(osRef.freemem());
+  const bootTime = systemBootTime(osRef.uptime(), now());
 
   return Object.freeze({
     model,
+    bootTime,
     cpuUsagePercent: readCpuUsage(osRef.cpus()),
     loadAverage: Object.freeze(osRef.loadavg().map((value) => finiteNonNegative(value))),
     memory: Object.freeze({
@@ -31,6 +34,15 @@ export async function collectSystemMetrics({
     temperatureC,
     disk
   });
+}
+
+function systemBootTime(uptimeSeconds, nowMilliseconds) {
+  const uptime = finiteNonNegative(uptimeSeconds);
+  if (uptime === null || !Number.isFinite(nowMilliseconds)) {
+    return null;
+  }
+  const timestamp = new Date(nowMilliseconds - uptime * 1000);
+  return Number.isFinite(timestamp.getTime()) ? timestamp.toISOString() : null;
 }
 
 async function readHardwareModel(fsRef, modelPath) {

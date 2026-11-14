@@ -2107,6 +2107,26 @@ a:focus-visible {
   font-weight: 700;
 }
 
+.dashboard-pi-boot-time {
+  flex: 0 1 auto;
+  margin-left: auto;
+  color: #e8edf4;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .dashboard-pi-health {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-pi-boot-time {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
 .pi-health-heading,
 .pi-health-title,
 .pi-health-metric-heading {
