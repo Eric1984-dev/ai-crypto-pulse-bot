@@ -35,6 +35,7 @@ test("OneSignal sends a push to subscribed devices with executed trade details",
 
   await notify(TRADE);
   await notify({ ...TRADE, side: "BUY" });
+  await notify({ ...TRADE, executionReason: "MAX_POSITION_LOSS_EXIT" });
 
   assert.equal(requests[0].url, "https://api.onesignal.com/notifications?c=push");
   assert.equal(requests[0].options.method, "POST");
@@ -57,6 +58,8 @@ test("OneSignal sends a push to subscribed devices with executed trade details",
   const buyPayload = JSON.parse(requests[1].options.body);
   assert.match(buyPayload.contents.en, /^A new Buy trade was executed:/);
   assert.equal(buyPayload.data.side, "BUY");
+  const lossExitPayload = JSON.parse(requests[2].options.body);
+  assert.equal(lossExitPayload.data.executionReason, "MAX_POSITION_LOSS_EXIT");
   assert.equal(logs[0].event, "onesignal_trade_notification_sent");
   assert.equal(logs[0].recipients, 1);
 });

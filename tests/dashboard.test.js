@@ -445,6 +445,27 @@ test("dashboard maps market-strength boundaries to the requested market views", 
   assert.deepEqual(cards.map((card) => (
     card.children[1].children[1].children[1].textContent
   )), expectedViews);
+
+  dashboard.renderDashboard({
+    openPositionAiStatus: {
+      count: 1,
+      items: [{
+        symbol: "MIX-EUR",
+        amount: 1,
+        entry_price: 1,
+        current_price: 1,
+        unrealized_pnl: 0,
+        latestAiDecision: {
+          decision: "BUY",
+          marketStrength: 86,
+          directionalAlignment: false
+        }
+      }]
+    }
+  }, dashboardDocument, null);
+  const mixedCard = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children[0];
+  assert.match(mixedCard.textContent, /Market ViewMixed Timeframe Trends/);
+  assert.match(mixedCard.textContent, /new entries are blocked/);
 });
 
 test("dashboard AI commentary is short, decision-aware, and adapts HOLD to market view", () => {

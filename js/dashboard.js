@@ -633,7 +633,10 @@
         details.className = "position-ai-status-details";
 
         const marketStrength = latestDecision && latestDecision.marketStrength;
-        const marketView = describeMarketView(marketStrength);
+        const marketView = describeMarketView(
+          marketStrength,
+          latestDecision && latestDecision.directionalAlignment
+        );
         appendPositionAiField(documentRef, details, "decision", "Decision", decision);
         appendPositionAiField(
           documentRef,
@@ -738,7 +741,10 @@
     details.append(field);
   }
 
-  function describeMarketView(value) {
+  function describeMarketView(value, directionalAlignment) {
+    if (directionalAlignment === false) {
+      return "Mixed Timeframe Trends";
+    }
     const strength = value === null || value === undefined
       ? null
       : typeof value === "number" ? value : Number(value);
@@ -763,15 +769,24 @@
   function describeAiCommentary(decision, marketView) {
     const normalizedDecision = typeof decision === "string" ? decision.toUpperCase() : "";
     if (normalizedDecision === "BUY") {
+      if (marketView === "Mixed Timeframe Trends") {
+        return "The daily-led BUY conflicts with the hourly trend; new entries are blocked.";
+      }
       return "Bullish trend detected. AI currently favors upward continuation.";
     }
     if (normalizedDecision === "SELL") {
+      if (marketView === "Mixed Timeframe Trends") {
+        return "The timeframes conflict; this SELL remains available to reduce exposure.";
+      }
       return "Bearish trend detected. Downside risk currently outweighs upside potential.";
     }
     if (normalizedDecision === "WAIT") {
       return "Insufficient or unreliable data. AI is waiting for better market conditions.";
     }
     if (normalizedDecision === "HOLD") {
+      if (marketView === "Mixed Timeframe Trends") {
+        return "The daily and hourly trends conflict; no new directional entry is allowed.";
+      }
       if (marketView === "Bullish" || marketView === "Strong Bullish") {
         return "Bullish conditions are present, but the AI currently recommends holding.";
       }

@@ -378,19 +378,19 @@ Scheduler-authenticated `/api/paper-trading`
 ↓
 Database advisory lock and per-portfolio row lock
 ↓
-Freshness, confidence, position, cooldown, balance, drawdown, and emergency checks
+Freshness, timeframe alignment, confidence, position, cooldown, balance, drawdown, and emergency checks
 ↓
-Simulated BUY, AI SELL, or position-aware trailing SELL with stored fees/slippage
+Simulated BUY, AI SELL, 5% net-loss-stop SELL, or position-aware ATR-trailing SELL
 ↓
 Position, trade, portfolio balance/value, and snapshot writes in one transaction
 
-BUY opens long positions only; AI SELL closes existing positions; HOLD and WAIT do not trade. A separate active PAPER policy closes an individual position after its net-profit floor arms and its ratcheting ATR stop is reached. Automatic SELL trades use `execution_reason = ATR_TRAILING_EXIT` and have no AI-decision link, so actual trade outcomes are retained without being misattributed as AI SELL decisions. The executor does not contact Bitvavo or any exchange and cannot place a real order.
+BUY opens long positions only after the daily and hourly EMA trends align; a missing alignment fails closed. SELL remains available to close existing positions regardless of alignment. HOLD and WAIT do not trade. A PAPER position policy protects each open position with a modeled maximum net-loss trigger at 5% of the fee/slippage-inclusive entry cost basis and the existing +€3 net-floor ATR trail. Automatic SELL trades use `execution_reason = MAX_POSITION_LOSS_EXIT` or `ATR_TRAILING_EXIT` and have no AI-decision link, so actual trade outcomes are retained without being misattributed as AI SELL decisions. The executor does not contact Bitvavo or any exchange and cannot place a real order.
 
 Each user profile without a portfolio is provisioned with a €10,000 simulated balance and an initial stored snapshot. Buy notional is capped at 10% of current portfolio value, with no more than nine open positions and a 15-minute per-market entry cooldown. New entries stop at 5% daily drawdown or 15% peak drawdown; 20% peak drawdown appends `EMERGENCY_STOP` and sets Agent Status to `STOPPED`. Fresh SELL decisions may close positions during a pause to reduce exposure.
 
 ## Active Position Exit Policy
 
-The Raspberry Pi paper executor persists a high-water price and a monotonic stop price per position. It arms after the high-water mark could realize at least €3 net after entry basis, exit fee, and slippage, then uses the higher of that net-profit floor or high-water price minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. Only a fresh stored market mark triggers the paper SELL. Missing, stale, incomplete, misaligned, or gapped candles cannot create a stop; any previously persisted stop is still checked. There is no initial fixed stop-loss or fixed take-profit. The additive Phase 8.14 migration must be reviewed/applied by the operator before deploying the code; this repository task does not apply it to the Pi database.
+The Raspberry Pi paper executor persists a high-water price and a monotonic stop price per position. The active stop is the more protective of the 5% modeled net-loss threshold and, once armed, the +€3 net floor or high-water price minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. The loss threshold includes modeled exit fee and slippage, but is not a guaranteed realized-loss ceiling because the runtime evaluates only fresh stored marks and gaps can exceed the threshold. Missing, stale, incomplete, misaligned, or gapped candles cannot create or advance the ATR trail; the loss stop remains active. The additive Phase 8.17 migration extends the allowed automatic-exit and audit reasons. Review and apply it after Phases 8.15 and 8.16 before deploying; this repository task does not apply it to the Pi database.
 
 ## Shadow Exit Scenarios
 

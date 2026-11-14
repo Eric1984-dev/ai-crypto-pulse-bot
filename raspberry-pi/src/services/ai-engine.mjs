@@ -143,6 +143,7 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
     },
     timeframes: timeframeResults,
     marketStrength: score,
+    directionalAlignment: v2Signal.available ? v2Signal.alignment === 1 : null,
     dataQuality: {
       candleIntervalsAvailable: validTimeframes.map(({ interval }) => interval),
       candleIntervalsRequiredForAnalysis: MIN_TIMEFRAMES_FOR_ANALYSIS,

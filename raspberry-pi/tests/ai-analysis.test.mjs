@@ -165,6 +165,32 @@ test("Pi V2 analysis returns the expected directional and safe outcomes", () => 
     assert.equal(actual.timestamp, fixedNow.toISOString());
     assert.equal(actual.indicators.interval, AI_DECISION_INTERVAL);
   }
+  assert.equal(analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: [],
+    now: fixedNow
+  }).indicators.directionalAlignment, null);
+});
+
+test("V2 records disagreement between the daily and hourly EMA directions", () => {
+  const candles = [
+    ...["5m", "15m", "4h"].flatMap((interval) =>
+      createCandles("BTC-EUR", interval, 60, "up")
+    ),
+    ...createCandles("BTC-EUR", "1h", 60, "down"),
+    ...createCandles("BTC-EUR", "1d", 60, "up")
+  ];
+  const result = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles,
+    now: fixedNow
+  });
+
+  assert.equal(result.indicators.timeframes["1h"].trend.direction, "bearish");
+  assert.equal(result.indicators.timeframes["1d"].trend.direction, "bullish");
+  assert.equal(result.indicators.directionalAlignment, false);
 });
 
 test("AI excludes in-progress candles and accepts them only at the interval close", () => {

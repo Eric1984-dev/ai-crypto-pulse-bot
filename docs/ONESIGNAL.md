@@ -3,8 +3,8 @@
 CryptoPulse uses OneSignal Web Push for the installed dashboard web app. The
 Pi runtime sends a notification after a paper trade has committed; a provider
 failure is logged and does not roll back or fail the trade. Both AI BUY/SELL
-trades and automatic ATR trailing SELL exits are included. Skipped decisions
-do not produce notifications.
+trades and automatic ATR-trailing / maximum-position-loss SELL exits are
+included. Skipped decisions do not produce notifications.
 
 ## OneSignal setup
 

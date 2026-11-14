@@ -124,7 +124,12 @@ test("trade history renders all required fields as text and treats buys as unrea
       }),
       createTradeRow({ id: "trade-3", price: "0.98123456" }),
       createTradeRow({ id: "trade-4", price: "12.3456" }),
-      createTradeRow({ id: "trade-5", price: "69421.22", realized_pnl: "-10" })
+      createTradeRow({
+        id: "trade-5",
+        price: "69421.22",
+        realized_pnl: "-10",
+        execution_reason: "MAX_POSITION_LOSS_EXIT"
+      })
     ],
     stats: {
       closedTrades: 1,
@@ -188,6 +193,8 @@ test("trade history renders all required fields as text and treats buys as unrea
     rows.children[1].children[9].textContent,
     "CLOSED · ATR Trailing Exit · Paper Trade"
   );
+  assert.equal(rows.children[4].children[9].textContent, "CLOSED · 5% Net-Loss Stop · Paper Trade");
+  assert.match(rows.children[4].children[8].textContent, /5% maximum modeled net loss/);
   assert.equal(rows.children[1].children[7].textContent, "+€118.69 (+11.84%)");
   assert.deepEqual(
     rows.children[1].children[8].children[0].children.map((line) => line.textContent),

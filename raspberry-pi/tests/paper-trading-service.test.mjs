@@ -44,6 +44,7 @@ function makeRepository(overrides = {}) {
       symbol: SYMBOL,
       decision: "BUY",
       confidence: "90",
+      indicators: { directionalAlignment: true },
       created_at: NOW
     }],
     recordPaperExecutionAttempt: async (_client, attempt) => {
@@ -287,6 +288,7 @@ test("paper BUY confidence gate accepts 70 and rejects values below it", async (
         symbol: SYMBOL,
         decision: "BUY",
         confidence,
+        indicators: { directionalAlignment: true },
         created_at: NOW
       }]
     });
@@ -386,6 +388,44 @@ test("ATR ratchet closes one position after a pullback and records an automatic 
   }]);
 });
 
+test("the five-percent net-loss stop closes a position without valid ATR candles", async () => {
+  const position = {
+    id: "00000000-0000-4000-8000-000000000003",
+    symbol: SYMBOL,
+    amount: "1",
+    entry_price: "100.35025",
+    entry_cost_basis: "100.35025",
+    current_price: "100.35025",
+    unrealized_pnl: "0",
+    high_water_price: "100.35025",
+    trailing_stop_price: null
+  };
+  let sellInput;
+  const repository = makeRepository({
+    listOpenPositions: async () => [position],
+    listMarketData: async () => [{
+      symbol: SYMBOL,
+      price: "90",
+      captured_at: NOW
+    }],
+    insertSell: async (_client, input) => {
+      sellInput = input;
+      return {
+        availableBalance: "10090",
+        portfolioValue: "10090",
+        openPositions: 0,
+        tradeId: "00000000-0000-4000-8000-000000000012"
+      };
+    }
+  });
+
+  const result = await makeService(repository).run();
+
+  assert.equal(result.automaticExits, 1);
+  assert.equal(sellInput.executionReason, "MAX_POSITION_LOSS_EXIT");
+  assert.equal(sellInput.decisionId, null);
+});
+
 test("missing ATR history does not create a new exit, but an existing stop remains active", async (t) => {
   const basePosition = {
     id: "00000000-0000-4000-8000-000000000003",
@@ -415,7 +455,7 @@ test("missing ATR history does not create a new exit, but an existing stop remai
     assert.equal(result.automaticExits, 0);
     assert.equal(repository.calls.includes("sell"), false);
     assert.ok(logs.some(({ event, reason }) =>
-      event === "paper_position_exit_waiting_for_valid_atr"
+      event === "paper_position_exit_atr_data_quality"
         && reason === "INSUFFICIENT_CANDLES"));
   });
 
@@ -448,6 +488,7 @@ test("multiple decisions retain drawdown baselines after partial trade-state upd
         symbol: "BTC-EUR",
         decision: "BUY",
         confidence: "90",
+        indicators: { directionalAlignment: true },
         created_at: NOW
       },
       {
@@ -455,6 +496,7 @@ test("multiple decisions retain drawdown baselines after partial trade-state upd
         symbol: "ETH-EUR",
         decision: "BUY",
         confidence: "90",
+        indicators: { directionalAlignment: true },
         created_at: NOW
       }
     ],
@@ -531,6 +573,7 @@ test("SELL decisions close an existing virtual position without opening a short"
       symbol: SYMBOL,
       decision: "SELL",
       confidence: "80",
+      indicators: { directionalAlignment: false },
       created_at: NOW
     }],
     listOpenPositions: async () => [position]
@@ -654,6 +697,25 @@ test("risk and freshness gates reject ineligible BUY decisions", async (t) => {
     ["missing market data", "MISSING_MARKET_DATA", {
       listMarketData: async () => []
     }],
+    ["misaligned timeframes", "TIMEFRAME_MISALIGNMENT", {
+      listLatestDecisions: async () => [{
+        id: DECISION_ID,
+        symbol: SYMBOL,
+        decision: "BUY",
+        confidence: "90",
+        indicators: { directionalAlignment: false },
+        created_at: NOW
+      }]
+    }],
+    ["missing timeframe alignment", "TIMEFRAME_ALIGNMENT_UNAVAILABLE", {
+      listLatestDecisions: async () => [{
+        id: DECISION_ID,
+        symbol: SYMBOL,
+        decision: "BUY",
+        confidence: "90",
+        created_at: NOW
+      }]
+    }],
     ["cooldown", "COOLDOWN_ACTIVE", {
       listCooldowns: async () => new Map([
         [SYMBOL, new Date(NOW.getTime() - 60 * 1000)]
@@ -724,6 +786,7 @@ test("maximum open positions prevents a tenth virtual position", async () => {
       symbol: "ZZZ-EUR",
       decision: "BUY",
       confidence: "90",
+      indicators: { directionalAlignment: true },
       created_at: NOW
     }],
     listOpenPositions: async () => symbols.map((symbol) => ({

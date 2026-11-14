@@ -571,13 +571,25 @@ test("paper repository fails closed on malformed agent status", async () => {
   }), { code: "PAPER_TRADING_STATUS_INVALID" });
 });
 
-test("Phase 8.15 and 8.16 migrations install the audit table with scoped writer grants", async () => {
+test("Phase 8.15-8.17 migrations install audit grants and support alignment/loss reasons", async () => {
   const database = new PGlite();
   try {
     await database.exec(`
       CREATE ROLE ai_crypto_bot_runtime_reader;
       CREATE ROLE paper_writer;
-      CREATE TABLE public."AI_Crypto_Bot_Trades" (id uuid PRIMARY KEY);
+      CREATE TABLE public."AI_Crypto_Bot_Trades" (
+        id uuid PRIMARY KEY,
+        ai_decision_id uuid,
+        side text,
+        execution_reason text NOT NULL DEFAULT 'AI_DECISION',
+        CONSTRAINT "AI_Crypto_Bot_Trades_execution_reason_valid"
+          CHECK (execution_reason IN ('AI_DECISION', 'ATR_TRAILING_EXIT')),
+        CONSTRAINT "AI_Crypto_Bot_Trades_trailing_exit_source_valid"
+          CHECK (
+            execution_reason <> 'ATR_TRAILING_EXIT'
+            OR (side = 'SELL' AND ai_decision_id IS NULL)
+          )
+      );
     `);
     await database.query(
       "SELECT pg_catalog.set_config('cryptopulse.paper_database_user', $1, false)",
@@ -600,6 +612,14 @@ test("Phase 8.15 and 8.16 migrations install the audit table with scoped writer 
       "utf8"
     );
     await database.exec(conflictKeyMigration);
+    const entryAlignmentMigration = await readFile(
+      new URL(
+        "../migrations/phase-8.17-paper-entry-alignment-and-loss-stop.sql",
+        import.meta.url
+      ),
+      "utf8"
+    );
+    await database.exec(entryAlignmentMigration);
 
     const grants = await database.query(`
       SELECT
@@ -651,6 +671,41 @@ test("Phase 8.15 and 8.16 migrations install the audit table with scoped writer 
       writer_can_select_decision_id: true,
       writer_can_delete: false
     });
+
+    await database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, ai_decision_id, side, execution_reason)
+      VALUES (
+        '00000000-0000-4000-8000-000000000110',
+        NULL,
+        'SELL',
+        'MAX_POSITION_LOSS_EXIT'
+      )
+    `);
+    await assert.rejects(database.query(`
+      INSERT INTO public."AI_Crypto_Bot_Trades"
+        (id, ai_decision_id, side, execution_reason)
+      VALUES (
+        '00000000-0000-4000-8000-000000000111',
+        '00000000-0000-4000-8000-000000000112',
+        'BUY',
+        'MAX_POSITION_LOSS_EXIT'
+      )
+    `));
+    for (const [runId, reasonCode] of [
+      ["00000000-0000-4000-8000-000000000113", "TIMEFRAME_MISALIGNMENT"],
+      ["00000000-0000-4000-8000-000000000116", "TIMEFRAME_ALIGNMENT_UNAVAILABLE"]
+    ]) {
+      await database.query(`
+        INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit" (
+          evaluation_run_id, portfolio_id, decision_id, symbol, action,
+          decision_at, evaluated_at, outcome, reason_code
+        )
+        VALUES ($1, '00000000-0000-4000-8000-000000000114',
+          '00000000-0000-4000-8000-000000000115',
+          'BTC-EUR', 'BUY', now(), now(), 'SKIPPED', $2)
+      `, [runId, reasonCode]);
+    }
 
     await database.exec(`
       SET ROLE paper_writer;
@@ -722,6 +777,22 @@ test("Phase 8.15 and 8.16 migrations install the audit table with scoped writer 
         outcome: "DUPLICATE",
         reason_code: "DUPLICATE_TRADE",
         trade_id: duplicateTradeId
+      },
+      {
+        evaluation_run_id: "00000000-0000-4000-8000-000000000113",
+        decision_id: "00000000-0000-4000-8000-000000000115",
+        action: "BUY",
+        outcome: "SKIPPED",
+        reason_code: "TIMEFRAME_MISALIGNMENT",
+        trade_id: null
+      },
+      {
+        evaluation_run_id: "00000000-0000-4000-8000-000000000116",
+        decision_id: "00000000-0000-4000-8000-000000000115",
+        action: "BUY",
+        outcome: "SKIPPED",
+        reason_code: "TIMEFRAME_ALIGNMENT_UNAVAILABLE",
+        trade_id: null
       }
     ]);
   } finally {

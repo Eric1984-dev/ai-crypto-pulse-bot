@@ -86,8 +86,9 @@ function validateTrade(trade) {
     || !SYMBOL_PATTERN.test(trade.symbol || "")
     || !DECIMAL_PATTERN.test(trade.executionPrice || "")
     || !DECIMAL_PATTERN.test(trade.quantity || "")
-    || !["AI_DECISION", "ATR_TRAILING_EXIT"].includes(trade.executionReason)
-    || (trade.executionReason === "ATR_TRAILING_EXIT" && trade.side !== "SELL")) {
+    || !["AI_DECISION", "ATR_TRAILING_EXIT", "MAX_POSITION_LOSS_EXIT"]
+      .includes(trade.executionReason)
+    || (trade.executionReason !== "AI_DECISION" && trade.side !== "SELL")) {
     throw new TypeError("The executed trade is invalid for a OneSignal notification.");
   }
 }

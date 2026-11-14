@@ -255,7 +255,7 @@ export function createPaperTradingService({
                 marketPrice: market.price,
                 quote,
                 positionId: position.id,
-                executionReason: "ATR_TRAILING_EXIT"
+                executionReason: assessment.exitReason
               });
               executedTrades.push({
                 tradeId: tradeState.tradeId,
@@ -263,7 +263,7 @@ export function createPaperTradingService({
                 symbol: position.symbol,
                 executionPrice: quote.execution_price,
                 quantity: quote.amount,
-                executionReason: "ATR_TRAILING_EXIT"
+                executionReason: assessment.exitReason
               });
               state = Object.freeze({ ...state, ...tradeState });
               openPositions = openPositions.filter(({ id }) => id !== position.id);
@@ -569,6 +569,11 @@ function getBuySkipReason({
   if (openPositions.some(({ symbol }) => symbol === decision.symbol)) {
     return "POSITION_ALREADY_OPEN";
   }
+  if (decision.indicators?.directionalAlignment !== true) {
+    return decision.indicators?.directionalAlignment === false
+      ? "TIMEFRAME_MISALIGNMENT"
+      : "TIMEFRAME_ALIGNMENT_UNAVAILABLE";
+  }
   if (openPositions.length >= PAPER_TRADING_RULES.maxOpenPositions) {
     return "MAX_OPEN_POSITIONS";
   }
@@ -643,7 +648,7 @@ function safeErrorCode(error) {
 function logPositionExitDataQuality(logger, position, reason) {
   const log = typeof logger.warn === "function" ? logger.warn : logger.error;
   log.call(logger, JSON.stringify({
-    event: "paper_position_exit_waiting_for_valid_atr",
+    event: "paper_position_exit_atr_data_quality",
     component: "paper-trading-service",
     policy: POSITION_EXIT_POLICY.version,
     positionId: position.id,
@@ -658,7 +663,7 @@ function logPositionExitExecuted(logger, position, marketPrice, exitState, quote
     return;
   }
   log.call(logger, JSON.stringify({
-    event: "paper_position_closed_by_trailing_exit",
+    event: "paper_position_closed_by_exit_policy",
     component: "paper-trading-service",
     policy: POSITION_EXIT_POLICY.version,
     positionId: position.id,
@@ -666,6 +671,7 @@ function logPositionExitExecuted(logger, position, marketPrice, exitState, quote
     marketPrice,
     highWaterPrice: exitState.highWaterPrice,
     trailingStopPrice: exitState.trailingStopPrice,
+    exitReason: exitState.exitReason,
     realizedPnl: quote.realized_pnl
   }));
 }

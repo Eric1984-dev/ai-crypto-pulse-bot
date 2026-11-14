@@ -34,11 +34,29 @@ test("ATR ratchet uses 1.5 ATR and waits for a pullback through the persisted st
   assert.equal(risingMark.dataQuality, "VALID");
   assert.equal(risingMark.atr, "2.000000000000");
   assert.equal(risingMark.trailingStopPrice, "107.000000000000");
+  assert.equal(risingMark.exitReason, "ATR_TRAILING_EXIT");
   assert.equal(risingMark.shouldExit, false);
 
   const pullback = assessPositionExit(position(), "106", candles(), NOW);
   assert.equal(pullback.trailingStopPrice, "107.000000000000");
+  assert.equal(pullback.exitReason, "ATR_TRAILING_EXIT");
   assert.equal(pullback.shouldExit, true);
+});
+
+test("the initial stop caps modeled net loss at five percent of entry cost basis", () => {
+  const assessment = assessPositionExit(position(), "100", [], NOW);
+  const stop = Number(assessment.trailingStopPrice);
+  const netProceeds = stop * 0.999 * 0.9975;
+
+  assert.equal(assessment.exitReason, "MAX_POSITION_LOSS_EXIT");
+  assert.equal(assessment.dataQuality, "INSUFFICIENT_CANDLES");
+  assert.equal(assessment.shouldExit, false);
+  assert.ok(netProceeds - 100 >= -5);
+  assert.ok(netProceeds - 100 < -4.999999);
+
+  const triggered = assessPositionExit(position(), assessment.trailingStopPrice, [], NOW);
+  assert.equal(triggered.shouldExit, true);
+  assert.equal(triggered.exitReason, "MAX_POSITION_LOSS_EXIT");
 });
 
 test("the profit floor includes entry basis, exit fee, and exit slippage", () => {
@@ -63,7 +81,7 @@ test("the profit floor includes entry basis, exit fee, and exit slippage", () =>
 test("stale, incomplete, sparse, and invalid candle histories cannot arm a trail", () => {
   const stale = assessPositionExit(position(), "110", candles({ stale: true }), NOW);
   assert.equal(stale.dataQuality, "STALE_CANDLES");
-  assert.equal(stale.trailingStopPrice, null);
+  assert.ok(Number(stale.trailingStopPrice) > 0);
 
   const incompleteCandles = candles();
   incompleteCandles[14] = {
@@ -72,6 +90,7 @@ test("stale, incomplete, sparse, and invalid candle histories cannot arm a trail
   };
   const incomplete = assessPositionExit(position(), "110", incompleteCandles, NOW);
   assert.equal(incomplete.dataQuality, "INCOMPLETE_CANDLE");
+  assert.ok(Number(incomplete.trailingStopPrice) > 0);
 
   const gapCandles = candles();
   gapCandles[10] = {
@@ -80,6 +99,7 @@ test("stale, incomplete, sparse, and invalid candle histories cannot arm a trail
   };
   const gap = assessPositionExit(position(), "110", gapCandles, NOW);
   assert.equal(gap.dataQuality, "CANDLE_GAP");
+  assert.ok(Number(gap.trailingStopPrice) > 0);
 
   const invalid = assessPositionExit(
     position(),
@@ -88,6 +108,7 @@ test("stale, incomplete, sparse, and invalid candle histories cannot arm a trail
     NOW
   );
   assert.equal(invalid.dataQuality, "INVALID_CANDLE");
+  assert.ok(Number(invalid.trailingStopPrice) > 0);
 
   const zeroAtr = assessPositionExit(
     position(),
@@ -96,7 +117,7 @@ test("stale, incomplete, sparse, and invalid candle histories cannot arm a trail
     NOW
   );
   assert.equal(zeroAtr.dataQuality, "ZERO_ATR");
-  assert.equal(zeroAtr.trailingStopPrice, null);
+  assert.ok(Number(zeroAtr.trailingStopPrice) > 0);
 });
 
 test("a persisted stop never loosens when volatility expands or ATR data is unavailable", () => {

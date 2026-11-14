@@ -10,10 +10,12 @@ All notable project changes should be documented here.
 
 ### Paper position exit policy
 
-- Add one active 1.5 × closed 5-minute-ATR trailing exit with a fee/slippage-adjusted +€3 net floor; no fixed take-profit or initial stop-loss
+- Add an initial stop targeting a 5% maximum modeled net loss per position, after modeled entry/exit fees and slippage
+- Retain the 1.5 × closed 5-minute-ATR trailing exit with a fee/slippage-adjusted +€3 net floor
 - Persist high-water and stop state and identify automatic SELLs without attributing them to AI decisions
 - Stop automatic evaluation of the experimental shadow-exit grid during paper-trading cycles
-- Add the local, unapplied Phase 8.14 PostgreSQL migration proposal
+- Require daily/hourly EMA alignment for BUY execution while keeping SELL exits available; show mixed trend context in open-position AI status
+- Add the local, unapplied Phase 8.17 PostgreSQL migration proposal for new audit and exit reasons
 
 ### Persistent dashboard sessions
 

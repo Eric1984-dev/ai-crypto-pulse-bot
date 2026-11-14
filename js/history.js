@@ -151,7 +151,9 @@
           `Exit Price: ${formatters.formatPrice(trade.price)}`,
           ...(trade.execution_reason === "ATR_TRAILING_EXIT"
             ? ["Exit Rule: 1.5 × 5m ATR trail, activated at +€3 net"]
-            : []),
+            : trade.execution_reason === "MAX_POSITION_LOSS_EXIT"
+              ? ["Exit Rule: 5% maximum modeled net loss from entry cost basis"]
+              : []),
           `Realized P&L: ${formatPnlSummary(trade.realized_pnl, closedTradeMetrics ? closedTradeMetrics.realizedPnlPercent : null)}`
         ]
         : [];
@@ -174,7 +176,9 @@
         : trade.side === "SELL"
           ? trade.execution_reason === "ATR_TRAILING_EXIT"
             ? "CLOSED · ATR Trailing Exit · Paper Trade"
-            : "CLOSED · Paper Trade"
+            : trade.execution_reason === "MAX_POSITION_LOSS_EXIT"
+              ? "CLOSED · 5% Net-Loss Stop · Paper Trade"
+              : "CLOSED · Paper Trade"
           : "Executed · Paper Trade"
     ];
     for (const [index, value] of values.entries()) {

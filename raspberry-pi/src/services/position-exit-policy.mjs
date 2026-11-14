@@ -7,8 +7,9 @@ const EXIT_NET_FACTOR_NUMERATOR = 9_965_025n;
 const EXIT_NET_FACTOR_DENOMINATOR = 10_000_000n;
 
 export const POSITION_EXIT_POLICY = Object.freeze({
-  version: "ATR_TRAILING_EXIT_V1",
+  version: "POSITION_EXIT_POLICY_V2",
   minimumNetProfit: "3",
+  maximumLossBasisPoints: 500,
   atrMultipleNumerator: 3,
   atrMultipleDenominator: 2,
   interval: "5m",
@@ -25,10 +26,18 @@ export function assessPositionExit(position, marketPrice, candles, now) {
     || position.trailing_stop_price === undefined
     ? null
     : decimalToScaled(position.trailing_stop_price);
+  const maximumLossStop = maximumLossPrice(position);
   const quality = validateAtrCandles(candles, now);
   let dataQuality = quality.reason;
   let stop = existingStop;
+  let exitReason = existingStop !== null && existingStop > maximumLossStop
+    ? "ATR_TRAILING_EXIT"
+    : "MAX_POSITION_LOSS_EXIT";
   let atr = null;
+  if (stop === null || maximumLossStop > stop) {
+    stop = maximumLossStop;
+    exitReason = "MAX_POSITION_LOSS_EXIT";
+  }
 
   if (quality.valid) {
     atr = calculateAtr(candles);
@@ -40,7 +49,10 @@ export function assessPositionExit(position, marketPrice, candles, now) {
           / BigInt(POSITION_EXIT_POLICY.atrMultipleDenominator);
         const atrStop = highWater - trailDistance;
         const candidateStop = maxScaled(minimumProfitPrice, atrStop);
-        stop = stop === null ? candidateStop : maxScaled(stop, candidateStop);
+        if (candidateStop > stop) {
+          stop = candidateStop;
+          exitReason = "ATR_TRAILING_EXIT";
+        }
       }
     } else {
       dataQuality = "ZERO_ATR";
@@ -51,6 +63,7 @@ export function assessPositionExit(position, marketPrice, candles, now) {
     highWaterPrice: scaledToDecimal(highWater),
     trailingStopPrice: stop === null ? null : scaledToDecimal(stop),
     atr: atr === null ? null : scaledToDecimal(atr),
+    exitReason,
     dataQuality,
     shouldExit: stop !== null && mark <= stop
   });
@@ -126,6 +139,23 @@ function minimumPriceForNetProfit(position) {
     throw new TypeError("An open paper position must have a positive amount.");
   }
   return ceilDivide(requiredProceeds * SCALE, amountAfterExitCosts) + 1n;
+}
+
+function maximumLossPrice(position) {
+  const amount = decimalToScaled(position.amount);
+  const entryCostBasis = position.entry_cost_basis === undefined
+    ? amount * decimalToScaled(position.entry_price) / SCALE
+    : decimalToScaled(position.entry_cost_basis);
+  const maximumLoss = entryCostBasis
+    * BigInt(POSITION_EXIT_POLICY.maximumLossBasisPoints)
+    / 10_000n;
+  const minimumNetProceeds = entryCostBasis - maximumLoss;
+  const amountAfterExitCosts = amount * EXIT_NET_FACTOR_NUMERATOR
+    / EXIT_NET_FACTOR_DENOMINATOR;
+  if (amount <= 0n || entryCostBasis <= 0n || amountAfterExitCosts <= 0n) {
+    throw new TypeError("An open paper position must have a positive cost basis and amount.");
+  }
+  return ceilDivide(minimumNetProceeds * SCALE, amountAfterExitCosts) + 1n;
 }
 
 function decimalToScaled(value) {

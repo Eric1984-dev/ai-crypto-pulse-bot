@@ -116,7 +116,7 @@ The additive `phase-8.15-paper-execution-audit.sql` migration is a required
 operator-applied Pi schema change. It has not been applied to a live database,
 and this implementation did not deploy or validate a production export. Global
 cycle skips before per-decision evaluation have no per-decision row; HOLD/WAIT
-and automatic `ATR_TRAILING_EXIT` sells remain excluded.
+and automatic `ATR_TRAILING_EXIT` / `MAX_POSITION_LOSS_EXIT` sells remain excluded.
 
 Execution attempts are written in the paper-trade transaction, with unique
 `(evaluation_run_id, portfolio_id, decision_id)` identity. A failed audit write

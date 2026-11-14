@@ -84,15 +84,16 @@ Existing positions remain visible and can still be closed by a fresh, stored SEL
 
 ## Position Exits
 
-The paper executor retains fresh AI-SELL exits and also runs one active position-aware profit-protection rule:
+The paper executor retains fresh AI-SELL exits and applies two position-aware stop rules:
 
+- Every open position has a stop that targets a maximum modeled net loss of 5% of its fee/slippage-inclusive entry cost basis. The threshold accounts for the modeled 0.10% exit slippage and 0.25% exit fee.
 - The rule arms once the observed high-water mark could realize at least €3 net after the fee-inclusive entry cost basis, 0.10% exit slippage, and 0.25% exit fee.
 - The stop is the greater of that +€3 net floor and the high-water mark minus 1.5 × ATR from 15 consecutive, closed 5-minute candles. The stop only ratchets upward.
-- A fresh stored market mark at or below the persisted stop closes that position as a paper SELL. The trade has `execution_reason = ATR_TRAILING_EXIT` and no AI-decision link, so it remains visible as a real trade without being counted as an AI SELL decision.
-- High-water is the highest fresh market mark observed during paper cycles, not a tick-level or intrabar candle high. Missing, stale, incomplete, misaligned, gapped, or zero-range candles cannot create a new stop. A previously persisted stop remains enforceable with a fresh market mark, and its high-water mark continues to update.
-- There is no initial fixed stop-loss and no fixed take-profit. Before the +€3 net floor arms, a position can continue to lose value; the portfolio drawdown controls are not per-position stops. Mark-price gaps can also produce less than €3 net on the eventual simulated fill.
+- A fresh stored market mark at or below the active stop closes the position as a paper SELL. The trade uses `execution_reason = MAX_POSITION_LOSS_EXIT` or `ATR_TRAILING_EXIT` and has no AI-decision link, so it remains visible in actual trade P&L without being counted as an AI SELL decision.
+- High-water is the highest fresh market mark observed during paper cycles, not a tick-level or intrabar candle high. Missing, stale, incomplete, misaligned, gapped, or zero-range candles cannot create or advance the ATR trail; the maximum-loss stop remains active independently.
+- There is no fixed take-profit. The 5% loss threshold is a modeled trigger, not a guaranteed realized-loss ceiling: the executor checks fresh stored marks on paper cycles, and market gaps or execution beyond the modeled slippage/fee assumptions can result in a larger loss. Existing positions already beyond the threshold can close on their first evaluation under the new policy.
 
-The 1.5 × ATR multiplier and €3 net floor are the single active PAPER starting configuration, not statistically validated optimal values. The previous shadow rule grid is no longer evaluated during paper-trading cycles; its stored records remain historical/read-only. Before starting a runtime that uses this policy, the operator must review and apply the additive [Phase 8.14 migration](../raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql). Existing open positions are seeded from their stored entry/current prices; prior unrecorded peaks cannot be reconstructed. This workspace has not applied the migration to the Pi database.
+The 1.5 × ATR multiplier, €3 net floor, and 5% modeled net-loss threshold are a PAPER risk configuration, not statistically validated profitability settings. The previous shadow rule grid is no longer evaluated during paper-trading cycles; its stored records remain historical/read-only. Before starting a runtime that uses the updated exit and entry rules, the operator must review and apply the additive [Phase 8.14 migration](../raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql) and [Phase 8.17 migration](../raspberry-pi/migrations/phase-8.17-paper-entry-alignment-and-loss-stop.sql), after the audit-table migrations. Existing high-water values are seeded from stored entry/current prices; prior unrecorded peaks cannot be reconstructed. This workspace has not applied these migrations to the Pi database.
 
 ---
 

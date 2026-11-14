@@ -5,9 +5,10 @@
 - Phases 1–9: the operator reports the Raspberry Pi runtime, database, scheduler, trading services, dashboard, single-admin authentication, and tunnel operational. See the [Phase 7.7 validation](raspberry-pi/docs/phase-7.7-operational-validation.md), [Phase 8 cutover](raspberry-pi/docs/phase-8-dashboard-cutover.md), and [Phase 9 authentication](raspberry-pi/docs/phase-9-dashboard-authentication.md).
 - Phase 10: conservative post-migration cleanup is being validated. See the [cleanup report](docs/post-migration-cleanup-report.md).
 - Local paper-trading hardening now excludes incomplete candles, reports stale/missing candle intervals, and uses an explicit snapshot sequence for equal timestamps. The snapshot migration remains unapplied and no live Pi validation or deployment is claimed.
+- Local paper-trading changes now require daily/hourly EMA alignment for BUYs and add a modeled 5% per-position net-loss stop alongside the existing ATR trail. The Phase 8.17 reason-constraint migration is a local proposal; apply required migrations and review existing positions before any operator-managed runtime update. No Pi deployment or live validation is claimed.
 - The Exports page now offers a complete, paginated JSONL history export for AI analysis using the existing Pi data route; local implementation and production verification are tracked in the [full-history export report](raspberry-pi/docs/reports/full-history-analysis-export.md).
 - Paper-trading execution attributes each evaluated directional BUY/SELL decision to an executed, duplicate, or reason-coded skipped outcome. Phase 8.15 creates the audit table; additive Phase 8.16 grants only SELECT on its three `ON CONFLICT` key columns and runtime preflight validates those column grants. The operator reports Phase 8.15 and the equivalent manual grant applied to the Pi, with a successful paper-trading cycle; the full-history export is format v3 and includes a paginated paper-execution-attempts JSONL source.
-- OneSignal Web Push is locally implemented for the installed dashboard: Settings manages browser opt-in, and the Pi sends best-effort notifications only after committed paper BUY/SELL trades, including automatic ATR exits. Vercel/Pi OneSignal credentials and a production deployment are operator-managed; see [setup instructions](docs/ONESIGNAL.md).
+- OneSignal Web Push is locally implemented for the installed dashboard: Settings manages browser opt-in, and the Pi sends best-effort notifications only after committed paper BUY/SELL trades, including automatic position exits. Vercel/Pi OneSignal credentials and a production deployment are operator-managed; see [setup instructions](docs/ONESIGNAL.md).
 - Raspberry Pi infrastructure metrics now include the device model as the first metric on the dashboard and Exports page, read through the existing monitoring route.
 - The dashboard shows the Raspberry Pi system-health summary at the top, with a green indicator when healthy and red for unhealthy or unavailable status, plus the host's last boot time aligned to the far right using the existing monitoring route.
 - The dashboard activity strip distinguishes AI analysis and paper-trading run statuses/scheduled cycle times from the latest market-data update and actual paper trade; on-demand analytics and market scans are omitted.
@@ -367,15 +368,16 @@ Constraints:
 Status:
 One active PAPER policy; the separate shadow candidate grid is no longer evaluated during paper-trading cycles.
 
-The executor still honors fresh AI SELL decisions and also runs a position-aware ratcheting exit:
+The executor still honors fresh AI SELL decisions and also runs a position-aware stop policy:
 
+- Maintain a modeled maximum net-loss trigger at 5% of the fee/slippage-inclusive entry cost basis, including modeled exit costs.
 - Arm after the position's high-water mark could realize at least €3 net after entry cost basis, exit fee, and slippage.
 - Ratchet the exit floor to the greater of the +€3 net floor or high-water mark minus 1.5 × ATR from 15 consecutive, closed 5-minute candles.
-- Close only on a fresh stored market mark at or below the persisted floor.
-- Do not create or loosen a stop when candle history is missing, stale, incomplete, misaligned, or gapped. A previously persisted floor remains enforceable.
-- Do not use a fixed take-profit or an initial fixed loss stop. Losses remain possible before the profit floor activates.
+- Close on a fresh stored market mark at or below the more protective active stop.
+- Do not create or advance the ATR trail when candle history is missing, stale, incomplete, misaligned, or gapped; the modeled maximum-loss stop remains active.
+- Do not use a fixed take-profit. Price gaps or execution beyond modeled costs can exceed the 5% trigger.
 
-This is an initial paper-trading configuration, not a validated profitability claim. The export replay was limited and did not establish that this rule outperforms holding. Review outcomes after a meaningful sample of closed trades before tuning the multiplier or activation floor. The [Phase 8.14 migration](raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql) must be reviewed and applied by the operator before deploying the updated Pi runtime; it has not been applied to the database.
+This is an initial paper-trading configuration, not a validated profitability claim. The export replay was limited and did not establish that these rules improve profitability. Review outcomes after a meaningful sample of closed trades before tuning thresholds. The [Phase 8.14 migration](raspberry-pi/migrations/phase-8.14-position-aware-trailing-exits.sql) and [Phase 8.17 migration](raspberry-pi/migrations/phase-8.17-paper-entry-alignment-and-loss-stop.sql) must be reviewed and applied by the operator after the required audit migrations and before deploying the updated Pi runtime; this task has not applied them.
 - Break-even Protection
 - Partial Exits
 

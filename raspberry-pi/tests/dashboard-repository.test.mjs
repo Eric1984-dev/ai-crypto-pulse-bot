@@ -170,7 +170,11 @@ async function createDatabase() {
     INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
       (id, symbol, decision, confidence, reason, indicators, created_at)
     VALUES ('00000000-0000-4000-8000-000000000700',
-      'BTC-EUR', 'HOLD', 82, 'Consolidating.', '{"marketStrength": 12.5}', NOW());
+      'BTC-EUR', 'HOLD', 82, 'Consolidating.',
+      '{"marketStrength": 12.5, "timeframes": {
+        "1h": {"trend": {"direction": "bearish"}},
+        "1d": {"trend": {"direction": "bullish"}}
+      }}', NOW());
     INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit" (
       id, evaluation_run_id, portfolio_id, decision_id, symbol, action,
       confidence, decision_at, evaluated_at, outcome, reason_code, trade_id
@@ -233,6 +237,10 @@ test("dashboard repository reads only the standalone system portfolio and bounde
     assert.equal(result.openPositionAiStatus.items[0].unrealized_pnl, 10);
     assert.ok(result.openPositionAiStatus.items[0].current_market_captured_at);
     assert.equal(result.openPositionAiStatus.items[0].latestAiDecision.decision, "HOLD");
+    assert.equal(
+      result.openPositionAiStatus.items[0].latestAiDecision.directionalAlignment,
+      false
+    );
     assert.equal(result.recentTrades.items[0].side, "SELL");
     assert.equal(result.portfolioSnapshots.length, 1);
     assert.equal(result.portfolioSnapshots[0].snapshot_order, "1");

@@ -26,7 +26,8 @@ verwachte database en eigenaar gebruikt:
 ls -l migrations/phase-8.13-portfolio-snapshot-order.sql \
   migrations/phase-8.14-position-aware-trailing-exits.sql \
   migrations/phase-8.15-paper-execution-audit.sql \
-  migrations/phase-8.16-paper-execution-audit-conflict-key-select.sql
+  migrations/phase-8.16-paper-execution-audit-conflict-key-select.sql \
+  migrations/phase-8.17-paper-entry-alignment-and-loss-stop.sql
 sudo -u postgres psql --dbname=ai_crypto_bot_store \
   --command="SELECT current_database(), current_user;"
 ```
@@ -230,6 +231,49 @@ true; `writer_can_select_table`, `writer_can_update`, `writer_can_delete` and
 `writer_can_truncate` are false. Restart the runtime only after the updated
 code is installed and its startup contract validation succeeds. Do not start a
 deployment or apply the migration automatically.
+
+## Phase 8.17 exit and alignment constraints
+
+Phase 8.17 updates existing trade/audit check constraints to allow
+`MAX_POSITION_LOSS_EXIT`, `TIMEFRAME_MISALIGNMENT`, and
+`TIMEFRAME_ALIGNMENT_UNAVAILABLE`. It adds no tables or columns. Apply only
+after Phases 8.14, 8.15, and 8.16 are installed, with the runtime stopped and a
+fresh backup made. A currently open position already beyond the modeled 5%
+loss threshold can be closed on its first evaluation after the updated runtime
+starts.
+
+```bash
+sudo -u postgres psql --set=ON_ERROR_STOP=1 \
+  --dbname=ai_crypto_bot_store \
+  --file=migrations/phase-8.17-paper-entry-alignment-and-loss-stop.sql
+```
+
+Inspect the resulting constraints before allowing the runtime to use the new
+reason codes:
+
+```bash
+sudo -u postgres psql --dbname=ai_crypto_bot_store --command="
+SELECT relation.relname AS table_name,
+       constraint_row.conname,
+       pg_catalog.pg_get_constraintdef(constraint_row.oid) AS definition
+FROM pg_catalog.pg_constraint AS constraint_row
+JOIN pg_catalog.pg_class AS relation
+  ON relation.oid = constraint_row.conrelid
+WHERE relation.relname IN (
+  'AI_Crypto_Bot_Trades',
+  'AI_Crypto_Bot_Paper_Execution_Audit'
+)
+  AND constraint_row.conname IN (
+    'AI_Crypto_Bot_Trades_execution_reason_valid',
+    'AI_Crypto_Bot_Trades_automatic_exit_source_valid',
+    'AI_Crypto_Bot_Paper_Execution_Audit_reason_valid'
+  )
+ORDER BY relation.relname, constraint_row.conname;"
+```
+
+Confirm the definitions include the three new reason codes. Do not deploy or
+restart the Pi runtime as part of this local code change; the operator must
+review and apply the migration and separately manage runtime updates.
 
 ## Volgende migraties en fouten
 

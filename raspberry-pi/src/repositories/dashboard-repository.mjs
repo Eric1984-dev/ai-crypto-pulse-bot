@@ -922,6 +922,7 @@ export class DashboardRepository {
               decision: position.latest_ai_decision,
               confidence: position.latest_ai_confidence,
               marketStrength: position.latest_ai_indicators?.marketStrength ?? null,
+              directionalAlignment: readDirectionalAlignment(position.latest_ai_indicators),
               reason: position.latest_ai_reason,
               created_at: position.latest_ai_created_at
             }
@@ -1765,6 +1766,20 @@ function createExportSelection(exportType, period, now) {
     definition: EXPORTS[exportType],
     cutoff: durationMs === null ? null : new Date(now.getTime() - durationMs).toISOString()
   };
+}
+
+function readDirectionalAlignment(indicators) {
+  if (typeof indicators?.directionalAlignment === "boolean") {
+    return indicators.directionalAlignment;
+  }
+  const hourlyDirection = indicators?.timeframes?.["1h"]?.trend?.direction;
+  const dailyDirection = indicators?.timeframes?.["1d"]?.trend?.direction;
+  const validDirections = ["bullish", "bearish", "sideways"];
+  if (!validDirections.includes(hourlyDirection)
+    || !validDirections.includes(dailyDirection)) {
+    return null;
+  }
+  return hourlyDirection === dailyDirection && dailyDirection !== "sideways";
 }
 
 function normalizePosition(row) {

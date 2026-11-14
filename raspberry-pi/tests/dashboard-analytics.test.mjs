@@ -115,28 +115,30 @@ test("analytics attributes outcomes to BUY and SELL decisions, not HOLD or WAIT"
     interpretation: "descriptive association; not evidence of causation"
   });
 
-  test("automatic trailing SELLs count as trade outcomes, not unmatched AI decisions", () => {
-    const analytics = buildDashboardAnalytics({
-      period: "30d",
-      now,
-      portfolio: { starting_balance: 10000, portfolio_value: 10005 },
-      positions: [],
-      trades: [
-        trade("buy-trade", "BUY", "buy", 1, 0, "2026-03-05T00:00:00.000Z"),
-        {
-          ...trade("exit-trade", "SELL", null, 1, 5, "2026-03-05T01:00:00.000Z"),
-          execution_reason: "ATR_TRAILING_EXIT"
-        }
-      ],
-      decisions: [decision("buy", 90, "BUY")],
-      snapshots: []
-    });
+  test("automatic position exits count as trade outcomes, not unmatched AI decisions", () => {
+    for (const executionReason of ["ATR_TRAILING_EXIT", "MAX_POSITION_LOSS_EXIT"]) {
+      const analytics = buildDashboardAnalytics({
+        period: "30d",
+        now,
+        portfolio: { starting_balance: 10000, portfolio_value: 10005 },
+        positions: [],
+        trades: [
+          trade("buy-trade", "BUY", "buy", 1, 0, "2026-03-05T00:00:00.000Z"),
+          {
+            ...trade("exit-trade", "SELL", null, 1, 5, "2026-03-05T01:00:00.000Z"),
+            execution_reason: executionReason
+          }
+        ],
+        decisions: [decision("buy", 90, "BUY")],
+        snapshots: []
+      });
 
-    assert.equal(analytics.tradePerformance.closedTrades, 1);
-    assert.equal(analytics.tradePerformance.realizedPnl, 5);
-    assert.equal(analytics.aiPerformance.unmatchedDecisionTrades, 0);
-    assert.equal(analytics.aiPerformance.actions.BUY.scoredCount, 1);
-    assert.equal(analytics.aiPerformance.actions.SELL.scoredCount, 0);
+      assert.equal(analytics.tradePerformance.closedTrades, 1);
+      assert.equal(analytics.tradePerformance.realizedPnl, 5);
+      assert.equal(analytics.aiPerformance.unmatchedDecisionTrades, 0);
+      assert.equal(analytics.aiPerformance.actions.BUY.scoredCount, 1);
+      assert.equal(analytics.aiPerformance.actions.SELL.scoredCount, 0);
+    }
   });
   assert.equal(analytics.portfolio.periodPnl, 50);
   assert.equal(analytics.portfolio.maxDrawdown, 10);

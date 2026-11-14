@@ -24,6 +24,8 @@ const PAPER_EXECUTION_REASONS = new Set([
   "AGENT_STOPPED",
   "STALE_OPEN_POSITION_DATA",
   "POSITION_ALREADY_OPEN",
+  "TIMEFRAME_MISALIGNMENT",
+  "TIMEFRAME_ALIGNMENT_UNAVAILABLE",
   "MAX_OPEN_POSITIONS",
   "COOLDOWN_ACTIVE",
   "DAILY_DRAWDOWN_LIMIT",
@@ -88,6 +90,7 @@ const LATEST_DECISIONS_SQL = `
          decision.symbol,
          decision.decision,
          decision.confidence,
+         decision.indicators,
          decision.created_at
   FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
   JOIN public."AI_Crypto_Bot_Watched_Markets" AS watched_market
@@ -971,8 +974,9 @@ export class PaperTradingRepository {
     realizedPnl,
     executionReason = "AI_DECISION"
   }) {
-    if (!["AI_DECISION", "ATR_TRAILING_EXIT"].includes(executionReason)
-      || (executionReason === "ATR_TRAILING_EXIT" && (side !== "SELL" || decisionId !== null))
+    if (!["AI_DECISION", "ATR_TRAILING_EXIT", "MAX_POSITION_LOSS_EXIT"].includes(executionReason)
+      || (["ATR_TRAILING_EXIT", "MAX_POSITION_LOSS_EXIT"].includes(executionReason)
+        && (side !== "SELL" || decisionId !== null))
       || (executionReason === "AI_DECISION" && decisionId === null)) {
       throw new TypeError("The paper trade source and decision reference are inconsistent.");
     }

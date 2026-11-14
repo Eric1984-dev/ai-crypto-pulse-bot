@@ -321,7 +321,8 @@ function createAiPerformance(decisions, trades, decisionSummary = null) {
   const buyOutcomes = matchBuyDecisionOutcomes(trades, decisionById);
   const sellTrades = trades.filter(({ side }) => side === "SELL");
   for (const trade of sellTrades) {
-    if (trade.execution_reason === "ATR_TRAILING_EXIT" && !trade.ai_decision_id) {
+    if (["ATR_TRAILING_EXIT", "MAX_POSITION_LOSS_EXIT"].includes(trade.execution_reason)
+      && !trade.ai_decision_id) {
       continue;
     }
     const decision = trade.ai_decision_id
