@@ -54,6 +54,8 @@ These tests mock the OneSignal SDK/API. They do not subscribe a real device or v
 
 The full-history export regressions cover source keyset pagination at PostgreSQL microsecond boundaries (including all decisions across multiple pages), deduplicated trade/linked-decision candle anchors, fixed as-of filtering, source-count and anchor/candle/link invariants, cursor-cycle and API-failure manifests, bounded sequential browser requests, `Retry-After` handling, JSONL file-size splitting, and cancellation. The UI requires a browser with the File System Access API; the automated tests use an in-memory implementation and do not verify a physical browser or Raspberry Pi transfer. Candle-ingestion tests separately verify the 150-candle first bootstrap and retained 500-candle catch-up bound.
 
+The operator reset regression uses local PGlite fixtures to verify that paper execution audit rows are removed before referenced trades, candle/market and strategy history are cleared, the EUR 2,000 system balance and baseline snapshot are created, and profile, watched-market, strategy-definition, agent-status, and emergency-stop rows remain. It does not connect to a production database.
+
 ## Dashboard and authentication
 
 ```powershell

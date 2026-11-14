@@ -1,47 +1,81 @@
-# Paper-tradinggeschiedenis resetten en starten met €2.000
+# Volledige paper-data reset en starten met €2.000
 
-Deze operatorprocedure wist geselecteerde paper-tradinggegevens van het
-standalone systeemportfolio. Het zijn destructieve handelingen; voer ze
-uitsluitend uit als je bewust een nieuwe paper-tradingrun wilt beginnen.
-De scripts zijn niet automatisch uitgevoerd.
+Dit is een destructieve, operatorgestarte reset voor een nieuwe paper-tradingrun.
+Het SQL-script is nooit automatisch onderdeel van de runtime en wordt niet
+uitgevoerd tijdens installatie of deployment. Maak eerst een databasebackup en
+voer het alleen uit wanneer je de beschreven historie bewust wilt wissen.
 
 ## Wat wordt verwijderd en behouden
 
-`sql/reset-system-paper-data.sql` verwijdert de trades, posities, snapshots en
-shadow-exitgegevens van het actieve systeemportfolio, alle AI-beslissingen en
-alle analytics-runs (als die tabel is geïnstalleerd). Vervolgens maakt het één
-nieuwe basissnapshot aan op het bestaande `starting_balance`.
+`sql/reset-system-paper-data.sql` wist in één transactie:
 
-Het script behoudt watched markets, marketdata, candlehistorie,
-profiel-/portfolio-identiteit, scanner-events, strategieën,
-strategiewijzigingen, strategieprestaties, backtests, agentstatus en
-emergency-state. Een bestaande `EMERGENCY_STOP` wordt dus niet gewist of
-omzeild. Controleer die staat voor je de runtime weer start.
+- paper execution-audit (eerst, vanwege de foreign key naar trades);
+- trades, posities, portfolio-snapshots en AI-beslissingen;
+- shadow-exit events/scenario's en analytics-runs, indien geïnstalleerd;
+- marktprijs-snapshots en alle candlehistorie;
+- scanner-events;
+- strategie-wijzigingen, strategieprestaties en backtests.
 
-AI-beslissingen zijn marktbreed en niet aan een portfolio gekoppeld. Om
-geschiedenis van andere portfolios te beschermen, stopt het reset-script
-zonder wijzigingen als een trade buiten het systeemportfolio naar een
-AI-beslissing verwijst. Stop dan en laat de bestaande gegevens beoordelen;
-verwijder die trades niet om de reset te forceren.
+De bestaande profielrijen, de watched-marketslijst, het systeemportfolio en de
+strategie-definities blijven bestaan. Het systeemportfolio wordt in hetzelfde
+script op `starting_balance`, `available_balance` en `portfolio_value` van
+`2000` gezet, met één nieuwe basissnapshot en nul open posities. Agentstatus en
+alle emergency-state-rijen blijven bewust behouden: een bestaande
+`EMERGENCY_STOP` of `PAUSED` wordt nooit gewist of omzeild. Controleer de meest
+recente status voordat je de runtime opnieuw start.
 
-## Uitvoeren
+Het script weigert te starten bij een ontbrekende vereiste tabel, een
+inconsistente set shadow-exittabellen, meer dan één systeemportfolio of enig
+niet-systeemportfolio. Zo worden gedeelde trades, audit- of portfoliohistorie
+niet per ongeluk verwijderd. Herstel dan eerst de database-situatie; forceer
+de reset niet.
 
-Voer deze commando's in de Linux-shell van de Pi uit, niet in een `psql`-prompt.
-Sluit een open `psql`-sessie eerst met `\q`. Stop het runtime-service en maak
-eerst een backup:
+Er worden geen tabellen, constraints of andere schema-objecten aangepast en er
+wordt geen `TRUNCATE` gebruikt. De watched markets blijven ongewijzigd. Omdat
+marketdata en candles wel worden gewist, moeten die opnieuw worden opgehaald;
+de eerste candle-bootstrap is begrensd op 150 gesloten candles per markt en
+interval. De paper-engine kan pas analyseren/handelen als voldoende verse data
+beschikbaar is.
 
-```bash
-cd ~/ai-crypto-pulse-bot/raspberry-pi
-sudo systemctl stop cryptopulse-runtime.service
-sudo systemctl is-active cryptopulse-runtime.service
-umask 077
-sudo -u postgres pg_dump -Fc ai_crypto_bot_store \
-  > "$HOME/ai_crypto_bot_store-before-paper-reset-$(date -u +%Y%m%dT%H%M%SZ).dump"
+## Uitvoeren via PowerShell/SSH
+
+Open in Windows PowerShell een SSH-sessie naar de Pi:
+
+```powershell
+ssh eric@raspberrypi
 ```
 
-De service hoort `inactive` te zijn. Zorg ook dat er geen handmatige
-AI-analyse- of ingestiecommando's draaien. Pas de reset toe met de expliciete
-bevestigingsoptie:
+De commando's hieronder voer je daarna uit in de Linux-shell op de Pi (waar de
+prompt bijvoorbeeld `eric@raspberrypi:~$` toont), niet binnen `psql`. Als de
+Pi-repository nog niet is bijgewerkt:
+
+```bash
+cd ~/ai-crypto-pulse-bot
+git pull --ff-only origin main
+cd raspberry-pi
+```
+
+Stop de runtime en controleer dat deze niet meer draait. Sluit eventuele open
+`psql`-sessies met `\q` en zorg dat er geen handmatige AI-, ingestie- of
+paper-tradingcommando's lopen:
+
+```bash
+sudo systemctl stop cryptopulse-runtime.service
+sudo systemctl is-active cryptopulse-runtime.service
+```
+
+De tweede opdracht hoort `inactive` te tonen. Maak daarna een backup en
+controleer dat het dumpbestand bestaat en niet leeg is:
+
+```bash
+umask 077
+backup="$HOME/ai_crypto_bot_store-before-full-reset-$(date -u +%Y%m%dT%H%M%SZ).dump"
+sudo -u postgres pg_dump -Fc ai_crypto_bot_store > "$backup"
+test -s "$backup" && ls -lh "$backup"
+```
+
+Voer de reset uit met de expliciete bevestigingsoptie. De transactie wordt
+afgebroken bij een SQL-fout:
 
 ```bash
 sudo -u postgres psql --set=ON_ERROR_STOP=1 \
@@ -50,21 +84,10 @@ sudo -u postgres psql --set=ON_ERROR_STOP=1 \
   --file=sql/reset-system-paper-data.sql
 ```
 
-Zet daarna het startkapitaal op €2.000. Dit script accepteert alleen de schone
-basissituatie die het reset-script heeft aangemaakt:
+Controleer de nieuwe portefeuille en basissnapshot:
 
 ```bash
-sudo -u postgres psql --set=ON_ERROR_STOP=1 \
-  --set=confirm_new_paper_capital=on \
-  --dbname=ai_crypto_bot_store \
-  --file=sql/start-system-paper-portfolio-2000.sql
-```
-
-Controleer de portefeuille en basissnapshot voordat de runtime opnieuw wordt
-gestart:
-
-```bash
-sudo -u postgres psql --dbname=ai_crypto_bot_store --command="
+sudo -u postgres psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store --command="
 SELECT portfolio.id, portfolio.starting_balance, portfolio.available_balance,
        portfolio.portfolio_value, snapshot.open_positions,
        snapshot.captured_at
@@ -78,11 +101,35 @@ ORDER BY snapshot.captured_at DESC, snapshot.snapshot_order DESC
 LIMIT 1;"
 ```
 
-Verwacht: `starting_balance`, `available_balance` en `portfolio_value` zijn
-alle drie `2000`; `open_positions` is `0`. Controleer ook de nieuwste
-emergency-state, agentstatus, bijgewerkte Pi-code en
-`ENABLE_LIVE_TRADING=false`. Start pas daarna de Pi-runtime volgens de
-bestaande operatorprocedure.
+Verwacht: alle drie balansvelden zijn `2000` en `open_positions` is `0`.
+Controleer de lege geschiedenis en de behouden gegevens:
+
+```bash
+sudo -u postgres psql --set=ON_ERROR_STOP=1 --dbname=ai_crypto_bot_store --command="
+SELECT
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Trades\") AS trades,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Positions\") AS positions,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_AI_Decisions\") AS decisions,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Paper_Execution_Audit\") AS execution_audit,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Market_Data\") AS market_data,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Candles\") AS candles,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Scanner_Events\") AS scanner_events,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Watched_Markets\") AS watched_markets,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Profiles\") AS profiles,
+  (SELECT count(*) FROM public.\"AI_Crypto_Bot_Strategies\") AS strategy_definitions,
+  (SELECT status FROM public.\"AI_Crypto_Bot_Emergency_State\"
+   ORDER BY created_at DESC, id DESC LIMIT 1) AS emergency_state,
+  (SELECT status FROM public.\"AI_Crypto_Bot_Status\"
+   ORDER BY updated_at DESC, id DESC LIMIT 1) AS agent_status;"
+```
+
+Trades, positions, decisions, execution audit, market data, candles en scanner
+events horen `0` te zijn; de watched-market-, profile- en strategy-definition
+rijen horen behouden te zijn. Controleer dat de meest recente emergency-state
+en agentstatus kloppen en dat `ENABLE_LIVE_TRADING=false`. Start de runtime pas
+opnieuw wanneer de reset en deze controles succesvol zijn. Candlehistorie moet
+opnieuw worden opgebouwd voordat AI-analyse weer voldoende verse intervallen
+heeft. Voer bij een SQL-fout geen volgende stap uit.
 
 ## Verwachte positiegrootte
 

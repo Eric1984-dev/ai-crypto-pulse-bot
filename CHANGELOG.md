@@ -12,7 +12,7 @@
 - Replace the vague dashboard Bot Run timestamp with AI-analysis and paper-trading stage statuses and cycle times; remove on-demand Analytics and Market scan placeholders.
 - Remove the inactive Shadow Exit monitoring panel and its dashboard rendering; historical shadow records remain available to full-history exports.
 - Show the Raspberry Pi model as the first infrastructure metric on the dashboard and Exports page using the existing monitoring route.
-- Document guarded Raspberry Pi paper-history reset and €2,000 portfolio initialization scripts; the reset preserves watched markets and market data.
+- Expand the guarded Raspberry Pi paper reset to clear market data, candles, paper execution audit, analytics, scanner events, and strategy history in one transaction; preserve profiles, watched markets, strategy definitions, agent status, and emergency state, and initialize the system portfolio at €2,000.
 - Document a repeatable, operator-run procedure for applying PostgreSQL migrations on the Raspberry Pi.
 - Make dashboard data, agent status, and monitoring reads wait for `Retry-After` and retry once on rate limiting.
 - Show dashboard Pi services as Unknown, rather than Offline, when a monitoring request fails and preserve the last successful metrics.

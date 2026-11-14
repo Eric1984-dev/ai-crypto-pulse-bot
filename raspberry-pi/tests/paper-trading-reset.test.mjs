@@ -52,6 +52,11 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
       ai_decision_id uuid REFERENCES public."AI_Crypto_Bot_AI_Decisions"(id)
         ON DELETE RESTRICT
     );
+    CREATE TABLE public."AI_Crypto_Bot_Paper_Execution_Audit" (
+      id uuid PRIMARY KEY,
+      portfolio_id uuid NOT NULL,
+      trade_id uuid REFERENCES public."AI_Crypto_Bot_Trades"(id) ON DELETE RESTRICT
+    );
     CREATE TABLE public."AI_Crypto_Bot_Portfolio_Snapshots" (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       portfolio_id uuid NOT NULL REFERENCES public."AI_Crypto_Bot_Portfolios"(id),
@@ -60,6 +65,41 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
       open_positions integer NOT NULL,
       captured_at timestamptz NOT NULL DEFAULT now(),
       snapshot_order bigint GENERATED ALWAYS AS IDENTITY
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Market_Data" (
+      symbol text PRIMARY KEY REFERENCES public."AI_Crypto_Bot_Watched_Markets"(symbol)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Candles" (
+      id uuid PRIMARY KEY,
+      symbol text NOT NULL REFERENCES public."AI_Crypto_Bot_Watched_Markets"(symbol)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Strategies" (
+      id uuid PRIMARY KEY,
+      name text NOT NULL
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Strategy_Changes" (
+      id uuid PRIMARY KEY,
+      strategy_id uuid NOT NULL REFERENCES public."AI_Crypto_Bot_Strategies"(id)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Strategy_Performance" (
+      id uuid PRIMARY KEY,
+      strategy_id uuid NOT NULL REFERENCES public."AI_Crypto_Bot_Strategies"(id)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Backtests" (
+      id uuid PRIMARY KEY,
+      strategy_id uuid NOT NULL REFERENCES public."AI_Crypto_Bot_Strategies"(id)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Scanner_Events" (
+      id uuid PRIMARY KEY,
+      symbol text NOT NULL REFERENCES public."AI_Crypto_Bot_Watched_Markets"(symbol)
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Status" (
+      id uuid PRIMARY KEY,
+      status text NOT NULL
+    );
+    CREATE TABLE public."AI_Crypto_Bot_Emergency_State" (
+      id uuid PRIMARY KEY,
+      status text NOT NULL
     );
     CREATE TABLE public."AI_Crypto_Bot_Shadow_Exit_Scenarios" (
       id uuid PRIMARY KEY,
@@ -80,9 +120,7 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
     INSERT INTO public."AI_Crypto_Bot_Portfolios"
       (id, user_id, starting_balance, available_balance, portfolio_value)
     VALUES
-      ('00000000-0000-4000-8000-000000000300', '${systemProfileId}'::uuid, 10000, 8500, 9000),
-      ('00000000-0000-4000-8000-000000000400',
-       '00000000-0000-4000-8000-000000000200', 1000, 1000, 1000);
+      ('00000000-0000-4000-8000-000000000300', '${systemProfileId}'::uuid, 10000, 8500, 9000);
     INSERT INTO public."AI_Crypto_Bot_Watched_Markets" (symbol)
     VALUES ('BTC-EUR');
     INSERT INTO public."AI_Crypto_Bot_AI_Decisions" (id, symbol)
@@ -94,6 +132,10 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
     VALUES ('00000000-0000-4000-8000-000000000700',
             '00000000-0000-4000-8000-000000000300',
             '00000000-0000-4000-8000-000000000500');
+    INSERT INTO public."AI_Crypto_Bot_Paper_Execution_Audit" (id, portfolio_id, trade_id)
+    VALUES ('00000000-0000-4000-8000-000000001200',
+            '00000000-0000-4000-8000-000000000300',
+            '00000000-0000-4000-8000-000000000700');
     INSERT INTO public."AI_Crypto_Bot_Portfolio_Snapshots"
       (portfolio_id, portfolio_value, available_balance, open_positions)
     VALUES ('00000000-0000-4000-8000-000000000300', 9000, 8500, 1);
@@ -106,9 +148,37 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
             '00000000-0000-4000-8000-000000000800');
     INSERT INTO public."AI_Crypto_Bot_Analytics_Runs" (id)
     VALUES ('00000000-0000-4000-8000-000000001000');
+    INSERT INTO public."AI_Crypto_Bot_Market_Data" (symbol)
+    VALUES ('BTC-EUR');
+    INSERT INTO public."AI_Crypto_Bot_Candles" (id, symbol)
+    VALUES ('00000000-0000-4000-8000-000000001300', 'BTC-EUR');
+    INSERT INTO public."AI_Crypto_Bot_Strategies" (id, name)
+    VALUES ('00000000-0000-4000-8000-000000001400', 'Momentum');
+    INSERT INTO public."AI_Crypto_Bot_Strategy_Changes" (id, strategy_id)
+    VALUES ('00000000-0000-4000-8000-000000001500',
+            '00000000-0000-4000-8000-000000001400');
+    INSERT INTO public."AI_Crypto_Bot_Strategy_Performance" (id, strategy_id)
+    VALUES ('00000000-0000-4000-8000-000000001600',
+            '00000000-0000-4000-8000-000000001400');
+    INSERT INTO public."AI_Crypto_Bot_Backtests" (id, strategy_id)
+    VALUES ('00000000-0000-4000-8000-000000001700',
+            '00000000-0000-4000-8000-000000001400');
+    INSERT INTO public."AI_Crypto_Bot_Scanner_Events" (id, symbol)
+    VALUES ('00000000-0000-4000-8000-000000001800', 'BTC-EUR');
+    INSERT INTO public."AI_Crypto_Bot_Status" (id, status)
+    VALUES ('00000000-0000-4000-8000-000000001900', 'STOPPED');
+    INSERT INTO public."AI_Crypto_Bot_Emergency_State" (id, status)
+    VALUES ('00000000-0000-4000-8000-000000002000', 'EMERGENCY_STOP');
   `);
   if (externalDecisionReference) {
-    await database.query(`
+    await database.exec(`
+      INSERT INTO public."AI_Crypto_Bot_Portfolios"
+        (id, user_id, starting_balance, available_balance, portfolio_value)
+      VALUES (
+        '00000000-0000-4000-8000-000000000400',
+        '00000000-0000-4000-8000-000000000200',
+        1000, 1000, 1000
+      );
       INSERT INTO public."AI_Crypto_Bot_Trades" (id, portfolio_id, ai_decision_id)
       VALUES (
         '00000000-0000-4000-8000-000000001100',
@@ -120,7 +190,7 @@ async function createDatabase({ externalDecisionReference = false } = {}) {
   return database;
 }
 
-test("paper reset preserves markets and unrelated portfolios, then starts the system portfolio at EUR 2000", async () => {
+test("full data reset retains profiles, markets, strategy definitions, and safety state", async () => {
   const database = await createDatabase();
   try {
     await database.exec(resetSql);
@@ -152,6 +222,8 @@ test("paper reset preserves markets and unrelated portfolios, then starts the sy
         (SELECT count(*)::integer
          FROM public."AI_Crypto_Bot_Watched_Markets") AS market_count,
         (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Profiles") AS profile_count,
+        (SELECT count(*)::integer
          FROM public."AI_Crypto_Bot_Portfolios"
          WHERE user_id = '00000000-0000-4000-8000-000000000200') AS other_portfolio_count,
         (SELECT count(*)::integer
@@ -163,16 +235,52 @@ test("paper reset preserves markets and unrelated portfolios, then starts the sy
         (SELECT count(*)::integer
          FROM public."AI_Crypto_Bot_Analytics_Runs") AS analytics_count,
         (SELECT count(*)::integer
-         FROM public."AI_Crypto_Bot_Shadow_Exit_Events") AS shadow_event_count
+         FROM public."AI_Crypto_Bot_Shadow_Exit_Events") AS shadow_event_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Shadow_Exit_Scenarios") AS shadow_scenario_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Paper_Execution_Audit") AS audit_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Market_Data") AS market_data_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Candles") AS candle_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Scanner_Events") AS scanner_event_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Strategy_Changes") AS strategy_change_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Strategy_Performance") AS strategy_performance_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Backtests") AS backtest_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Strategies") AS strategy_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Status"
+         WHERE status = 'STOPPED') AS stopped_status_count,
+        (SELECT count(*)::integer
+         FROM public."AI_Crypto_Bot_Emergency_State"
+         WHERE status = 'EMERGENCY_STOP') AS emergency_stop_count
     `);
     assert.deepEqual(preserved.rows, [{
       market_count: 1,
-      other_portfolio_count: 1,
+      profile_count: 2,
+      other_portfolio_count: 0,
       trade_count: 0,
       position_count: 0,
       decision_count: 0,
       analytics_count: 0,
-      shadow_event_count: 0
+      shadow_event_count: 0,
+      shadow_scenario_count: 0,
+      audit_count: 0,
+      market_data_count: 0,
+      candle_count: 0,
+      scanner_event_count: 0,
+      strategy_change_count: 0,
+      strategy_performance_count: 0,
+      backtest_count: 0,
+      strategy_count: 1,
+      stopped_status_count: 1,
+      emergency_stop_count: 1
     }]);
   } finally {
     await database.close();
@@ -182,7 +290,7 @@ test("paper reset preserves markets and unrelated portfolios, then starts the sy
 test("paper reset fails closed when another portfolio references an AI decision", async () => {
   const database = await createDatabase({ externalDecisionReference: true });
   try {
-    await assert.rejects(database.exec(resetSql), /outside the system portfolio/);
+    await assert.rejects(database.exec(resetSql), /non-system portfolio/);
     await database.exec("ROLLBACK");
     const remaining = await database.query(`
       SELECT
