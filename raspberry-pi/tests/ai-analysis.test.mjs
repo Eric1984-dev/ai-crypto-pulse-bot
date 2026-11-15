@@ -60,6 +60,14 @@ function buildCandles(symbol = "BTC-EUR", direction = "up", now = fixedNow,
   return intervals.flatMap((interval) => createCandles(symbol, interval, 60, direction, now));
 }
 
+function setCandleRange(candles, halfRangeFraction) {
+  return candles.map((candle) => ({
+    ...candle,
+    high: candle.close * (1 + halfRangeFraction),
+    low: candle.close * (1 - halfRangeFraction)
+  }));
+}
+
 function makeMarket(symbol, priority) {
   return {
     id: `00000000-0000-0000-0000-${String(priority).padStart(12, "0")}`,
@@ -173,14 +181,20 @@ test("Pi V2 analysis returns the expected directional and safe outcomes", () => 
   }).indicators.directionalAlignment, null);
 });
 
-test("V2 records disagreement between the daily and hourly EMA directions", () => {
-  const candles = [
+test("V2 applies misalignment penalties to Market Strength and confidence", () => {
+  const candles = setCandleRange([
     ...["5m", "15m", "4h"].flatMap((interval) =>
       createCandles("BTC-EUR", interval, 60, "up")
     ),
     ...createCandles("BTC-EUR", "1h", 60, "down"),
     ...createCandles("BTC-EUR", "1d", 60, "up")
-  ];
+  ], 0.03);
+  const aligned = analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: setCandleRange(buildCandles(), 0.03),
+    now: fixedNow
+  });
   const result = analyzeMarket({
     symbol: "BTC-EUR",
     marketData: createSnapshot(),
@@ -191,6 +205,30 @@ test("V2 records disagreement between the daily and hourly EMA directions", () =
   assert.equal(result.indicators.timeframes["1h"].trend.direction, "bearish");
   assert.equal(result.indicators.timeframes["1d"].trend.direction, "bullish");
   assert.equal(result.indicators.directionalAlignment, false);
+  assert.equal(aligned.indicators.directionalAlignment, true);
+  assert.equal(result.indicators.marketStrength, aligned.indicators.marketStrength - 30);
+  assert.equal(result.confidence, aligned.confidence - 30);
+  assert.equal(aligned.decision, "BUY");
+  assert.notEqual(result.decision, "BUY");
+});
+
+test("V2 caps the average volatility penalty at five confidence points", () => {
+  const analyze = (halfRangeFraction) => analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles: setCandleRange(buildCandles(), halfRangeFraction),
+    now: fixedNow
+  });
+  const mediumVolatility = analyze(0.005);
+  const highVolatility = analyze(0.03);
+  const intervals = ["5m", "15m", "1h", "4h", "1d"];
+
+  assert.ok(intervals.every((interval) =>
+    mediumVolatility.indicators.timeframes[interval].volatility.level === "medium"));
+  assert.ok(intervals.every((interval) =>
+    highVolatility.indicators.timeframes[interval].volatility.level === "high"));
+  assert.equal(highVolatility.confidence, mediumVolatility.confidence - 1);
+  assert.equal(highVolatility.indicators.marketStrength, mediumVolatility.indicators.marketStrength);
 });
 
 test("AI excludes in-progress candles and accepts them only at the interval close", () => {

@@ -24,6 +24,10 @@ The internal scheduler aligns to five-minute UTC slots. It runs snapshot refresh
 
 A process-level session advisory lock (`882018082`) prevents a second runtime instance and is checked at pipeline-stage boundaries. Losing the lock stops further scheduling. Paper runs also take a separate transaction-level lock (`882018081`) and persist a deterministic idempotency key for each portfolio/decision pair. BUY sizing and SELL accounting keep numeric arithmetic in PostgreSQL. The runtime honors confidence, position count/size, cooldown, market freshness, daily/portfolio drawdown, emergency stop, fees, and slippage rules. It never uses an authenticated Bitvavo API.
 
+### Paper-only strategy scoring update (2026-11-16)
+
+The Raspberry Pi AI engine applies a 20-point penalty to Market Strength and confidence when the 1h and 1d trends do not establish the same non-sideways direction. The existing ATR-based average volatility penalty is capped at five confidence points. These changes do not bypass the paper executor's explicit alignment requirement or alter its confidence threshold of 70, sizing, position/cooldown limits, drawdown protections, emergency stop, or exit rules. The AI signal floor remains 65. The user-provided replay figures are preliminary and have not been independently reproduced; this update has not been deployed or validated against the live Pi.
+
 The retention service creates a plan for candle and AI-decision age cutoffs but issues no `DELETE` or other data-removal statement. Its deletion flag remains false until a separately authorized implementation changes that policy.
 
 The systemd sample is `deploy/cryptopulse-runtime.service`. systemd starts and restarts the single Node service; it is not a timer and does not trigger pipeline cycles.

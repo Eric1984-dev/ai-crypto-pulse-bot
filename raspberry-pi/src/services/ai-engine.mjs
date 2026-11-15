@@ -22,6 +22,8 @@ const CANDLE_MAX_AGE_MS = Object.freeze({
   "1d": 72 * 60 * 60 * 1000
 });
 const MARKET_DATA_MAX_AGE_MS = 15 * 60 * 1000;
+const MISALIGNMENT_PENALTY = 20;
+const MAX_AVERAGE_VOLATILITY_PENALTY = 5;
 
 export function analyzeMarket({ symbol, marketData, candles, now = new Date() }) {
   const analysisTime = now instanceof Date ? now : new Date(now);
@@ -95,7 +97,7 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
     ? clamp(
       40 + 30 * v2Signal.trendStrength + 10 * v2Signal.alignment
         + 10 * v2Signal.volumeConfirmation + 5 * v2Signal.rsiConfirmation
-        - volatilityPenalty,
+        - volatilityPenalty - v2Signal.misalignmentPenalty,
       0,
       95
     )
@@ -288,13 +290,15 @@ function calculateV2Signal(timeframes, validTimeframes) {
   const dailyEmaScore = clamp(dailySpread * 50, -100, 100);
   const dailyRsiScore = clamp((dailyRsi - 50) * 2, -100, 100);
   const alignment = hourlyDirection === dailyDirection && dailyDirection !== "sideways" ? 1 : 0;
+  const misalignmentPenalty = alignment === 0 ? MISALIGNMENT_PENALTY : 0;
   const volumeConfirmation = clamp(hourlyVolumeRatio - 0.5, 0, 1);
   const rsiConfirmation = clamp(Math.max(0, Math.sign(dailyEmaScore) * dailyRsiScore / 100), 0, 1);
   const marketStrength = round(clamp(
     0.75 * dailyEmaScore
       + 0.10 * dailyEmaScore * alignment
       + 0.10 * dailyEmaScore * volumeConfirmation
-      + 0.05 * dailyRsiScore,
+      + 0.05 * dailyRsiScore
+      - misalignmentPenalty,
     -100,
     100
   ));
@@ -304,6 +308,7 @@ function calculateV2Signal(timeframes, validTimeframes) {
     marketStrength,
     trendStrength: Math.abs(dailyEmaScore) / 100,
     alignment,
+    misalignmentPenalty,
     volumeConfirmation,
     rsiConfirmation
   };
@@ -521,7 +526,7 @@ function averageVolatilityPenalty(timeframes) {
   }
   const penaltyTotal = timeframes.reduce((total, { volatility }) =>
     total + (volatility.level === "high" ? 12 : volatility.level === "medium" ? 4 : 0), 0);
-  return penaltyTotal / timeframes.length;
+  return Math.min(penaltyTotal / timeframes.length, MAX_AVERAGE_VOLATILITY_PENALTY);
 }
 
 function buildDecisionReason({

@@ -4,6 +4,16 @@
 
 The limits below are enforced by the Raspberry Pi paper-trading service before any simulated entry. Browser clients cannot write trades, positions, balances, or snapshots. The executor uses stored AI decisions and stored market data only.
 
+### Paper Trading Research Update
+
+Date: 2026-11-16
+
+The AI analysis engine now subtracts 20 points from both Market Strength and confidence when the 1h and 1d trends do not establish the same non-sideways direction. Its existing ATR-based average volatility penalty is capped at five confidence points. These adjustments change signal scoring only; they do not relax the executor's requirement for explicit timeframe alignment.
+
+The AI confidence floor remains 65 and the paper executor BUY threshold remains 70. Position sizing, the nine-position limit, cooldown, drawdown controls, emergency stop, fees, slippage, and exit rules are unchanged. No live-trading code or setting is changed.
+
+The preceding user-provided ~24-hour replay reported 5 BUY/3 SELL executions across two markets, realized P&L of -€2.65 and maximum drawdown of 0.887%, compared with 2 BUY/1 SELL across one market, -€10.48 realized P&L and 1.017% maximum drawdown under the prior configuration. This short replay is not independently reproduced here and is not evidence of future profitability. A fresh stateful replay and monitored paper-only evaluation are required before drawing conclusions.
+
 ## Trading Mode
 
 Current Mode:
