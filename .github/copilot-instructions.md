@@ -52,8 +52,9 @@ Frontend:
 
 Backend:
 
-- Vercel Functions
-- Supabase
+- Raspberry Pi Node.js runtime and PostgreSQL
+- Vercel static hosting and limited authentication/data bridge
+- Cloudflare Tunnel
 
 Libraries:
 
@@ -151,9 +152,21 @@ Vercel
 
 Database:
 
-Supabase
+Existing PostgreSQL database on the Raspberry Pi
 
 Never claim deployment succeeded unless verified.
+
+## PostgreSQL Access
+
+The active production database is PostgreSQL on the Raspberry Pi; Supabase is historical and is not the active runtime database. The operator can open a local SSH tunnel with:
+
+```bash
+ssh -N -L 5433:localhost:5432 eric@192.168.0.121
+```
+
+When the operator has opened the tunnel, connect to `localhost:5433` through the configured PostgreSQL integration/client and use existing local configuration for the database name and credentials. The tunnel does not provide PostgreSQL credentials. The operator owns starting and stopping the tunnel; do not start, stop, or leave it running on the operator's behalf. If it is unavailable, ask the operator to open it before concluding the database is unreachable.
+
+Use read-only queries by default. Production writes or migrations require explicit user authorization and must follow the Raspberry Pi migration procedure. Never hardcode, expose, or log database credentials.
 
 ---
 

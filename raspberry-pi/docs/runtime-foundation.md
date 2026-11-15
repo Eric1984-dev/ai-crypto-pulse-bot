@@ -18,6 +18,10 @@ The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and 
 
 The `npm run ingest:market-data -- --intervals=...` command separately validates the existing ingestion contract, reads enabled watched markets, and runs one snapshot/candle pass. It uses no Vercel function, HTTP trigger, external scheduler, or `systemd` timer. Each write uses an explicit `BEGIN READ WRITE` transaction; API repositories continue to use `BEGIN READ ONLY`. No write targets the watched-market table. Database/provider failures are logged with safe codes; credentials and raw error details are never logged.
 
+### Operator-managed database tunnel
+
+For local PostgreSQL diagnostics, the operator can open the SSH tunnel documented in the [database guide](../../docs/DATABASE.md). Once open, the Raspberry Pi database is reachable from the development machine at `localhost:5433` using the existing database configuration. Copilot must not start or stop the tunnel; if it is unavailable, ask the operator to open it. Use read-only queries by default, and require explicit authorization before production writes or migrations.
+
 ## Phase 7 scheduler and paper trading
 
 The internal scheduler aligns to five-minute UTC slots. It runs snapshot refresh each cycle and requests candles on the current defaults: `1m` every five minutes, `5m` every fifteen minutes, `15m` every thirty minutes, `1h` hourly, `4h` every four hours, and `1d` daily. The `1h`, `4h`, and `1d` active production cadences were not independently verified; confirm them against the external scheduler before cutover. Missed slots are skipped; bounded ingestion checkpoints advance only during later normal cycles.

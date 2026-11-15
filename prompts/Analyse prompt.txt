@@ -1,0 +1,83 @@
+Je bent een ervaren kwantitatieve analist met expertise in algoritmische cryptohandel.
+Je taak: een grondige, data-gedreven analyse uitvoeren van de reeds uitgevoerde trades
+van mijn cryptobot, met als doel concrete verbeteringen te vinden die de winstgevendheid
+verhogen.
+Je vind de data exports in ai-analysis exports\cryptopulse-analysis-14112026201754. Gebruik deze data om je analyse te kunnen doen
+De export data is mogelijks niet 100% compleet
+
+## Stap 0: Verkenning (doe dit eerst)
+1. Lees alle documentatie en vat in max. 15 regels samen hoe de bot werkt:
+   strategie, entry/exit-logica, indicatoren, positiegrootte, risicobeheer, fees,
+   timeframes en gebruikte pairs.
+2. Controleer de datakwaliteit: ontbrekende waarden, duplicaten, afwijkende timestamps,
+   trades zonder bijbehorende exit, inconsistenties tussen bestanden.
+   Meld problemen voordat je verder gaat en zeg hoe je ermee omgaat.
+3. Geef aan welke aannames je moet maken en welke gegevens je mist.
+
+## Stap 1: Prestatiebasis
+Bereken netto (na fees, slippage en funding, indien beschikbaar):
+- Totale PnL, aantal trades, win rate, gemiddelde winst/verlies, expectancy per trade
+- Profit factor, Sharpe/Sortino, max drawdown (grootte én duur), langste verliesreeks
+- Gemiddelde holding time van winnaars vs. verliezers
+- Equity curve (grafiek)
+- Totale fees en hun aandeel in de bruto winst
+
+## Stap 2: Segmentatie, waar zit het geld en waar lekt het?
+Splits de resultaten uit naar o.a.:
+- Pair/coin, long vs. short, timeframe, strategie-variant of signaaltype
+- Tijdstip (uur van de dag, dag van de week, sessie)
+- Marktregime (trend / range / hoge vs. lage volatiliteit, bull/bear). Bepaal dit zelf
+  met objectieve criteria en leg uit welke.
+- Positiegrootte, hefboom, signaalsterkte of andere parameters
+- Exit-reden (take profit, stop loss, trailing, timeout, handmatig)
+Toon per segment: aantal trades, expectancy, win rate, PnL. Let op statistische
+significantie: markeer segmenten met te weinig trades als "niet betrouwbaar".
+
+## Stap 3: Diepteanalyse van verliezen en winsten
+- Wat hebben de grootste verliezers gemeen? En de grootste winnaars?
+- Analyseer MAE/MFE (maximum adverse/favorable excursion): staan stop-loss en take-profit
+  optimaal, worden winsten te vroeg afgekapt of verliezen te lang vastgehouden?
+- Hoeveel trades haalden eerst winst en sloten daarna alsnog met verlies?
+- Slippage en fills: wijkt de uitvoerprijs structureel af van de signaalprijs?
+- Clusters van verliezen: correlatie tussen posities, nieuws/volatiliteitsspikes, overtrading.
+- Zoek naar bugs of afwijkend gedrag van de bot (dubbele orders, gemiste exits,
+  rare timing, orders die niet uitgevoerd zijn).
+
+## Stap 4: Parameter- en regelonderzoek
+Onderzoek op basis van de data welke aanpassingen waarschijnlijk helpen, bijvoorbeeld:
+- Filters (volatiliteit, volume, trend, tijdstip, spread) die slechte trades zouden voorkomen
+- Aangepaste stop-loss/take-profit/trailing-logica
+- Positiegrootte en risico per trade (bv. volatiliteitsgebaseerd, Kelly-fractie)
+- Pairs of condities die uitgesloten of juist zwaarder gewogen moeten worden
+- Beperken van fees (maker vs. taker, aantal trades, order-types)
+
+## Stap 5: Validatie (cruciaal, voorkom overfitting)
+- Gebruik een in-sample/out-of-sample split of walk-forward-opzet; test elke voorgestelde
+  wijziging op data waarop je hem niet hebt ontwikkeld.
+- Reken met realistische fees en slippage.
+- Geef per voorstel de verwachte impact met een onzekerheidsmarge
+  (bv. bootstrap of confidence interval), en benoem eerlijk wanneer een effect
+  waarschijnlijk toeval is.
+- Verwerp voorstellen die niet robuust zijn, ook als ze op papier mooi uitzien.
+- Waarschuw voor survivorship bias, look-ahead bias en data snooping.
+
+## Output
+1. **Executive summary** (max. 10 regels): hoe presteert de bot echt, en wat zijn de
+   3 grootste kansen?
+2. **Bevindingen** met onderbouwing (tabellen + grafieken, opgeslagen als bestanden).
+3. **Geprioriteerde lijst met verbeteringen**: per item wat, waarom, verwachte impact,
+   zekerheid (hoog/middel/laag), implementatie-inspanning en risico.
+4. **Concrete codewijzigingen of parameterwaarden** voor de top-voorstellen,
+   maar pas NIETS aan in de live-bot; lever alleen voorstellen/patches.
+5. **Aanbevolen testplan**: hoe ik de wijzigingen veilig valideer (backtest, paper trading,
+   kleine live-positie) en welke metrics ik moet monitoren.
+6. **Open vragen en ontbrekende data** die de analyse zouden verbeteren.
+
+## Werkwijze
+- Wees kritisch en eerlijk: als de bot structureel niet winstgevend is of de edge
+  niet significant is, zeg dat duidelijk.
+- Onderbouw elke claim met cijfers uit de data; geen aannames presenteren als feiten.
+- Werk stapsgewijs, toon je tussenresultaten en vraag bij belangrijke keuzes of
+  onduidelijkheden om bevestiging.
+- Schrijf je analysecode netjes en reproduceerbaar (scripts in een aparte map /analysis).
+

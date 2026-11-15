@@ -36,7 +36,7 @@ The operator reports that the Pi runtime, PostgreSQL, ingestion, AI analysis, sc
 - Monitoring reads the Pi runtime API, including the Raspberry Pi model, scheduler, process, host, and database metrics. The dashboard and Exports page show the Pi model first in their infrastructure metrics. The former archive server is retired and is no longer used.
 - `PostgreSQL/migrations/` and `config/markets.js` remain as historical schema/seed provenance and inputs to local PGlite validation. They do not configure a live Supabase runtime.
 
-See [deployment](docs/DEPLOYMENT.md), [API contracts](docs/API.md), [architecture](docs/ARCHITECTURE.md), [scheduling](docs/SCHEDULING.md), and the [Phase 10 cleanup report](docs/post-migration-cleanup-report.md).
+See [deployment](docs/DEPLOYMENT.md), [database access and design](docs/DATABASE.md), [API contracts](docs/API.md), [architecture](docs/ARCHITECTURE.md), [scheduling](docs/SCHEDULING.md), and the [Phase 10 cleanup report](docs/post-migration-cleanup-report.md).
 
 ## Local validation
 

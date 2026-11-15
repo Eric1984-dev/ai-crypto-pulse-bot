@@ -84,8 +84,11 @@ Frontend:
 
 Backend:
 
-- Vercel Functions
-- Supabase
+- Raspberry Pi Node.js runtime and PostgreSQL
+- Vercel static hosting and limited authentication/data bridge
+- Cloudflare Tunnel
+
+Supabase is no longer the production backend. The Supabase/Vercel database implementation is retained as historical project material.
 
 Libraries:
 
@@ -394,11 +397,13 @@ Vercel
 
 Database:
 
-Supabase
+Existing PostgreSQL database on the Raspberry Pi
 
 Environment configuration must be documented.
 
 Never claim deployment success unless verified.
+
+The Raspberry Pi runtime and database are reached through the operator-managed Cloudflare/SSH access path; do not assume production connectivity.
 
 ---
 
@@ -992,23 +997,31 @@ Current phases must remain functional without external AI services.
 
 ## Development Environment
 
-The project is developed in VS Code with direct Supabase access configured.
+The current production database is PostgreSQL on the Raspberry Pi. Supabase is no longer used by the active runtime.
 
 Copilot may:
 
-- Inspect Supabase tables
-- Inspect Supabase schema
+- Inspect PostgreSQL tables
+- Inspect PostgreSQL schema
 - Run read-only validation queries
 - Verify migrations
 - Verify production data
 - Compare implementation with live database state
 
+The operator can provide local database access by opening this SSH tunnel:
+
+```bash
+ssh -N -L 5433:localhost:5432 eric@192.168.0.121
+```
+
+While the tunnel is open, connect to `localhost:5433` using the existing configured PostgreSQL client and credentials. The user manages the tunnel; do not start, stop, or leave it running on the user's behalf. If the database is unreachable, ask whether the tunnel is open before assuming a database or migration problem. Use read-only queries by default; production writes and migrations require explicit user authorization and the documented migration procedure.
+
 When diagnosing database-related issues:
 
-- Prefer live Supabase verification over assumptions.
+- Prefer live Raspberry Pi PostgreSQL verification over assumptions when the operator-managed tunnel is open.
 - Verify production schema before assuming migration problems.
 - Verify table contents before assuming missing data.
-- Use existing Supabase access where available.
+- Use the configured PostgreSQL integration and existing project configuration; never ask for credentials to be hardcoded or print them to logs.
 
 Important:
 
@@ -1020,7 +1033,8 @@ Use existing project environment variables and configured development integratio
 Production Platform:
 
 - Vercel Hobby
-- Supabase
+- Raspberry Pi runtime and PostgreSQL
+- Cloudflare Tunnel
 - Bitvavo Public API
 
 Constraints:
@@ -1035,8 +1049,8 @@ PAPER ACTIVE
 
 Development Access:
 
-- VS Code environment has Supabase access available for diagnostics and validation.
-- Live database verification is preferred for production investigations.
+- PostgreSQL diagnostics are available through `localhost:5433` only while the operator has opened the SSH tunnel documented above.
+- Use read-only queries by default; do not initiate the tunnel or perform production writes without authorization.
 
 # Recommendation Architecture
 

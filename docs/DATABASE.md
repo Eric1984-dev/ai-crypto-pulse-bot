@@ -2,6 +2,18 @@
 
 > **Current runtime:** Supabase is no longer used by this project. The complete backend runs on the Raspberry Pi, and its existing PostgreSQL database is the operational source of truth. SQL files under `PostgreSQL/migrations/` are retained only as historical schema provenance and local PGlite test fixtures; they are not applied to production or used to connect to a Supabase project.
 
+## Operator-managed PostgreSQL access
+
+For development diagnostics, the operator can open a local SSH tunnel to the Raspberry Pi:
+
+```bash
+ssh -N -L 5433:localhost:5432 eric@192.168.0.121
+```
+
+While that tunnel is open, connect to the existing PostgreSQL database at `localhost:5433` using the configured PostgreSQL client and the existing local database name and credentials. The SSH tunnel forwards the connection; it does not supply database credentials. The operator starts and stops the tunnel. Copilot must not manage the tunnel, and should ask the operator to open it if database access is unavailable.
+
+Use read-only SQL by default for diagnostics. Production data writes and schema changes require explicit user authorization and must follow the [Raspberry Pi migration procedure](../raspberry-pi/docs/database-migrations-on-pi.md). Never place database credentials in source files or logs.
+
 ## Historical Phase 03 schema and Phase 08 runtime usage
 
 The historical Phase 03 description adds the application schema through versioned migrations. Later historical phases use the existing portfolio, position, trade, snapshot, decision, market-data, and status tables. The current Pi backend uses its PostgreSQL database directly; browser writes remain prohibited.
