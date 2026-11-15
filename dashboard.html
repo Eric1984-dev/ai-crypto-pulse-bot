@@ -55,7 +55,10 @@
         <span class="pi-health-indicator" aria-hidden="true"></span>
         <span class="pi-health-kicker">RASPBERRY PI</span>
         <span class="dashboard-pi-health-state" data-dashboard-pi-health-state>Checking system status…</span>
-        <time class="dashboard-pi-boot-time" data-dashboard-pi-boot-time aria-label="Last Raspberry Pi boot time">Last boot: —</time>
+        <div class="dashboard-pi-timestamps">
+          <time class="dashboard-pi-boot-time" data-dashboard-pi-boot-time aria-label="Last Raspberry Pi boot time">Last boot: —</time>
+          <time class="dashboard-pi-service-start-time" data-dashboard-pi-service-start-time aria-label="Last cryptopulse-runtime.service start time">Last service start: —</time>
+        </div>
       </div>
       <p data-auth-message role="status" aria-live="polite"></p>
       <p class="dashboard-muted realtime-status" data-realtime-status role="status" aria-live="polite" hidden></p>

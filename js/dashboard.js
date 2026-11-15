@@ -233,6 +233,22 @@
         : "Last boot: —";
       bootTimeElement.dateTime = validBootTime ? bootTime.toISOString() : "";
     }
+    const serviceStartTimeElement = documentRef.querySelector(
+      "[data-dashboard-pi-service-start-time]"
+    );
+    const serviceStartTime = typeof system.serviceStartTime === "string"
+      ? new Date(system.serviceStartTime)
+      : null;
+    const validServiceStartTime = serviceStartTime
+      && Number.isFinite(serviceStartTime.getTime());
+    if (serviceStartTimeElement) {
+      serviceStartTimeElement.textContent = validServiceStartTime
+        ? `Last service start: ${formatters.formatTimestamp(serviceStartTime)}`
+        : "Last service start: —";
+      serviceStartTimeElement.dateTime = validServiceStartTime
+        ? serviceStartTime.toISOString()
+        : "";
+    }
     const systemMetrics = [
       {
         name: "temperature",

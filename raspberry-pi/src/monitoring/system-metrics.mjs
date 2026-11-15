@@ -19,11 +19,16 @@ export async function collectSystemMetrics({
   ]);
   const memoryTotalBytes = finiteNonNegative(osRef.totalmem());
   const memoryAvailableBytes = finiteNonNegative(osRef.freemem());
-  const bootTime = systemBootTime(osRef.uptime(), now());
+  const timestampNow = now();
+  const bootTime = timestampFromUptime(osRef.uptime(), timestampNow);
+  const serviceStartTime = processRef && typeof processRef.uptime === "function"
+    ? timestampFromUptime(processRef.uptime(), timestampNow)
+    : null;
 
   return Object.freeze({
     model,
     bootTime,
+    serviceStartTime,
     cpuUsagePercent: readCpuUsage(osRef.cpus()),
     loadAverage: Object.freeze(osRef.loadavg().map((value) => finiteNonNegative(value))),
     memory: Object.freeze({
@@ -36,7 +41,7 @@ export async function collectSystemMetrics({
   });
 }
 
-function systemBootTime(uptimeSeconds, nowMilliseconds) {
+function timestampFromUptime(uptimeSeconds, nowMilliseconds) {
   const uptime = finiteNonNegative(uptimeSeconds);
   if (uptime === null || !Number.isFinite(nowMilliseconds)) {
     return null;

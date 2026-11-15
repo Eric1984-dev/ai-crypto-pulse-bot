@@ -5,10 +5,12 @@ import { collectSystemMetrics } from "../src/monitoring/system-metrics.mjs";
 function createSystemMetricsOptions({
   model = "Raspberry Pi 5 Model B Rev 1.0\0",
   uptimeSeconds = 3600,
+  processUptimeSeconds = 120,
   now = Date.now
 } = {}) {
   return {
     cwd: "/app",
+    processRef: { uptime: () => processUptimeSeconds },
     osRef: {
       cpus: () => [{ times: { user: 10, idle: 90 } }],
       loadavg: () => [0.1, 0.2, 0.3],
@@ -60,4 +62,5 @@ test("system metrics derive host boot time from operating-system uptime", async 
   }));
 
   assert.equal(metrics.bootTime, "2026-11-14T19:00:00.000Z");
+  assert.equal(metrics.serviceStartTime, "2026-11-14T19:58:00.000Z");
 });

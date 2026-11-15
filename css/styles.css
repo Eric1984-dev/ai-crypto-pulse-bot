@@ -2107,12 +2107,19 @@ a:focus-visible {
   font-weight: 700;
 }
 
-.dashboard-pi-boot-time {
+.dashboard-pi-timestamps {
   flex: 0 1 auto;
   margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.dashboard-pi-boot-time,
+.dashboard-pi-service-start-time {
   color: #e8edf4;
   font-size: 11px;
-  text-align: right;
   white-space: nowrap;
 }
 
@@ -2121,7 +2128,7 @@ a:focus-visible {
     flex-wrap: wrap;
   }
 
-  .dashboard-pi-boot-time {
+  .dashboard-pi-timestamps {
     flex-basis: 100%;
     margin-left: 0;
   }
