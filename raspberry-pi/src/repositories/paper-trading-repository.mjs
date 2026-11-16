@@ -85,18 +85,27 @@ const UPDATE_STATUS_SQL = `
 `;
 
 const LATEST_DECISIONS_SQL = `
-  SELECT DISTINCT ON (decision.symbol)
-         decision.id,
-         decision.symbol,
-         decision.decision,
-         decision.confidence,
-         decision.indicators,
-         decision.created_at
-  FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
-  JOIN public."AI_Crypto_Bot_Watched_Markets" AS watched_market
-    ON watched_market.symbol = decision.symbol
-   AND watched_market.enabled IS TRUE
-  ORDER BY decision.symbol ASC, decision.created_at DESC, decision.id DESC
+  SELECT latest_decision.id,
+         latest_decision.symbol,
+         latest_decision.decision,
+         latest_decision.confidence,
+         latest_decision.indicators,
+         latest_decision.created_at
+  FROM public."AI_Crypto_Bot_Watched_Markets" AS watched_market
+  CROSS JOIN LATERAL (
+    SELECT decision.id,
+           decision.symbol,
+           decision.decision,
+           decision.confidence,
+           decision.indicators,
+           decision.created_at
+    FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
+    WHERE decision.symbol = watched_market.symbol
+    ORDER BY decision.created_at DESC, decision.id DESC
+    LIMIT 1
+  ) AS latest_decision
+  WHERE watched_market.enabled IS TRUE
+  ORDER BY watched_market.symbol ASC
   LIMIT $1
 `;
 

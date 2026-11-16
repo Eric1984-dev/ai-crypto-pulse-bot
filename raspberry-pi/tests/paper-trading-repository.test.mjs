@@ -99,6 +99,74 @@ test("paper repository resolves idempotency keys to their existing trade IDs", a
   assert.deepEqual(captured.values, [[key]]);
 });
 
+test("paper repository reads only the newest decision for each enabled market", async () => {
+  const database = new PGlite();
+  try {
+    await database.exec(`
+      CREATE TABLE public."AI_Crypto_Bot_Watched_Markets" (
+        symbol text PRIMARY KEY,
+        enabled boolean NOT NULL
+      );
+      CREATE TABLE public."AI_Crypto_Bot_AI_Decisions" (
+        id uuid PRIMARY KEY,
+        symbol text NOT NULL,
+        decision text NOT NULL,
+        confidence numeric NOT NULL,
+        indicators jsonb NOT NULL,
+        created_at timestamptz NOT NULL
+      );
+      CREATE INDEX "AI_Crypto_Bot_AI_Decisions_symbol_created_id_idx"
+        ON public."AI_Crypto_Bot_AI_Decisions" (symbol, created_at DESC, id DESC);
+      INSERT INTO public."AI_Crypto_Bot_Watched_Markets" (symbol, enabled)
+      VALUES
+        ('BTC-EUR', TRUE),
+        ('ETH-EUR', TRUE),
+        ('DOGE-EUR', FALSE),
+        ('XRP-EUR', TRUE);
+      INSERT INTO public."AI_Crypto_Bot_AI_Decisions"
+        (id, symbol, decision, confidence, indicators, created_at)
+      VALUES
+        ('00000000-0000-4000-8000-000000000001', 'BTC-EUR', 'BUY', 70, '{}',
+          '2026-11-16T12:00:00Z'),
+        ('00000000-0000-4000-8000-000000000002', 'BTC-EUR', 'BUY', 80, '{}',
+          '2026-11-16T12:05:00Z'),
+        ('00000000-0000-4000-8000-000000000003', 'BTC-EUR', 'SELL', 85, '{}',
+          '2026-11-16T12:05:00Z'),
+        ('00000000-0000-4000-8000-000000000004', 'ETH-EUR', 'HOLD', 55, '{}',
+          '2026-11-16T12:04:00Z'),
+        ('00000000-0000-4000-8000-000000000005', 'DOGE-EUR', 'BUY', 90, '{}',
+          '2026-11-16T12:06:00Z');
+    `);
+    const repository = new PaperTradingRepository({
+      connect: async () => ({
+        query: database.query.bind(database),
+        release() {}
+      })
+    });
+
+    const decisions = await repository.listLatestDecisions(database);
+
+    assert.deepEqual(decisions.map(({ id, symbol, decision }) => ({
+      id,
+      symbol,
+      decision
+    })), [
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        symbol: "BTC-EUR",
+        decision: "SELL"
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000004",
+        symbol: "ETH-EUR",
+        decision: "HOLD"
+      }
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
 test("paper repository uses snapshot sequence for same-time daily baselines", async () => {
   const database = new PGlite();
   try {

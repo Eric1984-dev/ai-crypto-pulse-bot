@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fetch the latest AI decision for each enabled watched market through a bounded lateral lookup and the existing composite index, avoiding full-history scans and sort spills in the paper-trading cycle; no migration is required.
 - Show the Raspberry Pi runtime service's last start time beneath the host boot time in the dashboard health bar, using the existing monitoring endpoint.
 - Apply a 20-point timeframe-misalignment penalty to AI Market Strength and confidence, and cap the average ATR volatility penalty at five points for paper-trading analysis; preserve all executor thresholds and risk controls.
 - Persist per-evaluation, reason-coded outcomes for directional paper BUY/SELL decisions atomically with trade execution; add a paginated paper-execution-audit source to the existing full-history JSONL export without adding a Vercel function.

@@ -34,6 +34,10 @@ The Raspberry Pi AI engine applies a 20-point penalty to Market Strength and con
 
 The retention service creates a plan for candle and AI-decision age cutoffs but issues no `DELETE` or other data-removal statement. Its deletion flag remains false until a separately authorized implementation changes that policy.
 
+### Latest-decision lookup performance (2026-11-16)
+
+The paper worker selects the latest stored decision for each enabled watched market. A read-only production `EXPLAIN ANALYZE` of the former `DISTINCT ON` query scanned about 55,000 decision rows, spilled sort data to disk, and took 3.62 seconds; the Pi's `PG_QUERY_TIMEOUT_MS` is 5,000 ms. This matches the intermittent paper-stage failures after successful AI analysis. The local implementation now performs one bounded `LATERAL` lookup per enabled market using the existing `(symbol, created_at DESC, id DESC)` index. No schema migration or permission change is needed. The change is not deployed to the Pi; an operator-managed runtime update and subsequent production-cycle verification remain pending.
+
 The systemd sample is `deploy/cryptopulse-runtime.service`. systemd starts and restarts the single Node service; it is not a timer and does not trigger pipeline cycles.
 
 ## Read-only repositories and result bounds
