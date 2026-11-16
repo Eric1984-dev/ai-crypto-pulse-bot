@@ -164,7 +164,8 @@ test("circuit SVG uses blue AI artwork and boundary-origin moving signals", () =
   );
   assert.match(container.innerHTML, /viewBox="0 0 1254 1254"/);
   assert.match(container.innerHTML, /class="circuit-board-image" href="\/assets\/agent-circuit-board\.png"/);
-  assert.match(container.innerHTML, /class="circuit-chip-analyzing-glow"[^>]+filter="url\(#circuit-chip-analyzing-glow\)"/);
+  assert.doesNotMatch(container.innerHTML, /circuit-chip-analyzing-glow|<rect[^>]+circuit-chip/);
+  assert.match(container.innerHTML, /class="circuit-brain-analyzing-highlight"[^>]+clip-path="url\(#circuit-brain-highlight\)"/);
   assert.doesNotMatch(container.innerHTML, /<text\b|INPUT BUS|OUTPUT BUS|DATA BUS/);
   assert.match(container.innerHTML, /class="circuit-flow circuit-flow--analyzing"/);
   assert.match(container.innerHTML, /<animateMotion[^>]+path="M/);
@@ -331,12 +332,15 @@ test("reduced-motion styling leaves the circuit static and visible", () => {
   assert.match(styles, /\.circuit-flow--analyzing/);
 });
 
-test("the chip has a subtle default glow and status neurons have stronger halos", () => {
+test("the brain highlight is hidden by default and status neurons have stronger halos", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
   const brainSource = fs.readFileSync(path.join(__dirname, "..", "js", "agent-brain.js"), "utf8");
   const boardImage = styles.match(/\.circuit-board-image\s*\{([\s\S]*?)\n\}/);
-  const chipGlow = styles.match(/\.circuit-chip-analyzing-glow\s*\{([\s\S]*?)\n\}/);
+  const brainHighlight = styles.match(/\.circuit-brain-analyzing-highlight\s*\{([\s\S]*?)\n\}/);
+  const analyzingHighlight = styles.match(
+    /\.agent-brain\[data-state="analyzing"\] \.circuit-brain-analyzing-highlight\s*\{([\s\S]*?)\n\}/
+  );
   const signalHalo = styles.match(/\.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
   const analyzingHalo = styles.match(/\.circuit-neuron--analyzing \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
   const errorHalo = styles.match(/\.circuit-neuron--error \.circuit-neuron-halo\s*\{([\s\S]*?)\n\}/);
@@ -344,8 +348,11 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
   assert.ok(boardImage);
   assert.match(boardImage[1], /opacity:\s*0\.62;/);
   assert.match(boardImage[1], /saturate\(1\.1\)/);
-  assert.ok(chipGlow);
-  assert.match(chipGlow[1], /opacity:\s*0\.18;/);
+  assert.ok(brainHighlight);
+  assert.match(brainHighlight[1], /opacity:\s*0;/);
+  assert.match(brainHighlight[1], /brightness\(1\.6\)/);
+  assert.ok(analyzingHighlight);
+  assert.match(analyzingHighlight[1], /opacity:\s*0\.76;/);
   assert.ok(signalHalo);
   assert.match(signalHalo[1], /opacity:\s*1;/);
   assert.match(signalHalo[1], /drop-shadow\(0 0 18px #7cb7ff\)/);
@@ -359,29 +366,27 @@ test("the chip has a subtle default glow and status neurons have stronger halos"
     styles,
     /\.agent-brain-stage\s*\{[^}]*box-shadow:[\s\S]*?rgb\(91 156 255 \/ 8%\)/s
   );
-  assert.match(chipGlow[1], /stroke:\s*var\(--accent\);/);
 });
 
-test("ANALYZING adds a stronger chip glow while desktop keeps the circuit compact", () => {
+test("ANALYZING brightens only the brain while desktop keeps the circuit compact", () => {
   const stylesPath = path.join(__dirname, "..", "css", "styles.css");
   const styles = fs.readFileSync(stylesPath, "utf8");
   const brainSource = fs.readFileSync(path.join(__dirname, "..", "js", "agent-brain.js"), "utf8");
   const desktopBlock = styles.match(/@media \(min-width: 900px\)\s*\{([\s\S]*?)\n\}/);
-  const analyzingGlow = styles.match(
-    /\.agent-brain\[data-state="analyzing"\] \.circuit-chip-analyzing-glow\s*\{([\s\S]*?)\n\}/
+  const analyzingHighlight = styles.match(
+    /\.agent-brain\[data-state="analyzing"\] \.circuit-brain-analyzing-highlight\s*\{([\s\S]*?)\n\}/
   );
 
   assert.ok(desktopBlock);
   assert.match(desktopBlock[1], /\.agent-brain-stage\s*\{\s*width:\s*min\(100%,\s*440px\);/);
-  assert.ok(analyzingGlow);
-  assert.match(analyzingGlow[1], /opacity:\s*0\.58;/);
-  assert.match(analyzingGlow[1], /drop-shadow\(0 0 14px rgb\(91 156 255 \/ 45%\)\)/);
+  assert.ok(analyzingHighlight);
+  assert.match(analyzingHighlight[1], /opacity:\s*0\.76;/);
   assert.match(
     brainSource,
-    /class="circuit-chip-analyzing-glow"[^>]+stroke-width="14" filter="url\(#circuit-chip-analyzing-glow\)"/
+    /class="circuit-brain-analyzing-highlight"[^>]+clip-path="url\(#circuit-brain-highlight\)"/
   );
   assert.match(
     styles,
-    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.circuit-chip-analyzing-glow\s*\{\s*transition:\s*none;/
+    /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.circuit-brain-analyzing-highlight\s*\{\s*transition:\s*none;/
   );
 });

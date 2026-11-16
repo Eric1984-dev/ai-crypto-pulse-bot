@@ -183,10 +183,6 @@
           <feGaussianBlur stdDeviation="10" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <filter id="circuit-chip-analyzing-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
         <filter id="circuit-trace-mask-filter" color-interpolation-filters="sRGB">
           <feColorMatrix type="matrix" values="1 0 1 0 0 1 0 1 0 0 1 0 1 0 0 0 0 0 1 0"/>
           <feComponentTransfer>
@@ -198,10 +194,31 @@
         <mask id="circuit-trace-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254" mask-type="luminance">
           <image href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" filter="url(#circuit-trace-mask-filter)"/>
         </mask>
+        <clipPath id="circuit-brain-highlight" clipPathUnits="userSpaceOnUse">
+          <path d="M627 376
+            C598 350 568 345 545 355
+            C520 333 485 335 462 356
+            C429 360 406 386 401 419
+            C380 440 378 477 389 508
+            C375 539 381 574 399 600
+            C392 636 412 669 442 688
+            C450 722 480 744 516 741
+            C541 766 580 771 607 748
+            C616 741 622 735 627 729
+            C632 735 638 741 647 748
+            C674 771 713 766 738 741
+            C774 744 804 722 812 688
+            C842 669 862 636 855 600
+            C873 574 879 539 865 508
+            C876 477 874 440 853 419
+            C848 386 825 360 792 356
+            C769 335 734 333 709 355
+            C686 345 656 350 627 376Z"/>
+        </clipPath>
         ${createRouteMasks()}
       </defs>
       <image class="circuit-board-image" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
-      <rect class="circuit-chip-analyzing-glow" x="456" y="418" width="342" height="336" rx="28" fill="none" stroke="#74ff9f" stroke-width="14" filter="url(#circuit-chip-analyzing-glow)"/>
+      <image class="circuit-brain-analyzing-highlight" href="/assets/agent-circuit-board.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet" clip-path="url(#circuit-brain-highlight)"/>
       <g class="circuit-flows" mask="url(#circuit-trace-mask)">${signals}</g>
     </svg>`;
   }

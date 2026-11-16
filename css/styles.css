@@ -1065,16 +1065,15 @@ a:focus-visible {
   opacity: 0.62;
 }
 
-.circuit-chip-analyzing-glow {
-  opacity: 0.18;
+.circuit-brain-analyzing-highlight {
+  opacity: 0;
   pointer-events: none;
-  stroke: var(--accent);
-  transition: opacity 450ms ease;
+  filter: brightness(1.6) saturate(1.35) drop-shadow(0 0 16px rgb(91 156 255 / 55%));
+  transition: opacity 350ms ease;
 }
 
-.agent-brain[data-state="analyzing"] .circuit-chip-analyzing-glow {
-  opacity: 0.58;
-  filter: drop-shadow(0 0 14px rgb(91 156 255 / 45%));
+.agent-brain[data-state="analyzing"] .circuit-brain-analyzing-highlight {
+  opacity: 0.76;
 }
 
 .circuit-flow {
@@ -1776,7 +1775,7 @@ a:focus-visible {
     display: none !important;
   }
 
-  .circuit-chip-analyzing-glow {
+  .circuit-brain-analyzing-highlight {
     transition: none;
   }
 
