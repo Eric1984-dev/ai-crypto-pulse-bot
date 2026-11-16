@@ -57,30 +57,33 @@ const CANDLES_FOR_SYMBOL_SQL = `
   LIMIT $3
 `;
 const CANDLES_FOR_MARKETS_SQL = `
-  WITH ranked_candles AS (
-    SELECT candle.symbol,
-           candle.interval,
-           candle.open,
-           candle.high,
-           candle.low,
-           candle.close,
-           candle.volume,
-           candle."timestamp",
-           ROW_NUMBER() OVER (
-             PARTITION BY candle.symbol
-             ORDER BY candle."timestamp" DESC
-           ) AS row_number
-    FROM public."AI_Crypto_Bot_Candles" AS candle
-    JOIN public."AI_Crypto_Bot_Watched_Markets" AS watched_market
-      ON watched_market.symbol = candle.symbol
-    WHERE watched_market.enabled IS TRUE
-      AND candle.interval = $1
-      AND candle.symbol = ANY($2::text[])
-  )
-  SELECT symbol, interval, open, high, low, close, volume, "timestamp"
-  FROM ranked_candles
-  WHERE row_number <= $3
-  ORDER BY symbol ASC, "timestamp" ASC
+  SELECT candle.symbol,
+         candle.interval,
+         candle.open,
+         candle.high,
+         candle.low,
+         candle.close,
+         candle.volume,
+         candle."timestamp"
+  FROM public."AI_Crypto_Bot_Watched_Markets" AS watched_market
+  CROSS JOIN LATERAL (
+    SELECT stored_candle.symbol,
+           stored_candle.interval,
+           stored_candle.open,
+           stored_candle.high,
+           stored_candle.low,
+           stored_candle.close,
+           stored_candle.volume,
+           stored_candle."timestamp"
+    FROM public."AI_Crypto_Bot_Candles" AS stored_candle
+    WHERE stored_candle.symbol = watched_market.symbol
+      AND stored_candle.interval = $1
+    ORDER BY stored_candle."timestamp" DESC
+    LIMIT $3
+  ) AS candle
+  WHERE watched_market.enabled IS TRUE
+    AND watched_market.symbol = ANY($2::text[])
+  ORDER BY candle.symbol ASC, candle."timestamp" ASC
 `;
 
 export class MarketDataRepository {

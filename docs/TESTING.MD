@@ -20,6 +20,12 @@ npm.cmd run validate --prefix raspberry-pi
 
 The Pi tests cover the active API, authentication, PostgreSQL repositories, scheduler, market ingestion, AI engine, paper trading, monitoring, and runtime lifecycle. Tests use controlled local fixtures and do not claim that a live Pi/database was reached.
 
+Focused candle-query regressions use isolated PGlite fixtures to verify latest-per-market ordering, interval and enabled-market filtering, result bounds, missing history, and checkpoint semantics:
+
+```powershell
+node --test raspberry-pi/tests/market-data-repository.test.mjs raspberry-pi/tests/market-ingestion-repository.test.mjs
+```
+
 Paper-trading hardening regressions can be run with:
 
 ```powershell
@@ -44,7 +50,7 @@ node --test raspberry-pi/tests/position-exit-policy.test.mjs raspberry-pi/tests/
 
 The Phase 8.14, 8.15, and 8.16 migrations are exercised only inside isolated local PGlite fixtures; no test applies them to the live Pi database. Do not start the Pi runtime with this code until the operator has reviewed/applied the required migrations.
 
-OneSignal push regressions cover public App ID injection, private server-key isolation, permission prompting from Settings, executed-trade targeting, automatic SELL alerts, post-commit delivery, and provider-failure isolation:
+OneSignal push regressions cover public App ID injection, private server-key isolation, permission prompting from Settings, executed-trade targeting, automatic SELL alerts, post-commit delivery, backend `ERROR` alerts and episode deduplication, startup error notification, and provider-failure isolation:
 
 ```powershell
 node --test tests/runtime-api-config-build.test.mjs tests/project-setup.test.js tests/settings-notifications.test.js raspberry-pi/tests/runtime-config.test.mjs raspberry-pi/tests/onesignal-trade-notifier.test.mjs raspberry-pi/tests/paper-trading-service.test.mjs raspberry-pi/tests/runtime-bootstrap.test.mjs

@@ -114,6 +114,7 @@ test("settings prompts for push permission only after a click and supports optin
   assert.deepEqual(oneSignal.calls.slice(-2), ["requestPermission", "optIn"]);
   assert.equal(page.disableButton.hidden, false);
   assert.match(page.status.textContent, /staan aan/);
+  assert.match(page.status.textContent, /backendfouten/);
 
   await page.disableButton.trigger("click");
   assert.equal(oneSignal.calls.at(-1), "optOut");

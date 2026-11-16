@@ -7,7 +7,10 @@ import { AiDecisionsRepository } from "../repositories/ai-decisions-repository.m
 import { DashboardRepository } from "../repositories/dashboard-repository.mjs";
 import { MarketDataRepository } from "../repositories/market-data-repository.mjs";
 import { PaperTradingRepository } from "../repositories/paper-trading-repository.mjs";
-import { createOneSignalTradeNotifier } from "../services/onesignal-trade-notifier.mjs";
+import {
+  createOneSignalBackendErrorNotifier,
+  createOneSignalTradeNotifier
+} from "../services/onesignal-trade-notifier.mjs";
 import { RuntimeStatusRepository } from "../repositories/runtime-status-repository.mjs";
 import { WatchedMarketsRepository } from "../repositories/watched-markets-repository.mjs";
 import { createAiAnalysisDatabaseConfig } from "../analyze-ai.mjs";
@@ -115,6 +118,11 @@ export async function startRuntime(config, {
       appId: config.pushNotifications.oneSignalAppId,
       restApiKey: config.pushNotifications.oneSignalRestApiKey
     }, { fetchImpl, logger });
+    const backendErrorNotifier = createOneSignalBackendErrorNotifier({
+      enabled: config.pushNotifications.enabled,
+      appId: config.pushNotifications.oneSignalAppId,
+      restApiKey: config.pushNotifications.oneSignalRestApiKey
+    }, { fetchImpl, logger });
     const paperTrading = createPaperTradingService({
       repository: paperRepository,
       tradeNotifier,
@@ -126,6 +134,9 @@ export async function startRuntime(config, {
       error.code = "PAPER_TRADING_STATUS_ROW_MISSING";
       throw error;
     }
+    let startupError = existingStatus.status === "ERROR"
+      ? { stage: "runtime-startup", code: "RUNTIME_STATUS_ERROR_ON_STARTUP" }
+      : null;
     if (existingStatus.status !== "STOPPED"
       && (existingStatus.status === "ACTIVE"
         || existingStatus.status === "ANALYZING"
@@ -135,10 +146,29 @@ export async function startRuntime(config, {
         errorMessage: "Interrupted runtime activity was detected during startup.",
         updatedAt: new Date()
       });
+      startupError = {
+        stage: "runtime-startup",
+        code: "RUNTIME_ACTIVITY_INTERRUPTED"
+      };
       logger.warn(JSON.stringify({
         event: "runtime_interrupted_activity_recovered",
         code: "RUNTIME_ACTIVITY_INTERRUPTED"
       }));
+    }
+    const initialErrorNotificationSent = Boolean(startupError && backendErrorNotifier);
+    if (startupError && backendErrorNotifier) {
+      try {
+        await backendErrorNotifier({
+          ...startupError,
+          occurredAt: new Date().toISOString()
+        });
+      } catch (error) {
+        logger.error(JSON.stringify({
+          event: "runtime_error_notification_failed",
+          stage: startupError.stage,
+          code: safeErrorCode(error)
+        }));
+      }
     }
 
     const retentionService = createDataRetentionService();
@@ -159,6 +189,8 @@ export async function startRuntime(config, {
       }),
       runPaperTrading: () => paperTrading.run(),
       updateAgentStatus: (status) => paperTrading.updateAgentStatus(status),
+      notifyBackendError: backendErrorNotifier,
+      initialErrorNotificationSent,
       assertOwnership: () => ownershipLock.assertHeld(),
       retentionService,
       logger

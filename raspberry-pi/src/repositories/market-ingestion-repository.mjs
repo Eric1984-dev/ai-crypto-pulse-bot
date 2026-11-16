@@ -12,12 +12,17 @@ export const CANDLE_WRITE_BATCH_SIZE = 100;
 const MARKET_SYMBOL_PATTERN = /^[A-Z0-9]+-[A-Z0-9]+$/;
 const CANDLE_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 const CANDLE_CHECKPOINT_SQL = `
-  SELECT candle.symbol, MAX(candle."timestamp") AS latest_timestamp
-  FROM public."AI_Crypto_Bot_Candles" AS candle
-  WHERE candle.symbol = ANY($1::text[])
-    AND candle.interval = $2
-  GROUP BY candle.symbol
-  ORDER BY candle.symbol ASC
+  SELECT requested.symbol, latest_candle.latest_timestamp
+  FROM unnest($1::text[]) AS requested(symbol)
+  CROSS JOIN LATERAL (
+    SELECT candle."timestamp" AS latest_timestamp
+    FROM public."AI_Crypto_Bot_Candles" AS candle
+    WHERE candle.symbol = requested.symbol
+      AND candle.interval = $2
+    ORDER BY candle."timestamp" DESC
+    LIMIT 1
+  ) AS latest_candle
+  ORDER BY requested.symbol ASC
 `;
 const SNAPSHOT_UPSERT_SQL = `
   INSERT INTO public."AI_Crypto_Bot_Market_Data"

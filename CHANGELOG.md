@@ -3,12 +3,14 @@
 ## Unreleased
 
 - Fetch the latest AI decision for each enabled watched market through a bounded lateral lookup and the existing composite index, avoiding full-history scans and sort spills in the paper-trading cycle; no migration is required.
+- Bound scanner daily/hourly candle reads to the latest 35/12 candles per enabled market and replace ingestion checkpoint aggregation with one latest-candle lookup per requested market; reuse the existing composite candle index with no schema migration.
 - Show the Raspberry Pi runtime service's last start time beneath the host boot time in the dashboard health bar, using the existing monitoring endpoint.
 - Apply a 20-point timeframe-misalignment penalty to AI Market Strength and confidence, and cap the average ATR volatility penalty at five points for paper-trading analysis; preserve all executor thresholds and risk controls.
 - Persist per-evaluation, reason-coded outcomes for directional paper BUY/SELL decisions atomically with trade execution; add a paginated paper-execution-audit source to the existing full-history JSONL export without adding a Vercel function.
 - Bound new-market candle bootstrap to 150 candles per market/interval while preserving the 500-candle catch-up request cap; repair export keyset cursors to preserve PostgreSQL microseconds, verify full-source counts, and limit default candle windows to trades and linked AI decisions (format v4).
 - Add Phase 8.16 column-scoped SELECT grants for audit idempotency keys and fail paper-runtime preflight when any required conflict-key privilege is missing.
 - Add OneSignal Web Push subscription controls to Settings and send best-effort alerts after committed paper BUY/SELL trades without adding a Vercel function or database migration.
+- Send a best-effort OneSignal alert when persisted backend status enters `ERROR`, deduplicated until recovery and including safe stage/code details.
 - Show Infrastructure as an expandable strip matching the live backend signal instead of a nested dashboard card.
 - Add a Raspberry Pi health summary with a colored status indicator at the top of the dashboard using the existing monitoring route.
 - Show the Raspberry Pi host's last boot time at the far right of the dashboard health summary.

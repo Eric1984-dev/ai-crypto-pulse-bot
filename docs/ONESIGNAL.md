@@ -1,10 +1,11 @@
 # OneSignal trade push notifications
 
 CryptoPulse uses OneSignal Web Push for the installed dashboard web app. The
-Pi runtime sends a notification after a paper trade has committed; a provider
-failure is logged and does not roll back or fail the trade. Both AI BUY/SELL
-trades and automatic ATR-trailing / maximum-position-loss SELL exits are
-included. Skipped decisions do not produce notifications.
+Pi runtime sends a notification after a paper trade has committed and when the
+persisted agent status enters `ERROR`. Provider failures are logged and do not
+change trading or runtime results. Both AI BUY/SELL trades and automatic
+ATR-trailing / maximum-position-loss SELL exits are included. Skipped decisions
+do not produce notifications.
 
 ## OneSignal setup
 
@@ -33,8 +34,9 @@ and execution price.
 - Deploy the dashboard so it includes the Settings subscription controls and
   the root `OneSignalSDKWorker.js` service worker.
 - On iPhone/iPad with iOS/iPadOS 16.4 or newer, open CryptoPulse from its Home
-  Screen icon, go to **Settings**, and tap **Enable trade notifications**.
-  Permission must be granted by iOS. Use the Settings control to opt out later.
+  Screen icon, go to **Settings**, and tap **Enable push notifications**.
+  Permission must be granted by iOS. This opt-in covers paper-trade and backend
+  error alerts. Use the Settings control to opt out later.
 
 The `OneSignalSDKWorker.js` file must remain publicly accessible at the root of
 the dashboard's HTTPS origin. No additional Vercel function or database
@@ -42,8 +44,13 @@ migration is required.
 
 ## Delivery behavior
 
-Push requests are made only after the paper-trading transaction commits. The
-notification contains the trade ID, side, market, execution price, quantity,
-and execution reason as OneSignal data. Provider errors are logged with a safe
-error code and do not change the result of an already committed paper trade.
-Notifications are best-effort; there is no durable retry queue.
+Trade push requests are made only after the paper-trading transaction commits.
+They contain the trade ID, side, market, execution price, quantity, and
+execution reason as OneSignal data. Backend alerts include status `ERROR`, the
+failing runtime stage, a safe error code, and timestamp; they do not include
+credentials or raw database/provider messages. The runtime notifies once per
+error episode and rearms the alert after a successful cycle. A runtime startup
+that finds a persisted `ERROR` status also sends an alert. Consequently a
+service restart while the status remains `ERROR` can send another alert.
+Notifications are best-effort; provider errors are logged with a safe error
+code, and there is no durable retry queue.

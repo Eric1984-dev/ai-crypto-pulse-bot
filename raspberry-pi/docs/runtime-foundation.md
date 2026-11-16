@@ -18,6 +18,18 @@ The runtime uses only the existing `AI_Crypto_Bot_Watched_Markets` universe and 
 
 The `npm run ingest:market-data -- --intervals=...` command separately validates the existing ingestion contract, reads enabled watched markets, and runs one snapshot/candle pass. It uses no Vercel function, HTTP trigger, external scheduler, or `systemd` timer. Each write uses an explicit `BEGIN READ WRITE` transaction; API repositories continue to use `BEGIN READ ONLY`. No write targets the watched-market table. Database/provider failures are logged with safe codes; credentials and raw error details are never logged.
 
+### Backend ERROR push alerts
+
+When a runtime cycle successfully persists agent status `ERROR`, the Pi sends
+one OneSignal push for that failure episode. Consecutive failed cycles do not
+repeat the alert; a successfully completed cycle rearms it. On startup, an
+already-persisted `ERROR` status or interrupted active/analyzing state also
+produces an alert. Messages contain only the stage, safe error code, and time.
+OneSignal delivery is best-effort and does not alter runtime/trading outcomes;
+there is no durable retry queue, and restarting while status remains `ERROR`
+can produce another alert. The existing Settings subscription covers both
+these alerts and committed paper-trade notifications.
+
 ### Operator-managed database tunnel
 
 For local PostgreSQL diagnostics, the operator can open the SSH tunnel documented in the [database guide](../../docs/DATABASE.md). Once open, the Raspberry Pi database is reachable from the development machine at `localhost:5433` using the existing database configuration. Copilot must not start or stop the tunnel; if it is unavailable, ask the operator to open it. Use read-only queries by default, and require explicit authorization before production writes or migrations.
@@ -37,6 +49,24 @@ The retention service creates a plan for candle and AI-decision age cutoffs but 
 ### Latest-decision lookup performance (2026-11-16)
 
 The paper worker selects the latest stored decision for each enabled watched market. A read-only production `EXPLAIN ANALYZE` of the former `DISTINCT ON` query scanned about 55,000 decision rows, spilled sort data to disk, and took 3.62 seconds; the Pi's `PG_QUERY_TIMEOUT_MS` is 5,000 ms. This matches the intermittent paper-stage failures after successful AI analysis. The local implementation now performs one bounded `LATERAL` lookup per enabled market using the existing `(symbol, created_at DESC, id DESC)` index. No schema migration or permission change is needed. The change is not deployed to the Pi; an operator-managed runtime update and subsequent production-cycle verification remain pending.
+
+### Candle-query performance (2026-11-16)
+
+The Market Scanner requests the newest 35 daily and 12 hourly candles for each enabled watched market. Its previous `ROW_NUMBER()` query read and sorted every stored candle in the requested interval before discarding older rows. The repository now uses one bounded `LATERAL` index lookup per enabled requested market and keeps the existing response ordering and per-market limits.
+
+Candle ingestion now obtains each market/interval checkpoint with one descending index lookup and `LIMIT 1`, instead of aggregating `MAX(timestamp)` across every historical candle in the batch. A market with no candle history still has no checkpoint and follows the existing bounded bootstrap path. Both changes use the existing `(symbol, interval, timestamp)` key; they add no table, index, function, permission, API route, or dependency.
+
+The pre-rollout, read-only production plan comparison used warm-cache `EXPLAIN ANALYZE`:
+
+| Query | Previous form | Bounded per-market form |
+|---|---:|---:|
+| Scanner, 1d; 101 markets, 35 each | 15,110 rows scanned; 3,535 returned; 199 ms | 3,535 rows returned; 53 ms |
+| Scanner, 1h; 101 markets, 12 each | 18,490 rows scanned; 1,212 returned; 218 ms | 1,212 rows returned; 29 ms |
+| 1m checkpoint, first five active markets | 14,401 rows scanned; 5 checkpoints; 53 ms | 5 index lookups; 5 checkpoints; 2 ms |
+
+These are single read-only samples, not cold-cache benchmarks or post-deployment guarantees. The new SQL has local PGlite regressions for enabled/disabled markets, duplicate requested symbols, interval isolation, latest-N bounds and ordering, and missing candle history. The tests do not verify the live Pi query plan or production results.
+
+Expected benefit is lower history-reading and sorting work as candles accumulate. The main correctness risk is changing which candles are returned or how missing markets are handled; the local tests check those semantics. After an operator-managed Pi rollout, verify scanner rankings and runtime health, then compare the deployed plans and query latency under representative load. No production migration, write, or deployment was performed for this change.
 
 The systemd sample is `deploy/cryptopulse-runtime.service`. systemd starts and restarts the single Node service; it is not a timer and does not trigger pipeline cycles.
 

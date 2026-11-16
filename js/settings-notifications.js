@@ -75,7 +75,7 @@ function initializeSettingsNotifications(windowRef, documentRef) {
     enableButton.hidden = optedIn;
     disableButton.hidden = !optedIn;
     showStatus(optedIn
-      ? "Pushmeldingen voor uitgevoerde paper BUY- en SELL-trades staan aan."
+      ? "Pushmeldingen voor uitgevoerde papertrades en backendfouten staan aan."
       : "Pushmeldingen staan uit. Schakel ze in via deze knop; op iPhone moet je deze dashboard-app vanaf het beginscherm openen."
     );
   }

@@ -15,6 +15,8 @@ export function createRuntimeCycle({
   analyzeMarkets,
   runPaperTrading,
   updateAgentStatus,
+  notifyBackendError = null,
+  initialErrorNotificationSent = false,
   retentionService,
   assertOwnership = async () => {},
   now = () => new Date(),
@@ -24,12 +26,16 @@ export function createRuntimeCycle({
     || typeof analyzeMarkets !== "function"
     || typeof runPaperTrading !== "function"
     || typeof updateAgentStatus !== "function"
+    || (notifyBackendError !== null && typeof notifyBackendError !== "function")
+    || typeof initialErrorNotificationSent !== "boolean"
     || typeof assertOwnership !== "function"
     || !retentionService
     || typeof retentionService.plan !== "function"
     || typeof now !== "function") {
     throw new TypeError("All runtime cycle stages and status persistence are required.");
   }
+
+  let errorNotificationActive = initialErrorNotificationSent;
 
   return Object.freeze({
     async run({ slot, intervals }) {
@@ -96,6 +102,7 @@ export function createRuntimeCycle({
           errorMessage: null,
           updatedAt: cycleTime
         });
+        errorNotificationActive = false;
         const result = Object.freeze({
           status: "COMPLETED",
           cycleAt: cycleTime.toISOString(),
@@ -119,14 +126,18 @@ export function createRuntimeCycle({
         const failure = error instanceof RuntimeCycleError
           ? error
           : new RuntimeCycleError(stage, error);
+        let errorStatusPersisted = false;
+        let errorOccurredAt;
         if (failure.code !== "RUNTIME_OWNERSHIP_LOCK_LOST") {
           try {
+            errorOccurredAt = readTime(now());
             await updateAgentStatus({
               status: "ERROR",
               lastRunAt: null,
               errorMessage: `Runtime cycle failed during ${failure.stage}.`,
-              updatedAt: readTime(now())
+              updatedAt: errorOccurredAt
             });
+            errorStatusPersisted = true;
           } catch (statusError) {
             logger.error(JSON.stringify({
               event: "runtime_cycle_status_update_failed",
@@ -135,6 +146,22 @@ export function createRuntimeCycle({
           }
         }
         const code = safeCode(failure.cause?.code || failure.code);
+        if (errorStatusPersisted && notifyBackendError && !errorNotificationActive) {
+          errorNotificationActive = true;
+          try {
+            await notifyBackendError({
+              stage: failure.stage,
+              code,
+              occurredAt: errorOccurredAt.toISOString()
+            });
+          } catch (notificationError) {
+            logger.error(JSON.stringify({
+              event: "runtime_error_notification_failed",
+              stage: failure.stage,
+              code: safeCode(notificationError?.code)
+            }));
+          }
+        }
         logger.error(JSON.stringify({
           event: "runtime_cycle_failed",
           stage: failure.stage,

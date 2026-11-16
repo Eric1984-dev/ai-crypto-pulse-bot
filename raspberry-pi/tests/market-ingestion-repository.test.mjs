@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { PGlite } from "@electric-sql/pglite";
 import {
   MarketIngestionRepository
 } from "../src/repositories/market-ingestion-repository.mjs";
@@ -89,11 +90,55 @@ test("candle checkpoint reads are bounded, parameterized, and accept missing his
   );
   assert.equal(checkpoints.get("BTC-EUR"), Date.parse("2026-11-10T12:00:00Z"));
   assert.equal(checkpoints.has("ETH-EUR"), false);
-  const query = pool.calls.find(({ sql }) => sql.includes("MAX(candle.\"timestamp\")"));
+  const query = pool.calls.find(({ sql }) => sql.includes("FROM unnest($1::text[])"));
   assert.deepEqual(query.values, [["BTC-EUR", "ETH-EUR"], "1m"]);
-  assert.match(query.sql, /WHERE candle\.symbol = ANY\(\$1::text\[\]\)/);
+  assert.match(query.sql, /CROSS JOIN LATERAL/);
+  assert.match(query.sql, /candle\.symbol = requested\.symbol/);
+  assert.match(query.sql, /ORDER BY candle\."timestamp" DESC\s+LIMIT 1/);
   assert.match(query.sql, /candle\.interval = \$2/);
+  assert.doesNotMatch(query.sql, /MAX\s*\(/i);
   assert.doesNotMatch(query.sql, /SELECT\s+\*/i);
+});
+
+test("candle checkpoint lateral lookup returns each requested market's latest interval candle", async () => {
+  const database = new PGlite();
+  try {
+    await database.exec(`
+      CREATE TABLE public."AI_Crypto_Bot_Candles" (
+        symbol text NOT NULL,
+        interval text NOT NULL,
+        "timestamp" timestamptz NOT NULL
+      );
+      CREATE UNIQUE INDEX "AI_Crypto_Bot_Candles_symbol_interval_timestamp_key"
+        ON public."AI_Crypto_Bot_Candles" (symbol, interval, "timestamp");
+      INSERT INTO public."AI_Crypto_Bot_Candles" (symbol, interval, "timestamp")
+      VALUES
+        ('BTC-EUR', '1m', '2026-11-10T12:00:00Z'),
+        ('BTC-EUR', '1m', '2026-11-10T12:01:00Z'),
+        ('BTC-EUR', '5m', '2026-11-10T12:05:00Z'),
+        ('ETH-EUR', '1m', '2026-11-10T12:02:00Z');
+    `);
+    const repository = new MarketIngestionRepository({
+      async connect() {
+        return {
+          query: (sql, values) => database.query(sql, values),
+          release() {}
+        };
+      }
+    }, { logger });
+
+    const checkpoints = await repository.getLatestCandleCheckpoints(
+      ["BTC-EUR", "ETH-EUR", "SOL-EUR"],
+      "1m"
+    );
+
+    assert.deepEqual(checkpoints, new Map([
+      ["BTC-EUR", Date.parse("2026-11-10T12:01:00Z")],
+      ["ETH-EUR", Date.parse("2026-11-10T12:02:00Z")]
+    ]));
+  } finally {
+    await database.close();
+  }
 });
 
 test("snapshot persistence uses explicit columns and the existing symbol key", async () => {

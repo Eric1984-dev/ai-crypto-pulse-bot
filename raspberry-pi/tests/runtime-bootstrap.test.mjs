@@ -148,6 +148,49 @@ test("runtime starts only after contracts validate and closes cleanly", async ()
   assert.ok(pools.every((pool) => pool.ended));
 });
 
+test("runtime notifies subscribed devices when it starts with persisted ERROR status", async () => {
+  const config = runtimeConfig();
+  const requests = [];
+  const runtime = await startRuntime(Object.freeze({
+    ...config,
+    pushNotifications: Object.freeze({
+      enabled: true,
+      oneSignalAppId: "123e4567-e89b-12d3-a456-426614174000",
+      oneSignalRestApiKey: "test-server-key"
+    })
+  }), {
+    Pool: class extends MockPool {
+      constructor(options) {
+        super(options);
+        this.status = "ERROR";
+      }
+    },
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "startup-error-message", recipients: 1 })
+      };
+    },
+    validateContracts: async () => ({ contracts: "valid" }),
+    validateIngestionContracts: async () => ({ contracts: "valid" }),
+    validateAIContracts: async () => ({ contracts: "valid" }),
+    validatePaperContracts: async () => ({ contracts: "valid" })
+  });
+
+  try {
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "https://api.onesignal.com/notifications?c=push");
+    const payload = JSON.parse(requests[0].options.body);
+    assert.equal(payload.data.status, "ERROR");
+    assert.equal(payload.data.stage, "runtime-startup");
+    assert.equal(payload.data.code, "RUNTIME_STATUS_ERROR_ON_STARTUP");
+  } finally {
+    await runtime.close();
+  }
+});
+
 test("runtime fails closed and releases database resources when validation fails", async () => {
   let pool;
   await assert.rejects(startRuntime(runtimeConfig(), {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createOneSignalBackendErrorNotifier,
   createOneSignalTradeNotifier
 } from "../src/services/onesignal-trade-notifier.mjs";
 
@@ -64,12 +65,81 @@ test("OneSignal sends a push to subscribed devices with executed trade details",
   assert.equal(logs[0].recipients, 1);
 });
 
+test("OneSignal sends backend error stage and safe code to subscribed devices", async () => {
+  const requests = [];
+  const logs = [];
+  const notify = createOneSignalBackendErrorNotifier(CONFIG, {
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "backend-error-message", recipients: 2 })
+      };
+    },
+    logger: { info: (message) => logs.push(JSON.parse(message)) }
+  });
+
+  await notify({
+    stage: "paper-trading",
+    code: "PAPER_TRADING_DATABASE_FAILED",
+    occurredAt: "2026-11-16T20:25:32.000Z"
+  });
+
+  assert.equal(requests.length, 1);
+  const payload = JSON.parse(requests[0].options.body);
+  assert.deepEqual(payload, {
+    app_id: CONFIG.appId,
+    included_segments: ["Total Subscriptions"],
+    headings: { en: "CryptoPulse backend error" },
+    contents: {
+      en: "CryptoPulse backend entered ERROR during paper-trading. Check the dashboard or runtime logs."
+    },
+    data: {
+      type: "backend_error",
+      status: "ERROR",
+      stage: "paper-trading",
+      code: "PAPER_TRADING_DATABASE_FAILED",
+      occurredAt: "2026-11-16T20:25:32.000Z"
+    }
+  });
+  assert.equal(logs[0].event, "onesignal_backend_error_notification_sent");
+  assert.equal(logs[0].stage, "paper-trading");
+  assert.equal(logs[0].recipients, 2);
+});
+
 test("OneSignal notifier does not initialize when credentials are not configured", () => {
   assert.equal(createOneSignalTradeNotifier({
     enabled: false,
     appId: "",
     restApiKey: ""
   }), null);
+});
+
+test("OneSignal backend error notifier rejects unsafe or unsupported incident data", async () => {
+  const notify = createOneSignalBackendErrorNotifier(CONFIG, {
+    fetchImpl: async () => {
+      throw new Error("invalid notification must not reach network");
+    },
+    logger: { info() {} }
+  });
+
+  await assert.rejects(
+    notify({
+      stage: "paper-trading",
+      code: "DATABASE\nPASSWORD",
+      occurredAt: "2026-11-16T20:25:32.000Z"
+    }),
+    /backend error is invalid/
+  );
+  await assert.rejects(
+    notify({
+      stage: "unknown",
+      code: "RUNTIME_CYCLE_FAILED",
+      occurredAt: "2026-11-16T20:25:32.000Z"
+    }),
+    /backend error is invalid/
+  );
 });
 
 test("OneSignal notification errors are surfaced without exposing the API key", async () => {

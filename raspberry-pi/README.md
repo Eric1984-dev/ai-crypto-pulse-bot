@@ -160,7 +160,7 @@ npm start
 - `GET /api/v1/dashboard-data?view=analysis-bundle&period=30d&limit=500` — authenticated JSON bundle with manifest, bounded linked source rows, decision-anchored candle windows, shadow-exit comparisons and stored run history.
 - `GET /api/v1/dashboard-data?view=export-count&type=trades&period=7d` and `view=export` — bounded CSV export counts and downloads.
 - `GET /api/v1/agent-status` — existing `{ "data": { "status": "..." } }` response; missing/unknown status is `null`.
-- `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading.
+- `GET /api/v1/market-summary` — scanner rankings and summaries computed from stored watched markets, snapshots, candles and decisions; no refresh or trading. Daily/hourly candle windows are retrieved with bounded per-market index lookups; ingestion checkpoints use the same existing composite candle index and do not require a schema migration.
 - `GET /api/v1/monitoring` — Raspberry Pi model, host boot time derived from operating-system uptime, `cryptopulse-runtime.service` start time derived from the main Node.js process uptime, runtime status, last-cycle stages including position-exit processing, Node/process and host metrics, PostgreSQL size and estimated table row counts. The model comes from `/proc/device-tree/model` and may be `null` on unsupported systems.
 
 ## Phase 11 historical analytics
