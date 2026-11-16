@@ -130,9 +130,6 @@ PHASE_16_STRATEGY_SIMULATION_REPORT.md
 
 Constraints
 
-Maximum:
-12 Vercel Functions
-
 Reuse Analytics components.
 
 Do not start Phase 17.

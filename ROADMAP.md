@@ -354,6 +354,31 @@ Constraints:
 
 ---
 
+## Phase 16.1 - Historical Candle Backtesting
+
+Status:
+Planned; separate from Phase 16 Strategy Simulation.
+
+Implementation plan:
+[Phase 16.1 Backtesting Implementation Plan](prompts/16.1_BACKTESTING_IMPLEMENTATION_PLAN.md)
+
+Goal:
+
+Replay the existing deterministic strategy against historical candles using a separate simulated broker and isolated backtest results.
+
+Initial operating approach:
+
+- Retain Phase 16 as the lightweight simulator based on existing AI decisions, paper trades, and Analytics data.
+- Start Phase 16.1 with a bounded single-market CLI/pilot; benchmark before expanding to selected markets.
+- Use a separate low-priority worker and backtest data/results. Do not write to paper or live AI-decision tables.
+- Treat six months across all enabled markets and six intervals as a capacity target only; measure Pi resources and database growth before enabling that scope.
+- Keep the PostgreSQL database below the 10 GB hard limit; pause imports before that limit and preserve space for runtime operations.
+- Do not add a Vercel Serverless Function or run backtests inside the live runtime cycle.
+
+No Phase 16.1 implementation or production rollout has started.
+
+---
+
 ## Phase 17 - Strategy Optimization
 
 - Strategy Ranking
