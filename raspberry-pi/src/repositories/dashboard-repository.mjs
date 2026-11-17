@@ -1168,46 +1168,30 @@ export class DashboardRepository {
     }
 
     const periodEnd = now.toISOString();
+    // Keep this endpoint within the small PostgreSQL pool. Running six reads in
+    // parallel queues two behind the default four connections and can exceed
+    // PG_CONNECTION_TIMEOUT_MS before those queries begin.
+    const analyticsQueries = [
+      [ANALYTICS_POSITIONS_SQL, [portfolioRow.id, MAX_ANALYTICS_ROWS + 1]],
+      [ANALYTICS_TRADES_SQL, [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1]],
+      [ANALYTICS_DECISION_SUMMARY_SQL, [periodStart, periodEnd]],
+      [ANALYTICS_SNAPSHOTS_SQL, [portfolioRow.id, periodStart, periodEnd,
+        MAX_ANALYTICS_ROWS + 1, MAX_ANALYTICS_ROWS + 1]],
+      [ANALYTICS_SOURCE_COUNTS_SQL, [portfolioRow.id, periodStart, periodEnd]],
+      [ANALYTICS_SHADOW_EXIT_SQL, [portfolioRow.id, periodStart, periodEnd,
+        MAX_ANALYTICS_ROWS + 1]]
+    ];
+    const analyticsResults = [];
+    for (const [sql, values] of analyticsQueries) {
+      analyticsResults.push(await queryReadOnly(
+        this.pool,
+        sql,
+        values,
+        { logger: this.logger }
+      ));
+    }
     const [positionsResult, tradesResult, decisionSummaryResult, snapshotsResult,
-      sourceCountsResult, shadowExitResult] = await Promise.all([
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_POSITIONS_SQL,
-        [portfolioRow.id, MAX_ANALYTICS_ROWS + 1],
-        { logger: this.logger }
-      ),
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_TRADES_SQL,
-        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1],
-        { logger: this.logger }
-      ),
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_DECISION_SUMMARY_SQL,
-        [periodStart, periodEnd],
-        { logger: this.logger }
-      ),
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_SNAPSHOTS_SQL,
-        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1,
-          MAX_ANALYTICS_ROWS + 1],
-        { logger: this.logger }
-      ),
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_SOURCE_COUNTS_SQL,
-        [portfolioRow.id, periodStart, periodEnd],
-        { logger: this.logger }
-      ),
-      queryReadOnly(
-        this.pool,
-        ANALYTICS_SHADOW_EXIT_SQL,
-        [portfolioRow.id, periodStart, periodEnd, MAX_ANALYTICS_ROWS + 1],
-        { logger: this.logger }
-      )
-    ]);
+      sourceCountsResult, shadowExitResult] = analyticsResults;
     for (const [name, result] of [
       ["positions", positionsResult],
       ["trades", tradesResult],

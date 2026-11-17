@@ -371,6 +371,36 @@ test("analytics aggregates large decision histories without loading every decisi
   }
 });
 
+test("analytics repository performs source reads sequentially to fit the bounded pool", async () => {
+  const database = await createDatabase();
+  let activeConnections = 0;
+  let maximumActiveConnections = 0;
+  try {
+    const pool = {
+      async connect() {
+        activeConnections += 1;
+        maximumActiveConnections = Math.max(maximumActiveConnections, activeConnections);
+        return {
+          async query(...args) {
+            return database.query(...args);
+          },
+          release() {
+            activeConnections -= 1;
+          }
+        };
+      }
+    };
+    const repository = new DashboardRepository(pool, { logger: { error() {} } });
+
+    await repository.getAnalytics({ period: "30d", now: new Date() });
+
+    assert.equal(maximumActiveConnections, 1);
+    assert.equal(activeConnections, 0);
+  } finally {
+    await database.close();
+  }
+});
+
 test("analytics SQL assigns confidence boundary values to non-overlapping bands", async () => {
   const database = await createDatabase();
   try {
