@@ -36,6 +36,11 @@
   font-weight: 700;
 }
 
+.analytics-action-results .panel-heading .trade-action-buy,
+.analytics-action-results .panel-heading .trade-action-sell {
+  color: #edf1f7;
+}
+
 .trade-position-breakdown {
   display: grid;
   gap: 3px;
