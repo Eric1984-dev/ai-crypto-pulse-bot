@@ -434,6 +434,9 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(chartConfig.data.datasets[1].label, "Starting value");
   assert.equal(chartConfig.data.datasets[1].data[0], 1050);
   assert.equal(chartConfig.options.plugins.tooltip.displayColors, false);
+  assert.equal(chartConfig.options.plugins.tooltip.callbacks.filter({
+    dataset: { label: "Starting value" }
+  }), false);
   assert.equal(chartConfig.options.scales.x.grid.display, false);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
 });

@@ -615,6 +615,9 @@
             titleColor: "#edf1f7",
             bodyColor: "#c7d0dd",
             callbacks: {
+              filter(item) {
+                return item.dataset.label !== "Starting value";
+              },
               title(items) {
                 const timestamp = timestamps[items[0] && items[0].dataIndex];
                 return timestamp ? formatters.formatTimestamp(timestamp, "medium") : "";
