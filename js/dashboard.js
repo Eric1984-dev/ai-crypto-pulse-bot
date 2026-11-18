@@ -430,7 +430,8 @@
       item.symbol || "—",
       describeRecentTrade(item),
       item.symbol,
-      item.side
+      item.side,
+      item
     ]);
     renderPositionAiStatus(documentRef, openPositionAiStatus.items);
     const chart = renderPortfolioChart(
@@ -590,7 +591,7 @@
       list.hidden = safeItems.length === 0;
       list.dataset.scrollable = String(safeItems.length > dashboardListVisibleItemCount);
       for (const item of safeItems) {
-        const [primaryText, secondaryText, marketSymbol, tradeAction] = describeItem(item);
+        const [primaryText, secondaryText, marketSymbol, tradeAction, trade] = describeItem(item);
         const row = documentRef.createElement("li");
         const primary = documentRef.createElement("span");
         const secondary = documentRef.createElement("span");
@@ -609,6 +610,11 @@
         }
         if (tradeAction) {
           formatters.setTradeActionText(documentRef, secondary, secondaryText, tradeAction);
+          if (tradeAction.toUpperCase() === "SELL" && trade && trade.realized_pnl !== undefined) {
+            const actionLabel = Array.from(secondary.children || [])
+              .find((child) => child.className === "trade-action-sell");
+            formatters.setValueTone(actionLabel, trade.realized_pnl);
+          }
         } else {
           formatters.setTradeDetailsText(documentRef, secondary, secondaryText);
         }

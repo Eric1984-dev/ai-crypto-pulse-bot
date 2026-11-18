@@ -383,6 +383,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     "trade-action-sell"
   );
   assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].children[1].dataset.valueTone,
+    "positive"
+  );
+  assert.equal(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[0].textContent,
     "WIN-EUR"
   );
@@ -398,6 +402,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     child && child.dataset && child.dataset.valueTone === "negative"
       && child.textContent.startsWith("P&L: -€125.78")
   )));
+  assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[2].children[1].children[1].dataset.valueTone,
+    "negative"
+  );
   assert.equal(elements.get("[data-dashboard-value=\"openPositionAiStatus\"]")[0].textContent, "2");
   const statusCards = elements.get("[data-dashboard-list=\"position-ai-status\"]")[0].children;
   assert.equal(statusCards.length, 2);

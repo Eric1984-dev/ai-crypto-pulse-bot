@@ -1566,7 +1566,6 @@ a:focus-visible {
   font-weight: 650;
 }
 
-.history-table tbody tr[data-trade-side="sell"] td:nth-child(3),
 .history-table tbody tr[data-trade-side="sell"] td:nth-child(4) {
   color: var(--negative);
   font-weight: 650;

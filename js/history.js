@@ -218,7 +218,11 @@
       } else if (index === 1) {
         cell.append(formatters.createMarketSymbol(documentRef, value));
       } else if (index === 2) {
-        cell.append(formatters.createTradeActionLabel(documentRef, value));
+        const actionLabel = formatters.createTradeActionLabel(documentRef, value);
+        if (trade.side === "SELL") {
+          formatters.setValueTone(actionLabel, trade.realized_pnl);
+        }
+        cell.append(actionLabel);
       } else {
         cell.textContent = value === null || value === undefined ? "—" : value;
         if (index === 6) {
