@@ -152,6 +152,8 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.equal(rows.children[1].children[2].children[0].className, "trade-action-sell");
   assert.equal(rows.children[1].children[2].children[0].dataset.valueTone, "positive");
   assert.equal(rows.children[4].children[2].children[0].dataset.valueTone, "negative");
+  assert.equal(rows.children[1].children[3].children[0].dataset.valueTone, "positive");
+  assert.equal(rows.children[4].children[3].children[0].dataset.valueTone, "negative");
   assert.match(rows.children[0].children[3].textContent, /1,000\.00$/);
   assert.match(rows.children[1].children[3].textContent, /1,124\.00$/);
   assert.match(rows.children[2].children[3].textContent, /0\.98123$/);

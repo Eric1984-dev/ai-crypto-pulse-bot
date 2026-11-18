@@ -104,6 +104,32 @@
     setHighlightedText(documentRef, element, text, []);
   }
 
+  function setTradeDetailsTone(documentRef, element, text, markers) {
+    setHighlightedText(documentRef, element, text, Array.isArray(markers)
+      ? markers.map(({ text: markerText, value }) => {
+        const marker = typeof markerText === "string" ? markerText : "";
+        const markerIndex = marker ? String(text ?? "").indexOf(marker) : -1;
+        return markerIndex < 0
+          ? null
+          : {
+            text: marker,
+            start: markerIndex,
+            className: marker.toUpperCase() === "SELL" ? "trade-action-sell" : undefined,
+            valueTone: toneForValue(value)
+          };
+      }).filter(Boolean)
+      : []);
+  }
+
+  function setTradePriceTone(element, text, value) {
+    const price = typeof text === "string" ? text : "";
+    if (!element || !element.children) {
+      return;
+    }
+    const priceElement = Array.from(element.children).find((child) => child.textContent === price);
+    setValueTone(priceElement, value);
+  }
+
   function createTradeActionLabel(documentRef, action) {
     const element = documentRef.createElement("span");
     const side = normalizeTradeSide(action);
@@ -219,9 +245,7 @@
       return;
     }
     const amount = numericValue(value);
-    const tone = amount === null || amount === 0
-      ? ""
-      : amount < 0 ? "negative" : "positive";
+    const tone = toneForValue(amount);
     if (tone) {
       element.dataset.valueTone = tone;
     } else {
@@ -237,6 +261,11 @@
         delete card.dataset.valueTone;
       }
     }
+  }
+
+  function toneForValue(value) {
+    const amount = numericValue(value);
+    return amount === null || amount === 0 ? "" : amount < 0 ? "negative" : "positive";
   }
 
   function formatSignedCurrency(value) {
@@ -389,6 +418,7 @@
     setTradeActionText,
     setMarketAndTradeText,
     setTradeDetailsText,
+    setTradeDetailsTone,
     createTradeActionLabel
   };
 });

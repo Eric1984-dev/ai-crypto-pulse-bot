@@ -223,6 +223,11 @@
           formatters.setValueTone(actionLabel, trade.realized_pnl);
         }
         cell.append(actionLabel);
+      } else if (index === 3 && trade.side === "SELL") {
+        const price = documentRef.createElement("span");
+        price.textContent = value === null || value === undefined ? "—" : value;
+        formatters.setValueTone(price, trade.realized_pnl);
+        cell.append(price);
       } else {
         cell.textContent = value === null || value === undefined ? "—" : value;
         if (index === 6) {

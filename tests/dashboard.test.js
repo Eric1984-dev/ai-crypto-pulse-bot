@@ -387,6 +387,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
     "positive"
   );
   assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[0].children[1].children.find((child) => child && child.dataset && child.dataset.valueTone === "positive" && String(child.textContent).startsWith("Exit:" )).dataset.valueTone,
+    "positive"
+  );
+  assert.equal(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[1].children[0].textContent,
     "WIN-EUR"
   );
@@ -404,6 +408,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   )));
   assert.equal(
     elements.get("[data-dashboard-list=\"trades\"]")[0].children[2].children[1].children[1].dataset.valueTone,
+    "negative"
+  );
+  assert.equal(
+    elements.get("[data-dashboard-list=\"trades\"]")[0].children[2].children[1].children.find((child) => child && child.dataset && child.dataset.valueTone === "negative" && String(child.textContent).startsWith("Exit:" )).dataset.valueTone,
     "negative"
   );
   assert.equal(elements.get("[data-dashboard-value=\"openPositionAiStatus\"]")[0].textContent, "2");

@@ -431,7 +431,8 @@
       describeRecentTrade(item),
       item.symbol,
       item.side,
-      item
+      item,
+      `Exit: ${formatters.formatPrice(item.price)}`
     ]);
     renderPositionAiStatus(documentRef, openPositionAiStatus.items);
     const chart = renderPortfolioChart(
@@ -591,7 +592,7 @@
       list.hidden = safeItems.length === 0;
       list.dataset.scrollable = String(safeItems.length > dashboardListVisibleItemCount);
       for (const item of safeItems) {
-        const [primaryText, secondaryText, marketSymbol, tradeAction, trade] = describeItem(item);
+        const [primaryText, secondaryText, marketSymbol, tradeAction, trade, priceText] = describeItem(item);
         const row = documentRef.createElement("li");
         const primary = documentRef.createElement("span");
         const secondary = documentRef.createElement("span");
@@ -609,11 +610,18 @@
           primary.textContent = primaryText;
         }
         if (tradeAction) {
-          formatters.setTradeActionText(documentRef, secondary, secondaryText, tradeAction);
           if (tradeAction.toUpperCase() === "SELL" && trade && trade.realized_pnl !== undefined) {
-            const actionLabel = Array.from(secondary.children || [])
-              .find((child) => child.className === "trade-action-sell");
-            formatters.setValueTone(actionLabel, trade.realized_pnl);
+            formatters.setTradeDetailsTone(
+              documentRef,
+              secondary,
+              secondaryText,
+              [
+                { text: "SELL", value: trade.realized_pnl },
+                { text: priceText, start: secondaryText.indexOf(priceText), value: trade.realized_pnl }
+              ]
+            );
+          } else {
+            formatters.setTradeActionText(documentRef, secondary, secondaryText, tradeAction);
           }
         } else {
           formatters.setTradeDetailsText(documentRef, secondary, secondaryText);
