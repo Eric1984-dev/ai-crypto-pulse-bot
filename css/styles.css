@@ -1413,6 +1413,10 @@ a:focus-visible {
   margin-bottom: 18px;
 }
 
+.history-closed-count {
+  margin: 5px 0 0;
+}
+
 .history-filters {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

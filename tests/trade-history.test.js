@@ -46,6 +46,7 @@ test("trade history renders all required fields as text and treats buys as unrea
   const values = [
     "winningTrades",
     "losingTrades",
+    "closedTrades",
     "averageProfit",
     "averageLoss",
     "bestTrade",
@@ -145,6 +146,7 @@ test("trade history renders all required fields as text and treats buys as unrea
   assert.equal(table.hidden, false);
   assert.equal(empty.hidden, true);
   assert.equal(rows.children.length, 5);
+  assert.equal(elements.get('[data-history-value="closedTrades"]').textContent, "1");
   assert.match(rows.children[0].children[0].textContent, /12:00/);
   assert.equal(rows.children[0].children[1].textContent, "<img src=x>");
   assert.equal(rows.children[0].children[1].children[0].className, "market-symbol");

@@ -94,6 +94,7 @@
     const stats = data.stats;
     setText(documentRef, "winningTrades", formatCount(stats.winningTrades));
     setText(documentRef, "losingTrades", formatCount(stats.losingTrades));
+    setText(documentRef, "closedTrades", formatCount(stats.closedTrades));
     setText(documentRef, "averageProfit", formatCurrency(stats.averageProfit), stats.averageProfit);
     setText(documentRef, "averageLoss", formatCurrency(stats.averageLoss), stats.averageLoss);
     setText(documentRef, "bestTrade", formatCurrency(stats.bestTrade), stats.bestTrade);
