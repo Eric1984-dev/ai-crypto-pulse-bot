@@ -400,7 +400,9 @@
     setText(documentRef, "openPositionAiStatus", formatCount(openPositionAiStatus.count));
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
     setText(documentRef, "aiDecisions", formatCount(aiDecisions.count));
-    setText(documentRef, "paperTrades", formatCount(recentTrades.count));
+    setText(documentRef, "paperTrades", formatCount(
+      Array.isArray(recentTrades.items) ? recentTrades.items.length : 0
+    ));
     setText(
       documentRef,
       "trackedMarkets",

@@ -353,6 +353,8 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"totalPnl\"]")[0].dataset.valueTone, "negative");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[0].textContent, "2");
   assert.equal(elements.get("[data-dashboard-value=\"openPositions\"]")[1].textContent, "2");
+  assert.equal(elements.get("[data-dashboard-value=\"paperTrades\"]")[0].textContent, "3");
+  assert.equal(elements.get("[data-dashboard-value=\"paperTrades\"]")[1].textContent, "3");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
   assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "20/03/2026, 12:59");
