@@ -517,13 +517,52 @@
         label: `Portfolio ${index + 1}`,
         data: timestamps.map((timestamp) => snapshotsByTime.get(timestamp) ?? null),
         borderColor: chartColors[index % chartColors.length],
-        backgroundColor: `${chartColors[index % chartColors.length]}22`,
-        borderWidth: 2,
-        pointRadius: 2,
-        tension: 0.25,
+        backgroundColor(context) {
+          const chart = context.chart;
+          const area = chart && chart.chartArea;
+          const ctx = chart && chart.ctx;
+          if (!area || !ctx || typeof ctx.createLinearGradient !== "function") {
+            return `${chartColors[index % chartColors.length]}22`;
+          }
+          const gradient = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+          gradient.addColorStop(0, `${chartColors[index % chartColors.length]}55`);
+          gradient.addColorStop(1, `${chartColors[index % chartColors.length]}03`);
+          return gradient;
+        },
+        fill: true,
+        borderWidth: 2.5,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        pointHitRadius: 12,
+        pointBackgroundColor: "#111418",
+        pointBorderColor: chartColors[index % chartColors.length],
+        pointBorderWidth: 2,
+        pointHoverBackgroundColor: chartColors[index % chartColors.length],
+        pointHoverBorderColor: "#edf1f7",
+        tension: 0.3,
         spanGaps: false
       };
     });
+    const openingValues = datasets.map((dataset) => dataset.data.find((value) => value !== null))
+      .filter((value) => Number.isFinite(value));
+    if (openingValues.length) {
+      datasets.push({
+        label: "Starting value",
+        data: timestamps.map((_, timestampIndex) => openingValues.length === 1 || timestampIndex === 0
+          ? openingValues[0]
+          : null),
+        borderColor: "rgba(156, 168, 186, 0.45)",
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHitRadius: 0,
+        fill: false,
+        tension: 0,
+        spanGaps: true,
+        order: 1
+      });
+    }
 
     const legendLabels = ChartConstructor
       && ChartConstructor.defaults
@@ -564,15 +603,40 @@
               }
             }
           },
-          tooltip: { mode: "index", intersect: false }
+          tooltip: {
+            mode: "index",
+            intersect: false,
+            displayColors: false,
+            padding: 12,
+            cornerRadius: 8,
+            backgroundColor: "rgba(17, 20, 24, 0.96)",
+            borderColor: "rgba(156, 168, 186, 0.2)",
+            borderWidth: 1,
+            titleColor: "#edf1f7",
+            bodyColor: "#c7d0dd",
+            callbacks: {
+              title(items) {
+                const timestamp = timestamps[items[0] && items[0].dataIndex];
+                return timestamp ? formatters.formatTimestamp(timestamp, "medium") : "";
+              },
+              label(context) {
+                if (context.dataset.label === "Starting value") {
+                  return `Starting value · ${currencyFormat.format(context.parsed.y)}`;
+                }
+                return `${context.dataset.label} · ${currencyFormat.format(context.parsed.y)}`;
+              }
+            }
+          }
         },
         scales: {
           x: {
-            grid: { color: "rgba(156, 168, 186, 0.08)" },
-            ticks: { color: "#9ca8ba", maxTicksLimit: 6 }
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: "#9ca8ba", maxTicksLimit: 5, maxRotation: 0 }
           },
           y: {
-            grid: { color: "rgba(156, 168, 186, 0.08)" },
+            grid: { color: "rgba(156, 168, 186, 0.09)" },
+            border: { display: false },
             ticks: {
               color: "#9ca8ba",
               callback(value) {

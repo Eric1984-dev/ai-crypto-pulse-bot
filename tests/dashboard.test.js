@@ -429,6 +429,12 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.has("[data-dashboard-list=\"markets\"]"), false);
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
+  assert.equal(chartConfig.data.datasets[0].fill, true);
+  assert.equal(chartConfig.data.datasets[0].pointRadius, 2.5);
+  assert.equal(chartConfig.data.datasets[1].label, "Starting value");
+  assert.equal(chartConfig.data.datasets[1].data[0], 1050);
+  assert.equal(chartConfig.options.plugins.tooltip.displayColors, false);
+  assert.equal(chartConfig.options.scales.x.grid.display, false);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
 });
 
@@ -630,6 +636,8 @@ test("portfolio chart legend icons are gray without recoloring chart datasets", 
   });
 
   assert.equal(config.options.plugins.legend.display, true);
+  assert.equal(config.data.datasets[0].fill, true);
+  assert.equal(config.data.datasets[2].label, "Starting value");
   assert.equal(labels[0].fillStyle, "#8792a1");
   assert.equal(labels[0].strokeStyle, "#8792a1");
   assert.notEqual(config.data.datasets[0].borderColor, "#8792a1");
