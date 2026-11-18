@@ -22,7 +22,7 @@
   const dashboardRefreshIntervalMs = 30000;
   const archiveHealthRefreshIntervalMs = 300000;
   const dashboardListVisibleItemCount = 2;
-  const dashboardListNames = ["positions", "trades", "position-ai-status"];
+  const dashboardListNames = ["near-buy-markets", "positions", "trades", "position-ai-status"];
   const runtimeApiUrl = (path) => {
     if (!globalThis.CryptoPulseRuntimeApi) {
       throw new Error("Raspberry Pi runtime API is not configured.");
@@ -70,6 +70,7 @@
         winRate: null
       },
       openPositions: { count: 0, items: [] },
+      nearBuyMarkets: { count: 0, items: [] },
       recentTrades: { count: 0, items: [] },
       watchedMarkets: { count: 0, items: [] },
       aiDecisions: { count: 0, items: [] },
@@ -386,6 +387,7 @@
     const portfolio = view.portfolio || emptyDashboardData().portfolio;
     const openPositions = view.openPositions || { count: 0, items: [] };
     const openPositionAiStatus = view.openPositionAiStatus || { count: 0, items: [] };
+    const nearBuyMarkets = view.nearBuyMarkets || { count: 0, items: [] };
     const recentTrades = view.recentTrades || { count: 0, items: [] };
     const watchedMarkets = view.watchedMarkets || { count: 0, items: [] };
     const aiDecisions = view.aiDecisions || { count: 0, items: [] };
@@ -398,6 +400,7 @@
     setText(documentRef, "winRate", formatPercent(portfolio.winRate));
     setText(documentRef, "openPositions", formatCount(openPositions.count));
     setText(documentRef, "openPositionAiStatus", formatCount(openPositionAiStatus.count));
+    setText(documentRef, "nearBuyMarkets", formatCount(nearBuyMarkets.items.length));
     setText(documentRef, "availableBalance", formatCurrency(portfolio.availableBalance));
     setText(documentRef, "aiDecisions", formatCount(aiDecisions.count));
     setText(documentRef, "paperTrades", formatCount(
@@ -435,6 +438,11 @@
       item.side,
       item,
       `Exit: ${formatters.formatPrice(item.price)}`
+    ]);
+    renderCollection(documentRef, "near-buy-markets", nearBuyMarkets.items, (item) => [
+      item.symbol || "—",
+      "Near Buy",
+      item.symbol
     ]);
     renderPositionAiStatus(documentRef, openPositionAiStatus.items);
     const chart = renderPortfolioChart(
@@ -981,6 +989,12 @@
     if (target) {
       target.textContent = normalized || "UNKNOWN";
       target.dataset.state = normalized ? normalized.toLowerCase() : "unknown";
+    }
+    if (name === "agent") {
+      const activityStrip = documentRef.querySelector("[data-dashboard-activity-strip]");
+      if (activityStrip) {
+        activityStrip.dataset.agentState = normalized ? normalized.toLowerCase() : "unknown";
+      }
     }
   }
 

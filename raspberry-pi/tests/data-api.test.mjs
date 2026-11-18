@@ -49,10 +49,14 @@ const decisionRows = [
     decision: "HOLD",
     confidence: "72.5",
     reason: "Trend is consolidating.",
-    indicators: {},
+    indicators: {
+      marketStrength: 18,
+      directionalAlignment: true,
+      dataQuality: { sufficientForDirectionalSignal: true }
+    },
     strategy_name: null,
     strategy_version: null,
-    created_at: capturedAt
+    created_at: "2026-11-10T18:59:00.000Z"
   }
 ];
 const statusRow = {
@@ -92,6 +96,15 @@ function createPool({
             throw error;
           }
           if (sql.includes('FROM public."AI_Crypto_Bot_AI_Decisions"')) {
+            if (sql.includes("CROSS JOIN LATERAL")) {
+              return {
+                rows: marketRows.filter(({ enabled }) => enabled)
+                  .map(({ symbol }) => decisions
+                    .filter((decision) => decision.symbol === symbol)
+                    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))[0])
+                  .filter(Boolean)
+              };
+            }
             if (sql.includes("COUNT(*)")) {
               return { rows: [{ total_count: decisions.length }] };
             }
@@ -352,6 +365,7 @@ test("repositories select explicit columns with bounded parameterized queries", 
   assert.equal((await repositories.marketData.listForEnabledMarkets(markets))[0].volume, 10.5);
   assert.equal((await repositories.marketData.listCandles("BTC-EUR", "1m"))[0].close, 90000);
   assert.equal((await repositories.aiDecisions.listRecent())[0].confidence, 72.5);
+  assert.equal((await repositories.aiDecisions.listLatestForEnabledMarkets())[0].symbol, "BTC-EUR");
   assert.equal((await repositories.runtimeStatus.getStatus()).status, "ANALYZING");
 
   const statements = pool.queries
@@ -576,6 +590,10 @@ test("market summary and dashboard expose bounded stored data without synthesizi
     assert.deepEqual(body.data.agentStatus, statusRow);
     assert.equal(body.data.watchedMarkets.count, 2);
     assert.equal(body.data.aiDecisions.count, 1);
+    assert.deepEqual(body.data.nearBuyMarkets, {
+      count: 1,
+      items: [{ symbol: "BTC-EUR" }]
+    });
     assert.equal(body.data.marketData.count, 1);
     assert.equal(body.data.portfolio.count, 0);
     assert.equal(body.data.openPositions.count, 0);
@@ -585,6 +603,34 @@ test("market summary and dashboard expose bounded stored data without synthesizi
     });
     assert.equal(body.data.recentTrades.count, 0);
     assert.equal(body.data.emergencyState.status, "NORMAL");
+  });
+});
+
+test("dashboard hides Near Buy candidates when their latest signal is weak or stale", async () => {
+  const weakDecision = {
+    ...decisionRows[0],
+    indicators: {
+      marketStrength: 14,
+      directionalAlignment: true,
+      dataQuality: { sufficientForDirectionalSignal: true }
+    }
+  };
+  await withServer({
+    dataRepositories: createRepositories(createPool({ decisions: [weakDecision] })),
+    now: () => new Date("2026-11-10T19:00:00.000Z")
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/dashboard-data`);
+    const body = await response.json();
+    assert.deepEqual(body.data.nearBuyMarkets, { count: 0, items: [] });
+  });
+
+  await withServer({
+    dataRepositories: createRepositories(createPool()),
+    now: () => new Date("2026-11-10T19:10:01.000Z")
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/dashboard-data`);
+    const body = await response.json();
+    assert.deepEqual(body.data.nearBuyMarkets, { count: 0, items: [] });
   });
 });
 

@@ -6,6 +6,7 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+- Add a dashboard Near Buy watchlist for qualified current BUY/near-threshold signals across enabled markets, excluding open positions; reuse the existing dashboard API and decision index without schema or Vercel-function changes.
 - Add a Pi-specific migration runbook and separate guarded scripts for clearing selected paper history and initializing a €2,000 system portfolio.
 
 ### Paper position exit policy

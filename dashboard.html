@@ -194,7 +194,7 @@
       </section>
 
       <section class="dashboard-section dashboard-activity" aria-label="Recent system activity">
-        <dl class="activity-strip">
+        <dl class="activity-strip" data-dashboard-activity-strip data-agent-state="unknown">
           <div>
             <dt>AI analysis</dt>
             <dd>
@@ -321,6 +321,13 @@
       </section>
 
       <section class="dashboard-grid dashboard-grid-lists" aria-label="Portfolio, agent, and risk summaries">
+        <details class="dashboard-panel dashboard-list-panel">
+          <summary class="panel-heading">
+            <div><p class="eyebrow">AI signals</p><h2>Near Buy <span class="dashboard-panel-count">(<span data-dashboard-value="nearBuyMarkets">0</span>)</span></h2></div>
+          </summary>
+          <ul class="dashboard-list" data-dashboard-list="near-buy-markets" hidden></ul>
+          <p class="dashboard-empty" data-dashboard-empty="near-buy-markets">No markets near a BUY signal.</p>
+        </details>
         <details class="dashboard-panel dashboard-list-panel">
           <summary class="panel-heading">
             <div><p class="eyebrow">Portfolio</p><h2>Open Positions <span class="dashboard-panel-count">(<span data-dashboard-value="openPositions">0</span>)</span></h2></div>

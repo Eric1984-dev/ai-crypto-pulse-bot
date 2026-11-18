@@ -23,6 +23,7 @@ const dataRepositories = {
   },
   aiDecisions: {
     async listRecent() { return []; },
+    async listLatestForEnabledMarkets() { return []; },
     async listHistory() { return { items: [], total: 0 }; }
   },
   dashboard: {

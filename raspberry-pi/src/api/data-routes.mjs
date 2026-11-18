@@ -39,6 +39,7 @@ export const DATA_PATHS = Object.freeze({
 });
 
 const STATUS_VALUES = new Set(["ACTIVE", "ANALYZING", "IDLE", "STOPPED", "ERROR"]);
+const NEAR_BUY_DECISION_MAX_AGE_MS = 10 * 60 * 1000;
 const MARKET_SYMBOL_PATTERN = /^[A-Z0-9]+-EUR$/;
 const MARKET_QUERY_SCHEMA = Object.freeze({
   symbol: Object.freeze({}),
@@ -463,11 +464,12 @@ export function registerDataRoutes(router, repositories, {
       return;
     }
     const generatedAt = readClock(now);
-    const [markets, status, recentDecisions] = await readRepository(
+    const [markets, status, recentDecisions, latestMarketDecisions] = await readRepository(
       () => Promise.all([
         repositories.watchedMarkets.listEnabled(),
         repositories.runtimeStatus.getStatus(),
-        repositories.aiDecisions.listRecent({ limit: 5 })
+        repositories.aiDecisions.listRecent({ limit: 5 }),
+        repositories.aiDecisions.listLatestForEnabledMarkets({ limit: 500 })
       ]),
       "DASHBOARD_DATA_UNAVAILABLE",
       "Dashboard data is temporarily unavailable."
@@ -483,6 +485,11 @@ export function registerDataRoutes(router, repositories, {
       "DASHBOARD_DATA_UNAVAILABLE",
       "Dashboard data is temporarily unavailable."
     );
+    const openPositionSymbols = new Set(accountData.openPositions.items.map(({ symbol }) => symbol));
+    const nearBuyMarkets = latestMarketDecisions
+      .filter((decision) => isNearBuyDecision(decision, Date.parse(generatedAt))
+        && !openPositionSymbols.has(decision.symbol))
+      .map(({ symbol }) => ({ symbol }));
     let shadowExitScenarios = { status: "UNAVAILABLE", positions: [] };
     try {
       shadowExitScenarios = await readRepository(
@@ -506,6 +513,7 @@ export function registerDataRoutes(router, repositories, {
         openPositions: accountData.openPositions,
         shadowExitScenarios,
         openPositionAiStatus: accountData.openPositionAiStatus,
+        nearBuyMarkets: { count: nearBuyMarkets.length, items: nearBuyMarkets },
         recentTrades: accountData.recentTrades,
         portfolioSnapshots: accountData.portfolioSnapshots,
         lastMarketDataAt: accountData.lastMarketDataAt || latestTimestamp(marketData),
@@ -721,7 +729,7 @@ function validateRepositories(repositories) {
       "listForEnabledMarkets",
       "listRecentCandlesForEnabledMarkets"
     ],
-    aiDecisions: ["listRecent", "listHistory"],
+    aiDecisions: ["listRecent", "listLatestForEnabledMarkets", "listHistory"],
     dashboard: [
       "getSystemDashboardData",
       "getShadowExitScenarios",
@@ -739,6 +747,24 @@ function validateRepositories(repositories) {
     !repositories[name] || methods.some((method) => typeof repositories[name][method] !== "function"))) {
     throw new TypeError("All read-only data repositories are required.");
   }
+}
+
+function isNearBuyDecision(decision, nowMs) {
+  const indicators = decision && decision.indicators;
+  const marketStrength = indicators && indicators.marketStrength;
+  const decisionTime = Date.parse(decision && decision.created_at);
+  if (!indicators
+    || indicators.directionalAlignment !== true
+    || indicators.dataQuality?.sufficientForDirectionalSignal !== true
+    || !Number.isFinite(marketStrength)
+    || decision.confidence < 65
+    || !Number.isFinite(decisionTime)
+    || decisionTime > nowMs
+    || nowMs - decisionTime > NEAR_BUY_DECISION_MAX_AGE_MS) {
+    return false;
+  }
+  return decision.decision === "BUY"
+    || (decision.decision === "HOLD" && marketStrength >= 15 && marketStrength < 20);
 }
 
 function latestTimestamp(rows) {

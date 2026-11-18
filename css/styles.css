@@ -837,6 +837,16 @@ a:focus-visible {
   box-shadow: 0 0 22px rgb(52 211 153 / 8%);
 }
 
+.activity-strip[data-agent-state="error"] {
+  border-color: #8d3e51;
+  background: linear-gradient(105deg, #3a1d28, #351e29 58%, #3a1d28);
+  box-shadow: 0 0 22px rgb(255 96 120 / 10%);
+}
+
+.activity-strip[data-agent-state="error"] dt {
+  color: #ff9aab;
+}
+
 .activity-strip > div {
   display: grid;
   min-width: 0;

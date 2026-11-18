@@ -16,6 +16,25 @@ const RECENT_AI_DECISIONS_SQL = `
   ORDER BY created_at DESC, id DESC
   LIMIT $1
 `;
+const LATEST_ENABLED_MARKET_DECISIONS_SQL = `
+  SELECT latest_decision.id, latest_decision.symbol, latest_decision.decision,
+         latest_decision.confidence, latest_decision.reason,
+         latest_decision.indicators, latest_decision.strategy_name,
+         latest_decision.strategy_version, latest_decision.created_at
+  FROM public."AI_Crypto_Bot_Watched_Markets" AS watched_market
+  CROSS JOIN LATERAL (
+    SELECT decision.id, decision.symbol, decision.decision, decision.confidence,
+           decision.reason, decision.indicators, decision.strategy_name,
+           decision.strategy_version, decision.created_at
+    FROM public."AI_Crypto_Bot_AI_Decisions" AS decision
+    WHERE decision.symbol = watched_market.symbol
+    ORDER BY decision.created_at DESC, decision.id DESC
+    LIMIT 1
+  ) AS latest_decision
+  WHERE watched_market.enabled IS TRUE
+  ORDER BY watched_market.priority ASC, watched_market.symbol ASC
+  LIMIT $1
+`;
 const AI_DECISION_COUNT_SQL = `
   SELECT COUNT(*)::integer AS total_count
   FROM public."AI_Crypto_Bot_AI_Decisions"
@@ -39,6 +58,17 @@ export class AiDecisionsRepository {
     const result = await queryReadOnly(
       this.pool,
       RECENT_AI_DECISIONS_SQL,
+      [boundedLimit],
+      { logger: this.logger }
+    );
+    return result.rows.map(normalizeDecision);
+  }
+
+  async listLatestForEnabledMarkets({ limit = 500 } = {}) {
+    const boundedLimit = readPositiveLimit(limit, 500, 500);
+    const result = await queryReadOnly(
+      this.pool,
+      LATEST_ENABLED_MARKET_DECISIONS_SQL,
       [boundedLimit],
       { logger: this.logger }
     );

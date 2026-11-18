@@ -77,6 +77,7 @@ function createDashboardDocument() {
     "[data-dashboard-value=\"winRate\"]",
     "[data-dashboard-value=\"openPositions\"]",
     "[data-dashboard-value=\"openPositionAiStatus\"]",
+    "[data-dashboard-value=\"nearBuyMarkets\"]",
     "[data-dashboard-value=\"availableBalance\"]",
     "[data-dashboard-value=\"aiDecisions\"]",
     "[data-dashboard-value=\"paperTrades\"]",
@@ -86,6 +87,7 @@ function createDashboardDocument() {
     "[data-dashboard-activity=\"paper-trading-run\"]",
     "[data-dashboard-activity-status=\"ai-analysis\"]",
     "[data-dashboard-activity-status=\"paper-trading\"]",
+    "[data-dashboard-activity-strip]",
     "[data-dashboard-activity=\"market-data\"]",
     "[data-dashboard-activity=\"paper-trade\"]",
     "[data-dashboard-status=\"agent\"]",
@@ -105,9 +107,11 @@ function createDashboardDocument() {
     "[data-dashboard-list=\"positions\"]",
     "[data-dashboard-list=\"trades\"]",
     "[data-dashboard-list=\"position-ai-status\"]",
+    "[data-dashboard-list=\"near-buy-markets\"]",
     "[data-dashboard-empty=\"positions\"]",
     "[data-dashboard-empty=\"trades\"]",
     "[data-dashboard-empty=\"position-ai-status\"]",
+    "[data-dashboard-empty=\"near-buy-markets\"]",
     "[data-portfolio-chart]",
     "[data-dashboard-chart-empty]",
     "[data-dashboard-loading]",
@@ -119,6 +123,7 @@ function createDashboardDocument() {
   ];
   const elements = new Map(selectors.map((selector) => [selector, [createElement()]]));
   elements.set("[data-dashboard-value=\"openPositions\"]", [createElement(), createElement()]);
+  elements.set("[data-dashboard-value=\"nearBuyMarkets\"]", [createElement()]);
   elements.set("[data-dashboard-value=\"paperTrades\"]", [createElement(), createElement()]);
   elements.set("[data-dashboard-value=\"trackedMarkets\"]", [createElement(), createElement()]);
   elements.set("[data-dashboard-value=\"aiDecisions\"]", [createElement(), createElement()]);
@@ -294,6 +299,10 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
         }
       ]
     },
+    nearBuyMarkets: {
+      count: 1,
+      items: [{ symbol: "SOL-EUR" }]
+    },
     recentTrades: {
       count: 3,
       items: [
@@ -356,6 +365,7 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-value=\"paperTrades\"]")[0].textContent, "3");
   assert.equal(elements.get("[data-dashboard-value=\"paperTrades\"]")[1].textContent, "3");
   assert.equal(elements.get("[data-dashboard-status=\"agent\"]")[0].textContent, "ANALYZING");
+  assert.equal(elements.get("[data-dashboard-activity-strip]")[0].dataset.agentState, "analyzing");
   assert.equal(elements.get("[data-dashboard-status=\"emergency\"]")[0].dataset.state, "paused");
   assert.equal(elements.get("[data-dashboard-activity=\"market-data\"]")[0].textContent, "20/03/2026, 12:59");
   assert.equal(elements.get("[data-dashboard-activity=\"paper-trade\"]")[0].textContent, "20/03/2026, 13:00");
@@ -426,6 +436,9 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   assert.equal(elements.get("[data-dashboard-list=\"positions\"]")[0].hidden, false);
   assert.equal(elements.get("[data-dashboard-empty=\"positions\"]")[0].hidden, true);
   assert.equal(elements.get("[data-dashboard-value=\"trackedMarkets\"]")[0].textContent, "1");
+  assert.equal(elements.get("[data-dashboard-value=\"nearBuyMarkets\"]")[0].textContent, "1");
+  assert.equal(elements.get("[data-dashboard-list=\"near-buy-markets\"]")[0].children[0].children[0].textContent, "SOL-EUR");
+  assert.equal(elements.get("[data-dashboard-list=\"near-buy-markets\"]")[0].children[0].children[1].textContent, "Near Buy");
   assert.equal(elements.has("[data-dashboard-list=\"markets\"]"), false);
   assert.equal(elements.get("[data-portfolio-chart]")[0].hidden, false);
   assert.deepEqual(chartConfig.data.datasets[0].data, [1050, 1100]);
@@ -439,6 +452,15 @@ test("dashboard renders database summaries, recent lists, and an actual-snapshot
   }), false);
   assert.equal(chartConfig.options.scales.x.grid.display, false);
   assert.ok(chartConfig.data.labels.some((label) => label.endsWith("12:00")));
+  dashboard.renderDashboard({
+    agentStatus: { status: "ERROR" },
+    nearBuyMarkets: { count: 0, items: [] },
+    recentTrades: { count: 0, items: [] }
+  }, dashboardDocument, FakeChart);
+  assert.equal(elements.get("[data-dashboard-activity-strip]")[0].dataset.agentState, "error");
+  assert.equal(elements.get("[data-dashboard-value=\"nearBuyMarkets\"]")[0].textContent, "0");
+  assert.equal(elements.get("[data-dashboard-list=\"near-buy-markets\"]")[0].hidden, true);
+  assert.equal(elements.get("[data-dashboard-empty=\"near-buy-markets\"]")[0].hidden, false);
 });
 
 test("dashboard maps market-strength boundaries to the requested market views", () => {
@@ -815,8 +837,9 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   const panels = listSection
     ? [...listSection[1].matchAll(/<details class="dashboard-panel dashboard-list-panel">([\s\S]*?)<\/details>/g)]
     : [];
-  assert.equal(panels.length, 3);
+  assert.equal(panels.length, 4);
   assert.deepEqual(panels.map(([, panel]) => panel.match(/<p class="eyebrow">([^<]+)<\/p>/)[1]), [
+    "AI signals",
     "Portfolio",
     "Activity",
     "Position monitoring"
@@ -824,6 +847,7 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   assert.doesNotMatch(html, /Market universe|data-dashboard-list="markets"/);
   assert.doesNotMatch(listSection[1], /<details\b[^>]*\bopen(?:\s|>)/);
   for (const [title, value] of [
+    ["Near Buy", "nearBuyMarkets"],
     ["Open Positions", "openPositions"],
     ["Recent Trades", "paperTrades"],
     ["Open Position AI Status", "openPositionAiStatus"]
@@ -835,13 +859,13 @@ test("dashboard list panels start collapsed and prioritize open-position AI stat
   }
   assert.doesNotMatch(listSection[1], /class="count-pill"/);
   assert.match(styles, /\.dashboard-shell\s*\{[^}]*padding-block:\s*16px 64px;/s);
-  for (const listName of ["positions", "trades", "position-ai-status"]) {
+  for (const listName of ["near-buy-markets", "positions", "trades", "position-ai-status"]) {
     assert.match(listSection[1], new RegExp(`data-dashboard-list="${listName}"`));
   }
   assert.doesNotMatch(listSection[1], /Recent AI Decisions/);
   assert.match(listSection[1], /href="\/history\.html">View history<\/a>/);
 
-  const activityStrip = html.match(/<dl class="activity-strip">([\s\S]*?)<\/dl>/);
+  const activityStrip = html.match(/<dl class="activity-strip"[^>]*>([\s\S]*?)<\/dl>/);
   assert.ok(activityStrip);
   assert.match(activityStrip[1], /AI analysis[\s\S]*data-dashboard-activity="ai-analysis"/);
   assert.match(activityStrip[1], /Paper-trading run[\s\S]*data-dashboard-activity="paper-trading-run"/);
