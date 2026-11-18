@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-18  
 **Scope:** Read-only paper-trading signal visibility on the dashboard  
-**Status:** Implemented locally; Raspberry Pi rollout is not performed or verified.
+**Status:** Implemented and deployed to the Raspberry Pi, as reported by the operator.
 
 ## Result
 
@@ -35,7 +35,7 @@ The score range provides a five-point heads-up to the AI BUY boundary at Market 
 
 - `node --test tests/dashboard.test.js`: 26 passed, 1 failed. Near Buy rendering, empty state, and panel assertions passed. The remaining unrelated offline-status assertion expected `Offline` but received `Unknown`.
 - `node --test tests/data-api.test.mjs tests/auth-routes.test.mjs` from `raspberry-pi/`: 26 passed, 0 failed.
-- No production database query, migration, Pi deployment, or Vercel deployment was performed.
+- No database migration was needed. The operator reports the Raspberry Pi deployment is complete; this report does not independently verify live production behavior or a Vercel deployment.
 
 ## Operational notes
 
