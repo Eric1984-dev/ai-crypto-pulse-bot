@@ -57,6 +57,26 @@ No database table, column, index, policy, API route, Vercel Function, new
 dependency, executor, or risk-control change was introduced. Database mode
 remains opt-in.
 
+## Paper entry-filter experiment addendum
+
+The repository's updated Pi JavaScript engine is version `2.1.0`; deployment to
+the Pi is pending. After it derives the
+existing directional decision and confidence, an otherwise qualifying BUY is
+kept only when the stored 1d momentum change is positive and the existing 1h
+volume confirmation score is at least 0.25. Failed BUY candidates become HOLD
+decisions whose persisted reason includes `LOW_DAILY_MOMENTUM`,
+`LOW_VOLUME_SCORE`, or both. Momentum remains excluded from Market Strength and
+confidence.
+
+This isolated paper experiment was motivated by a 14-trade in-sample analysis;
+the combined filter retained six closed trades and is not independently
+validated. The filter is implemented only in the active Pi JavaScript decision
+path. No database analysis function, execution audit constraint, executor,
+schema, confidence rule, risk control, or exit behavior was changed. The
+experiment and its monitoring criteria are recorded in
+[`STRATEGY_CHANGELOG.md`](../STRATEGY_CHANGELOG.md) and
+[`RISK_MANAGEMENT.md`](../RISK_MANAGEMENT.md).
+
 ## Files changed
 
 - [lib/ai-engine.mjs](../../lib/ai-engine.mjs) — JavaScript scoring, confidence, required-input handling, and V2 decision identity.

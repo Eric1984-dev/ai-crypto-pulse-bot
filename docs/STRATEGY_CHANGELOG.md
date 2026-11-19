@@ -4,6 +4,39 @@ Alle wijzigingen aan strategieën moeten hier worden geregistreerd.
 
 ---
 
+### Experiment: Volume + Positive Momentum Entry Filter
+
+### Strategy / Version
+
+Deterministic Technical Analysis V2 — `2.1.0` (paper-only entry-selection experiment)
+
+### Change Date
+
+2026-11-19
+
+### Changes
+
+- Keep every existing BUY condition and require 1d momentum > 0.
+- Require the existing 1h volume confirmation score `clamp(hourlyVolumeRatio - 0.5, 0, 1)` to be >= 0.25.
+- Convert an otherwise qualifying BUY to HOLD when either filter fails and store `LOW_DAILY_MOMENTUM` and/or `LOW_VOLUME_SCORE` in the AI decision reason for later measurement.
+- Do not change confidence scoring or threshold, EMA/trend/alignment/RSI calculations, the paper executor, risk controls, exits, scheduler, or database schema.
+
+### Reason and Hypothesis
+
+The analysis of 14 closed trades found 7 winners and 7 losers, a 50.0% winrate, +€4.15 average win, -€10.06 average loss, and -€2.95 expectancy. All four executed trades with 1d momentum <= 0 were losses. Higher hourly volume-score groups performed better descriptively. Applying both fixed filters to the same in-sample trades retained 6 closed trades (5 wins, 1 loss), with 83.3% winrate, +€2.07 expectancy and +€12.43 total net P&L. The experiment tests whether these signals generalize; the six-trade subset is small and is not validation evidence.
+
+### Monitoring and Success Criteria
+
+Track executed BUYs, each filter's rejected candidate count, winrate, expectancy, profit factor, average winner, average loser, and max drawdown. Compare new prospective paper results with the historical 50.0% winrate and -€2.95 expectancy; success also requires higher profit factor and no material drawdown deterioration.
+
+### Results
+
+Prospective paper results pending. No live deployment or production-database change is part of this source update.
+
+Implementation and validation details: [Volume + Positive Momentum Entry Filter Experiment](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). Pi deployment remains pending.
+
+---
+
 ### Strategy
 
 V2 Daily-EMA-led paper strategy — misalignment and volatility research adjustment

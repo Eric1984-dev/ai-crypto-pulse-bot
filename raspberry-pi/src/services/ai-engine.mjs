@@ -6,7 +6,7 @@ import {
 
 export const AI_ANALYSIS_INTERVALS = Object.freeze(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export const AI_ANALYZER_NAME = "Deterministic Technical Analysis V2";
-export const AI_ANALYZER_VERSION = "2.0.0";
+export const AI_ANALYZER_VERSION = "2.1.0";
 export const AI_DECISION_INTERVAL = "1d";
 export const MIN_CANDLES_PER_TIMEFRAME = 26;
 export const MIN_TIMEFRAMES_FOR_ANALYSIS = 2;
@@ -24,6 +24,8 @@ const CANDLE_MAX_AGE_MS = Object.freeze({
 const MARKET_DATA_MAX_AGE_MS = 15 * 60 * 1000;
 const MISALIGNMENT_PENALTY = 20;
 const MAX_AVERAGE_VOLATILITY_PENALTY = 5;
+const MIN_BUY_DAILY_MOMENTUM_PCT = 0;
+const MIN_BUY_VOLUME_SCORE = 0.25;
 
 export function analyzeMarket({ symbol, marketData, candles, now = new Date() }) {
   const analysisTime = now instanceof Date ? now : new Date(now);
@@ -118,18 +120,35 @@ export function analyzeMarket({ symbol, marketData, candles, now = new Date() })
     }
   }
 
-  const reason = buildDecisionReason({
-    decision,
-    snapshot,
-    validTimeframes,
-    staleCandleIntervals,
-    incompleteCandleIntervals,
-    incompleteCandlesIgnored,
-    missingCandleIntervals,
-    totalInvalidCandles,
-    score,
-    v2InputsAvailable: v2Signal.available
-  });
+  // Apply these paper-only selection rules after the unchanged signal/confidence calculation.
+  const buyFilterFailures = [];
+  const dailyMomentumPct = finiteNumber(timeframeResults["1d"]?.momentum?.changePct);
+  if (decision === "BUY") {
+    if (dailyMomentumPct === null || dailyMomentumPct <= MIN_BUY_DAILY_MOMENTUM_PCT) {
+      buyFilterFailures.push("LOW_DAILY_MOMENTUM");
+    }
+    if (v2Signal.volumeConfirmation < MIN_BUY_VOLUME_SCORE) {
+      buyFilterFailures.push("LOW_VOLUME_SCORE");
+    }
+    if (buyFilterFailures.length) {
+      decision = "HOLD";
+    }
+  }
+
+  const reason = buyFilterFailures.length
+    ? `HOLD: BUY entry filter rejected (${buyFilterFailures.join(",")}); 1dMomentum=${dailyMomentumPct ?? "unavailable"}; volumeScore=${v2Signal.volumeConfirmation}.`
+    : buildDecisionReason({
+      decision,
+      snapshot,
+      validTimeframes,
+      staleCandleIntervals,
+      incompleteCandleIntervals,
+      incompleteCandlesIgnored,
+      missingCandleIntervals,
+      totalInvalidCandles,
+      score,
+      v2InputsAvailable: v2Signal.available
+    });
   const indicators = {
     interval: AI_DECISION_INTERVAL,
     marketData: {

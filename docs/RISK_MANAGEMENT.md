@@ -14,6 +14,16 @@ The AI confidence floor remains 65 and the paper executor BUY threshold remains 
 
 The preceding user-provided ~24-hour replay reported 5 BUY/3 SELL executions across two markets, realized P&L of -€2.65 and maximum drawdown of 0.887%, compared with 2 BUY/1 SELL across one market, -€10.48 realized P&L and 1.017% maximum drawdown under the prior configuration. This short replay is not independently reproduced here and is not evidence of future profitability. A fresh stateful replay and monitored paper-only evaluation are required before drawing conclusions.
 
+### Experiment: Volume + Positive Momentum Entry Filter
+
+The paper AI engine applies two additional BUY-selection conditions after the existing signal and confidence rules: 1d momentum must be > 0, and the existing 1h volume confirmation score `clamp(hourlyVolumeRatio - 0.5, 0, 1)` must be >= 0.25. A failed candidate is persisted as HOLD with `LOW_DAILY_MOMENTUM` and/or `LOW_VOLUME_SCORE` in its AI-decision reason. This uses the existing decision history; it does not add execution-audit reason codes or change the paper executor, schema, confidence model, alignment, or risk controls.
+
+The hypothesis is that BUY signals with positive daily momentum and sufficient hourly volume have better trade quality than the previous selection. It is based on an in-sample set of 14 closed trades: the combined filter retained six (five wins, one loss), with 83.3% winrate, +€2.07 expectancy and +€12.43 net P&L, versus 50.0% and -€2.95 expectancy for the full set. This tiny, concentrated sample may reflect chance and does not establish future performance.
+
+Monitor executed BUY count, filtered candidate count by reason, winrate, expectancy, profit factor, average win/loss, and maximum drawdown. Success criteria are higher winrate than 50%, expectancy better than -€2.95, higher profit factor, and no material drawdown deterioration, assessed on new paper-trading observations. Do not treat the historical filtered subset as validation; the two currently open positions and subsequent trades must be tracked separately.
+
+Implementation details and validation status are recorded in the [experiment report](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). The repository update is not deployed to the Pi yet.
+
 ## Trading Mode
 
 Current Mode:

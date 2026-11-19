@@ -181,6 +181,66 @@ test("Pi V2 analysis returns the expected directional and safe outcomes", () => 
   }).indicators.directionalAlignment, null);
 });
 
+test("BUY entry filter requires positive 1d momentum and at least 0.25 volume score", () => {
+  const analyze = (candles) => analyzeMarket({
+    symbol: "BTC-EUR",
+    marketData: createSnapshot(),
+    candles,
+    now: fixedNow
+  });
+  const baselineCandles = buildCandles();
+  const baseline = analyze(baselineCandles);
+  assert.equal(baseline.decision, "BUY");
+  assert.ok(baseline.indicators.timeframes["1d"].momentum.changePct > 0);
+
+  const hourlyCandles = baselineCandles.filter(({ interval }) => interval === "1h");
+  const hourlyAverage = hourlyCandles.slice(-21, -1)
+    .reduce((total, candle) => total + candle.volume, 0) / 20;
+  const lowVolumeTimestamp = hourlyCandles.at(-1).timestamp;
+  const belowVolumeThreshold = analyze(baselineCandles.map((candle) =>
+    candle.interval === "1h" && candle.timestamp === lowVolumeTimestamp
+      ? { ...candle, volume: hourlyAverage * 0.74 }
+      : candle
+  ));
+  assert.equal(belowVolumeThreshold.indicators.timeframes["1h"].volume.ratio, 0.74);
+  assert.equal(belowVolumeThreshold.decision, "HOLD");
+  assert.match(belowVolumeThreshold.reason, /LOW_VOLUME_SCORE/);
+  assert.doesNotMatch(belowVolumeThreshold.reason, /LOW_DAILY_MOMENTUM/);
+
+  const dailyCandles = baselineCandles.filter(({ interval }) => interval === "1d");
+  const dailyTimestamps = new Set(dailyCandles.slice(-6).map(({ timestamp }) => timestamp));
+  const zeroMomentum = analyze(baselineCandles.map((candle) =>
+    candle.interval === "1d" && dailyTimestamps.has(candle.timestamp)
+      ? { ...candle, open: 129, high: 129.3, low: 128.7, close: 129 }
+      : candle
+  ));
+  assert.equal(zeroMomentum.indicators.timeframes["1d"].momentum.changePct, 0);
+  assert.ok(zeroMomentum.indicators.timeframes["1h"].volume.ratio >= 0.75);
+  assert.equal(zeroMomentum.decision, "HOLD");
+  assert.match(zeroMomentum.reason, /LOW_DAILY_MOMENTUM/);
+  assert.doesNotMatch(zeroMomentum.reason, /LOW_VOLUME_SCORE/);
+
+  const bothFiltersFail = analyze(baselineCandles.map((candle) => {
+    if (candle.interval === "1d" && dailyTimestamps.has(candle.timestamp)) {
+      return { ...candle, open: 129, high: 129.3, low: 128.7, close: 129 };
+    }
+    if (candle.interval === "1h" && candle.timestamp === lowVolumeTimestamp) {
+      return { ...candle, volume: hourlyAverage * 0.74 };
+    }
+    return candle;
+  }));
+  assert.equal(bothFiltersFail.decision, "HOLD");
+  assert.match(bothFiltersFail.reason, /LOW_DAILY_MOMENTUM,LOW_VOLUME_SCORE/);
+
+  const thresholdVolume = analyze(baselineCandles.map((candle) =>
+    candle.interval === "1h" && candle.timestamp === lowVolumeTimestamp
+      ? { ...candle, volume: hourlyAverage * 0.75 }
+      : candle
+  ));
+  assert.equal(thresholdVolume.indicators.timeframes["1h"].volume.ratio, 0.75);
+  assert.equal(thresholdVolume.decision, "BUY");
+});
+
 test("V2 applies misalignment penalties to Market Strength and confidence", () => {
   const candles = setCandleRange([
     ...["5m", "15m", "4h"].flatMap((interval) =>

@@ -43,7 +43,7 @@ function decision(index = 1) {
     reason: "Daily trend and confirmation are positive.",
     timestamp: "2026-03-20T12:00:00.000Z",
     strategy_name: "Deterministic Technical Analysis V2",
-    strategy_version: "2.0.0"
+    strategy_version: "2.1.0"
   };
 }
 

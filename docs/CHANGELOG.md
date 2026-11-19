@@ -6,6 +6,7 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+- Add the paper-only Volume + Positive Momentum Entry Filter to AI BUY selection; require 1d momentum > 0 and the existing 1h volume confirmation >= 0.25, and retain failed candidate BUYs as HOLD decision records with filter reason codes. No confidence, executor, risk, exit, scheduler, or schema change.
 - Add a dashboard Near Buy watchlist for qualified current BUY/near-threshold signals across enabled markets, excluding open positions; reuse the existing dashboard API and decision index without schema or Vercel-function changes.
 - Add a Pi-specific migration runbook and separate guarded scripts for clearing selected paper history and initializing a €2,000 system portfolio.
 
@@ -78,7 +79,7 @@ All notable project changes should be documented here.
 ### AI Engine V2 replacement
 
 - Replace the directional score with a 1d EMA-led formula, confirmed by 1h/1d EMA alignment and fresh 1h volume, with a small 1d RSI contribution
-- Keep MACD and momentum in stored indicator diagnostics only; remove market context from directional scoring
+- Keep MACD and momentum out of directional-score/confidence calculations and persist them as diagnostics; the later 2026-11-19 BUY-entry experiment uses 1d momentum only as a post-score selection filter.
 - Replace coverage/depth bonuses in the actionable V2 confidence formula with V2 trend, alignment, volume, and RSI terms while retaining the existing volatility penalty and bounded low-data fallback
 - Require fresh valid 1h volume-ratio and 1d EMA/RSI inputs; preserve the existing signal, freshness, low-data, and paper-trading risk gates
 - Add an append-only SQL migration to keep optional database analysis behavior aligned with JavaScript without adding tables, columns, API routes, or dependencies

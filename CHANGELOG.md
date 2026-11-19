@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add the paper-only Volume + Positive Momentum Entry Filter: existing BUY conditions remain, plus positive 1d momentum and 1h volume confirmation >= 0.25; persist filtered signal codes in the AI decision reason without changing the executor or database schema.
 - Remove the Agent Brain's added rectangular chip frame in every status and brighten only the clipped brain artwork during `ANALYZING`.
 - Fetch the latest AI decision for each enabled watched market through a bounded lateral lookup and the existing composite index, avoiding full-history scans and sort spills in the paper-trading cycle; no migration is required.
 - Bound scanner daily/hourly candle reads to the latest 35/12 candles per enabled market and replace ingestion checkpoint aggregation with one latest-candle lookup per requested market; reuse the existing composite candle index with no schema migration.

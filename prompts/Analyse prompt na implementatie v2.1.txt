@@ -1,0 +1,113 @@
+READ ONLY.
+
+Voer een volledige performance-review uit van strategy_version = '2.1.0'.
+
+Vergelijk deze rechtstreeks met strategy_version = '2.0.0'.
+
+Gebruik uitsluitend gerealiseerde data uit de database.
+
+Onderzoek:
+
+1. Trade-overzicht
+
+Voor beide versies:
+
+- aantal BUY's
+- aantal SELL's
+- aantal gesloten trades
+- aantal open posities
+- winrate
+- average win
+- average loss
+- expectancy
+- profit factor
+- netto P&L
+
+2. Nieuwe filters
+
+Voor strategy_version = '2.1.0':
+
+- aantal LOW_DAILY_MOMENTUM afwijzingen
+- aantal LOW_VOLUME_SCORE afwijzingen
+- aantal gecombineerde afwijzingen
+- percentage van alle BUY-kandidaten dat hierdoor werd geweigerd
+
+3. Kwaliteit van de gefilterde signalen
+
+Onderzoek de signalen die door de nieuwe filters werden afgewezen.
+
+Toon:
+
+- gemiddelde confidence
+- gemiddelde volume score
+- gemiddelde 1d momentum
+- betrokken pairs
+
+Controleer of deze signalen overeenkomen met de historische verliespatronen.
+
+4. Versievergelijking
+
+Vergelijk 2.1.0 tegenover 2.0.0 op:
+
+- winrate
+- average win
+- average loss
+- expectancy
+- profit factor
+- drawdown
+- aantal trades
+
+Toon absolute én procentuele verschillen.
+
+5. Tradefrequentie
+
+Onderzoek:
+
+- gemiddeld aantal nieuwe trades per dag
+- gemiddeld aantal gesloten trades per dag
+- gemiddelde holding time
+
+Controleer of de nieuwe filters de strategie niet overdreven afremmen.
+
+6. Drawdown
+
+Voor beide versies:
+
+- maximale drawdown
+- duur van drawdown
+- verliesreeks
+- grootste verliestrade
+- grootste winnaar
+
+7. Statistische waarschuwingen
+
+Vermeld expliciet:
+
+- steekproefgrootte
+- mogelijke bias
+- welke conclusies nog onbetrouwbaar zijn
+- welke conclusies ondertussen redelijk robuust worden
+
+8. Eindbeoordeling
+
+Beantwoord expliciet:
+
+A. Presteert strategy_version 2.1.0 beter dan 2.0.0?
+
+B. Is er voldoende bewijs om de filters te behouden?
+
+C. Is er bewijs dat de filters de expectancy verbeteren?
+
+D. Is er bewijs dat de filters enkel het aantal trades verlagen zonder kwaliteitsverbetering?
+
+E. Wat zou de volgende meest logische hypothese zijn om te testen?
+
+Belangrijk:
+
+- geen codewijzigingen
+- geen databasewijzigingen
+- geen optimalisatievoorstellen
+- geen curve fitting
+- uitsluitend analyse van daadwerkelijk gerealiseerde resultaten
+
+Lever ook de gebruikte SQL-query's.
