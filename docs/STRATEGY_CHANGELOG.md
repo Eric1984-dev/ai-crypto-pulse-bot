@@ -20,6 +20,7 @@ Deterministic Technical Analysis V2 — `2.1.0` (paper-only entry-selection expe
 - Require the existing 1h volume confirmation score `clamp(hourlyVolumeRatio - 0.5, 0, 1)` to be >= 0.25.
 - Convert an otherwise qualifying BUY to HOLD when either filter fails and store `LOW_DAILY_MOMENTUM` and/or `LOW_VOLUME_SCORE` in the AI decision reason for later measurement.
 - Do not change confidence scoring or threshold, EMA/trend/alignment/RSI calculations, the paper executor, risk controls, exits, scheduler, or database schema.
+- Clarification: daily/hourly alignment is not a hard condition for generating the AI BUY decision; it contributes to Market Strength and confidence. The paper executor separately requires explicit alignment before it opens a position.
 
 ### Reason and Hypothesis
 
@@ -31,9 +32,9 @@ Track executed BUYs, each filter's rejected candidate count, winrate, expectancy
 
 ### Results
 
-Prospective paper results pending. No live deployment or production-database change is part of this source update.
+Prospective performance remains unproven. The operator reports deploying V2.1.0 to the Pi, and production decision rows tagged `2.1.0` were observed in the database. The running binary/build identity has not been independently verified in this documentation update.
 
-Implementation and validation details: [Volume + Positive Momentum Entry Filter Experiment](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). Pi deployment remains pending.
+Implementation and validation details: [Volume + Positive Momentum Entry Filter Experiment](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). Broader findings and limitations are in the [November 2026 strategy architecture findings](reports/STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
 
 ---
 
@@ -63,7 +64,7 @@ The preceding signal analysis found frequent timeframe-disagreement noise and a 
 
 - Reduce the directional strength and confidence of misaligned signals.
 - Limit the maximum average volatility deduction to five points while retaining ATR-based classification.
-- Keep the executor's explicit alignment gate and all position, cooldown, sizing, drawdown, emergency, and exit protections.
+- Keep the executor's explicit alignment gate and all position, cooldown, sizing, drawdown, emergency, and exit protections. This execution-time alignment check is separate from AI BUY generation, where alignment affects score/confidence but is not a hard gate.
 
 ### Results
 

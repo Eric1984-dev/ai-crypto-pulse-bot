@@ -1,5 +1,7 @@
 # Paper Trading Confidence Threshold Experiment
 
+> **Historical implementation status:** This report describes the legacy SQL/Supabase 70-to-67 threshold experiment. It is not the active Raspberry Pi configuration. The operator later reported V2.1.0 deployed and production decision rows tagged `strategy_version=2.1.0`; the exact running build was not independently verified. Current repository code uses a 65 AI signal floor and a separate 70 paper-executor gate. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Status
 
 Implementation and local validation are complete. Production migration and deployment have not been performed or verified.

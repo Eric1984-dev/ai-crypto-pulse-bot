@@ -6,6 +6,7 @@ All notable project changes should be documented here.
 
 ## [Unreleased]
 
+- Clarify AI BUY generation versus the paper executor's separate timeframe-alignment gate, and record V2.0.0/V2.1.0 strategy-architecture findings and statistical limitations in the November 2026 analysis report. Documentation only; no runtime behavior changed.
 - Add the paper-only Volume + Positive Momentum Entry Filter to AI BUY selection; require 1d momentum > 0 and the existing 1h volume confirmation >= 0.25, and retain failed candidate BUYs as HOLD decision records with filter reason codes. No confidence, executor, risk, exit, scheduler, or schema change.
 - Add a dashboard Near Buy watchlist for qualified current BUY/near-threshold signals across enabled markets, excluding open positions; reuse the existing dashboard API and decision index without schema or Vercel-function changes.
 - Add a Pi-specific migration runbook and separate guarded scripts for clearing selected paper history and initializing a €2,000 system portfolio.

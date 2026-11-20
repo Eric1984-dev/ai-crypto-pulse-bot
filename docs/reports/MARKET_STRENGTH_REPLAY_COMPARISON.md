@@ -4,6 +4,12 @@
 **Data source:** live Supabase production decisions, portfolio snapshots, trades, and candles  
 **Scope:** read-only analysis. No code, thresholds, production records, or deployment settings were changed.
 
+> **Historical replay note:** This replay reflects the 2026-11-01 through
+> 2026-11-09 data and the then-observed 67 confidence gate. It does not describe
+> the current Raspberry Pi executor, which uses a 70 BUY confidence gate and a
+> separate alignment check. The current AI engine's signal floor is 65. For
+> current V2.1.0 behavior, see the [architecture findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
+
 ## Executive summary
 
 The replay generated fewer BUY signals for each simplified model than for the current production model. After applying paper-trading limits, the models opened only five or six positions apiece. Models B–E had at most one closed trade each; their 100% win rates therefore represent one winner, not evidence of a repeatable advantage. Models C and E ended with the same four open positions and estimated marked equity, so their small-sample result does not distinguish them.

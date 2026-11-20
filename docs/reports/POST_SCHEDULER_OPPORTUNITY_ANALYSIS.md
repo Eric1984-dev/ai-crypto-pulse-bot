@@ -4,6 +4,8 @@
 - **Source:** Live Supabase AI decisions, positions, trades, portfolio state, and active paper-trading function definition
 - **Scope:** Diagnosis only. No code, database data, or production settings were changed.
 
+> **Historical snapshot:** The production function and any 67-confidence threshold discussed here were observed in the legacy SQL/Supabase environment in November 2026. They do not describe the current Raspberry Pi implementation, whose repository code has AI signal floor 65 and executor gate 70. V2.1.0 deployment was reported by the operator and version-tagged rows were observed; exact runtime build was not independently verified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Executive conclusion
 
 **No new position was opened because there were no BUY decisions in the requested eight-hour window.** This was not a Paper Trading rejection, open-position cap, allocation limit, emergency stop, or drawdown block.

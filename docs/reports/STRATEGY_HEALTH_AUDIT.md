@@ -1,10 +1,18 @@
 # Strategy Health Audit
 
+> **Historical threshold note:** This audit's 67 BUY-entry gate and references to the then-active database function are a November 2026 legacy SQL/Supabase snapshot. Current Raspberry Pi repository code has AI confidence floor 65 and executor gate 70. V2.1.0 deployment is operator-reported, with version-tagged decisions observed; exact runtime build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 **Verdict: RED — Investigation required**
 
 **Production observation:** 2026-11-04 10:03 UTC  
 **Decision-data cutoff:** 2026-11-04 10:01:19 UTC  
 **Scope:** Read-only review of production AI decisions, paper trades, open positions, current market data, deployed paper-trading threshold, implementation, and focused tests. No code, database, scheduler, or deployment settings were changed.
+
+> **Historical threshold note:** The 67 BUY-entry gate below was verified in
+> the production environment observed on 2026-11-04. The current Raspberry Pi
+> code has an AI signal floor of 65 and a separate executor BUY gate of 70;
+> alignment also remains a separate executor check. This dated audit is not a
+> current runtime-status report. See the [current V2 findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
 
 ## Executive summary
 

@@ -4,10 +4,18 @@
 **Database session timezone:** UTC<br>
 **Scope:** Read-only production and repository investigation, plus correction of the current BUY-entry threshold statement in `docs/API.md`. No trading code, database objects/data, deployment, scheduler, or live-trading settings were changed.
 
+> **Historical production snapshot:** This report's 67 BUY-entry gate, migration, and database-function findings refer to the legacy SQL/Supabase runtime observed in November 2026. They do not describe the current Raspberry Pi implementation. Current repository code has AI confidence floor 65 and executor gate 70. V2.1.0 deployment is operator-reported and version-tagged decision rows were observed; exact runtime build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
+> **Historical threshold note:** The 67 gate below was observed in the
+> production SQL executor on 2026-11-05. It is not the current Raspberry Pi
+> JavaScript executor setting: current Pi code uses a 70 BUY gate and a
+> separate AI signal floor of 65. The deployment/commit findings remain
+> specific to the dated 2026-11-05 observation. See the [current V2 findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
+
 ## Executive findings
 
 1. A Git commit that changes the AI Engine history cap from 1,000 to 150 candles per market and interval exists: [`26a1c2ed76ff367be98d391b397d7f8b82e82c7c`](https://github.com/Eric1984-dev/ai-crypto-pulse-bot/commit/26a1c2ed76ff367be98d391b397d7f8b82e82c7c), committed at **2026-11-04 13:50:23 UTC**. The production decision records show the history-depth transition between complete batches at 13:46:19 and 13:51:16 UTC. The timing is compatible with that commit, but no accessible Vercel deployment record ties the commit to a deployment or proves when it became Ready/promoted. **The production deployment and commit attribution therefore remains unresolved.**
-2. The current production paper-trading function uses a BUY-entry confidence gate of **67**, and the repository's `20261102140000_paper_trading_confidence_experiment.sql` migration changes that gate from 70 to 67. The separate AI Engine directional-signal floor is **65**. `docs/API.md` was corrected to state both thresholds distinctly; `docs/RISK_MANAGEMENT.md` already documented the current 67 gate.
+2. The legacy SQL paper-trading function observed during this November 5 investigation used a BUY-entry confidence gate of **67**, and the repository's `20261102140000_paper_trading_confidence_experiment.sql` migration changes that historical gate from 70 to 67. The separate AI Engine directional-signal floor was **65**. Subsequent Raspberry Pi code has a separate executor gate of 70; `docs/API.md` and `docs/RISK_MANAGEMENT.md` now distinguish the current Pi thresholds from this historical SQL setting.
 3. An exploratory, causal, 1-minute-close simulation covered the six retained BUY position episodes: one closed BEAM-EUR position and five currently open positions. It evaluated fixed take-profit levels of 5%, 10%, 15%, and 20%; trailing stops of 5%, 10%, and 15% after 5% activation; and position stop-losses of 5%, 10%, 15%, and 20%.
 4. The retained candle path is severely incomplete: the six position episodes have only **2,228 observed 1-minute candles out of 12,640 expected minute slots (17.6%)**, with gaps up to 423 minutes and a 24-hour initial gap for BEAM-EUR. Results are observed-data-only scenarios, not a reliable backtest. The apparent gains in some scenarios are dominated by one ARX-EUR run-up. **The evidence does not support selecting or recommending any exit rule.**
 5. The one actual SELL in this history was BEAM-EUR: a fresh recorded AI `SELL` at 01:46:16 UTC on Nov 4, executed at 01:48:12 UTC for **-EUR 246.71 realized P&L**. The other five positions had no SELL trade at the observation cutoff. This is consistent with the current decision-driven exit design; it is not evidence that an eligible SELL was ignored.

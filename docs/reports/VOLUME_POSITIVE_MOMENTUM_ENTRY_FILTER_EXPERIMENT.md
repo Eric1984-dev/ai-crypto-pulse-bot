@@ -1,15 +1,16 @@
 # Volume + Positive Momentum Entry Filter Experiment
 
-**Status:** Implemented in the local Raspberry Pi JavaScript AI engine; not deployed to the Pi  
+**Status:** Operator-reported deployed to the Pi; production decisions tagged `2.1.0` were observed. The running binary/build identity was not independently verified for this report.
 **Mode:** PAPER only  
 **Strategy identity:** Deterministic Technical Analysis V2, version `2.1.0`  
 **Change date:** 2026-11-19
 
 ## Change
 
-BUY decisions retain every existing signal-generation, confidence, data-quality,
-and alignment condition. An otherwise qualifying BUY is converted to HOLD when
-either:
+An AI BUY candidate must pass the existing valid-data, Market Strength, and
+confidence decision gate. Alignment affects Market Strength and confidence but
+is not a hard condition for generating the AI BUY label. An otherwise
+qualifying BUY is converted to HOLD when either:
 
 - the stored 1d momentum `changePct` is not greater than zero; or
 - the existing 1h volume confirmation score is below 0.25. The score is
@@ -43,16 +44,19 @@ volume deliver better average trade quality than the previous selection.
 The implementation changes only post-score BUY selection and strategy
 identity. It does not change confidence formulas or threshold, EMA/trend,
 alignment or RSI calculations, the paper executor, fees, sizing, cooldown,
-position/portfolio controls, exits, scheduler, or database schema. SELL, HOLD,
+position/portfolio controls, exits, scheduler, or database schema. The paper
+executor has a separate explicit daily/hourly alignment requirement before
+opening a position. SELL, HOLD,
 and WAIT behavior remains unchanged except that rejected BUY candidates are
 stored as HOLD with an explanatory reason.
 
 The active Raspberry Pi JavaScript engine is versioned `2.1.0` so new AI
 decisions are distinguishable from historical version `2.0.0`. Trades retain
 their source `ai_decision_id`, allowing a trade to be joined to its entry
-decision's `strategy_version` and `created_at`. The version/date in this
-document describes the source change, not production deployment; the Pi runtime
-has not been updated or verified.
+decision's `strategy_version` and `created_at`. The operator reports deploying
+the version, and production database decision rows tagged `2.1.0` confirm that
+version-tagged decisions were recorded. The currently running binary/build
+identity was not independently verified during this documentation update.
 
 ## Monitoring
 
@@ -73,8 +77,11 @@ validation set.
 
 - Focused AI-analysis and decision-repository tests: **19 passed**.
 - Full Raspberry Pi test suite: **280 passed, 0 failed**.
-- No production database writes, schema migrations, deployment, or live bot
-  configuration changes were performed.
+- During the original source update, no production database writes, schema
+  migrations, deployment, or live bot configuration changes were performed.
+  The operator later reported deploying V2.1.0; production decisions tagged
+  `2.1.0` were subsequently observed, but the running binary/build was not
+  independently inspected for this report.
 
 ## Files
 
@@ -82,3 +89,4 @@ validation set.
 - Focused regression coverage: `raspberry-pi/tests/ai-analysis.test.mjs`
 - Strategy history: `docs/STRATEGY_CHANGELOG.md`
 - Operational experiment notes: `docs/RISK_MANAGEMENT.md`
+- Broader V2.0.0/V2.1.0 findings: `docs/reports/STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md`

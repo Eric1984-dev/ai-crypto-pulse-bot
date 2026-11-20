@@ -1,16 +1,27 @@
 # V2 Paper Trading Experiment Plan
 
-**Status:** Planning only; no code, configuration, migration, or deployment changes  
+**Status:** Historical planning document; the paper experiment was subsequently implemented as V2.1.0
 **Mode:** Paper trading only; no real money or exchange orders  
 **Candidate:** [AI Engine V2 proposal](./AI_ENGINE_V2_PROPOSAL.md)
 
+> **Historical plan; superseded as an active rollout/configuration reference.**
+> The operator reports V2.1.0 deployed to the Raspberry Pi, and production
+> decisions tagged `2.1.0` were observed. The current Pi JavaScript AI signal
+> floor is 65; its paper executor confidence gate is 70 and it separately
+> requires daily/hourly alignment. V2.1.0 also applies 1d momentum > 0 and 1h
+> volume score >= 0.25 after AI BUY generation. This plan's V1/V2 selector,
+> sample limits, and proposed controls below describe an earlier design and are
+> not active settings. The exact running Pi binary/build has not been
+> independently verified. See [current architecture findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md)
+> and [risk management](../RISK_MANAGEMENT.md).
+
 ## 1. Objective and scope
 
-Run one controlled, reversible paper-trading experiment using AI Engine V2
-decisions, and compare its realized results with the existing V1 paper-trading
-history. V1 remains implemented and is the default. V2 must not be activated
-until the version-selection, execution-isolation, risk-regression, and reporting
-requirements below are implemented and verified.
+At the time this plan was written, the objective was to run one controlled,
+reversible paper-trading experiment using AI Engine V2 decisions and compare its
+realized results with V1 history. The V1-default/V2-not-yet-activated statement
+and prerequisites below describe that historical planning state; they are not
+the current Pi configuration or rollout instructions.
 
 The experiment changes only which AI Engine version generates eligible
 decisions. It does not change the Risk Manager, paper executor's trading rules,
@@ -156,7 +167,7 @@ All existing safeguards remain authoritative and unchanged:
 | Trading mode | Paper only; `ENABLE_LIVE_TRADING=false` |
 | Maximum open positions | 5 |
 | Maximum entry notional | 10% of current portfolio value |
-| BUY confidence gate | Current paper executor gate: 67 |
+| BUY confidence gate | Historical SQL executor assumption in this plan: 67; current Raspberry Pi executor gate: 70 |
 | Per-market cooldown | 15 minutes |
 | Daily drawdown entry block | 5% |
 | Maximum portfolio drawdown entry block | 15% |

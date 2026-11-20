@@ -6,6 +6,8 @@
 
 **Scope:** Read-only comparison of the 32 BUY decisions in the [Post-Fix Trade Generation Audit](./POST_FIX_TRADE_GENERATION_AUDIT.md) with the BEAM-EUR and WIN-EUR entry decisions. No code, database, scheduler, or trading settings were changed.
 
+> **Historical snapshot:** This analysis is limited to 2026-11-04 and its threshold references describe the then-observed legacy SQL/Supabase state. Current repository code has an AI signal floor of 65 and a separate executor gate of 70. V2.1.0 deployment is operator-reported, with tagged rows observed; exact runtime build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Executive result
 
 The current BUYs have full candle coverage and maximum depth bonuses. Their average Market Strength contribution is 10.88 points, while the average volatility penalty subtracts 5.08 points. The resulting average confidence is 65.80, with a mean deficit of **1.2019 points** to 67.

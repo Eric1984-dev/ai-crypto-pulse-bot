@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Clarify that timeframe alignment affects AI BUY scoring/confidence but is enforced separately by the paper executor; document V2.0.0/V2.1.0 EMA dominance, confidence semantics, observed regime, and evidence limitations in `docs/reports/STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md`.
 - Add the paper-only Volume + Positive Momentum Entry Filter: existing BUY conditions remain, plus positive 1d momentum and 1h volume confirmation >= 0.25; persist filtered signal codes in the AI decision reason without changing the executor or database schema.
 - Remove the Agent Brain's added rectangular chip frame in every status and brighten only the clipped brain artwork during `ANALYZING`.
 - Fetch the latest AI decision for each enabled watched market through a bounded lateral lookup and the existing composite index, avoiding full-history scans and sort spills in the paper-trading cycle; no migration is required.

@@ -4,6 +4,8 @@
 **Date:** 2026-11-09  
 **Basis:** Current repository implementation, V2 proposal, and paper-trading experiment plan
 
+> **Historical assessment:** This checklist records the repository and deployment assessment as of 2026-11-09. The operator later reported V2.1.0 deployed to the Raspberry Pi and version-tagged decision rows were observed; the exact running build was not independently verified. Current repository code uses AI signal floor 65 and a separate executor gate 70, with V2.1.0 momentum and volume entry filters. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Assessment summary
 
 **Estimated complexity:** High  

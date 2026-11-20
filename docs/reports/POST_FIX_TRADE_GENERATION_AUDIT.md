@@ -5,6 +5,8 @@
 **Decision window:** 2026-11-04 08:56:02–10:45:16 UTC
 **Scope:** Read-only production audit. No code, database, scheduler, or deployment settings were changed.
 
+> **Historical snapshot:** Any 67-confidence entry gate described here is the legacy SQL/Supabase state observed on 2026-11-04, not the current Raspberry Pi implementation. Current repository code uses AI signal floor 65 and executor gate 70. V2.1.0 deployment is operator-reported and tagged rows were observed; exact runtime build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Executive finding
 
 **Primary bottleneck: the current paper-entry confidence threshold.** In 22 complete 102-market analysis batches, the AI generated 32 BUY decisions. Every one met the AI signal-generation floor of 65, but their confidence ranged only from 65.10 to 66.61. None reached the live paper-entry threshold of 67, so none was eligible to open a position. No trade rows were created during the decision window.
@@ -17,7 +19,7 @@ The exact per-decision execution outcome cannot be reconstructed. The executor a
 
 The analysis starts at **08:56:02 UTC**, when the post-deployment validation confirmed candle rows for all 102 enabled markets at all six intervals. This is a conservative operational boundary after the checkpoint RPC production deployment (`d4fce8c`, Ready at 08:42:29 UTC) and the coverage restoration. It intentionally excludes the historical operational incidents preceding these fixes. The exact scheduler-edit time was not available.
 
-The decision query is bounded at the capture time above. It contains **2,244 decisions** from 08:56:18 through 10:41:23 UTC, corresponding to 22 batches of 102 markets. The live BUY-entry threshold was verified as 67; the earlier 70 value is the Phase 08 baseline, not the current experiment setting. AI BUY/SELL generation uses confidence of at least 65 and absolute Market Strength of at least 20.
+The decision query is bounded at the capture time above. It contains **2,244 decisions** from 08:56:18 through 10:41:23 UTC, corresponding to 22 batches of 102 markets. The legacy SQL BUY-entry threshold was verified as 67 for this dated observation; the earlier 70 value was the Phase 08 baseline. Current Pi executor gate is 70. AI BUY/SELL generation uses confidence of at least 65 and absolute Market Strength of at least 20.
 
 Production evidence was read from `AI_Crypto_Bot_AI_Decisions`, `AI_Crypto_Bot_Trades`, `AI_Crypto_Bot_Portfolios`, `AI_Crypto_Bot_Positions`, and `AI_Crypto_Bot_Status`. Vercel runtime logs were available only for two recent paper-trading invocations; the Hobby plan did not retain the requested full log range.
 

@@ -4,6 +4,8 @@
 **Capture cutoff:** 2026-11-04 14:26:20 UTC  
 **Scope:** Read-only replay of post-fix production decisions. No code, database, scheduler, or deployment settings were changed.
 
+> **Historical threshold note:** Any reference below to the 67 paper-entry threshold describes the legacy SQL/Supabase executor observed during this November 4 replay. Current Raspberry Pi repository code has an AI confidence floor of 65 and a separate executor gate of 70. V2.1.0 is operator-reported as deployed and tagged decision rows were observed; the exact running build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 > **Current status (2026-11-05):** This replay's Verdict B is not approval for a cadence change. The latest market-universe investigation observed approximately five-minute decision spacing and recommends keeping the existing cadence unchanged during a market-universe pilot. The 10-minute cadence is not active, approved, or deployed. See the [current cadence clarification](./AI_ANALYSIS_CADENCE_STATUS_CLARIFICATION_2026-11-05.md).
 
 ## Executive summary
@@ -56,7 +58,7 @@ For the aligned phase, comparing each selected 10-minute decision set with the i
 
 Across the observed interior of the window, all **8 BUY and 8 SELL signal episodes** were captured by the aligned phase. Two episodes of each direction were first sampled about five minutes after they began.
 
-The alternate phase missed one short **CAP-EUR BUY** episode (confidence 65.77) and one short **ENSO-EUR SELL** episode (confidence 65.14). The BUY was below the current 67 paper-entry threshold; the SELL was not an executable exit without an open position in that market. The alternate phase also delayed five BUY and five SELL episodes by about five minutes.
+The alternate phase missed one short **CAP-EUR BUY** episode (confidence 65.77) and one short **ENSO-EUR SELL** episode (confidence 65.14). The BUY was below the then-observed legacy 67 paper-entry threshold; the SELL was not an executable exit without an open position in that market. The alternate phase also delayed five BUY and five SELL episodes by about five minutes.
 
 ## 3. Observed paper trades and entry/exit implications
 

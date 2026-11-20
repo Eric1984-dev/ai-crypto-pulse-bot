@@ -4,6 +4,8 @@
 **Production query observation:** 2026-11-05 13:14:38 UTC
 **Scope:** Read-only comparison of five-, seven-, and ten-minute AI Analysis and Paper Trading cadences. No code, scheduler settings, production data, migrations, or deployments were changed.
 
+> **Historical threshold note:** The 67 BUY-entry gate cited in this November 5 assessment was the legacy SQL/Supabase executor setting at the time. Current Raspberry Pi repository code uses AI confidence floor 65 and executor gate 70. V2.1.0 deployment is operator-reported with version-tagged rows observed; the running build was not independently verified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Verdicts
 
 | Cadence | Verdict | Assessment |
@@ -32,7 +34,7 @@ All seven linked trades used decisions between **1.599 and 1.930 minutes old** a
 
 There were **1,118** portfolio snapshots for one portfolio from 2026-11-01 16:17:16.791 UTC through 2026-11-05 13:03:11.322 UTC. Snapshot gaps had a median of 4.997 minutes, p95 5.059 minutes, maximum 14.162 minutes, and none exceeded 15 minutes. Snapshots are only a proxy for Paper Trading invocations; there is no durable per-invocation or per-decision rejection history to prove every paper job ran.
 
-Risk rules in [RISK_MANAGEMENT.md](../RISK_MANAGEMENT.md) and the Phase 08 database functions enforce a **15-minute** decision-age limit. The current BUY-entry threshold is **67**; valid SELL decisions can close an existing position without that entry threshold. The 15-minute gate is fail-closed and cannot be relaxed as a cadence workaround.
+Risk rules in [RISK_MANAGEMENT.md](../RISK_MANAGEMENT.md) and the Phase 08 database functions enforced a **15-minute** decision-age limit in this historical system. The observed BUY-entry threshold was **67**; valid SELL decisions could close an existing position without that entry threshold. The current Pi executor gate is 70. The 15-minute gate is fail-closed and cannot be relaxed as a cadence workaround.
 
 ### Delays and failures
 
@@ -62,7 +64,7 @@ The rate calculation follows the minute-list/hour reset semantics, not an extern
 
 The replay used the 1,235 complete 102-symbol batches above. For each minute-of-hour phase, it generated the proposed cron ticks and mapped each tick to the nearest stored complete five-minute batch within three minutes. The resulting latest stored states were sampled for:
 
-- BUY with confidence `>= 67`, matching the current paper-entry gate.
+- BUY with confidence `>= 67`, matching the legacy paper-entry gate observed during this assessment.
 - Any SELL decision, because a SELL can close an open position without the BUY-entry confidence threshold.
 - A signal episode was a contiguous sequence of complete five-minute batches for the same symbol and side. “Short” means one or two qualifying batches (roughly up to ten minutes at the observed baseline); it is a sampled duration, not a measured continuous signal lifetime.
 

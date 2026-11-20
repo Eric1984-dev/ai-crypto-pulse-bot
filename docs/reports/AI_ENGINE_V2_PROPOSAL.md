@@ -1,8 +1,16 @@
 # AI Engine V2 Proposal
 
-**Status:** Design proposal only; not implemented, activated, or deployed  
+**Status:** Historical design proposal; the proposal is not active as written. A later V2.0.0/V2.1.0 implementation exists.
 **Evidence basis:** Existing production-data investigations in this directory  
 **Trading mode:** Paper trading only
+
+> **Current-state note (2026-11-20):** The operator reports V2.1.0 deployed to
+> the Raspberry Pi, and production decision records tagged `2.1.0` were
+> observed. This document describes an earlier candidate design and its V1
+> comparison; its “current” labels and 67 executor threshold are historical.
+> Current Pi code uses AI signal confidence >= 65 and paper executor confidence
+> >= 70. Alignment affects AI score/confidence but is a separate hard gate in
+> the paper executor. See the [architecture findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
 
 ## Executive proposal
 
@@ -74,8 +82,8 @@ clamp(
 The current average volatility penalty is 0, 4, or 12 points for low, medium,
 or high volatility per valid timeframe. Insufficient data produces a capped
 low-data confidence; stale or insufficient histories fail safely. Confidence
-below 65 prevents a directional signal. Paper Trading separately enforces its
-current 67 BUY-entry gate.
+below 65 prevents a directional signal. This proposal's 67 BUY-entry gate was
+the legacy SQL/Supabase experiment; the current Pi paper executor uses 70.
 
 ### Current flow and invariants
 

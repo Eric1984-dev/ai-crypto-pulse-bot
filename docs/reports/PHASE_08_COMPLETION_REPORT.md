@@ -1,10 +1,12 @@
 # Phase 08 Completion Report — Paper Trading
 
+> **Historical baseline:** The 67 threshold described in this Phase 08 report refers to the legacy SQL/Supabase paper-trading experiment, not the current Raspberry Pi implementation. Current repository code has an AI signal floor of 65 and a separate paper executor gate of 70; V2.1.0 is operator-reported as deployed, with tagged rows observed, while the exact running build remains unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Status
 
 Phase 08 is implemented and locally validated. Phase 09 has not been started.
 
-The confidence threshold documented below (70) was the Phase 08 baseline. The active BUY-entry threshold is 67 during the approved paper-only experiment implemented by [`20261102140000_paper_trading_confidence_experiment.sql`](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql); see the [experiment report](./CONFIDENCE_THRESHOLD_EXPERIMENT_REPORT.md). All other risk controls remain unchanged.
+The confidence threshold documented below (70) was the Phase 08 baseline. The 67 BUY-entry threshold in the historical experiment implemented by [`20261102140000_paper_trading_confidence_experiment.sql`](../../PostgreSQL/migrations/20261102140000_paper_trading_confidence_experiment.sql) applied to the legacy SQL executor; it is not the current Pi setting. The current Pi executor gate is 70, separate from the AI signal floor of 65. See the [experiment report](./CONFIDENCE_THRESHOLD_EXPERIMENT_REPORT.md) and [current implementation report](./V2_IMPLEMENTATION_REPORT.md).
 
 ## Architecture
 

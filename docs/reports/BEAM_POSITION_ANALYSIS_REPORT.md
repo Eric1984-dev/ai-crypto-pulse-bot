@@ -1,5 +1,7 @@
 ﻿# BEAM-EUR Position Forensic Analysis
 
+> **Historical production snapshot:** This forensic report describes the legacy Supabase runtime observed in November 2026. Its 67 BUY-entry gate and deployment statements are not current Raspberry Pi settings. Current repository code has AI confidence floor 65 and paper executor gate 70. V2.1.0 deployment is operator-reported and tagged rows were observed; exact runtime build is unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Executive finding
 
 The position remaining open is consistent with the currently implemented paper-trading rules: the executor closes a position only when a fresh stored `SELL` decision is available, and it has no take-profit, trailing-stop, or break-even exit. The live history contains no `SELL` decisions after entry.

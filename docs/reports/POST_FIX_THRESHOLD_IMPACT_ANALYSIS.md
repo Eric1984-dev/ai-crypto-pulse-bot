@@ -4,12 +4,14 @@
 
 **Data cutoff:** 2026-11-04 10:45:16.611867 UTC
 
-**Current production BUY threshold:** 67
+**Observed legacy production BUY threshold (2026-11-04):** 67
+
+> **Historical snapshot:** “Current production” above means the legacy SQL/Supabase state observed on 2026-11-04. It is not the current Raspberry Pi gate. Current repository code uses an AI signal floor of 65 and a separate paper-executor gate of 70. V2.1.0 deployment was reported by the operator and version-tagged rows were observed; the exact running binary was not independently verified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
 **Scope:** Read-only analysis of the same post-fix period as the [Post-Fix Trade Generation Audit](./POST_FIX_TRADE_GENERATION_AUDIT.md). No code, database, scheduler, or threshold settings were changed.
 
 ## Executive result
 
-The audit window contained **32 BUY decisions**. All 32 were below the current 67 entry threshold, with confidence from 65.10 to 66.61. No BUY decision reached 67.
+The audit window contained **32 BUY decisions**. All 32 were below the observed legacy 67 entry threshold, with confidence from 65.10 to 66.61. No BUY decision reached 67.
 
 Threshold-only counts show:
 
@@ -40,7 +42,7 @@ The unique-market counts by band are not additive: MEGA-EUR appears in multiple 
 |---:|---:|---:|---:|---:|---:|
 | 65 | 32 | 4 | Up to 4 | +32 | +4 |
 | 66 | 7 | 1 | Up to 1 | +7 | +1 |
-| 67 (current) | 0 | 0 | 0 | 0 | 0 |
+| 67 (observed legacy gate) | 0 | 0 | 0 | 0 | 0 |
 
 ### Interpretation of the estimate
 
@@ -51,7 +53,7 @@ The unique-market counts by band are not additive: MEGA-EUR appears in multiple 
 
 ## Cause of zero trades at the current threshold
 
-The confidence distribution is the direct, measured reason the BUY signals did not qualify under the current 67 gate: **100% (32/32) of BUY records clustered below 67**, and the highest score was 66.61. The threshold-only simulation would admit seven records at 66, but all seven are MEGA-EUR signals; at 65 it would admit 32 records across four markets.
+The confidence distribution is the direct, measured reason the BUY signals did not qualify under the observed legacy 67 gate: **100% (32/32) of BUY records clustered below 67**, and the highest score was 66.61. The threshold-only simulation would admit seven records at 66, but all seven are MEGA-EUR signals; at 65 it would admit 32 records across four markets.
 
 Market breadth was limited: only **4 of 102 tracked markets** generated a BUY during the audit window. However, the prior audit found 95 additional HOLD decisions across seven markets with Market Strength >= 20, all below the AI signal-generation confidence floor of 65. That evidence indicates confidence constrained both entry eligibility and upstream BUY generation. For the zero-trade result in this specific window, the 67 threshold's mismatch with the observed BUY confidence distribution is the primary quantified factor; limited market breadth is secondary context.
 

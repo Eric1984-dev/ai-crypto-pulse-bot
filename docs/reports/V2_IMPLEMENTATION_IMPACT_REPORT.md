@@ -4,6 +4,14 @@
 **Date:** 2026-11-09  
 **Scope:** Smallest safe implementation to run the proposed V2 engine through the existing paper-trading framework
 
+> **Historical planning note:** This impact report predates the V2.1.0
+> Raspberry Pi deployment reported by the operator and is retained as design
+> history. Its proposed version selector, 67 executor gate, and rollout steps
+> are not active settings. Current Pi code uses AI signal confidence >= 65,
+> executor BUY confidence >= 70, a separate execution-time alignment gate, and
+> the V2.1.0 momentum/volume filters. The running binary/build was not
+> independently verified. See the [current V2 findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
+
 ## Executive assessment
 
 V2 can use the existing architecture and storage. The minimum complete change

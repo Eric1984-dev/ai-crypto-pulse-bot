@@ -4,6 +4,13 @@
 **Analysis date:** 2026-11-09 UTC; BUY decisions span 2026-11-01 11:15 through 2026-11-09 05:56 UTC  
 **Scope:** read-only investigation. No code, thresholds, production data, or deployment settings were changed.
 
+> **Historical analysis note:** This report analyzes the pre-V2 confidence
+> formula and the production environment observed on 2026-11-09. Its “current”
+> formula, Supabase references, and 67 BUY-entry gate are not descriptions of
+> the active Raspberry Pi V2.1.0 implementation. Current Pi gates are AI signal
+> confidence >= 65 and executor BUY confidence >= 70. See the [November 2026
+> architecture findings](./STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md).
+
 ## Executive findings
 
 - Current confidence is driven mostly by the Market Strength contribution and volatility penalty. Coverage and depth add many points to the score but scarcely distinguish BUY decisions: depth is constant, and coverage varies for only a small fraction.

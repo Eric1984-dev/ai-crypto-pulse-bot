@@ -5,6 +5,8 @@
 **Yesterday window:** 2026-11-03 23:00 UTC through 2026-11-04 23:00 UTC, corresponding to 2026-11-04 in Europe/Brussels<br>
 **Scope:** Read-only review of the five open paper positions, stored decisions, trades, portfolio snapshots, market marks, and retained candles. No code, database, scheduler, deployment, environment, or trading settings were changed.
 
+> **Historical snapshot:** This report records the legacy production state observed on 2026-11-05. Its 67-confidence gate and Supabase references are historical and are not the current Pi runtime. Current repository code has AI signal floor 65 and separate paper-executor gate 70. V2.1.0 deployment is operator-reported with tagged rows observed; exact running build remains unverified. See [V2 implementation report](./V2_IMPLEMENTATION_REPORT.md).
+
 ## Executive findings
 
 1. Production had **five open paper positions** at the observation time: ARX-EUR, MEGA-EUR, POL-EUR, SXT-EUR, and WIN-EUR. Each has one linked BUY trade and no SELL trade. All five are still unrealized; there is no realized P&L for these positions.

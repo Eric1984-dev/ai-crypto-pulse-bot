@@ -8,7 +8,7 @@ The limits below are enforced by the Raspberry Pi paper-trading service before a
 
 Date: 2026-11-16
 
-The AI analysis engine now subtracts 20 points from both Market Strength and confidence when the 1h and 1d trends do not establish the same non-sideways direction. Its existing ATR-based average volatility penalty is capped at five confidence points. These adjustments change signal scoring only; they do not relax the executor's requirement for explicit timeframe alignment.
+The AI analysis engine now subtracts 20 points from both Market Strength and confidence when the 1h and 1d trends do not establish the same non-sideways direction. Alignment is a scoring/confidence component, not a hard gate for generating an AI BUY label. The paper executor has a separate explicit alignment gate before opening a simulated position. Confidence measures model signal strength, not bullish direction or a calibrated probability; a high-confidence bearish SELL is possible. The existing ATR-based average volatility penalty is capped at five confidence points.
 
 The AI confidence floor remains 65 and the paper executor BUY threshold remains 70. Position sizing, the nine-position limit, cooldown, drawdown controls, emergency stop, fees, slippage, and exit rules are unchanged. No live-trading code or setting is changed.
 
@@ -16,13 +16,13 @@ The preceding user-provided ~24-hour replay reported 5 BUY/3 SELL executions acr
 
 ### Experiment: Volume + Positive Momentum Entry Filter
 
-The paper AI engine applies two additional BUY-selection conditions after the existing signal and confidence rules: 1d momentum must be > 0, and the existing 1h volume confirmation score `clamp(hourlyVolumeRatio - 0.5, 0, 1)` must be >= 0.25. A failed candidate is persisted as HOLD with `LOW_DAILY_MOMENTUM` and/or `LOW_VOLUME_SCORE` in its AI-decision reason. This uses the existing decision history; it does not add execution-audit reason codes or change the paper executor, schema, confidence model, alignment, or risk controls.
+The paper AI engine applies two additional BUY-selection conditions after its directional score/confidence gate: 1d momentum must be > 0, and the existing 1h volume confirmation score `clamp(hourlyVolumeRatio - 0.5, 0, 1)` must be >= 0.25. A failed candidate is persisted as HOLD with `LOW_DAILY_MOMENTUM` and/or `LOW_VOLUME_SCORE` in its AI-decision reason. This uses the existing decision history; it does not add execution-audit reason codes or change the paper executor, schema, confidence model, alignment calculation, or risk controls. See the [strategy architecture findings](reports/STRATEGY_ARCHITECTURE_FINDINGS_2026-11.md) for the observed historical evidence and limits.
 
 The hypothesis is that BUY signals with positive daily momentum and sufficient hourly volume have better trade quality than the previous selection. It is based on an in-sample set of 14 closed trades: the combined filter retained six (five wins, one loss), with 83.3% winrate, +€2.07 expectancy and +€12.43 net P&L, versus 50.0% and -€2.95 expectancy for the full set. This tiny, concentrated sample may reflect chance and does not establish future performance.
 
 Monitor executed BUY count, filtered candidate count by reason, winrate, expectancy, profit factor, average win/loss, and maximum drawdown. Success criteria are higher winrate than 50%, expectancy better than -€2.95, higher profit factor, and no material drawdown deterioration, assessed on new paper-trading observations. Do not treat the historical filtered subset as validation; the two currently open positions and subsequent trades must be tracked separately.
 
-Implementation details and validation status are recorded in the [experiment report](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). The repository update is not deployed to the Pi yet.
+Implementation details and validation status are recorded in the [experiment report](reports/VOLUME_POSITIVE_MOMENTUM_ENTRY_FILTER_EXPERIMENT.md). The operator reports the strategy is deployed on the Pi; production decisions tagged `2.1.0` were observed, but the current running build was not independently verified for this report.
 
 ## Trading Mode
 

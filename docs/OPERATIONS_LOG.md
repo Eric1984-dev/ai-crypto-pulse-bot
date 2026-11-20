@@ -127,3 +127,36 @@ Metrics:
 - Drawdown
 - Portfolio Growth
 - Trade Count
+
+---
+
+### Date
+
+2026-11-20
+
+### Event Type
+
+Strategy Documentation / Runtime Status Reconciliation
+
+### Description
+
+The V2.1.0 paper-only BUY filter is reported by the operator as deployed to the
+Raspberry Pi. Production AI decision rows tagged `strategy_version = '2.1.0'`
+were observed during read-only analysis. This confirms that version-tagged
+decisions were persisted; it does not independently identify the running Pi
+binary/build.
+
+The active Raspberry Pi code has an AI directional-signal confidence floor of
+65 and a separate paper executor BUY confidence gate of 70. The 67 value in the
+2026-11-02 entry above records the earlier SQL-executor experiment and is not
+the current Pi executor setting. AI BUY generation uses the signed Market
+Strength threshold and confidence floor; daily/hourly alignment affects score
+and confidence, while the executor separately requires alignment before
+opening a position. V2.1.0 additionally filters AI BUY candidates on positive
+1d momentum and hourly volume score >= 0.25.
+
+### Result
+
+No code, configuration, database, deployment, or strategy changes were made by
+this documentation reconciliation. The recorded analysis remains descriptive;
+V2.1.0 performance is not established by the small closed-trade sample.

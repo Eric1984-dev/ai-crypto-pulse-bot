@@ -1,12 +1,20 @@
 # AI Engine V2 Implementation Report
 
-**Status:** Implemented and committed on `main`; production migration and deployment have not been performed
+**Status:** Historical V2.0.0 implementation record; superseded as an active-state reference. The operator reports V2.1.0 deployed to the Pi, and production decisions tagged `2.1.0` were observed. The exact running binary/build is not independently verified here.
 **Mode:** Paper trading only
 **Baseline:** `v1-final-backup` and `v1-final` point to commit `d51bd633f51731f047cb4ea23e138d4817545a37`
 
+The original status and validation results below describe the V2.0.0 implementation
+at the time of that work. They are not the current Pi deployment status. The
+active Raspberry Pi implementation is the JavaScript engine; the historical
+Supabase/database-analysis migration notes below do not describe the active
+production backend.
+
 ## Implementation summary
 
-The active JavaScript AI Engine now directly uses the V2 directional score:
+The V2 directional score introduced in this implementation was subsequently
+extended with the misalignment penalty. The current Raspberry Pi V2.1.0 score
+is:
 
 ```text
 E1d = clamp(1d EMA percent spread * 50, -100, 100)
@@ -18,11 +26,17 @@ Market Strength = clamp(
   0.75 * E1d
   + 0.10 * E1d * A1h
   + 0.10 * E1d * V1h
-  + 0.05 * R1d,
+  + 0.05 * R1d
+  - misalignmentPenalty,
   -100,
   100
 )
 ```
+
+`misalignmentPenalty` is 20 when 1d and 1h directions do not match as the same
+non-sideways direction; otherwise it is zero. Alignment contributes to score
+and confidence but is not a hard gate for generating an AI BUY. The paper
+executor separately requires explicit alignment before opening a position.
 
 For valid V2 inputs, confidence is:
 
@@ -33,40 +47,49 @@ clamp(
   + 10 * A1h
   + 10 * V1h
   + 5 * clamp(max(0, sign(E1d) * R1d / 100), 0, 1)
-  - existing average volatility penalty,
+  - capped average volatility penalty
+  - misalignmentPenalty,
   0,
   95
 )
 ```
 
-MACD and momentum remain in the persisted timeframe diagnostics but do not
-contribute to directional scoring. Market context is not used in the score.
-Coverage and depth bonuses are removed from actionable V2 confidence; the
-bounded low-data fallback remains unchanged.
+The current confidence formula uses `abs(E1d) / 100` as trend strength,
+alignment, volume and RSI confirmations, the capped volatility penalty, and
+the misalignment penalty. Confidence is a deterministic model-strength score,
+not direction or a calibrated win probability; strong bearish signals can
+have high confidence. MACD and momentum remain in the persisted timeframe
+diagnostics but do not contribute directly to Market Strength or confidence.
+Market context is not used in the score. Coverage and depth bonuses are removed
+from actionable V2 confidence; the bounded low-data fallback remains.
 
 Fresh valid 1h volume-ratio and 1d EMA/RSI inputs are required. If they are
 missing or invalid, the engine stores a non-actionable `WAIT`. Existing
 snapshot and candle freshness checks, two-interval analysis minimum, four-fresh-
-interval directional gate, 65 AI confidence floor, ±20 directional score
-levels, and paper executor's 67 BUY gate remain unchanged. New decisions use
+interval directional gate, 65 AI confidence floor, and ±20 directional score
+levels were retained in V2.0.0. The 67 paper-entry gate cited in this original
+implementation record applied to the historical SQL executor experiment; the
+current Raspberry Pi paper executor uses confidence >= 70. New decisions use
 the existing strategy snapshot fields with name `Deterministic Technical
-Analysis V2` and version `2.0.0`.
+Analysis V2`; V2.1.0 adds the two post-score BUY filters described below.
 
-The optional database-analysis path is updated by an append-only migration.
+The optional database-analysis path was updated by an append-only migration
+proposal for the then-used database-analysis deployment.
 No database table, column, index, policy, API route, Vercel Function, new
 dependency, executor, or risk-control change was introduced. Database mode
 remains opt-in.
 
 ## Paper entry-filter experiment addendum
 
-The repository's updated Pi JavaScript engine is version `2.1.0`; deployment to
-the Pi is pending. After it derives the
-existing directional decision and confidence, an otherwise qualifying BUY is
-kept only when the stored 1d momentum change is positive and the existing 1h
-volume confirmation score is at least 0.25. Failed BUY candidates become HOLD
+The Pi JavaScript engine is version `2.1.0`. The operator reports deployment,
+and production decision records tagged `2.1.0` were observed. After deriving
+the directional decision and confidence, an otherwise qualifying BUY is kept
+only when stored 1d momentum `changePct` is > 0 and the existing 1h volume
+confirmation score is >= 0.25. The score is
+`clamp(hourlyVolumeRatio - 0.5, 0, 1)`. Failed BUY candidates become HOLD
 decisions whose persisted reason includes `LOW_DAILY_MOMENTUM`,
 `LOW_VOLUME_SCORE`, or both. Momentum remains excluded from Market Strength and
-confidence.
+confidence. The exact running Pi binary/build is not independently verified.
 
 This isolated paper experiment was motivated by a 14-trade in-sample analysis;
 the combined filter retained six closed trades and is not independently
@@ -103,8 +126,10 @@ Its signature, response shape, service-role-only execution, and underlying
 tables remain unchanged. The migration is append-only and must be applied
 manually before database analysis is used with the V2 implementation.
 
-The migration has **not** been applied to Supabase, and no production runtime,
-deployment, or hosted database validation is claimed.
+The statement that this migration had not been applied to Supabase was the
+status at the original V2.0.0 report date. Supabase is not the active production
+backend. This report does not establish the current Pi binary/build or the
+status of the historical database-analysis path.
 
 ## Validation results
 
